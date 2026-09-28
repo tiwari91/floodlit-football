@@ -3241,22 +3241,50 @@
 		}
 	}
 
+	// Movement off the ball. When his side has it, a player doesn't just stand in his slot:
+	// every second or two he has a new idea: forwards run in behind or come short, midfielders
+	// drift into pockets, full-backs push on. Onside, and never off the pitch. Without the ball the
+	// ideas fade and he tucks back into shape.
+	function offBallRun (p, target) {
+		const ours = ball.owner ? ball.owner.team === p.team : possTeam === p.team;
+		if (!ours || state !== "play") {
+			p.runDX = (p.runDX || 0) * 0.94; p.runDY = (p.runDY || 0) * 0.94;
+		} else if (!p.runT || frame > p.runT) {
+			p.runT = frame + 60 + Math.floor(Math.random() * 110);
+			const r = Math.sqrt(S), fwd = p.team === 0 ? 1 : -1;
+			const ahead = p.role === "fwd" ? [ -50, 150 ] : p.role === "mid" ? [ -70, 120 ] : [ -40, 90 ];
+			p.runDX = (ahead[0] + Math.random() * (ahead[1] - ahead[0])) * r * fwd;
+			p.runDY = (Math.random() * 2 - 1) * 100 * r;
+		}
+		let x = target[0] + (p.runDX || 0), y = target[1] + (p.runDY || 0);
+		if (ours && offsideOn()) {
+			const line = offsideLine(p.team) - 8, rx = rel(p.team, x);
+			if (rx > line) { x = p.team === 0 ? line : FW - line; }
+		}
+		x = clamp(x, 20, FW - 20); y = clamp(y, 20, FH - 20);
+		// Got there: the next idea comes quickly, as it would.
+		if (ours && Math.hypot(x - p.x, y - p.y) < 22 && p.runT > frame + 18) { p.runT = frame + 12 + Math.floor(Math.random() * 20); }
+		return [ x, y ];
+	}
+
 	// Rotate an angle toward a target by at most `rate` radians.
 	function turnToward (a, b, rate) {
 		const d = Math.atan2(Math.sin(b - a), Math.cos(b - a));
 		return a + clamp(d, -rate, rate);
 	}
 
-	function steer (p, tx, ty, spd) {
-		const dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy);
-		if (d < 7) {
+	// far: how far he really has to go (the point he steers at can be a smoothed step ahead).
+	function steer (p, tx, ty, spd, far) {
+		let dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy);
+		if (d < 7 && (far || 0) > 20) { dx = dx || 0.01; dy = dy || 0.01; d = Math.max(d, 1); }   // on his way somewhere: keep going
+		else if (d < 7) {
 			if (!ball || dist(p, ball) < 380) { return [ 0, 0 ]; }   // near the play: set, ready
 			// In position far from the ball: nobody stands like a statue. Shift about a little, at a walk.
 			if (!p.idleT || frame > p.idleT) { p.idleT = frame + 90 + Math.floor(Math.random() * 120); p.idleX = (Math.random() * 2 - 1) * 14; p.idleY = (Math.random() * 2 - 1) * 14; }
 			const ix = tx + p.idleX - p.x, iy = ty + p.idleY - p.y, id = Math.hypot(ix, iy);
 			return id < 3 ? [ 0, 0 ] : [ ix / id * 0.32, iy / id * 0.32 ];
 		}
-		const s = spd * Math.min(1, d / 26);
+		const s = spd * Math.min(1, Math.max(d, far || 0) / 26);
 		return [ dx / d * s, dy / d * s ];
 	}
 
@@ -3518,7 +3546,7 @@
 				const gap = clamp(40 - (A(p, "def") - 65) * 0.6, 22, 55);   // tight, tighter for good markers
 				target = [ q.x + gx / gd * gap, q.y + gy / gd * gap ];
 			} else {
-				target = spreadTarget(p, formationTarget(p));
+				target = offBallRun(p, spreadTarget(p, formationTarget(p)));
 			}
 			// The CPU carrier dribbles a touch slower than you run, so you can close it down.
 			// A keeper facing a shot moves at full stretch; how quickly depends on his handling.
@@ -3527,23 +3555,29 @@
 			// Off the ball, nobody runs flat out all game: they jog back into shape, stride out
 			// when they're well out of position or near the ball, and markers match their runner.
 			if (!diving && sprint === 1 && p.role !== "gk") {
-				const off = p.tx === undefined ? 0 : Math.hypot(p.tx - p.x, p.ty - p.y), near = dist(p, ball);
+				const off = Math.hypot(target[0] - p.x, target[1] - p.y), near = dist(p, ball);
 				const ours = ball.owner ? ball.owner.team === p.team : possTeam === p.team;
 				// On the ball's side of the game everyone is at it: supporting runs when we have it,
 				// getting back into shape when we don't. Only the far side of the pitch takes a breather.
-				let effort = ours ? (off > 140 ? 1 : off > 50 ? 0.92 : 0.78) : (off > 140 ? 1 : off > 50 ? 0.9 : 0.72);
-				if (near > 520 && off < 90) { effort = 0.6; }
-				if (near < 260) { effort = Math.max(effort, 0.95); }
-				if (marks0.has(p) || marks1.has(p)) { effort = Math.max(effort, off > 50 ? 1 : 0.82); }
+				// Pace grows with how far he is from where he wants to be, never the whole side flat out
+				// at once; each player has his own work rate on top.
+				const work = p.work || (p.work = 0.88 + ((p.idx * 37 + p.team * 11) % 7) * 0.03);
+				let effort = clamp((ours ? 0.66 : 0.6) + off / 420, 0.6, 0.94) * work;
+				if (near > 520 && off < 90) { effort = Math.min(effort, 0.62); }
+				if (near < 240) { effort = Math.max(effort, 0.9 * work); }
+				if (marks0.has(p) || marks1.has(p)) { effort = Math.max(effort, (off > 50 ? 1 : 0.82) * work); }
 				p.effort = (p.effort || effort) + (effort - (p.effort || effort)) * 0.1;   // no sudden gear changes
 				sprint = p.effort;
 			}
 			// Smooth where AI players are heading so they don't twitch as the ball moves.
-			if (p.tx === undefined || Math.hypot(target[0] - p.tx, target[1] - p.ty) > 160) { p.tx = target[0]; p.ty = target[1]; }
-			const k = ball.owner === p || p === chaser1 ? 1 : 0.18;
+			if (p.tx === undefined || Math.hypot(target[0] - p.tx, target[1] - p.ty) > 900) { p.tx = target[0]; p.ty = target[1]; }
+			// Everyone reads the play at his own speed, so a side never slides across in lockstep.
+			const ours = ball.owner ? ball.owner.team === p.team : possTeam === p.team;
+			// The shape glides after the ball rather than chasing it; getting back is quicker than pushing on.
+			const k = ball.owner === p || p === chaser1 ? 1 : (0.03 + ((p.idx * 7 + p.team * 3) % 5) * 0.012) * (ours ? 1 : 1.8);
 			p.tx += (target[0] - p.tx) * k;
 			p.ty += (target[1] - p.ty) * k;
-			const [ dvx, dvy ] = steer(p, diving ? target[0] : p.tx, diving ? target[1] : p.ty, BASE_SPD * spdMul * sprint);
+			const [ dvx, dvy ] = steer(p, diving ? target[0] : p.tx, diving ? target[1] : p.ty, BASE_SPD * spdMul * sprint, Math.hypot(target[0] - p.x, target[1] - p.y));
 			movePlayer(p, dvx, dvy, diving ? 0.4 : cond.grip, diving ? 9 : p.role === "gk" ? 0.16 : ACC_AI);   // a dive is explosive
 			if (Math.hypot(p.vx, p.vy) > 0.6) { p.dir = turnToward(p.dir, Math.atan2(p.vy, p.vx), 0.2); }
 		}
