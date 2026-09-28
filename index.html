@@ -3584,8 +3584,18 @@
 			p.tx += (target[0] - p.tx) * k;
 			p.ty += (target[1] - p.ty) * k;
 			const [ dvx, dvy ] = steer(p, diving ? target[0] : p.tx, diving ? target[1] : p.ty, BASE_SPD * spdMul * sprint, Math.hypot(target[0] - p.x, target[1] - p.y));
-			movePlayer(p, dvx, dvy, diving ? 0.4 : cond.grip, diving ? 9 : p.role === "gk" ? 0.16 : ACC_AI);   // a dive is explosive
-			if (Math.hypot(p.vx, p.vy) > 0.6) { p.dir = turnToward(p.dir, Math.atan2(p.vy, p.vx), 0.2); }
+			movePlayer(p, dvx, dvy, diving ? 0.4 : cond.grip, diving ? 9 : p.role === "gk" ? 0.16 : ball.owner === p ? 0.13 : ACC_AI);   // a dive is explosive
+			// Where he looks: the man on the ball looks where he's going; everyone else keeps his
+			// eyes on the ball, backpedalling when he drops off and turning to run only when he must.
+			const sp = Math.hypot(p.vx, p.vy);
+			if (ball.owner === p) {
+				if (sp > 0.6) { p.dir = turnToward(p.dir, Math.atan2(p.vy, p.vx), 0.2); }
+			} else {
+				const toBall = Math.atan2(ball.y - p.y, ball.x - p.x), mv = Math.atan2(p.vy, p.vx);
+				const away = Math.abs(Math.atan2(Math.sin(mv - toBall), Math.cos(mv - toBall))) > 1.9;
+				const look = sp < 1.5 || (away && sp < 2.3) || p.role === "gk";
+				p.dir = turnToward(p.dir, look || sp < 0.3 ? toBall : mv, look ? 0.12 : 0.2);
+			}
 		}
 
 		separate();
@@ -5740,7 +5750,9 @@
 	// The pitch (with everything painted on it: shadows, rings, lines) is drawn flat into an
 	// offscreen picture, then laid down in perspective one strip at a time; players, the ball,
 	// the goals and the far stand stand up on top of it.
-	let camMode = store.get("ff-cam") === "tv" ? "tv" : "top";
+	// The TV camera by default on a laptop or desktop; on a phone the players would be tiny, so overhead.
+	const wideScreen = (() => { try { return window.matchMedia("(min-width: 700px)").matches; } catch (e) { return false; } })();
+	let camMode = store.get("ff-cam") === "tv" || (!store.get("ff-cam") && wideScreen) ? "tv" : "top";
 	const TV = { camX: null, Cy: 0, Hc: 0, th: 0, f: 1, cy: 0, key: "" };
 	const Z_W = 0.71;   // ball and crossbar heights are in their own units; this turns them into pitch pixels
 	function tvSetup () {
@@ -6194,6 +6206,9 @@
 	$("menuToggle").addEventListener("click", e => { setBig(!(document.body && document.body.classList.contains("big"))); e.currentTarget.blur(); });
 	// Big pitch is the default; the menu comes back with the button on the pitch (or F).
 	setBig(store.get("ff-big") !== "0");
+	// Leave the tab or the window and the match waits for you.
+	document.addEventListener("visibilitychange", () => { if (document.hidden && state === "play") { pause(); } });
+	window.addEventListener("blur", () => { if (state === "play" && document.hasFocus && !document.hasFocus()) { pause(); } });
 	$("camBtn").addEventListener("click", e => { setCam(camMode === "tv" ? "top" : "tv"); e.currentTarget.blur(); toast(camMode === "tv" ? "TV camera" : "Overhead camera", "#f2b52e"); });
 	setCam(camMode);
 	$("offsideBtn").addEventListener("click", e => {
