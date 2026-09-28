@@ -4,10 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="description" content="Floodlit Football: an 11, 6 or 5-a-side football game with a 38-round league, transfers, fouls and cards.">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230f1d16'/%3E%3Cpath d='M9 8l12 10M55 8L43 18' stroke='%23f2b52e' stroke-width='5' stroke-linecap='round'/%3E%3Ccircle cx='32' cy='38' r='19' fill='%23ffffff'/%3E%3Cpath d='M32 29l8.5 6.2-3.2 10H26.7l-3.2-10z' fill='%2316201b'/%3E%3Cpath d='M32 19v10M40.5 35.2l9.3-3.1M37.3 45.2l5.4 8.2M26.7 45.2l-5.4 8.2M23.5 35.2l-9.3-3.1' stroke='%2316201b' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E">
 <style>body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>
 </head>
 <body>
 <title>Floodlit Football</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230f1d16'/%3E%3Cpath d='M9 8l12 10M55 8L43 18' stroke='%23f2b52e' stroke-width='5' stroke-linecap='round'/%3E%3Ccircle cx='32' cy='38' r='19' fill='%23ffffff'/%3E%3Cpath d='M32 29l8.5 6.2-3.2 10H26.7l-3.2-10z' fill='%2316201b'/%3E%3Cpath d='M32 19v10M40.5 35.2l9.3-3.1M37.3 45.2l5.4 8.2M26.7 45.2l-5.4 8.2M23.5 35.2l-9.3-3.1' stroke='%2316201b' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Barlow:wght@400;500;600;700&display=swap">
@@ -2594,7 +2596,7 @@
 		ball.owner = taker; ball.z = 0; ball.vz = 0;
 		taker.hold = 0; taker.think = 20;
 		possTeam = taker.team;
-		if (taker.team === 0) { ctrl = players.indexOf(taker); }
+		if (taker.team === 0 && taker.role !== "gk") { ctrl = players.indexOf(taker); }
 		freeze = 60;
 		freezeKind = "free";
 		sfx("whistle");
@@ -3774,7 +3776,7 @@
 		taker.hold = 0; taker.think = 20; taker.kickCd = 0;
 		possTeam = taker.team;
 		lastTouch = taker.team;
-		if (taker.team === 0) { ctrl = players.indexOf(taker); }
+		if (taker.team === 0 && taker.role !== "gk") { ctrl = players.indexOf(taker); }
 		freeze = frames;
 		freezeKind = "free";
 		sfx("whistle");
@@ -4128,6 +4130,7 @@
 		const m = mates.sort((a, b) => openness(b) - openness(a))[0];
 		if (setPiece && setPiece.taker === p) { setPiece = null; }
 		if (m && openness(m) > 45) { passTo(p, m); } else if (m) { loftTo(p, m.x + (attackX(p.team) === FW ? 60 : -60), m.y); } else { kick(p, attackX(p.team), FH / 2, 13); }
+		if (p.team === 0 && m) { handOff(m, 160); }
 	}
 
 	// Taking whatever set piece you are standing over.
@@ -4200,7 +4203,8 @@
 				if (ball.z > (isGk ? 45 : 16)) { continue; }   // over their head
 				// The intended receiver always controls a firm pass.
 				if (speed > 11 && !isReceiver) {
-					let save = (p.team === 1 ? diff.save : 0.3 * defMul(p)) * (1 - 0.35 * edge(1 - p.team)) * cond.handling;   // wet balls slip
+					// Your keeper holds most of what he reaches; theirs is set by the opponent level.
+					let save = (p.team === 1 ? diff.save : 0.58 * defMul(p)) * (1 - 0.35 * edge(1 - p.team)) * cond.handling;   // wet balls slip
 					// One save attempt per shot: beaten once, the keeper stays beaten for that shot.
 					if (isGk) {
 						if (ball.lift) { save = Math.min(0.9, save * 1.9); }
@@ -4299,9 +4303,12 @@
 		// A change of possession is a new situation, so drop any manual-switch hold.
 		if (p.team !== possTeam) { manualLock = 0; possTeam = p.team; }
 		if (pendingPass) { if (p.team === 0) { stats.completed++; swing(0, 0.03); } pendingPass = false; }
-		if (p.team === 0) {
-			// Your keeper too: when he has it, you choose where it goes. A catch stops him dead.
-			if (p.role === "gk") { p.vx = 0; p.vy = 0; }
+		if (p.team === 0 && p.role === "gk") {
+			// Your keeper plays himself: a catch stops him dead, he looks up and distributes,
+			// and you stay on an outfielder (the one he finds, once it's on its way).
+			p.vx = 0; p.vy = 0; p.hold = 0; p.holdFor = 0;
+			if (human() === p) { const m = bestDefender(null); if (m) { ctrl = players.indexOf(m); } }
+		} else if (p.team === 0) {
 			const idx = players.indexOf(p);
 			if (idx !== ctrl && p !== receiver) { flashPlayer(p); }
 			ctrl = idx;
