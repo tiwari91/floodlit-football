@@ -3503,10 +3503,12 @@
 			if (setPiece.team === 0 && setPiece.wait > 420) { takeSetPiece(setPiece.taker, false); }
 		}
 		if (setPiece && ball.owner === setPiece.taker) {
+			const R = setPiece.kind === "free" ? fkDist() : 80;
+			if (setPiece.wall) { for (const w of setPiece.wall) { if (players.includes(w.p)) { w.p.x = w.x; w.p.y = w.y; w.p.vx = w.p.vy = 0; } } }
 			for (const q of players) {
 				if (q.team === setPiece.team) { continue; }
 				const d = dist(q, setPiece.taker);
-				if (d < 80) { q.x = clamp(setPiece.taker.x + (q.x - setPiece.taker.x) / (d || 1) * 80, 12, FW - 12); q.y = clamp(setPiece.taker.y + (q.y - setPiece.taker.y) / (d || 1) * 80, 12, FH - 12); }
+				if (d < R) { q.x = clamp(setPiece.taker.x + (q.x - setPiece.taker.x) / (d || 1) * R, 12, FW - 12); q.y = clamp(setPiece.taker.y + (q.y - setPiece.taker.y) / (d || 1) * R, 12, FH - 12); }
 			}
 		} else if (setPiece && ball.owner !== setPiece.taker) {
 			setPiece = null;
@@ -3899,18 +3901,33 @@
 		setTimeout(() => { if (banner.textContent === text) { banner.hidden = true; } }, 2200);
 	}
 
+	// 9.15 m, to scale: about 148 px on the full-size pitch, less on the small ones.
+	const fkDist = () => FW * 0.087;
 	function awardFreeKick (t, vic) {
 		const taker = vic.injured ? outfield(t).filter(q => q !== vic).reduce((a, b) => (dist(a, vic) < dist(b, vic) ? a : b)) : vic;
 		const spot = { x: clamp(vic.x, 20, FW - 20), y: clamp(vic.y, 20, FH - 20) };
 		taker.x = spot.x; taker.y = spot.y;
 		taker.dir = Math.atan2(FH / 2 - spot.y, attackX(t) - spot.x);
+		const R = fkDist();
+		// In range of goal, the defenders build a wall 9.15 m out, on the line to goal.
+		const gx = attackX(t), gd = Math.hypot(gx - spot.x, FH / 2 - spot.y);
+		let wall = null;
+		if (gd < FW * 0.36 && gd > R + 20) {
+			const ux = (gx - spot.x) / gd, uy = (FH / 2 - spot.y) / gd, n = N === 11 ? 4 : 2;
+			const men = outfield(1 - t).sort((a, b) => dist(a, spot) - dist(b, spot)).slice(0, n);
+			wall = men.map((q, i) => {
+				const off = (i - (n - 1) / 2) * 17;
+				return { p: q, x: clamp(spot.x + ux * R - uy * off, 12, FW - 12), y: clamp(spot.y + uy * R + ux * off, 12, FH - 12) };
+			});
+			for (const w of wall) { w.p.x = w.x; w.p.y = w.y; w.p.vx = w.p.vy = 0; w.p.dir = Math.atan2(-uy, -ux); }
+		}
 		for (const q of players) {
-			if (q.team === t) { continue; }
+			if (q.team === t || (wall && wall.some(w => w.p === q))) { continue; }
 			const d = dist(q, taker);
-			if (d < 90) { q.x = clamp(taker.x + (q.x - taker.x) / (d || 1) * 90, 12, FW - 12); q.y = clamp(taker.y + (q.y - taker.y) / (d || 1) * 90, 12, FH - 12); }
+			if (d < R) { q.x = clamp(taker.x + (q.x - taker.x) / (d || 1) * R, 12, FW - 12); q.y = clamp(taker.y + (q.y - taker.y) / (d || 1) * R, 12, FH - 12); }
 		}
 		setPieceStart(taker, 55);
-		setPiece = { kind: "free", team: t, taker };
+		setPiece = { kind: "free", team: t, taker, wall, spot: { ...spot } };
 		restartBanner("Free kick", t);
 	}
 
@@ -4788,6 +4805,29 @@
 		ctx.lineCap = "butt";
 	}
 
+	// The referee's vanishing spray: the 9.15 m the other side must give, and the line for the wall.
+	function drawFreeKickSpray () {
+		if (!setPiece || setPiece.kind !== "free" || ball.owner !== setPiece.taker) { return; }
+		const X = MX + ball.x, Y = MY + ball.y, R = fkDist();
+		ctx.save();
+		ctx.strokeStyle = "rgba(255, 255, 255, 0.55)";
+		ctx.lineWidth = 2;
+		ctx.setLineDash([ 3, 7 ]);
+		ctx.beginPath(); ctx.arc(X, Y, R, 0, Math.PI * 2); ctx.stroke();
+		if (setPiece.wall && setPiece.wall.length) {
+			const w = setPiece.wall, a = w[0], b = w[w.length - 1];
+			const dx = b.x - a.x, dy = b.y - a.y, L = Math.hypot(dx, dy) || 1, ex = dx / L * 14, ey = dy / L * 14;
+			// the line sits just in front of the wall, toward the ball
+			const nx = (ball.x - (a.x + b.x) / 2), ny = (ball.y - (a.y + b.y) / 2), nl = Math.hypot(nx, ny) || 1;
+			const ox = nx / nl * 13, oy = ny / nl * 13;
+			ctx.setLineDash([]);
+			ctx.lineWidth = 3;
+			ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+			ctx.beginPath(); ctx.moveTo(MX + a.x - ex + ox, MY + a.y - ey + oy); ctx.lineTo(MX + b.x + ex + ox, MY + b.y + ey + oy); ctx.stroke();
+		}
+		ctx.restore();
+	}
+
 	// Dashed amber ring under the teammate your pass would reach.
 	function drawPassTarget () {
 		if (state !== "play" || freeze > 0) { return; }
@@ -5465,6 +5505,7 @@
 		camY += (ty - camY) * ease;
 		ctx.setTransform(scale, 0, 0, scale, -camX * scale, -camY * scale);
 		drawPitch();
+		drawFreeKickSpray();
 		drawPassTarget();
 		const order = [ ...players ].sort((a, b) => a.y - b.y);
 		const ballBehind = ball.owner && Math.sin(ball.owner.dir) < 0;

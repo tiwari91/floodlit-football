@@ -5,3 +5,7 @@ A top-down football game in one HTML file: 11, 6 or 5-a-side, a 20-club league o
 **Play:** https://tiwari91.github.io/floodlit-football/
 
 Controls: arrows move, S pass, W through ball, Q long ball, D shoot (hold for power), A tackle, E sprint. Your league saves in your browser.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
