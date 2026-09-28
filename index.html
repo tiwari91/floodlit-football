@@ -1016,6 +1016,7 @@
 		<p class="fine"><b>Home and away.</b> The home side has the crowd behind it: it starts with a little momentum and the visitors play slightly below their rating. The stands fill with the home club's colours, with a corner of away fans. On a kit clash the away side changes, so you'll wear white on some away days. The scoreboard lists the home team first.</p>
 		<p class="fine"><b>Crowd and music.</b> The crowd swells as the ball nears a goal, the home end sings, goals get a roar (or a groan from the home fans), and hard saves get an "ooh". The menus play a stadium anthem; turn it off with Music.</p>
 		<p class="fine"><b>Weather and grounds.</b> Every club has a home ground: grass, muddy or artificial turf. Mud slows the ball and the players and kills the bounce. Turf is quick and true. Rain makes grass and turf skid, makes mud heavier, costs players grip on the turn, sends passes a little astray and makes shots harder for keepers to hold. In the league, matchdays 10 to 26 are the rainy season, and the forecast is shown in advance. In a friendly, pick the weather and ground yourself.</p>
+		<p class="fine"><b>Free kicks.</b> The other side stands 9.15 m back, and near your goal they build a wall. From shooting range, press W to curl it over the wall (up or down picks the corner, the far post if you don't choose), or D to drive it low and hard. S plays it short. Hold E (or Shift) to sprint at any time: you'll see speed streaks behind your player.</p>
 		<p class="fine"><b>Fouls and cards.</b> A slide that misses the ball and takes the man, above all from behind, is a foul: a free kick where it happened, or a penalty in the box (pick a side with ↑ ↓ and press D; the keeper guesses). Reckless tackles get a yellow card, a second yellow is a red, and a bad one from behind can be a straight red: the player walks off and his side plays a man down. In the league a red card is a ban (two games for a straight red), five yellows in a season is one, and a player hurt in a foul limps on and then misses one to three games. Banned and injured players come off the team sheet by themselves and go back on it when they're available.</p>
 		<p class="fine"><b>Throw-ins.</b> When the ball goes over a touchline, the other side throws it back in from that spot. On yours, aim with the arrows and press S for a short throw to feet or Q for a long throw. Opponents stand off the thrower, and there is no offside from a throw-in.</p>
 		<p class="fine"><b>Corners and goal kicks.</b> If a defender puts the ball over their own goal line it's a corner; if an attacker does, it's a goal kick. On your corners, aim with the arrows (the dashed ring shows who you'll find) and press S or Q to whip in a lofted cross. Runners head for the box and defenders mark them. There is no offside from a corner.</p>
@@ -2592,6 +2593,7 @@
 		ball.z = 0; ball.vz = 0;
 		ball.beaten = null;
 		ball.pen = null;
+		ball.lift = false;
 		ball.lastBy = p;
 		ball.kickedAt = frame;
 		p.kickCd = 20;
@@ -2751,7 +2753,11 @@
 		const p = human();
 		if (ball.owner !== p) { return; }
 		if (tut) { tut.flags.through = true; }
-		if (setPiece && setPiece.taker === p) { takeSetPiece(p, false); return; }
+		if (setPiece && setPiece.taker === p) {
+			if (setPiece.kind === "free" && shotInRange(p)) { liftShot(p); return; }
+			takeSetPiece(p, false);
+			return;
+		}
 		const m = passTarget(p);
 		if (m) { startPass(p, m, true); }
 	}
@@ -3090,6 +3096,7 @@
 			setPiece = null;
 			const g = { x: attackX(p.team), y: FH / 2 };
 			if (dist(p, g) < 250 * Math.sqrt(S) && Math.random() < 0.7) {
+				if (Math.random() < 0.55) { liftShot(p); return null; }
 				shootAt(p, 0.75 + Math.random() * 0.25, FH / 2 + (Math.random() * 2 - 1) * FMT.goal * 0.48);
 				ooh();
 				return null;
@@ -3951,6 +3958,29 @@
 		if (t === 1) { ooh(); }
 	}
 
+	// A free kick lifted over the wall: it has to clear heads at 9.15 m and dip under the bar.
+	// Up or down picks the corner (the far post if you don't); better finishers get it right more often.
+	function liftShot (p) {
+		setPiece = null;
+		const goalX = attackX(p.team), gx = goalX + (goalX === FW ? 20 : -20), sho = A(p, "sho");
+		const lean = p.team === 0 && Math.abs(stickVec.y) > 0.2 ? Math.sign(stickVec.y) : ball.y < FH / 2 ? 1 : -1;
+		const miss = Math.max(0, 72 - sho) * 0.8 + 30;
+		const ty = FH / 2 + lean * FMT.goal * 0.27 + (Math.random() * 2 - 1) * miss * GH;
+		const D = Math.hypot(goalX - ball.x, ty - ball.y);
+		const vh = clamp(D / 30, 8.5, 15);
+		const T = Math.log(Math.max(0.05, 1 - D * (1 - AIR_DRAG) / vh)) / Math.log(AIR_DRAG);
+		// Height as it reaches the goal: under the bar (55) most of the time, over it now and then.
+		const zGoal = clamp(38 + gauss() * (13 + Math.max(0, 70 - sho) * 0.3), 6, 90);
+		kick(p, gx, ty, vh);
+		ball.vz = (zGoal + 0.5 * GRAV * T * T) / T;
+		ball.lift = true;   // slower than a driven shot: the keeper has longer to get across
+		// On target, the keeper gets across more often than not; into the corner, less so.
+		const gk = team(1 - p.team).find(q => q.role === "gk"), off = Math.abs(ty - FH / 2) / (FMT.goal / 2);
+		if (gk && off < 1 && zGoal < 50) { ball.pen = { gk, saved: Math.random() < clamp(0.72 - off * 0.3 - (sho - 65) * 0.006, 0.3, 0.85) }; }
+		if (p.team === 0) { stats.shots++; burst(p.x, p.y, "Over the wall"); } else { ooh(); }
+	}
+	function gauss () { let u = 0, v = 0; while (!u) { u = Math.random(); } while (!v) { v = Math.random(); } return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+
 	// Taking a penalty: side-foot or blast it where you are leaning.
 	function takePenalty (p) {
 		setPiece = null;
@@ -4074,9 +4104,10 @@
 				if (ball.z > (isGk ? 45 : 16)) { continue; }   // over their head
 				// The intended receiver always controls a firm pass.
 				if (speed > 11 && !isReceiver) {
-					const save = (p.team === 1 ? diff.save : 0.3 * defMul(p)) * (1 - 0.35 * edge(1 - p.team)) * cond.handling;   // wet balls slip
+					let save = (p.team === 1 ? diff.save : 0.3 * defMul(p)) * (1 - 0.35 * edge(1 - p.team)) * cond.handling;   // wet balls slip
 					// One save attempt per shot: beaten once, the keeper stays beaten for that shot.
 					if (isGk) {
+						if (ball.lift) { save = Math.min(0.9, save * 1.9); }
 						if (ball.pen && ball.pen.gk === p) { if (!ball.pen.saved) { continue; } }
 						else if (ball.beaten === p) { continue; }
 						if (!(ball.pen && ball.pen.gk === p) && Math.random() > save * 1.6) { ball.beaten = p; continue; }
@@ -5020,6 +5051,17 @@
 
 		ctx.fillStyle = "rgba(0, 0, 0, 0.38)";
 		ctx.beginPath(); ctx.ellipse(X + 4, Y + 8, 15, 8, 0, 0, Math.PI * 2); ctx.fill();
+		// Sprinting: speed streaks behind him.
+		if ((p.sprintAmt || 0) > 0.45 && Math.hypot(p.vx, p.vy) > 1.2) {
+			const a = Math.atan2(p.vy, p.vx), c = Math.cos(a), sn = Math.sin(a);
+			ctx.strokeStyle = `rgba(255, 255, 255, ${0.25 + 0.35 * p.sprintAmt})`; ctx.lineWidth = 2;
+			ctx.beginPath();
+			for (const o of [ -7, 0, 7 ]) {
+				const bx = X - c * 20 - sn * o, by = Y - sn * 20 + c * o;
+				ctx.moveTo(bx, by); ctx.lineTo(bx - c * (12 + Math.abs(o)), by - sn * (12 + Math.abs(o)));
+			}
+			ctx.stroke();
+		}
 		// Team disc: every player stands on a ring of their side's shirt colour (keepers in theirs).
 		const disc = p.role === "gk" ? kit.gk : kit.outfield;
 		ctx.save();
@@ -5338,7 +5380,9 @@
 			items = setPiece.kind === "throw"
 				? [ [ P ? "Stick" : "Arrows", "Aim" ], [ P ? "A" : "S", "Short throw" ], [ P ? "RB" : "Q", "Long throw" ] ]
 				: setPiece.kind === "pen" ? [ [ P ? "Stick" : "↑ ↓", "Pick a side" ], [ P ? "B" : "D", "Take the penalty" ] ]
-				: setPiece.kind === "free" ? [ [ P ? "Stick" : "Arrows", "Aim" ], [ P ? "A" : "S", "Pass" ], [ P ? "RB" : "Q", "Long ball" ], [ P ? "B" : "D", "Shoot" ] ]
+				: setPiece.kind === "free" ? (shotInRange(me)
+					? [ [ P ? "Stick" : "↑ ↓", "Pick a corner" ], [ P ? "Y" : "W", "Curl it over the wall" ], [ P ? "B" : "D", "Drive it low" ], [ P ? "A" : "S", "Pass" ] ]
+					: [ [ P ? "Stick" : "Arrows", "Aim" ], [ P ? "A" : "S", "Pass" ], [ P ? "RB" : "Q", "Long ball" ], [ P ? "B" : "D", "Shoot" ] ])
 				: [ [ P ? "Stick" : "Arrows", "Aim" ], [ P ? "A" : "S", "Cross" ] ];
 		} else if (ball.owner === me && charging && aimY !== null && shotInRange(me)) {
 			items = [ [ P ? "Stick" : "↑ ↓", "Aim in the goal" ], [ P ? "Release B" : "Release D", "Shoot (harder = wider)" ] ];
