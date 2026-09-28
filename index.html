@@ -72,6 +72,19 @@
 	.sub { margin: 0; color: var(--muted); max-width: 46ch; }
 
 	/* Scoreboard: the one loud element on the page. */
+	/* Big pitch: no title or scoreboard, the ground takes the screen, a score bug on the pitch. */
+	body.big .top, body.big .scoreboard { display: none; }
+	body.big .pitchwrap { height: max(220px, min(calc(100svh - 96px), calc(var(--pw) * 648 / 1072), 1400px)); }
+	.scorebug {
+		position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 3;
+		display: none; align-items: center; gap: 10px; padding: 4px 12px 5px;
+		background: rgba(7, 12, 10, 0.88); border: 1px solid var(--rule); border-radius: 4px;
+		font-family: var(--display); font-weight: 800; font-size: 20px; letter-spacing: 0.05em; text-transform: uppercase;
+		color: var(--chalk, #eef6ea); pointer-events: none; white-space: nowrap;
+	}
+	body.big .scorebug { display: inline-flex; }
+	.scorebug b { font-size: 24px; font-variant-numeric: tabular-nums; }
+	.scorebug .t { color: #f2b52e; font-size: 18px; font-variant-numeric: tabular-nums; }
 	.scoreboard {
 		display: grid;
 		grid-template-columns: 1fr auto 1fr;
@@ -837,6 +850,7 @@
 
 	<div class="pitchwrap" id="pitchwrap">
 		<canvas id="pitch" aria-label="Football pitch"></canvas>
+		<div class="scorebug" id="scoreBug" aria-hidden="true"><span id="bugHome">You</span><b id="bugScore">0 – 0</b><span id="bugAway">CPU</span><span class="t" id="bugClock">03:00</span></div>
 		<div class="banner" id="banner" hidden></div>
 		<div class="coach" id="coach" hidden>
 			<div class="coach-step" id="coachStep"></div>
@@ -944,6 +958,7 @@
 		<button id="mapBtn" type="button" aria-pressed="false">Minimap off</button>
 		<button id="offsideBtn" type="button" aria-pressed="true">Offside on</button>
 		<button id="camBtn" type="button" aria-pressed="false">Camera: overhead</button>
+		<button id="bigBtn" type="button" aria-pressed="false">Big pitch: off</button>
 	</div>
 
 	<section class="league" id="league" aria-label="League">
@@ -1017,6 +1032,7 @@
 		<p class="fine"><b>Home and away.</b> The home side has the crowd behind it: it starts with a little momentum and the visitors play slightly below their rating. The stands fill with the home club's colours, with a corner of away fans. On a kit clash the away side changes, so you'll wear white on some away days. The scoreboard lists the home team first.</p>
 		<p class="fine"><b>Crowd and music.</b> The crowd swells as the ball nears a goal, the home end sings, goals get a roar (or a groan from the home fans), and hard saves get an "ooh". The menus play a stadium anthem; turn it off with Music.</p>
 		<p class="fine"><b>Weather and grounds.</b> Every club has a home ground: grass, muddy or artificial turf. Mud slows the ball and the players and kills the bounce. Turf is quick and true. Rain makes grass and turf skid, makes mud heavier, costs players grip on the turn, sends passes a little astray and makes shots harder for keepers to hold. In the league, matchdays 10 to 26 are the rainy season, and the forecast is shown in advance. In a friendly, pick the weather and ground yourself.</p>
+		<p class="fine"><b>Big pitch.</b> Press F (or the Big pitch button) to hide the title and the scoreboard: the ground fills the screen and a small score bug on the pitch keeps the score and the clock. Press F again to bring them back.</p>
 		<p class="fine"><b>Camera.</b> Overhead follows the ball from above. TV watches from high in the main stand, like a broadcast, and cuts to the benches at kick-off, the breaks and after goals. Switch with the Camera button or press C. Every ground has its own look: the stands, the roof, the floodlights, how full it is and how the grass is cut.</p>
 		<p class="fine"><b>Free kicks.</b> The other side stands 9.15 m back, and near your goal they build a wall. From shooting range, press W to curl it over the wall (up or down picks the corner, the far post if you don't choose), or D to drive it low and hard. S plays it short. Hold E (or Shift) to sprint at any time: you'll see speed streaks behind your player.</p>
 		<p class="fine"><b>Fouls and cards.</b> A slide that misses the ball and takes the man, above all from behind, is a foul: a free kick where it happened, or a penalty in the box (pick a side with ↑ ↓ and press D; the keeper guesses). Reckless tackles get a yellow card, a second yellow is a red, and a bad one from behind can be a straight red: the player walks off and his side plays a man down. In the league a red card is a ban (two games for a straight red), five yellows in a season is one, and a player hurt in a foul limps on and then misses one to three games. Banned and injured players come off the team sheet by themselves and go back on it when they're available.</p>
@@ -3219,7 +3235,7 @@
 	function stepLimbs () {
 		for (const p of players) {
 			const spd = Math.hypot(p.vx, p.vy);
-			p.stride = (p.stride || 0) + spd * 0.045;
+			p.stride = (p.stride || 0) + spd * 0.068 + (spd > 0.4 ? 0.012 : 0);
 			const target = spd < 0.35 ? 0 : Math.min(1, spd / 2.6);
 			p.runAmt = (p.runAmt || 0) + (target - (p.runAmt || 0)) * 0.12;
 		}
@@ -3234,12 +3250,13 @@
 	function steer (p, tx, ty, spd) {
 		const dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy);
 		if (d < 7) {
-			// In position: nobody stands like a statue. Shift about a little, at a walk.
+			if (!ball || dist(p, ball) < 380) { return [ 0, 0 ]; }   // near the play: set, ready
+			// In position far from the ball: nobody stands like a statue. Shift about a little, at a walk.
 			if (!p.idleT || frame > p.idleT) { p.idleT = frame + 90 + Math.floor(Math.random() * 120); p.idleX = (Math.random() * 2 - 1) * 14; p.idleY = (Math.random() * 2 - 1) * 14; }
 			const ix = tx + p.idleX - p.x, iy = ty + p.idleY - p.y, id = Math.hypot(ix, iy);
 			return id < 3 ? [ 0, 0 ] : [ ix / id * 0.32, iy / id * 0.32 ];
 		}
-		const s = spd * Math.min(1, d / 40);
+		const s = spd * Math.min(1, d / 26);
 		return [ dx / d * s, dy / d * s ];
 	}
 
@@ -3511,10 +3528,14 @@
 			// when they're well out of position or near the ball, and markers match their runner.
 			if (!diving && sprint === 1 && p.role !== "gk") {
 				const off = p.tx === undefined ? 0 : Math.hypot(p.tx - p.x, p.ty - p.y), near = dist(p, ball);
-				let effort = off > 240 ? 0.98 : off > 120 ? 0.8 : 0.62;
-				if (near < 220) { effort = Math.max(effort, 0.88); }
-				if (marks0.has(p) || marks1.has(p)) { effort = Math.max(effort, off > 50 ? 1 : 0.75); }
-				p.effort = (p.effort || effort) + (effort - (p.effort || effort)) * 0.05;   // no sudden gear changes
+				const ours = ball.owner ? ball.owner.team === p.team : possTeam === p.team;
+				// On the ball's side of the game everyone is at it: supporting runs when we have it,
+				// getting back into shape when we don't. Only the far side of the pitch takes a breather.
+				let effort = ours ? (off > 140 ? 1 : off > 50 ? 0.92 : 0.78) : (off > 140 ? 1 : off > 50 ? 0.9 : 0.72);
+				if (near > 520 && off < 90) { effort = 0.6; }
+				if (near < 260) { effort = Math.max(effort, 0.95); }
+				if (marks0.has(p) || marks1.has(p)) { effort = Math.max(effort, off > 50 ? 1 : 0.82); }
+				p.effort = (p.effort || effort) + (effort - (p.effort || effort)) * 0.1;   // no sudden gear changes
 				sprint = p.effort;
 			}
 			// Smooth where AI players are heading so they don't twitch as the ball moves.
@@ -4593,6 +4614,10 @@
 		scoreHomeEl.textContent = leftIsYou ? score[0] : score[1];
 		scoreAwayEl.textContent = leftIsYou ? score[1] : score[0];
 		clockEl.textContent = clock;
+		$("bugHome").textContent = $("homeName").textContent;
+		$("bugAway").textContent = $("awayName").textContent;
+		$("bugScore").textContent = `${scoreHomeEl.textContent} – ${scoreAwayEl.textContent}`;
+		$("bugClock").textContent = clock;
 		const tot = possFrames[0] + possFrames[1];
 		const mine = tot ? Math.round(100 * possFrames[0] / tot) : 50;
 		$("possLabel").textContent = leftIsYou ? `Possession ${mine}% : ${100 - mine}%` : `Possession ${100 - mine}% : ${mine}%`;
@@ -5994,6 +6019,7 @@
 		if ((state === "play" || state === "goal") && GAME_KEYS.has(e.code)) { e.preventDefault(); }
 		if (e.repeat) { return; }
 		if (e.code === "KeyC") { setCam(camMode === "tv" ? "top" : "tv"); toast(camMode === "tv" ? "TV camera" : "Overhead camera", "#f2b52e"); return; }
+		if (e.code === "KeyF") { setBig(!document.body.classList.contains("big")); return; }
 		padOn = false;
 		keys.add(e.code);
 		// Tactics change any time the match is on, even at a set piece.
@@ -6113,6 +6139,17 @@
 		showIntro();
 		renderLeague();
 	});
+	function setBig (on) {
+		document.body.classList.toggle("big", on);
+		store.set("ff-big", on ? "1" : "0");
+		$("bigBtn").textContent = on ? "Big pitch: on" : "Big pitch: off";
+		$("bigBtn").setAttribute("aria-pressed", String(on));
+		lastHud = "";
+		resize();
+		if (on) { $("pitchwrap").scrollIntoView?.({ block: "start", behavior: reduceMotion ? "auto" : "smooth" }); }
+	}
+	$("bigBtn").addEventListener("click", e => { setBig(!document.body.classList.contains("big")); e.currentTarget.blur(); });
+	if (store.get("ff-big") === "1") { setBig(true); }
 	$("camBtn").addEventListener("click", e => { setCam(camMode === "tv" ? "top" : "tv"); e.currentTarget.blur(); toast(camMode === "tv" ? "TV camera" : "Overhead camera", "#f2b52e"); });
 	setCam(camMode);
 	$("offsideBtn").addEventListener("click", e => {
