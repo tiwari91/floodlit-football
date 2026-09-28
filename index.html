@@ -3233,14 +3233,26 @@
 
 	function steer (p, tx, ty, spd) {
 		const dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy);
-		if (d < 7) { return [ 0, 0 ]; }   // close enough: stand, don't shuffle
+		if (d < 7) {
+			// In position: nobody stands like a statue. Shift about a little, at a walk.
+			if (!p.idleT || frame > p.idleT) { p.idleT = frame + 90 + Math.floor(Math.random() * 120); p.idleX = (Math.random() * 2 - 1) * 14; p.idleY = (Math.random() * 2 - 1) * 14; }
+			const ix = tx + p.idleX - p.x, iy = ty + p.idleY - p.y, id = Math.hypot(ix, iy);
+			return id < 3 ? [ 0, 0 ] : [ ix / id * 0.32, iy / id * 0.32 ];
+		}
 		const s = spd * Math.min(1, d / 40);
 		return [ dx / d * s, dy / d * s ];
 	}
 
-	function movePlayer (p, dvx, dvy, grip = cond.grip) {
-		p.vx += (dvx - p.vx) * grip;
-		p.vy += (dvy - p.vy) * grip;
+	// Players have weight: they build up to speed over about half a second, and brake or
+	// turn harder than they accelerate. Wet or muddy grass takes some grip away.
+	const ACC_AI = 0.1, ACC_YOU = 0.2;
+	function movePlayer (p, dvx, dvy, grip = cond.grip, accMax = ACC_AI) {
+		let ax = (dvx - p.vx) * grip, ay = (dvy - p.vy) * grip;
+		const faster = dvx * dvx + dvy * dvy > p.vx * p.vx + p.vy * p.vy;
+		const cap = accMax * (faster ? 1 : 1.7) * (cond.grip / 0.22), a = Math.hypot(ax, ay);
+		if (a > cap) { ax *= cap / a; ay *= cap / a; }
+		p.vx += ax;
+		p.vy += ay;
 		p.x = clamp(p.x + p.vx, 12, FW - 12);
 		p.y = clamp(p.y + p.vy, 12, FH - 12);
 	}
@@ -3391,7 +3403,7 @@
 			if (p === receiver && !ball.owner) {
 				const [ tx, ty ] = ball.z > 0 ? [ ball.landX, ball.landY ] : interceptPoint(p);
 				const [ dvx, dvy ] = steer(p, tx, ty, BASE_SPD * 1.4);
-				movePlayer(p, dvx, dvy);
+				movePlayer(p, dvx, dvy, cond.grip, ACC_YOU);
 				p.dir = Math.atan2(ball.y - p.y, ball.x - p.x);
 				continue;
 			}
@@ -3421,11 +3433,11 @@
 				}
 				if (p.lunge > 0) {
 					p.lunge--;
-					movePlayer(p, Math.cos(p.dir) * BASE_SPD * 2, Math.sin(p.dir) * BASE_SPD * 2);
+					movePlayer(p, Math.cos(p.dir) * BASE_SPD * 2, Math.sin(p.dir) * BASE_SPD * 2, cond.grip, 9);
 				} else {
 					// Your player answers the keys a little faster than the AI, and stops when you let go.
 					const grip = Math.max(cond.grip, 0.18) * (inp.m > 0.1 ? 1.3 : 1.7);
-					movePlayer(p, inp.x * spd, inp.y * spd, Math.min(0.45, grip));
+					movePlayer(p, inp.x * spd, inp.y * spd, Math.min(0.45, grip), ACC_YOU);
 				}
 				continue;
 			}
@@ -3443,7 +3455,7 @@
 			if (p.slideCd > 0) { p.slideCd--; }
 			if (p.slideAI > 0) {
 				p.slideAI--;
-				movePlayer(p, Math.cos(p.dir) * BASE_SPD * 2, Math.sin(p.dir) * BASE_SPD * 2);
+				movePlayer(p, Math.cos(p.dir) * BASE_SPD * 2, Math.sin(p.dir) * BASE_SPD * 2, cond.grip, 9);
 				continue;
 			}
 			const carrier = ball.owner;
@@ -3494,14 +3506,24 @@
 			// The CPU carrier dribbles a touch slower than you run, so you can close it down.
 			// A keeper facing a shot moves at full stretch; how quickly depends on his handling.
 			const diving = p.role === "gk" && shotAt(p) ? 1.3 * (0.85 + 0.15 * defMul(p)) : 0;
-			const sprint = diving || (p === chaser1 || p === cover0 || (p === cover1 && press[1] === "high") ? 1.25 : ball.owner === p ? 1.12 : 1);
+			let sprint = diving || (p === chaser1 || p === cover0 || (p === cover1 && press[1] === "high") ? 1.25 : ball.owner === p ? 1.12 : 1);
+			// Off the ball, nobody runs flat out all game: they jog back into shape, stride out
+			// when they're well out of position or near the ball, and markers match their runner.
+			if (!diving && sprint === 1 && p.role !== "gk") {
+				const off = p.tx === undefined ? 0 : Math.hypot(p.tx - p.x, p.ty - p.y), near = dist(p, ball);
+				let effort = off > 240 ? 0.98 : off > 120 ? 0.8 : 0.62;
+				if (near < 220) { effort = Math.max(effort, 0.88); }
+				if (marks0.has(p) || marks1.has(p)) { effort = Math.max(effort, off > 50 ? 1 : 0.75); }
+				p.effort = (p.effort || effort) + (effort - (p.effort || effort)) * 0.05;   // no sudden gear changes
+				sprint = p.effort;
+			}
 			// Smooth where AI players are heading so they don't twitch as the ball moves.
 			if (p.tx === undefined || Math.hypot(target[0] - p.tx, target[1] - p.ty) > 160) { p.tx = target[0]; p.ty = target[1]; }
 			const k = ball.owner === p || p === chaser1 ? 1 : 0.18;
 			p.tx += (target[0] - p.tx) * k;
 			p.ty += (target[1] - p.ty) * k;
 			const [ dvx, dvy ] = steer(p, diving ? target[0] : p.tx, diving ? target[1] : p.ty, BASE_SPD * spdMul * sprint);
-			movePlayer(p, dvx, dvy, diving ? 0.4 : cond.grip);   // a dive is explosive
+			movePlayer(p, dvx, dvy, diving ? 0.4 : cond.grip, diving ? 9 : p.role === "gk" ? 0.16 : ACC_AI);   // a dive is explosive
 			if (Math.hypot(p.vx, p.vy) > 0.6) { p.dir = turnToward(p.dir, Math.atan2(p.vy, p.vx), 0.2); }
 		}
 
@@ -5838,7 +5860,9 @@
 		const down = (p.lunge > 0 && players.indexOf(p) === ctrl) || p.slideAI > 0;
 		const H = 34 * k * (down ? 0.55 : 1), X = b.x, Y = b.y;
 		const shirt = p.role === "gk" ? kit.gk : kit.outfield, shorts = kit.second || "#1f2a36";
-		const face = Math.cos(p.dir) >= 0 ? 1 : -1;
+		const cd = Math.cos(p.dir);
+		if (!p.faceTV || Math.abs(cd) > 0.3) { p.faceTV = cd >= 0 ? 1 : -1; }
+		const face = p.faceTV;
 		const sw = reduceMotion ? 0 : Math.sin(p.stride || 0) * clamp(p.runAmt || 0, 0, 1);
 		const hip = Y - H * 0.47, sh = Y - H * 0.8;
 		ctx.lineCap = "round";
