@@ -943,6 +943,7 @@
 		<button id="hintsBtn" type="button" aria-pressed="true">Hints on</button>
 		<button id="mapBtn" type="button" aria-pressed="false">Minimap off</button>
 		<button id="offsideBtn" type="button" aria-pressed="true">Offside on</button>
+		<button id="camBtn" type="button" aria-pressed="false">Camera: overhead</button>
 	</div>
 
 	<section class="league" id="league" aria-label="League">
@@ -1016,6 +1017,7 @@
 		<p class="fine"><b>Home and away.</b> The home side has the crowd behind it: it starts with a little momentum and the visitors play slightly below their rating. The stands fill with the home club's colours, with a corner of away fans. On a kit clash the away side changes, so you'll wear white on some away days. The scoreboard lists the home team first.</p>
 		<p class="fine"><b>Crowd and music.</b> The crowd swells as the ball nears a goal, the home end sings, goals get a roar (or a groan from the home fans), and hard saves get an "ooh". The menus play a stadium anthem; turn it off with Music.</p>
 		<p class="fine"><b>Weather and grounds.</b> Every club has a home ground: grass, muddy or artificial turf. Mud slows the ball and the players and kills the bounce. Turf is quick and true. Rain makes grass and turf skid, makes mud heavier, costs players grip on the turn, sends passes a little astray and makes shots harder for keepers to hold. In the league, matchdays 10 to 26 are the rainy season, and the forecast is shown in advance. In a friendly, pick the weather and ground yourself.</p>
+		<p class="fine"><b>Camera.</b> Overhead follows the ball from above. TV watches from high in the main stand, like a broadcast, and cuts to the benches at kick-off, the breaks and after goals. Switch with the Camera button or press C. Every ground has its own look: the stands, the roof, the floodlights, how full it is and how the grass is cut.</p>
 		<p class="fine"><b>Free kicks.</b> The other side stands 9.15 m back, and near your goal they build a wall. From shooting range, press W to curl it over the wall (up or down picks the corner, the far post if you don't choose), or D to drive it low and hard. S plays it short. Hold E (or Shift) to sprint at any time: you'll see speed streaks behind your player.</p>
 		<p class="fine"><b>Fouls and cards.</b> A slide that misses the ball and takes the man, above all from behind, is a foul: a free kick where it happened, or a penalty in the box (pick a side with ↑ ↓ and press D; the keeper guesses). Reckless tackles get a yellow card, a second yellow is a red, and a bad one from behind can be a straight red: the player walks off and his side plays a man down. In the league a red card is a ban (two games for a straight red), five yellows in a season is one, and a player hurt in a foul limps on and then misses one to three games. Banned and injured players come off the team sheet by themselves and go back on it when they're available.</p>
 		<p class="fine"><b>Throw-ins.</b> When the ball goes over a touchline, the other side throws it back in from that spot. On yours, aim with the arrows and press S for a short throw to feet or Q for a long throw. Opponents stand off the thrower, and there is no offside from a throw-in.</p>
@@ -1388,7 +1390,7 @@
 
 	/* ---------- DOM ---------- */
 	const canvas = document.getElementById("pitch");
-	const ctx = canvas.getContext("2d");
+	let ctx = canvas.getContext("2d");   // swapped for an offscreen one while painting the TV camera's pitch
 	const $ = id => document.getElementById(id);
 	const overlay = $("overlay"), ovTitle = $("ovTitle"), ovText = $("ovText"), ovButton = $("ovButton");
 	const banner = $("banner");
@@ -4593,18 +4595,35 @@
 		scale = canvas.width / VW;
 	}
 
-	function drawPitch () {
+	function drawPitch (forTex = false) {
 		ctx.fillStyle = "#0f1d16";
 		ctx.fillRect(0, 0, WW, WH);
-		drawStands();
+		drawStands(forTex);
 
-		const bands = Math.round(FW / 100);
-		// Turf is a brighter, even green; mud and grass share the mown stripes.
+		// Turf is a brighter, even green; mud and grass are mown, each ground in its own pattern.
 		const [ c1, c2 ] = cond.surfaceKey === "turf" ? [ "#23804a", "#26894f" ] : [ "#1f6a3b", "#237442" ];
-		for (let k = 0; k < bands; k++) {
-			ctx.fillStyle = k % 2 ? c1 : c2;
-			ctx.fillRect(MX + k * FW / bands, MY, FW / bands + 0.5, FH);
+		const mow = gstyle && cond.surfaceKey !== "turf" ? gstyle.mow : "stripes";
+		ctx.save();
+		ctx.beginPath(); ctx.rect(MX, MY, FW, FH); ctx.clip();
+		ctx.fillStyle = c1; ctx.fillRect(MX, MY, FW, FH);
+		ctx.fillStyle = c2;
+		if (mow === "checks") {
+			const cx = FW / 12, cy = FH / 8;
+			for (let i = 0; i < 12; i++) { for (let j = 0; j < 8; j++) { if ((i + j) % 2) { ctx.fillRect(MX + i * cx, MY + j * cy, cx + 0.5, cy + 0.5); } } }
+		} else if (mow === "diag") {
+			const w = FW / 14;
+			ctx.translate(MX + FW / 2, MY + FH / 2); ctx.rotate(Math.PI / 4);
+			for (let k = -20; k < 20; k += 2) { ctx.fillRect(k * w, -FW, w, FW * 2); }
+		} else if (mow === "rings") {
+			for (let r = Math.hypot(FW, FH) / 2, k = 0; r > 0; r -= 60, k++) {
+				ctx.fillStyle = k % 2 ? c1 : c2;
+				ctx.beginPath(); ctx.arc(MX + FW / 2, MY + FH / 2, r, 0, Math.PI * 2); ctx.fill();
+			}
+		} else {
+			const bands = Math.round(FW / (mow === "wide" ? 200 : 100));
+			for (let k = 1; k < bands; k += 2) { ctx.fillRect(MX + k * FW / bands, MY, FW / bands + 0.5, FH); }
 		}
+		ctx.restore();
 		if (cond.surfaceKey === "mud") {
 			// Worn patches in both goalmouths and the centre circle, worse in the wet.
 			const a = 0.42 + 0.14 * cond.wet;
@@ -4658,6 +4677,7 @@
 			ctx.beginPath(); ctx.arc(cx, cy, 12, a0, a0 + Math.PI / 2); ctx.stroke();
 		}
 
+		if (forTex) { return; }
 		drawDugouts();
 		drawGoal(MX - NET, true);
 		drawGoal(MX + FW, false);
@@ -4670,6 +4690,24 @@
 	// away supporters), advertising boards along the front and the ground's name on the main
 	// stand. It's painted once per match into four strips and then just drawn each frame.
 	let stands = null;
+	// Every ground its own: stand concrete, seats, a roof or open terraces, floodlight pylons or
+	// lights along the roof, how full it gets (bigger clubs draw bigger crowds) and how the grass is cut.
+	let gstyle = null;
+	function groundStyle (club) {
+		let h = [ ...String(club.ground || club.name) ].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) % 2147483647, 7) || 7;
+		const r = () => (h = (h * 48271) % 2147483647) / 2147483647;
+		const pick = a => a[Math.floor(r() * a.length)];
+		const concrete = pick([ [ "#141c18", "#1b2520" ], [ "#2a1c18", "#35241f" ], [ "#172031", "#1f2a3d" ], [ "#222226", "#2c2c31" ], [ "#1d2419", "#262f21" ] ]);
+		return {
+			mow: pick([ "stripes", "wide", "checks", "diag", "rings" ]),
+			concrete: concrete[0], steps: concrete[1],
+			seat: club.color2 && club.color2 !== "#ffffff" ? club.color2 : "#3b4a58",
+			fill: clamp(0.42 + (club.str || 3) * 0.11 + (r() - 0.5) * 0.1, 0.45, 1),
+			roof: r() < 0.65,
+			lights: r() < 0.5 ? "pylons" : "roof",
+			boards: [ club.color || "#f2b52e", "#eef2ec", club.color2 || "#1f2a36", "#1f2a36" ]
+		};
+	}
 	function buildCrowd () {
 		const R = 2;
 		const mk = (w, h) => {
@@ -4680,11 +4718,17 @@
 			return [ c, g ];
 		};
 		const homeC = homeSide === 0 ? KITS[0].outfield : KITS[1].outfield, awayC = homeSide === 0 ? KITS[1].outfield : KITS[0].outfield;
+		const club = leagueMatch ? (leagueMatch.home ? YOU : TEAMS[leagueMatch.opp]) : YOU;
+		const st = gstyle = groundStyle(club);
 		const neutral = [ "#3a4a42", "#56645c", "#7a857e", "#2c3531", "#eef2ec" ];
 		const skins = [ "#f1c9a5", "#e0ac86", "#c68a5e", "#9c6a44", "#6e4a30" ];
 		let h = 11;
 		const rnd = () => { h = (h * 16807) % 2147483647; return h / 2147483647; };
 		const fan = (g, x, y, away) => {
+			if (!away && rnd() > st.fill) {   // an empty seat
+				g.fillStyle = st.seat; g.globalAlpha = 0.55; g.fillRect(x - 2.4, y - 1.5, 4.8, 4.5); g.globalAlpha = 1;
+				return;
+			}
 			const r = rnd();
 			g.fillStyle = away ? (r < 0.75 ? awayC : neutral[Math.floor(r * 50) % 5]) : (r < 0.7 ? homeC : neutral[Math.floor(r * 50) % 5]);
 			g.fillRect(x - 2.2, y - 0.5, 4.4, 4.2);
@@ -4692,12 +4736,12 @@
 			g.beginPath(); g.arc(x, y - 2.4, 1.8, 0, Math.PI * 2); g.fill();
 		};
 		const concrete = (g, w, hh) => {
-			g.fillStyle = "#141c18"; g.fillRect(0, 0, w, hh);
-			g.fillStyle = "#1b2520";
+			g.fillStyle = st.concrete; g.fillRect(0, 0, w, hh);
+			g.fillStyle = st.steps;
 			for (let y = 0; y < hh; y += 7) { g.fillRect(0, y, w, 3); }   // the steps
 		};
 		const boards = (g, w, y) => {
-			const cols = [ homeC, "#eef2ec", "#1f2a36", awayC ];
+			const cols = st.boards;
 			for (let x = 0, k = 0; x < w; x += 90, k++) { g.fillStyle = cols[k % cols.length]; g.fillRect(x, y, 88, 6); }
 		};
 		const [ top, gt ] = mk(WW, MY), [ bottom, gb ] = mk(WW, MY), [ left, gl ] = mk(MX, FH), [ right, gr ] = mk(MX, FH);
@@ -4713,6 +4757,15 @@
 				}
 			}
 			boards(gt, WW, MY - 8); boards(gb, WW, 1);
+			// A roof over the main stands, with the floodlights along its edge at some grounds.
+			if (st.roof) {
+				gt.fillStyle = "rgba(8, 10, 12, 0.85)"; gt.fillRect(0, 0, WW, 5);
+				gb.fillStyle = "rgba(8, 10, 12, 0.85)"; gb.fillRect(0, MY - 5, WW, 5);
+				if (st.lights === "roof") {
+					gt.fillStyle = "#fff3cf"; gb.fillStyle = "#fff3cf";
+					for (let x = 20; x < WW; x += 60) { gt.fillRect(x, 1, 18, 2.5); gb.fillRect(x, MY - 3.5, 18, 2.5); }
+				}
+			}
 			// The ground's name, picked out across the main stand.
 			const ground = (leagueMatch ? (leagueMatch.home ? YOU : TEAMS[leagueMatch.opp]).ground : YOU.ground).toUpperCase();
 			gt.save && gt.save();
@@ -4729,14 +4782,14 @@
 		}
 		stands = { top, bottom, left, right };
 	}
-	function drawStands () {
+	function drawStands (quiet = false) {
 		if (!stands) { return; }
 		ctx.drawImage(stands.top, 0, 0, WW, MY);
 		ctx.drawImage(stands.bottom, 0, MY + FH, WW, MY);
 		ctx.drawImage(stands.left, 0, MY, MX, FH);
 		ctx.drawImage(stands.right, MX + FW, MY, MX, FH);
 		// When the crowd is on its feet, the odd camera flash goes off.
-		if (!reduceMotion && crowdHeat > 0.55 && Math.random() < crowdHeat * 0.5) {
+		if (!quiet && !reduceMotion && crowdHeat > 0.55 && Math.random() < crowdHeat * 0.5) {
 			ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
 			const top = Math.random() < 0.5;
 			ctx.fillRect(Math.random() * WW, top ? Math.random() * (MY - 10) : MY + FH + 14 + Math.random() * (MY - 16), 2.5, 2.5);
@@ -5157,7 +5210,7 @@
 		}
 	}
 
-	function drawFx () {
+	function drawFx (labels = true) {
 		ctx.textAlign = "center";
 		ctx.textBaseline = "middle";
 		for (const f of fx) {
@@ -5168,7 +5221,7 @@
 			ctx.strokeStyle = f.color;
 			ctx.lineWidth = 3;
 			ctx.beginPath(); ctx.arc(X, Y, 20 + (reduceMotion ? 0 : k * 26), 0, Math.PI * 2); ctx.stroke();
-			if (f.label) {
+			if (f.label && labels) {
 				ctx.fillStyle = f.color;
 				ctx.font = "800 22px 'Big Shoulders Display', 'Arial Narrow', Arial, sans-serif";
 				ctx.fillText(f.label.toUpperCase(), X, Y - 48 - (reduceMotion ? 0 : k * 16));
@@ -5541,6 +5594,10 @@
 	}
 
 	function drawScene () {
+		if (camMode === "tv" && !benchCam()) { drawSceneTV(); return; }
+		drawSceneTop();
+	}
+	function drawSceneTop () {
 		fitView();
 		const [ tx, ty ] = camTarget();
 		// Same glide on any screen: ease by elapsed time, not per drawn frame.
@@ -5589,6 +5646,253 @@
 		drawHints();
 		drawToasts();
 		drawCountdown();
+	}
+
+	/* ---------- the TV camera ---------- */
+	// High in the main stand behind the near touchline, following the play along the line.
+	// The pitch (with everything painted on it: shadows, rings, lines) is drawn flat into an
+	// offscreen picture, then laid down in perspective one strip at a time; players, the ball,
+	// the goals and the far stand stand up on top of it.
+	let camMode = store.get("ff-cam") === "tv" ? "tv" : "top";
+	const TV = { camX: null, Cy: 0, Hc: 0, th: 0, f: 1, cy: 0, key: "" };
+	const Z_W = 0.71;   // ball and crossbar heights are in their own units; this turns them into pitch pixels
+	function tvSetup () {
+		const key = `${FW}x${FH}:${Math.round(VW)}x${Math.round(VH)}`;
+		if (TV.key === key) { return; }
+		TV.key = key;
+		TV.Cy = FH * 2.4; TV.Hc = FH * 0.9; TV.cy = VH * 0.5;
+		const an = Math.atan2(TV.Hc, TV.Cy - (FH + 26)), af = Math.atan2(TV.Hc, TV.Cy + 16);
+		const bottom = VH - TV.cy, top = TV.cy - VH * 0.26;
+		// The tilt that puts the near touchline on the bottom edge and the far one a quarter down.
+		let lo = af, hi = an;
+		for (let i = 0; i < 50; i++) {
+			const th = (lo + hi) / 2;
+			if (Math.tan(an - th) / bottom - Math.tan(th - af) / top > 0) { lo = th; } else { hi = th; }
+		}
+		TV.th = (lo + hi) / 2;
+		TV.f = bottom / Math.tan(an - TV.th);
+	}
+	function tvProj (x, y, z) {
+		const c = Math.cos(TV.th), s = Math.sin(TV.th), ry = y - TV.Cy, rz = z - TV.Hc;
+		const depth = -ry * c - rz * s;
+		if (depth < 1) { return null; }
+		const k = TV.f / depth;
+		return { x: VW / 2 + (x - TV.camX) * k, y: TV.cy - (-ry * s + rz * c) * k, k };
+	}
+	function tvRow (sy) {
+		const c = Math.cos(TV.th), s = Math.sin(TV.th), v = -(sy - TV.cy) / TV.f, dz = -s + v * c;
+		if (dz >= -1e-6) { return null; }
+		const t = -TV.Hc / dz;
+		return { y: TV.Cy + (-c - v * s) * t, t };
+	}
+	let tvTex = null;
+	function tvGroundTex () {
+		if (tvTex && tvTex.stands === stands && tvTex.w === WW && tvTex.h === WH && tvTex.cond === cond.label && tvTex.st === gstyle) { return; }
+		const mk = () => { const c = document.createElement("canvas"); c.width = Math.ceil(WW); c.height = Math.ceil(WH); return c; };
+		const c = mk(), d = mk(), g = c.getContext && c.getContext("2d"), dg = d.getContext && d.getContext("2d");
+		if (!g || !dg) { tvTex = null; return; }
+		const keep = ctx;
+		ctx = g;
+		try { drawPitch(true); } finally { ctx = keep; }
+		tvTex = { c, d, dg, stands, w: WW, h: WH, cond: cond.label, st: gstyle };
+	}
+	function drawSceneTV () {
+		fitView();
+		tvSetup();
+		tvGroundTex();
+		if (!tvTex) { drawSceneTop(); return; }
+		// Keep the overhead camera up to date too, so switching back is smooth.
+		const [ tx, ty ] = camTarget(), ease = reduceMotion ? 1 : 1 - Math.exp(-frameDt / 190);
+		camX += (tx - camX) * ease; camY += (ty - camY) * ease;
+		const o = ball.owner, bx = o ? o.x + o.vx * 14 : ball.x;
+		const mid = tvRow(TV.cy), half = mid ? VW / 2 / TV.f * mid.t : FW;
+		const want = half * 2 >= FW ? FW / 2 : clamp(bx, half - MX * 0.6, FW - half + MX * 0.6);
+		TV.camX = TV.camX == null ? want : TV.camX + (want - TV.camX) * (reduceMotion ? 1 : 1 - Math.exp(-frameDt / 260));
+
+		// 1. The flat layer: the pitch, then shadows and everything painted on the grass.
+		const g = tvTex.dg;
+		g.setTransform(1, 0, 0, 1, 0, 0);
+		g.drawImage(tvTex.c, 0, 0);
+		const keep = ctx;
+		ctx = g;
+		try {
+			ctx.fillStyle = "rgba(0, 0, 0, 0.32)";
+			for (const p of players) { ctx.beginPath(); ctx.ellipse(MX + p.x + 3, MY + p.y + 2, 12, 5, 0, 0, Math.PI * 2); ctx.fill(); }
+			const bz = Math.max(0, ball.z);
+			ctx.fillStyle = `rgba(0, 0, 0, ${0.4 / (1 + bz / 40)})`;
+			ctx.beginPath(); ctx.ellipse(MX + ball.x + bz * 0.15, MY + ball.y + bz * 0.1, 5 + bz * 0.04, 3 + bz * 0.03, 0, 0, Math.PI * 2); ctx.fill();
+			drawFreeKickSpray(); drawPassTarget(); drawStrikerMarker(); drawSwitchPreview(); drawOffsideLine(); drawAim();
+			if (tut && tut.marker) {
+				ctx.strokeStyle = "#f2b52e"; ctx.lineWidth = 3;
+				ctx.beginPath(); ctx.arc(MX + tut.marker.x, MY + tut.marker.y, 24, 0, Math.PI * 2); ctx.stroke();
+			}
+			drawFx(false);
+		} finally { ctx = keep; }
+
+		ctx.setTransform(scale, 0, 0, scale, 0, 0);
+		// 2. The night sky, the far stand standing up behind the far touchline, the floodlights.
+		const st = gstyle || { roof: true, lights: "pylons" };
+		// The far stand is a tier rising back from the touchline: each row of its picture is
+		// laid on the slope at its own depth.
+		const standD = MY * 1.7, standH = MY * 1.9, xl = -MX - 40, xr = FW + MX + 40;
+		const onTier = u => [ -14 - u * standD, u * standH ];   // u: 0 at the front, 1 at the back
+		const back = tvProj(xl, ...onTier(1)), front = tvProj(xl, ...onTier(0));
+		const sky = ctx.createLinearGradient(0, 0, 0, back ? back.y : VH * 0.3);
+		sky.addColorStop(0, "#050a10"); sky.addColorStop(1, "#16232b");
+		ctx.fillStyle = sky; ctx.fillRect(0, 0, VW, VH);
+		if (stands && back && front) {
+			const img = stands.top, rows = 40, rh = img.height / rows;
+			for (let i = 0; i < rows; i++) {
+				const u0 = 1 - i / rows, u1 = 1 - (i + 1) / rows;
+				const a = tvProj(xl, ...onTier(u0)), b = tvProj(xr, ...onTier(u0)), c = tvProj(xl, ...onTier(u1));
+				if (!a || !b || !c) { continue; }
+				ctx.drawImage(img, 0, i * rh, img.width, rh, a.x, a.y, b.x - a.x, c.y - a.y + 0.8);
+			}
+			if (st.roof) {
+				const r1 = tvProj(xl, -14 - standD * 1.05, standH * 1.12), r2 = tvProj(xr, -14 - standD * 1.05, standH * 1.12);
+				if (r1 && r2) {
+					ctx.fillStyle = "#0a0d10";
+					ctx.fillRect(r1.x, r1.y, r2.x - r1.x, back.y - r1.y + 1);
+					if (st.lights === "roof") {
+						ctx.fillStyle = "#fff6d8";
+						for (let x = xl + 30; x < xr; x += 70) { const q = tvProj(x, -14 - standD * 0.2, standH * 1.1); if (q) { ctx.fillRect(q.x, back.y - 5, 30 * q.k, 3); } }
+					}
+				}
+			}
+		}
+		const wt = back;
+		if (st.lights === "pylons") {
+			for (const px of [ -MX * 0.6, FW + MX * 0.6 ]) {
+				const foot = tvProj(px, -40, 0), head = tvProj(px, -40, standH * 2.3);
+				if (!foot || !head) { continue; }
+				ctx.strokeStyle = "#39434a"; ctx.lineWidth = Math.max(2, 5 * head.k);
+				ctx.beginPath(); ctx.moveTo(foot.x, foot.y); ctx.lineTo(head.x, head.y); ctx.stroke();
+				const glow = ctx.createRadialGradient(head.x, head.y, 2, head.x, head.y, 90 * head.k + 30);
+				glow.addColorStop(0, "rgba(255, 244, 210, 0.55)"); glow.addColorStop(1, "rgba(255, 244, 210, 0)");
+				ctx.fillStyle = glow; ctx.fillRect(head.x - 140, head.y - 140, 280, 280);
+				ctx.fillStyle = "#fff6d8"; ctx.fillRect(head.x - 22 * head.k, head.y - 12 * head.k, 44 * head.k, 16 * head.k);
+			}
+		}
+		// 3. The pitch, strip by strip in perspective.
+		const far = tvProj(TV.camX, -14, 0), y0 = Math.max(0, Math.floor(far ? far.y : 0));
+		const R = 2;
+		for (let sy = y0; sy < VH; sy += R) {
+			const a = tvRow(sy), b = tvRow(sy + R);
+			if (!a || !b) { continue; }
+			const hw = VW / 2 / TV.f * a.t, sx0 = MX + TV.camX - hw, sw = hw * 2;
+			const L = Math.max(0, sx0), Rr = Math.min(WW, sx0 + sw), ty0 = MY + a.y, th = Math.max(0.6, b.y - a.y);
+			if (Rr <= L || ty0 < 0 || ty0 >= WH) { continue; }
+			ctx.drawImage(tvTex.d, L, ty0, Rr - L, Math.min(th, WH - ty0), (L - sx0) / sw * VW, sy, (Rr - L) / sw * VW, R + 0.6);
+		}
+		// 4. Goals, players and the ball, far to near.
+		const items = players.map(p => ({ y: p.y, draw: () => drawPlayerTV(p) }));
+		items.push({ y: ball.y + 0.5, draw: drawBallTV });
+		items.push({ y: GOAL_T, draw: () => drawGoalTV(true) }, { y: GOAL_T, draw: () => drawGoalTV(false) });
+		items.sort((a, b) => a.y - b.y);
+		for (const it of items) { it.draw(); }
+		// Pop-up words (goal, won it, saved) stand up over the spot.
+		ctx.textAlign = "center"; ctx.textBaseline = "middle";
+		ctx.font = "800 22px 'Big Shoulders Display', 'Arial Narrow', Arial, sans-serif";
+		for (const f of fx) {
+			if (f.toast || !f.label) { continue; }
+			const k = f.t / (f.life || 40), q = tvProj(f.p ? f.p.x : f.x, f.p ? f.p.y : f.y, 60);
+			if (!q) { continue; }
+			ctx.globalAlpha = 1 - k; ctx.fillStyle = f.color;
+			ctx.fillText(f.label.toUpperCase(), q.x, q.y - (reduceMotion ? 0 : k * 16));
+		}
+		ctx.globalAlpha = 1;
+		drawRain();
+		drawMinimap();
+		drawHints();
+		drawToasts();
+		drawCountdown();
+	}
+	function drawGoalTV (left) {
+		const x0 = left ? 0 : FW, xb = left ? -NET : FW + NET, cb = 55 * Z_W, bb = cb * 0.72;
+		const P = (x, y, z) => tvProj(x, y, z);
+		const seg = (a, b) => { if (a && b) { ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); } };
+		// The net: a mesh from the frame back to the rear bar.
+		ctx.strokeStyle = "rgba(255, 255, 255, 0.22)"; ctx.lineWidth = 1;
+		ctx.beginPath();
+		for (let y = GOAL_T; y <= GOAL_B + 0.1; y += (GOAL_B - GOAL_T) / 10) { seg(P(x0, y, cb), P(xb, y, bb)); seg(P(xb, y, bb), P(xb, y, 0)); }
+		for (let z = 0; z <= bb + 0.1; z += bb / 4) { seg(P(xb, GOAL_T, z), P(xb, GOAL_B, z)); }
+		ctx.stroke();
+		ctx.strokeStyle = "#f7faf5"; ctx.lineCap = "round";
+		const k = (P(x0, (GOAL_T + GOAL_B) / 2, 0) || { k: 1 }).k;
+		ctx.lineWidth = Math.max(2, 3.2 * k);
+		ctx.beginPath();
+		seg(P(x0, GOAL_T, 0), P(x0, GOAL_T, cb)); seg(P(x0, GOAL_T, cb), P(x0, GOAL_B, cb)); seg(P(x0, GOAL_B, cb), P(x0, GOAL_B, 0));
+		ctx.stroke();
+		ctx.lineWidth = Math.max(1, 1.6 * k);
+		ctx.beginPath();
+		seg(P(x0, GOAL_T, cb), P(xb, GOAL_T, bb)); seg(P(x0, GOAL_B, cb), P(xb, GOAL_B, bb)); seg(P(xb, GOAL_T, bb), P(xb, GOAL_B, bb));
+		seg(P(xb, GOAL_T, 0), P(xb, GOAL_T, bb)); seg(P(xb, GOAL_B, 0), P(xb, GOAL_B, bb));
+		ctx.stroke();
+		ctx.lineCap = "butt";
+	}
+	// A footballer seen from the stand: boots, legs, shorts, shirt, arms and head, running.
+	function drawPlayerTV (p) {
+		const b = tvProj(p.x, p.y, 0);
+		if (!b) { return; }
+		const kit = KITS[p.team], L = look(p), k = b.k;
+		const down = (p.lunge > 0 && players.indexOf(p) === ctrl) || p.slideAI > 0;
+		const H = 34 * k * (down ? 0.55 : 1), X = b.x, Y = b.y;
+		const shirt = p.role === "gk" ? kit.gk : kit.outfield, shorts = kit.second || "#1f2a36";
+		const face = Math.cos(p.dir) >= 0 ? 1 : -1;
+		const sw = reduceMotion ? 0 : Math.sin(p.stride || 0) * clamp(p.runAmt || 0, 0, 1);
+		const hip = Y - H * 0.47, sh = Y - H * 0.8;
+		ctx.lineCap = "round";
+		// Legs and boots.
+		ctx.strokeStyle = L.skin; ctx.lineWidth = Math.max(1.4, H * 0.09);
+		const f1 = down ? [ X + face * H * 0.55, Y - H * 0.1 ] : [ X + sw * H * 0.2 * face, Y ], f2 = down ? [ X + face * H * 0.35, Y ] : [ X - sw * H * 0.2 * face, Y ];
+		ctx.beginPath(); ctx.moveTo(X - H * 0.04, hip); ctx.lineTo(f1[0], f1[1]); ctx.moveTo(X + H * 0.04, hip); ctx.lineTo(f2[0], f2[1]); ctx.stroke();
+		ctx.strokeStyle = shirt; ctx.lineWidth = Math.max(1.6, H * 0.1);   // socks
+		const mix = (a, b, t) => a + (b - a) * t;
+		ctx.beginPath(); ctx.moveTo(mix(X - H * 0.04, f1[0], 0.55), mix(hip, f1[1], 0.55)); ctx.lineTo(f1[0], f1[1]); ctx.moveTo(mix(X + H * 0.04, f2[0], 0.55), mix(hip, f2[1], 0.55)); ctx.lineTo(f2[0], f2[1]); ctx.stroke();
+		ctx.fillStyle = "#101010";
+		for (const [ fx0, fy0 ] of [ f1, f2 ]) { ctx.beginPath(); ctx.ellipse(fx0 + face * H * 0.03, fy0, H * 0.06, H * 0.03, 0, 0, Math.PI * 2); ctx.fill(); }
+		// Shorts, shirt, arms.
+		ctx.fillStyle = shorts; ctx.fillRect(X - H * 0.12, hip - H * 0.06, H * 0.24, H * 0.13);
+		ctx.fillStyle = shirt; ctx.fillRect(X - H * 0.14, sh, H * 0.28, hip - sh - H * 0.04);
+		if (kit.pattern === "stripes" && p.role !== "gk") { ctx.fillStyle = shorts; for (let i = -1; i <= 1; i += 2) { ctx.fillRect(X + i * H * 0.06 - H * 0.02, sh, H * 0.04, hip - sh - H * 0.04); } }
+		ctx.strokeStyle = shirt; ctx.lineWidth = Math.max(1.2, H * 0.075);
+		ctx.beginPath(); ctx.moveTo(X - H * 0.13, sh + H * 0.03); ctx.lineTo(X - H * 0.16 - sw * H * 0.12 * face, sh + H * 0.3);
+		ctx.moveTo(X + H * 0.13, sh + H * 0.03); ctx.lineTo(X + H * 0.16 + sw * H * 0.12 * face, sh + H * 0.3); ctx.stroke();
+		// Head.
+		ctx.fillStyle = L.skin; ctx.beginPath(); ctx.arc(X, sh - H * 0.1, H * 0.09, 0, Math.PI * 2); ctx.fill();
+		if (!L.shaved) { ctx.fillStyle = L.hair; ctx.beginPath(); ctx.arc(X, sh - H * 0.12, H * 0.09, Math.PI, 0); ctx.fill(); }
+		ctx.lineCap = "butt";
+		const top = sh - H * 0.24;
+		if (p.yellow) { ctx.fillStyle = "#ffd21f"; ctx.fillRect(X + H * 0.18, top, 5, 7); }
+		if (p.injured) { ctx.fillStyle = "#ffffff"; ctx.fillRect(X - H * 0.18 - 7, top, 7, 7); ctx.fillStyle = "#d8343f"; ctx.fillRect(X - H * 0.18 - 4.5, top + 1, 2, 5); ctx.fillRect(X - H * 0.18 - 6, top + 2.5, 5, 2); }
+		// Your man: the marker and his name.
+		if (p.team === 0 && players.indexOf(p) === ctrl && state !== "intro") {
+			ctx.fillStyle = "#f2b52e";
+			ctx.beginPath(); ctx.moveTo(X - 7, top - 12); ctx.lineTo(X + 7, top - 12); ctx.lineTo(X, top - 3); ctx.closePath(); ctx.fill();
+			if (p.name) {
+				ctx.font = "700 12px Barlow, Arial, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+				const label = `${p.num} ${p.name}`, w = ctx.measureText(label).width;
+				ctx.fillStyle = "rgba(8, 13, 11, 0.8)"; ctx.fillRect(X - w / 2 - 5, top - 29, w + 10, 16);
+				ctx.fillStyle = "#eef6ea"; ctx.fillText(label, X, top - 15);
+			}
+		}
+	}
+	function drawBallTV () {
+		const q = tvProj(ball.x, ball.y, Math.max(0, ball.z) * Z_W + 3.2);
+		if (!q) { return; }
+		const r = Math.max(2.3, 3.4 * q.k);
+		ctx.fillStyle = "#ffffff";
+		ctx.beginPath(); ctx.arc(q.x, q.y, r, 0, Math.PI * 2); ctx.fill();
+		ctx.strokeStyle = "rgba(0, 0, 0, 0.55)"; ctx.lineWidth = 1; ctx.stroke();
+		ctx.fillStyle = "#1a1a1a";
+		ctx.beginPath(); ctx.arc(q.x - r * 0.25, q.y - r * 0.2, r * 0.32, 0, Math.PI * 2); ctx.fill();
+	}
+	function setCam (m) {
+		camMode = m;
+		store.set("ff-cam", m);
+		const b = $("camBtn");
+		b.textContent = m === "tv" ? "Camera: TV" : "Camera: overhead";
+		b.setAttribute("aria-pressed", String(m === "tv"));
 	}
 
 	// The simulation runs at 60 steps a second; screens often refresh faster. Remember
@@ -5665,6 +5969,7 @@
 		}
 		if ((state === "play" || state === "goal") && GAME_KEYS.has(e.code)) { e.preventDefault(); }
 		if (e.repeat) { return; }
+		if (e.code === "KeyC") { setCam(camMode === "tv" ? "top" : "tv"); toast(camMode === "tv" ? "TV camera" : "Overhead camera", "#f2b52e"); return; }
 		padOn = false;
 		keys.add(e.code);
 		// Tactics change any time the match is on, even at a set piece.
@@ -5784,6 +6089,8 @@
 		showIntro();
 		renderLeague();
 	});
+	$("camBtn").addEventListener("click", e => { setCam(camMode === "tv" ? "top" : "tv"); e.currentTarget.blur(); toast(camMode === "tv" ? "TV camera" : "Overhead camera", "#f2b52e"); });
+	setCam(camMode);
 	$("offsideBtn").addEventListener("click", e => {
 		offsideRule = !offsideRule;
 		offside = { team: -1, set: new Set() };
