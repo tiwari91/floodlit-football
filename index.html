@@ -2408,6 +2408,7 @@
 			p.x = x; p.y = p.by; p.vx = p.vy = 0;
 			p.dir = p.team === 0 ? 0 : Math.PI;
 			p.kickCd = 0; p.lunge = 0; p.lungeCd = 0; p.hold = 0;
+			p.celeb = null; p.celebA = 0; p.kickA = 0; p.plant = 0;
 		}
 		const side = outfield(kickTeam);   // (a side can be a man down after a red card)
 		const taker = side.find(p => p.idx === KICKER) || side.find(p => p.role === "fwd") || side[side.length - 1];
@@ -2615,6 +2616,15 @@
 		snapshotPrev();
 	}
 
+	// The kicking leg: back, through the ball, and a follow-through that's bigger on a shot.
+	const KICK_T = 16;
+	function kickSwing (p) {
+		if (!(p.kickA > 0)) { return null; }
+		const t = 1 - p.kickA / KICK_T, pow = p.kickPow || 0.5;
+		const s = t < 0.18 ? -0.35 - 0.45 * pow + (t / 0.18) * (0.75 + 0.45 * pow) : t < 0.55 ? 0.4 + (t - 0.18) / 0.37 * (0.3 + 0.8 * pow) : (0.7 + 0.8 * pow) * (1 - (t - 0.55) / 0.45);
+		return { s, bend: t < 0.18 ? 1.1 * (1 - t / 0.18) : 0.1 + 0.3 * Math.max(0, t - 0.55) };
+	}
+
 	function kick (p, tx, ty, speed) {
 		lastTouch = p.team;
 		markOffside(p);
@@ -2632,6 +2642,7 @@
 		ball.kickedAt = frame;
 		p.kickCd = 20;
 		p.dir = Math.atan2(dy, dx);
+		if (!(p.jump > 0)) { p.kickA = KICK_T; p.kickPow = clamp((speed - 5) / 9, 0.25, 1); }
 		sfx("kick");
 	}
 
@@ -3251,13 +3262,36 @@
 	/* ---------- simulation ---------- */
 	// Legs and arms: about one and a half full strides a second at a sprint, fewer
 	// when jogging, and the swing eases in and out as a player starts and stops.
+	// Cadence rises with speed (a walk is about one stride a second, a sprint about two and a
+	// quarter) so the feet keep pace with the ground instead of skating. Moving sideways or
+	// backwards he shuffles: shorter, quicker steps with the knees bent.
 	function stepLimbs () {
 		for (const p of players) {
-			const spd = Math.hypot(p.vx, p.vy);
-			p.stride = (p.stride || 0) + spd * 0.068 + (spd > 0.4 ? 0.012 : 0);
-			const target = spd < 0.35 ? 0 : Math.min(1, spd / 2.6);
+			const spd = Math.hypot(p.vx, p.vy), g = build(p);
+			const fwd = spd > 0.3 ? (p.vx * Math.cos(p.dir) + p.vy * Math.sin(p.dir)) / spd : 1;
+			p.shuf = (p.shuf || 0) + ((spd > 0.3 && fwd < 0.35 ? 1 : 0) - (p.shuf || 0)) * 0.15;
+			// Waiting for a pass he doesn't stand stock still: small steps to set his feet.
+			const settle = receiver === p && spd < 0.5 && !ball.owner ? 1 : 0;
+			const moving = Math.max(clamp(spd / 0.4, 0, 1), settle * 0.6);
+			const hz = (0.95 + 0.5 * spd) / g.stride * (1 + 0.35 * p.shuf);
+			p.stride = (p.stride || 0) + Math.PI * 2 * hz / 60 * moving;
+			const target = Math.max(spd < 0.35 ? 0 : Math.min(1, spd / 2.6), settle * 0.22);
 			p.runAmt = (p.runAmt || 0) + (target - (p.runAmt || 0)) * 0.12;
+			p.idlePh = (p.idlePh || g.seed * 6.28) + 0.028;
+			if (p.kickA > 0) { p.kickA--; }
+			if (p.plant > 0) { p.plant--; }
 		}
+	}
+
+	// Each player is built a little differently: how sharply he turns and how long he strides,
+	// fixed per player so a side never moves in lockstep.
+	function hashStr (t) { let h = 2166136261; for (let i = 0; i < t.length; i++) { h = Math.imul(h ^ t.charCodeAt(i), 16777619); } return h >>> 0; }
+	function build (p) {
+		if (!p.build) {
+			const h = hashStr(p.name || `${p.team}-${p.idx}-${p.num}`);
+			p.build = { seed: (h % 1000) / 1000, agil: 0.9 + ((h >> 4) % 21) / 100, stride: 0.93 + ((h >> 9) % 15) / 100, left: (h >> 13) % 5 === 0 };
+		}
+		return p.build;
 	}
 
 	// Movement off the ball. When his side has it, a player doesn't just stand in his slot:
@@ -3313,8 +3347,20 @@
 	function movePlayer (p, dvx, dvy, grip = cond.grip, accMax = ACC_AI) {
 		let ax = (dvx - p.vx) * grip, ay = (dvy - p.vy) * grip;
 		const faster = dvx * dvx + dvy * dvy > p.vx * p.vx + p.vy * p.vy;
-		const cap = accMax * (faster ? 1 : 1.7) * (cond.grip / 0.22), a = Math.hypot(ax, ay);
+		const cap = accMax * (faster ? 1 : 1.7) * (cond.grip / 0.22) * (accMax < 1 ? build(p).agil : 1), a = Math.hypot(ax, ay);
 		if (a > cap) { ax *= cap / a; ay *= cap / a; }
+		// At speed he can't swing round on the spot: the sideways push is limited, so a turn is a
+		// curve that tightens as he slows, and a hard change of direction means plant and cut.
+		const v = Math.hypot(p.vx, p.vy);
+		if (v > 1 && accMax < 1) {
+			const ux = p.vx / v, uy = p.vy / v, along = ax * ux + ay * uy;
+			let side = -ax * uy + ay * ux;
+			const latCap = cap * clamp(1.9 / v, 0.55, 1);
+			if (Math.abs(side) > latCap) { side = Math.sign(side) * latCap; }
+			ax = along * ux - side * uy; ay = along * uy + side * ux;
+			const want = Math.hypot(dvx, dvy);
+			if (want > 0.3 && v > 1.4 && (dvx * ux + dvy * uy) / want < -0.2) { p.plant = 10; }
+		}
 		p.vx += ax;
 		p.vy += ay;
 		p.x = clamp(p.x + p.vx, 12, FW - 12);
@@ -3374,6 +3420,8 @@
 			fx = fx.filter(f => f.t < (f.life || 40));
 		}
 		if (state === "goal") {
+			celebrate();
+			stepLimbs();
 			stepBall();
 			if (--goalTimer <= 0) {
 				banner.hidden = true;
@@ -3627,6 +3675,11 @@
 				p.effort = (p.effort || effort) + (effort - (p.effort || effort)) * 0.1;   // no sudden gear changes
 				sprint = p.effort;
 			}
+			// At a stoppage nobody sprints about: they walk into place, and jog only if well out.
+			if (setPiece && !diving && p !== setPiece.taker && p.role !== "gk") {
+				const off = Math.hypot(target[0] - p.x, target[1] - p.y);
+				sprint = Math.min(sprint, off > 160 ? 0.8 : off > 60 ? 0.5 : 0.34);
+			}
 			// Smooth where AI players are heading so they don't twitch as the ball moves.
 			if (p.tx === undefined || Math.hypot(target[0] - p.tx, target[1] - p.ty) > 900) { p.tx = target[0]; p.ty = target[1]; }
 			// Everyone reads the play at his own speed, so a side never slides across in lockstep.
@@ -3718,6 +3771,28 @@
 		const inMouth = ball.y > GOAL_T && ball.y < GOAL_B;
 		if (!inMouth) { return; }
 		if (ball.x < -2) { goalScored(1); } else if (ball.x > FW + 2) { goalScored(0); }
+	}
+
+	// After a goal the scorer wheels away toward the corner flag with his arms out and his
+	// teammates chase after him; the other side trudges back.
+	function celebrate () {
+		const hero = ball.lastBy && ball.lastBy.team === lastScorer ? ball.lastBy : null;
+		for (const p of players) {
+			let tx = p.x, ty = p.y, spd = 0;
+			if (p === hero) {
+				if (!p.celeb) { p.celeb = [ ball.x < FW / 2 ? 40 : FW - 40, p.y < FH / 2 ? 40 : FH - 40 ]; }
+				[ tx, ty ] = p.celeb; spd = BASE_SPD * 0.95;
+			} else if (hero && p.team === lastScorer && p.role !== "gk") {
+				const d = dist(p, hero);
+				if (d > 34) { tx = hero.x; ty = hero.y; spd = BASE_SPD * (d > 200 ? 0.9 : 0.6); }
+			} else if (p.team !== lastScorer && p.role !== "gk") {
+				tx = p.x + (p.team === 0 ? -1 : 1) * 30; ty = p.y; spd = BASE_SPD * 0.18;
+			}
+			const [ dvx, dvy ] = spd ? steer(p, tx, ty, spd, Math.hypot(tx - p.x, ty - p.y)) : [ 0, 0 ];
+			movePlayer(p, dvx, dvy, cond.grip, ACC_AI);
+			if (Math.hypot(p.vx, p.vy) > 0.4) { p.dir = turnToward(p.dir, Math.atan2(p.vy, p.vx), 0.15); }
+			p.celebA = p === hero ? Math.min(1, (p.celebA || 0) + 0.08) : 0;
+		}
 	}
 
 	function goalScored (scorer) {
@@ -4409,6 +4484,7 @@
 		offside = { team: -1, set: new Set() };
 		ball.owner = p;
 		ball.headed = false;
+		if (p.role !== "gk") { p.vx *= 0.85; p.vy *= 0.85; }   // the first touch takes a little pace off
 		p.hold = 0;
 		p.gotAt = frame;
 		p.think = 4;
@@ -5267,8 +5343,10 @@
 	const HAIR = [ "#1b1410", "#3b2616", "#6b4424", "#a0703a", "#d8b46a", "#2a2a2a" ];
 	function look (p) {
 		if (!p.look) {
-			const h = (p.team * 131 + p.idx * 57 + p.num * 13 + (p.team ? opp.name.length * 7 : 0)) >>> 0;
-			p.look = { skin: SKIN[h % SKIN.length], hair: HAIR[(h >> 2) % HAIR.length], shaved: h % 9 === 0 };
+			// Fixed by name, so a player looks the same every match.
+			const h = hashStr((p.name || `${p.team}-${p.idx}-${p.num}`) + "look");
+			const style = [ "short", "short", "short", "curly", "long", "buzz", "shaved" ][(h >> 5) % 7];
+			p.look = { skin: SKIN[h % SKIN.length], hair: HAIR[(h >> 2) % HAIR.length], shaved: style === "shaved", style };
 		}
 		return p.look;
 	}
@@ -5276,8 +5354,14 @@
 	function drawFigure (p, X, Y, kit) {
 		const fx = Math.cos(p.dir), fy = Math.sin(p.dir), sx = -fy, sy = fx;
 		// Stride and swing come from the simulation (see stepLimbs), not the screen's refresh rate.
-		const sw = reduceMotion ? 0 : Math.sin(p.stride || 0) * (3 + 5 * (p.runAmt || 0)) * (p.runAmt || 0);
+		// Shuffling steps are short; a planted cut leans back against the turn.
+		const sw = reduceMotion ? 0 : Math.sin(p.stride || 0) * (3 + 7 * (p.runAmt || 0)) * (p.runAmt || 0) * (1 - 0.5 * (p.shuf || 0));
 		const sliding = p.lunge > 0 || p.slideAI > 0, gk = p.role === "gk", lk = look(p);
+		const ks = reduceMotion ? null : kickSwing(p), kSide = build(p).left ? -1 : 1;
+		if (!reduceMotion && (p.runAmt || 0) < 0.15 && !sliding) {   // standing: a little weight shift
+			const w = Math.sin(p.idlePh || 0) * 0.9;
+			X += -fy * w; Y += fx * w;
+		}
 		const twist = reduceMotion ? 0 : Math.sin(p.stride || 0) * 0.14 * (p.runAmt || 0);   // shoulders against the hips
 		const shirt = gk ? kit.gk : kit.outfield, trim = gk ? "#1f2a36" : kit.second;
 		const outline = lum(shirt) < 0.18 ? "rgba(235, 242, 238, 0.7)" : "rgba(0, 0, 0, 0.5)";
@@ -5286,7 +5370,7 @@
 		ctx.lineCap = "round";
 		for (const side of [ -1, 1 ]) {
 			const hx = X + sx * side * 4, hy = Y + sy * side * 4;
-			const reach = sliding ? 15 : side * sw;
+			const reach = sliding ? 15 : ks ? (side === kSide ? ks.s * 14 : -1.5) : side * sw;
 			const ftx = hx + fx * reach, fty = hy + fy * reach;
 			ctx.strokeStyle = shirt;
 			ctx.lineWidth = 4.5;
@@ -5316,6 +5400,15 @@
 			else if (pattern === "sash") { ctx.beginPath(); ctx.moveTo(-7, -12); ctx.lineTo(-2, -12); ctx.lineTo(7, 10); ctx.lineTo(2, 12); ctx.closePath(); ctx.fill(); }
 			ctx.restore();
 		}
+		// Floodlight from the top left: the far side of the shirt falls into shade.
+		{
+			const la = Math.PI * 1.25 - (p.dir - twist);
+			ctx.save();
+			ctx.beginPath(); ctx.ellipse(0, 0, 7.5, 12.5, 0, 0, Math.PI * 2); ctx.clip();
+			ctx.fillStyle = "rgba(0, 0, 0, 0.22)";
+			ctx.beginPath(); ctx.ellipse(-Math.cos(la) * 5, -Math.sin(la) * 7, 7.5, 12.5, 0, 0, Math.PI * 2); ctx.fill();
+			ctx.restore();
+		}
 		ctx.strokeStyle = outline;
 		ctx.lineWidth = 1.4;
 		ctx.beginPath(); ctx.ellipse(0, 0, 7.5, 12.5, 0, 0, Math.PI * 2); ctx.stroke();
@@ -5326,7 +5419,7 @@
 		ctx.restore();
 
 		// Arms swing against the legs; keepers wear gloves. In the air they go up and out.
-		const up = jumpAmt(p);
+		const up = Math.max(jumpAmt(p), (p.celebA || 0) * 1.3);
 		for (const side of [ -1, 1 ]) {
 			const ax = X + sx * side * (11.5 + up * 4) - fx * side * sw * 0.6 + fx * up * 5, ay = Y + sy * side * (11.5 + up * 4) - fy * side * sw * 0.6 + fy * up * 5;
 			ctx.fillStyle = trim;
@@ -5346,7 +5439,9 @@
 		ctx.beginPath(); ctx.arc(hx, hy, 5.4, 0, Math.PI * 2); ctx.fill();
 		if (!lk.shaved) {
 			ctx.fillStyle = lk.hair;
-			ctx.beginPath(); ctx.arc(hx, hy, 5.6, p.dir + Math.PI * 0.55, p.dir + Math.PI * 1.45); ctx.closePath(); ctx.fill();
+			const big = lk.style === "curly" ? 6.4 : lk.style === "buzz" ? 5.4 : 5.6, span = lk.style === "buzz" ? 0.3 : lk.style === "curly" ? 0.42 : 0.55;
+			ctx.beginPath(); ctx.arc(hx, hy, big, p.dir + Math.PI * span, p.dir + Math.PI * (2 - span)); ctx.closePath(); ctx.fill();
+			if (lk.style === "long") { ctx.beginPath(); ctx.ellipse(hx - fx * 6, hy - fy * 6, 3.2, 2.4, p.dir, 0, Math.PI * 2); ctx.fill(); }
 		}
 		ctx.strokeStyle = "rgba(0, 0, 0, 0.35)";
 		ctx.lineWidth = 1;
@@ -6109,11 +6204,13 @@
 		const kit = KITS[p.team], L = look(p), k = b.k;
 		const down = (p.lunge > 0 && players.indexOf(p) === ctrl) || p.slideAI > 0;
 		const jump = reduceMotion ? 0 : jumpAmt(p);
-		const H = 34 * k * (down ? 0.55 : 1), X = b.x, Y = b.y - jump * 34 * k * 0.32;
-		if (jump > 0) {   // his shadow stays on the grass while he's up
-			ctx.fillStyle = "rgba(0, 0, 0, 0.3)";
-			ctx.beginPath(); ctx.ellipse(X, b.y, H * 0.28, H * 0.06, 0, 0, Math.PI * 2); ctx.fill();
-		}
+		const H = 34 * k * (down ? 0.55 : 1), Y = b.y - jump * 34 * k * 0.32;
+		let X = b.x;
+		// A soft shadow cast away from the floodlights, staying on the grass when he jumps.
+		ctx.fillStyle = "rgba(0, 0, 0, 0.16)";
+		ctx.beginPath(); ctx.ellipse(X + H * 0.12, b.y + H * 0.01, H * 0.36, H * 0.07, 0, 0, Math.PI * 2); ctx.fill();
+		ctx.fillStyle = "rgba(0, 0, 0, 0.22)";
+		ctx.beginPath(); ctx.ellipse(X + H * 0.05, b.y, H * 0.22, H * 0.05, 0, 0, Math.PI * 2); ctx.fill();
 		const shirt = p.role === "gk" ? kit.gk : kit.outfield, shorts = kit.second || "#1f2a36";
 		const cd = Math.cos(p.dir);
 		if (!p.faceTV || Math.abs(cd) > 0.3) { p.faceTV = cd >= 0 ? 1 : -1; }
@@ -6123,22 +6220,30 @@
 		// the run and a lift off the ground each stride, arms bent at the elbow working against the
 		// legs, far-side limbs a shade darker. Walking is the same action, smaller and upright.
 		const a = down ? 0 : clamp(p.runAmt || 0, 0, 1), ph = reduceMotion ? 0 : p.stride || 0;
-		const lean = a * a * 0.26, bob = reduceMotion ? 0 : Math.abs(Math.cos(ph)) * a * H * 0.035;
-		const hipX = X, hipY = Y - H * 0.5 - bob;
+		const shuf = down ? 0 : p.shuf || 0, ks = down || reduceMotion ? null : kickSwing(p), cel = p.celebA || 0;
+		// Leaning into the run, back against a planted cut, upright when shuffling.
+		const lean = a * a * 0.26 * (1 - 0.6 * shuf) - (p.plant > 0 ? 0.2 * p.plant / 10 : 0) + (ks ? 0.08 : 0);
+		const bob = reduceMotion ? 0 : Math.abs(Math.cos(ph)) * a * H * 0.035;
+		if (!reduceMotion && a < 0.15 && !down && !jump) { X += Math.sin(p.idlePh || 0) * H * 0.012; }   // standing: shifting his weight
+		const hipX = X, hipY = Y - H * 0.5 - bob + shuf * H * 0.035;
 		const shX = hipX + face * Math.sin(lean) * H * 0.32, shY = hipY - Math.cos(lean) * H * 0.32;
 		const shade = (hex, f) => { const n = parseInt(hex.slice(1), 16); return `rgb(${[ n >> 16, (n >> 8) & 255, n & 255 ].map(v => Math.round(v * f)).join(",")})`; };
 		const Lt = H * 0.26, Ls = H * 0.26, Lu = H * 0.16, Lf = H * 0.15;
 		const legPts = i => {
 			if (down) { return i ? [ [ X + face * H * 0.3, Y - H * 0.25 ], [ X + face * H * 0.62, Y - H * 0.05 ] ] : [ [ X + face * H * 0.2, Y - H * 0.12 ], [ X + face * H * 0.5, Y ] ]; }
 			const f = ph + i * Math.PI;
-			const th = jump > 0 ? (i ? -0.25 : 0.2) * jump : (0.06 + a * 0.62) * Math.sin(f) + (i ? -0.04 : 0.04);
-			const kn = jump > 0 ? 0.9 * jump : a * (0.18 + 1.35 * Math.max(0, Math.cos(f))) + (1 - a) * 0.05;
+			let th = jump > 0 ? (i ? -0.25 : 0.2) * jump : (0.06 + a * 0.62 * (1 - 0.45 * shuf)) * Math.sin(f) + (i ? -0.04 : 0.04);
+			let kn = jump > 0 ? 0.9 * jump : a * (0.18 + 1.35 * (1 - 0.5 * shuf) * Math.max(0, Math.cos(f))) + (1 - a) * 0.05 + shuf * 0.3;
+			if (ks) { if (i === 0) { th = ks.s; kn = ks.bend; } else { th = -0.12; kn = 0.2; } }   // kicking leg, and the one planted beside the ball
 			const kx = hipX + face * Math.sin(th) * Lt, ky = hipY + Math.cos(th) * Lt;
 			return [ [ kx, ky ], [ kx + face * Math.sin(th - kn) * Ls, ky + Math.cos(th - kn) * Ls ] ];
 		};
 		const armPts = i => {
 			const f = ph + i * Math.PI;
-			const ua = jump > 0 ? Math.PI * (0.55 + 0.3 * jump) + (i ? 0.25 : -0.1) : -(0.1 + a * 0.75) * Math.sin(f), eb = jump > 0 ? 0.3 : 0.25 + a * 1.25;
+			let ua = jump > 0 ? Math.PI * (0.55 + 0.3 * jump) + (i ? 0.25 : -0.1) : -(0.1 + a * 0.75 * (1 - 0.5 * shuf)) * Math.sin(f) + shuf * 0.25, eb = jump > 0 ? 0.3 : 0.25 + a * 1.25;
+			if (ks) { ua = i === 0 ? -0.6 : 0.9; eb = 0.5; }   // arms out for balance as he strikes it
+			if (cel > 0) { ua = ua * (1 - cel) + (i ? 1.9 : 1.5) * cel; eb = eb * (1 - cel) + 0.15 * cel; }   // arms out wide
+			if (!reduceMotion && a < 0.15 && !jump && !ks && !cel) { ua += Math.sin((p.idlePh || 0) + i) * 0.05; }
 			const ex = shX + face * Math.sin(ua) * Lu, ey = shY + Math.cos(ua) * Lu;
 			return [ [ ex, ey ], [ ex + face * Math.sin(ua + eb) * Lf, ey + Math.cos(ua + eb) * Lf ] ];
 		};
@@ -6147,8 +6252,16 @@
 			ctx.lineWidth = Math.max(1.4, H * 0.1);
 			ctx.strokeStyle = dark ? shade(L.skin.length === 7 ? L.skin : "#c68a5e", 0.78) : L.skin;
 			ctx.beginPath(); ctx.moveTo(hipX, hipY); ctx.lineTo(k[0], k[1]); ctx.stroke();
+			// Shorts over the top of the thigh.
+			ctx.strokeStyle = dark ? shade(shorts, 0.72) : shorts; ctx.lineWidth = Math.max(1.8, H * 0.13);
+			ctx.beginPath(); ctx.moveTo(hipX, hipY - H * 0.02); ctx.lineTo(hipX + (k[0] - hipX) * 0.45, hipY + (k[1] - hipY) * 0.45); ctx.stroke();
+			ctx.lineWidth = Math.max(1.4, H * 0.1);
+			// Bare knee, then the sock from just below it down to the boot.
+			const sk = [ k[0] + (f[0] - k[0]) * 0.3, k[1] + (f[1] - k[1]) * 0.3 ];
+			ctx.strokeStyle = dark ? shade(L.skin.length === 7 ? L.skin : "#c68a5e", 0.78) : L.skin;
+			ctx.beginPath(); ctx.moveTo(k[0], k[1]); ctx.lineTo(sk[0], sk[1]); ctx.stroke();
 			ctx.strokeStyle = dark ? shade(shirt, 0.72) : shirt;   // socks
-			ctx.beginPath(); ctx.moveTo(k[0], k[1]); ctx.lineTo(f[0], f[1]); ctx.stroke();
+			ctx.beginPath(); ctx.moveTo(sk[0], sk[1]); ctx.lineTo(f[0], f[1]); ctx.stroke();
 			ctx.fillStyle = "#101010";
 			ctx.beginPath(); ctx.ellipse(f[0] + face * H * 0.035, f[1], H * 0.065, H * 0.03, 0, 0, Math.PI * 2); ctx.fill();
 		};
@@ -6159,6 +6272,7 @@
 			ctx.beginPath(); ctx.moveTo(shX, shY + H * 0.03); ctx.lineTo(e[0], e[1]); ctx.stroke();
 			ctx.strokeStyle = dark ? shade(L.skin, 0.78) : L.skin;
 			ctx.beginPath(); ctx.moveTo(e[0], e[1]); ctx.lineTo(hnd[0], hnd[1]); ctx.stroke();
+			if (p.role === "gk") { ctx.fillStyle = dark ? "#b9c97e" : "#e8f7a1"; ctx.beginPath(); ctx.arc(hnd[0], hnd[1], Math.max(1.3, H * 0.055), 0, Math.PI * 2); ctx.fill(); }   // gloves
 		};
 		ctx.lineCap = "round"; ctx.lineJoin = "round";
 		drawArm(1, true);
@@ -6167,8 +6281,23 @@
 		ctx.strokeStyle = shorts; ctx.lineWidth = Math.max(2, H * 0.2);
 		ctx.beginPath(); ctx.moveTo(hipX, hipY + H * 0.02); ctx.lineTo(hipX + face * Math.sin(lean) * H * 0.06, hipY - H * 0.05); ctx.stroke();
 		drawLeg(0, false);
-		ctx.strokeStyle = shirt; ctx.lineWidth = Math.max(2.4, H * 0.24);
-		ctx.beginPath(); ctx.moveTo(hipX + face * Math.sin(lean) * H * 0.06, hipY - H * 0.05); ctx.lineTo(shX, shY + H * 0.04); ctx.stroke();
+		{
+			// The torso: narrower at the waist than the chest, lit on the side toward the floodlights.
+			const wx = hipX + face * Math.sin(lean) * H * 0.06, wy = hipY - H * 0.05, tx = shX, ty = shY + H * 0.04;
+			const dx = tx - wx, dy = ty - wy, dl = Math.hypot(dx, dy) || 1, nx = -dy / dl, ny = dx / dl;
+			const w0 = H * 0.1, w1 = H * 0.135;
+			ctx.fillStyle = shirt;
+			ctx.beginPath();
+			ctx.moveTo(wx + nx * w0, wy + ny * w0); ctx.lineTo(tx + nx * w1, ty + ny * w1);
+			ctx.bezierCurveTo(tx + nx * w1 + dx / dl * H * 0.07, ty + ny * w1 + dy / dl * H * 0.07, tx - nx * w1 + dx / dl * H * 0.07, ty - ny * w1 + dy / dl * H * 0.07, tx - nx * w1, ty - ny * w1);
+			ctx.lineTo(wx - nx * w0, wy - ny * w0); ctx.closePath(); ctx.fill();
+			ctx.fillStyle = "rgba(0, 0, 0, 0.2)";
+			const bs = -face;   // his back is in the shade
+			ctx.beginPath();
+			ctx.moveTo(wx, wy); ctx.lineTo(tx, ty);
+			ctx.lineTo(tx + nx * w1 * bs, ty + ny * w1 * bs); ctx.lineTo(wx + nx * w0 * bs, wy + ny * w0 * bs); ctx.closePath();
+			ctx.fill();
+		}
 		if (kit.pattern === "stripes" && p.role !== "gk") {
 			ctx.strokeStyle = shorts; ctx.lineWidth = Math.max(0.8, H * 0.035);
 			ctx.beginPath(); ctx.moveTo(hipX + face * Math.sin(lean) * H * 0.06, hipY - H * 0.05); ctx.lineTo(shX, shY + H * 0.04); ctx.stroke();
@@ -6177,7 +6306,12 @@
 		// Head, carried forward with the lean.
 		const hx = shX + face * Math.sin(lean) * H * 0.09, hy = shY - H * 0.1;
 		ctx.fillStyle = L.skin; ctx.beginPath(); ctx.arc(hx, hy, H * 0.085, 0, Math.PI * 2); ctx.fill();
-		if (!L.shaved) { ctx.fillStyle = L.hair; ctx.beginPath(); ctx.arc(hx - face * H * 0.01, hy - H * 0.02, H * 0.085, Math.PI, 0); ctx.fill(); }
+		if (!L.shaved) {
+			ctx.fillStyle = L.hair;
+			const hr = H * (L.style === "curly" ? 0.1 : L.style === "buzz" ? 0.086 : 0.088);
+			ctx.beginPath(); ctx.arc(hx - face * H * 0.01, hy - H * (L.style === "buzz" ? 0.03 : 0.02), hr, Math.PI, 0); ctx.fill();
+			if (L.style === "long") { ctx.fillRect(hx - face * H * 0.09 - H * 0.03, hy - H * 0.02, H * 0.06, H * 0.12); }
+		}
 		const sh = shY;
 		ctx.lineCap = "butt";
 		const top = sh - H * 0.24;
