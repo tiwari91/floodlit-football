@@ -3931,6 +3931,7 @@
 		for (const q of players) { q.vx = q.vy = 0; q.lunge = 0; q.tx = undefined; }
 		ball.owner = taker; ball.z = 0; ball.vz = 0; ball.vx = ball.vy = 0;
 		taker.hold = 0; taker.think = 20; taker.kickCd = 0;
+		passStreak[1 - taker.team] = 0;   // the ball went dead: the other side's run is over
 		possTeam = taker.team;
 		lastTouch = taker.team;
 		if (taker.team === 0 && taker.role !== "gk") { ctrl = players.indexOf(taker); }
@@ -4523,10 +4524,12 @@
 		p.gotAt = frame;
 		p.think = 4;
 		// A change of possession is a new situation, so drop any manual-switch hold.
+		const lostBy = p.team !== possTeam ? possTeam : -1;
 		if (p.team !== possTeam) { manualLock = 0; possTeam = p.team; }
 		if (pendingPass) { if (p.team === 0) { stats.completed++; } pendingPass = false; }
 		const by = ball.lastBy, fromMate = by && by !== p && by.team === p.team && frame - (ball.kickedAt ?? -999) < 300;
 		if (fromMate) { completedPass(p.team); } else if (by && by.team !== p.team) { breakStreak(by.team, p.team); }
+		if (lostBy === 1 - p.team && passStreak[lostBy]) { breakStreak(lostBy, p.team); }   // a loose ball or tackle ends the run too
 		if (p.team === 0 && p.role === "gk") {
 			// Your keeper plays himself: a catch stops him dead, he looks up and distributes,
 			// and you stay on an outfielder (the one he finds, once it's on its way).
@@ -4887,24 +4890,29 @@
 			: momentum < -0.6 ? "You're rattled"
 				: momentum > 0.25 ? "Your momentum"
 					: momentum < -0.25 ? `${opp.short} momentum` : "Momentum even";
-		const key = `${Math.sign(momentum)}|${pct}|${label}`;
+		// While a pass run is shown, the strip belongs to the side on the run, so its colour
+		// and its label never disagree; a run against the tide shows as a sliver on their side.
+		const youSide = run ? run > 0 : momentum >= 0;
+		const w = run && (run > 0) !== (momentum >= 0) ? 4 : pct;
+		const tone = run ? (run > 0 ? " home" : " away") : momentum > 0.25 ? " home" : momentum < -0.25 ? " away" : "";
+		const key = `${youSide}|${w}|${label}`;
 		if (key === lastMood) { return; }
 		lastMood = key;
 		const fill = $("mFill"), lab = $("mLabel");
 		// The fill grows toward whichever side of the scoreboard is on top.
-		fill.classList.toggle("cpu", momentum < 0);
-		fill.style.width = pct + "%";
-		fill.style.left = ((momentum >= 0) === leftIsYou ? 50 - pct : 50) + "%";
+		fill.classList.toggle("cpu", !youSide);
+		fill.style.width = w + "%";
+		fill.style.left = (youSide === leftIsYou ? 50 - w : 50) + "%";
 		lab.textContent = label;
-		lab.className = "mlabel" + (momentum > 0.25 ? " home" : momentum < -0.25 ? " away" : "");
+		lab.className = "mlabel" + tone;
 		const bf = $("bugFill"), bm = $("bugMood");
 		if (bf && bm) {
-			bf.classList.toggle("cpu", momentum < 0);
-			bf.style.width = pct + "%";
+			bf.classList.toggle("cpu", !youSide);
+			bf.style.width = w + "%";
 			bf.style.left = fill.style.left;
 			bm.hidden = !(run || Math.abs(momentum) > 0.25);
 			bm.textContent = label;
-			bm.className = "bugmood" + ((run ? run > 0 : momentum > 0.25) ? " home" : (run ? run < 0 : momentum < -0.25) ? " away" : "");
+			bm.className = "bugmood" + tone;
 		}
 	}
 
