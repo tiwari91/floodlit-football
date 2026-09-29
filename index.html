@@ -92,6 +92,11 @@
 	}
 	.scorebug b { font-size: 24px; font-variant-numeric: tabular-nums; }
 	.scorebug .t { color: #f2b52e; font-size: 18px; font-variant-numeric: tabular-nums; }
+	/* Big pitch keeps the momentum: a strip along the bottom of the bug and a word under it. */
+	.scorebug .bugbar { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; overflow: hidden; border-radius: 0 0 4px 4px; background: rgba(255, 255, 255, 0.08); }
+	.scorebug .bugmood { position: absolute; top: calc(100% + 4px); left: 50%; transform: translateX(-50%); font-size: 12px; font-weight: 700; letter-spacing: 0.08em; padding: 2px 8px; border-radius: 3px; background: rgba(7, 12, 10, 0.78); color: var(--chalk, #eef6ea); }
+	.scorebug .bugmood.home { color: var(--amber); }
+	.scorebug .bugmood.away { color: var(--opp-text); }
 	.scoreboard {
 		display: grid;
 		grid-template-columns: 1fr auto 1fr;
@@ -860,7 +865,7 @@
 	<div class="pitchwrap" id="pitchwrap">
 		<canvas id="pitch" aria-label="Football pitch"></canvas>
 		<button class="menutoggle" id="menuToggle" type="button" aria-pressed="true">Show menu</button>
-		<div class="scorebug" id="scoreBug" aria-hidden="true"><span id="bugHome">You</span><b id="bugScore">0 – 0</b><span id="bugAway">CPU</span><span class="t" id="bugClock">03:00</span></div>
+		<div class="scorebug" id="scoreBug" aria-hidden="true"><span id="bugHome">You</span><b id="bugScore">0 – 0</b><span id="bugAway">CPU</span><span class="t" id="bugClock">03:00</span><span class="bugbar"><span class="mfill" id="bugFill"></span></span><span class="bugmood" id="bugMood" hidden></span></div>
 		<div class="banner" id="banner" hidden></div>
 		<div class="coach" id="coach" hidden>
 			<div class="coach-step" id="coachStep"></div>
@@ -1043,6 +1048,7 @@
 		<div class="key"><b>Simulate</b> button (next to Pause): the whole match before kick-off, or the rest of it once it's on. The score so far stands.</div>
 		<p class="fine"><b>Controller.</b> Plug in or pair an Xbox or PlayStation controller and press a button. Left stick moves; A (✕) passes or switches; B (○) shoots, hold for power; X (□) slide tackles; Y (△) plays a through ball; RB (R1) hits a long ball; RT or LT sprints; Start pauses. The hints at the bottom of the pitch show what each button does at that moment; turn them off with Hints.</p>
 		<p class="fine"><b>Home and away.</b> The home side has the crowd behind it: it starts with a little momentum and the visitors play slightly below their rating. The stands fill with the home club's colours, with a corner of away fans. On a kit clash the away side changes, so you'll wear white on some away days. The scoreboard lists the home team first.</p>
+		<p class="fine"><b>Pass and they wilt.</b> String passes together and your side grows in confidence: sharper passing and touches, and the momentum bar swings your way (5 in a row gets a mention, 10 gets an Olé). The side chasing the ball gets tense: stray passes, heavy first touches, late and rash challenges, shakier keeping. It works both ways, so if the computer keeps it off you, your players get nervy too. Win the ball back, keep it for a few passes or score, and the nerves settle; a goal against the run of play flips the game.</p>
 		<p class="fine"><b>Crowd and music.</b> The crowd swells as the ball nears a goal, the home end sings, goals get a roar (or a groan from the home fans), and hard saves get an "ooh". The menus play a stadium anthem; turn it off with Music.</p>
 		<p class="fine"><b>Weather and grounds.</b> Every club has a home ground: grass, muddy or artificial turf. Mud slows the ball and the players and kills the bounce. Turf is quick and true. Rain makes grass and turf skid, makes mud heavier, costs players grip on the turn, sends passes a little astray and makes shots harder for keepers to hold. In the league, matchdays 10 to 26 are the rainy season, and the forecast is shown in advance. In a friendly, pick the weather and ground yourself.</p>
 		<p class="fine"><b>Your season, backed up.</b> Your league saves in this browser. Export league saves it to a file; Import league loads a file back (press twice to confirm, since it replaces the season you have). Use it to keep a backup or carry your season to another browser or device.</p>
@@ -1463,6 +1469,25 @@
 	const edge = t => (t === 0 ? Math.max(0, momentum) : Math.max(0, -momentum));
 	const mood = (t, amt) => 1 + amt * edge(t) - amt * edge(1 - t);
 	function swing (t, amt) { momentum = clamp(momentum + (t === 0 ? amt : -amt), -1, 1); }
+	// Pass runs: every completed pass in a row adds a little more, so a side that keeps
+	// knocking it about takes over the game and the side chasing it gets tense.
+	let passStreak = [ 0, 0 ], bestStreak = [ 0, 0 ], heavyTouches = [ 0, 0 ];
+	const teamName = t => (t === 0 ? "You" : opp.short);
+	function completedPass (t) {
+		const n = ++passStreak[t];
+		bestStreak[t] = Math.max(bestStreak[t], n);
+		swing(t, 0.012 + 0.004 * Math.min(n, 10) + 0.02 * edge(1 - t));   // a tense side calms itself by keeping it
+		if (n === 5) { toast(`${n} passes in a row`, t === 0 ? "#7fd49b" : "#f2b52e"); }
+		else if (n === 10 || n === 15 || n === 20) {
+			toast(n === 10 ? "Olé! 10 passes in a row" : `Olé! ${n} passes, ${t === 0 ? opp.short : "you"} can't get near it`, t === 0 ? "#7fd49b" : "#f2b52e");
+			if (typeof chant === "function" && (homeSide === t || n >= 15)) { try { chant(0.9); } catch (e) { /* audio is optional */ } }
+		}
+	}
+	// Winning it back breaks the spell, and the more rattled you were the more it settles you.
+	function breakStreak (loser, winner) {
+		if (passStreak[loser] >= 5 || edge(loser) > 0.3) { swing(winner, 0.03 + 0.08 * edge(loser)); }
+		passStreak[loser] = 0;
+	}
 	let pendingPass = false;
 	let diff = DIFF.normal;
 	let charging = false, chargeStart = 0;
@@ -1639,7 +1664,10 @@
 	// Computer-v-computer games, from the two ratings plus a little home advantage.
 	function simMatch (h, a) {
 		const d = getStr(h) - getStr(a);
-		return [ h, a, poisson(clamp(1.4 + 0.32 * d, 0.3, 3.2)), poisson(clamp(1.1 - 0.32 * d, 0.25, 3)) ];
+		// Who controls the ball on the day: the better side usually does, and the side
+		// that dominates possession makes a few more chances than the ratings alone give.
+		const ctl = clamp(0.06 * d + (Math.random() * 2 - 1) * 0.15, -0.25, 0.25);
+		return [ h, a, poisson(clamp((1.4 + 0.32 * d) * (1 + ctl), 0.3, 3.2)), poisson(clamp((1.1 - 0.32 * d) * (1 - ctl), 0.25, 3)) ];
 	}
 
 	function standings () {
@@ -2372,7 +2400,7 @@
 	const paceMul = p => 1 + (A(p, "pac") - 65) * 0.0025;
 	const defMul = p => 1 + (A(p, "def") - 65) * 0.012;
 	// Poor passers drift a little off target, and everyone does in the rain.
-	const passErr = p => (Math.max(0, 70 - A(p, "pas")) * 0.6 + cond.wet * 5) * (style[p.team] === "possession" ? 0.6 : 1);
+	const passErr = p => (Math.max(0, 70 - A(p, "pas")) * 0.6 + cond.wet * 5) * (style[p.team] === "possession" ? 0.6 : 1) * (1 - 0.25 * edge(p.team)) + 22 * edge(1 - p.team);
 
 	// A keeper with the ball in hands inside their own area.
 	const KEEPER_CLEAR = 70;
@@ -2647,7 +2675,7 @@
 	}
 
 	function passTo (p, m) {
-		// A rattled side's computer-run passes stray; your own passes stay true.
+		// A rattled side's passes stray (yours a little, the computer-run ones more).
 		const err = p.team === 0 && players.indexOf(p) === ctrl ? passErr(p) : 45 * edge(1 - p.team) + cond.wet * 8;
 		const lx = m.x + m.vx * 10 + (Math.random() * 2 - 1) * err;
 		const ly = m.y + m.vy * 10 + (Math.random() * 2 - 1) * err;
@@ -3071,8 +3099,9 @@
 		const st = style[p.team], pr = press[p.team];
 		// With the ball: possession sides stay close to support, direct and counter sides go long.
 		// Without it: a high press squeezes up the pitch, a low block drops off.
-		const up = inPoss ? { possession: 95, balanced: 140, direct: 185, counter: 200 }[st]
-			: { high: 20, mid: -50, low: -120 }[pr] - (st === "counter" ? 30 : 0);
+		// On top, the side pushes on to support; under the cosh it sits a little deeper.
+		const up = (inPoss ? { possession: 95, balanced: 140, direct: 185, counter: 200 }[st]
+			: { high: 20, mid: -50, low: -120 }[pr] - (st === "counter" ? 30 : 0)) + 25 * edge(p.team) - 20 * edge(1 - p.team);
 		let tx = p.bx + dirX * up * S + (ball.x - FW / 2) * (inPoss && st === "possession" ? 0.5 : 0.35);
 		// Mentality pushes the whole block up or drops it off; defenders move least.
 		tx += dirX * ment * (p.role === "def" ? 75 : p.role === "mid" ? 90 : 60) * S;
@@ -3180,7 +3209,7 @@
 		const goal = { x: attackX(p.team), y: FH / 2 };
 		const dg = dist(p, goal);
 		if (--p.think <= 0) {
-			p.think = cfg.think + Math.round(6 * edge(1 - p.team));   // rattled players dither
+			p.think = Math.max(2, cfg.think + Math.round(6 * edge(1 - p.team) - 2 * edge(p.team)));   // rattled players dither; confident ones play quicker
 			// Wide in the final third: cross it into the box.
 			if (rel(p.team, p.x) > FW * 0.72 && isWide(p.y) && Math.random() < 0.45) {
 				const goalX = attackX(p.team);
@@ -3194,7 +3223,7 @@
 			const range = Math.sqrt(S);
 			// Close in: shoot. Further out and crowded: sometimes try one from distance.
 			const crowded = openness(p) < 70;
-			const longShot = dg < 400 * range && crowded && Math.random() < 0.18;
+			const longShot = dg < 400 * range && (crowded || edge(p.team) > 0.5) && Math.random() < 0.18 + 0.1 * edge(p.team);   // on top, they fancy one from range
 			if (dg < 170 * range || (dg < 270 * range && Math.random() < 0.35) || longShot) {
 				// Better finishers are more accurate and hit it harder.
 				const fin = clamp(1.3 - (A(p, "sho") - 50) / 100, 0.6, 1.4);
@@ -3203,7 +3232,7 @@
 				return null;
 			}
 			// A forward timing a run on the offside line: slide a through ball into the space behind.
-			if (offsideOn() && Math.random() < (style[p.team] === "possession" ? 0.15 : style[p.team] === "balanced" ? 0.3 : 0.45) && openness(p) > 45) {
+			if (offsideOn() && Math.random() < (style[p.team] === "possession" ? 0.15 : style[p.team] === "balanced" ? 0.3 : 0.45) + 0.12 * edge(p.team) && openness(p) > 45) {
 				const line = offsideLine(p.team);
 				const runner = outfield(p.team).filter(m => m !== p && m.role === "fwd" && !isOffside(m, line) && line - rel(p.team, m.x) < 90 &&
 					rel(p.team, m.x) > rel(p.team, p.x) + 40).sort((a, b) => openness(b) - openness(a))[0];
@@ -3460,6 +3489,7 @@
 		} else if (momentum < -0.6 && moodZone !== -1) {
 			moodZone = -1; toast("You're rattled", "#de4f5a");
 		} else if (Math.abs(momentum) < 0.4) {
+			if (moodZone === -1) { toast("Nerves settling", "#7fd49b"); } else if (moodZone === 1) { toast(`${opp.short} settling`, "#f2b52e"); }
 			moodZone = 0;
 		}
 		if (timeLeft <= 0) { endMatch(); return; }
@@ -3805,7 +3835,9 @@
 			logEvent(scorer, "goal", own ? `${name} (own goal)` : headed ? `${name || "Goal"} (header)` : name || "Goal");
 			if (scorer === 0 && by && !own && by.name) { matchGoals.push(by.name); }
 		}
-		swing(scorer, 0.15);
+		// A goal against the run of play flips it; one for the side on top just adds to it.
+		if (edge(1 - scorer) > 0) { momentum = scorer === 0 ? 0.2 : -0.2; } else { swing(scorer, 0.15); }
+		passStreak = [ 0, 0 ];
 		lastConceded = 1 - scorer;
 		lastScorer = scorer;
 		ball.owner = null;
@@ -4369,8 +4401,10 @@
 				q.slideHit = true;
 				const moving = Math.hypot(o.vx, o.vy) > 0.5;
 				const behind = moving && Math.cos(Math.atan2(o.y - q.y, o.x - q.x) - Math.atan2(o.vy, o.vx)) > 0.55;
-				if (Math.random() < (behind ? 0.6 : q.team === 1 ? 0.22 : 0.14)) { commitFoul(q, o, behind); return; }
+				if (Math.random() < Math.min(0.9, (behind ? 0.6 : q.team === 1 ? 0.22 : 0.14) * (1 + 0.5 * edge(1 - q.team)))) { commitFoul(q, o, behind); return; }
 			}
+			// A tense defender stands in and sometimes clatters the man instead.
+			if (!won && !sliding && !isHuman && Math.random() < 0.0025 * edge(1 - q.team)) { commitFoul(q, o, false); return; }
 			if (!won) { if (q.team === 1) { break; } continue; }
 			{
 				o.kickCd = 40;
@@ -4490,7 +4524,9 @@
 		p.think = 4;
 		// A change of possession is a new situation, so drop any manual-switch hold.
 		if (p.team !== possTeam) { manualLock = 0; possTeam = p.team; }
-		if (pendingPass) { if (p.team === 0) { stats.completed++; swing(0, 0.03); } pendingPass = false; }
+		if (pendingPass) { if (p.team === 0) { stats.completed++; } pendingPass = false; }
+		const by = ball.lastBy, fromMate = by && by !== p && by.team === p.team && frame - (ball.kickedAt ?? -999) < 300;
+		if (fromMate) { completedPass(p.team); } else if (by && by.team !== p.team) { breakStreak(by.team, p.team); }
 		if (p.team === 0 && p.role === "gk") {
 			// Your keeper plays himself: a catch stops him dead, he looks up and distributes,
 			// and you stay on an outfielder (the one he finds, once it's on its way).
@@ -4504,6 +4540,16 @@
 		}
 		receiver = null;
 		if (p.team !== 0 || players.indexOf(p) !== ctrl) { charging = false; }
+		// Nerves: a tense side's first touch sometimes gets away from it.
+		if (fromMate && p.role !== "gk" && !setPiece && Math.random() < (p.team === 0 && players.indexOf(p) === ctrl ? 0.1 : 0.16) * edge(1 - p.team)) {
+			const a = Math.hypot(p.vx, p.vy) > 0.4 ? Math.atan2(p.vy, p.vx) : p.dir;
+			const sp = 2.4 + Math.random() * 1.4, off = (Math.random() * 2 - 1) * 0.7;
+			ball.owner = null;
+			ball.vx = Math.cos(a + off) * sp; ball.vy = Math.sin(a + off) * sp;
+			ball.lastBy = p; ball.kickedAt = frame; lastTouch = p.team;
+			p.kickCd = 14;
+			heavyTouches[p.team]++;
+		}
 	}
 
 	/* ---------- flow ---------- */
@@ -4531,6 +4577,7 @@
 		updateSubsBtn();
 		possFrames = [ 0, 0 ];
 		momentum = leagueMatch ? (homeSide === 0 ? 0.12 : -0.12) : 0;   // the home crowd gives the home side a start
+		passStreak = [ 0, 0 ]; bestStreak = [ 0, 0 ]; heavyTouches = [ 0, 0 ];
 		mentality = [ 0, 0 ];
 		teamShape = [ shapeKeyOf(fmtKey), shapeKeyOf(fmtKey) ];
 		readInstructions();
@@ -4680,7 +4727,8 @@
 			[ `${poss}%`, "Possession" ],
 			[ `${stats.completed}/${stats.passes}`, "Passes" ],
 			[ String(stats.shots), "Shots" ],
-			[ String(stats.tackles), "Tackles won" ]
+			[ String(stats.tackles), "Tackles won" ],
+			[ String(bestStreak[0]), "Best pass run" ]
 		]);
 		pauseBtn.textContent = "Pause";
 		if (!tut) { $("ovSubs").hidden = false; }
@@ -4795,7 +4843,8 @@
 			[ String(stats.shots), "Shots" ],
 			[ String(stats.tackles), "Tackles won" ],
 			[ String(stats.corners || 0), "Corners" ],
-			[ `${Math.round(100 * possFrames[0] / Math.max(1, possFrames[0] + possFrames[1]))}%`, "Possession" ]
+			[ `${Math.round(100 * possFrames[0] / Math.max(1, possFrames[0] + possFrames[1]))}%`, "Possession" ],
+			[ String(bestStreak[0]), "Best pass run" ]
 		]);
 		if (leagueMatch && !seasonDone() && tiredStarters().length) { $("ovFix").textContent = "Rotate now"; $("ovFix").hidden = false; }
 		renderReport();
@@ -4832,7 +4881,9 @@
 	let lastHud = "", lastCooling = false, lastMood = "";
 	function renderMomentum () {
 		const pct = Math.round(Math.abs(momentum) * 50);   // half the bar is full
-		const label = momentum > 0.6 ? `${opp.short} rattled`
+		const run = passStreak[0] >= 5 ? passStreak[0] : passStreak[1] >= 5 ? -passStreak[1] : 0;
+		const label = run ? `Olé · ${Math.abs(run)} passes${run > 0 ? "" : ` (${opp.short})`}`
+			: momentum > 0.6 ? `${opp.short} rattled`
 			: momentum < -0.6 ? "You're rattled"
 				: momentum > 0.25 ? "Your momentum"
 					: momentum < -0.25 ? `${opp.short} momentum` : "Momentum even";
@@ -4846,6 +4897,15 @@
 		fill.style.left = ((momentum >= 0) === leftIsYou ? 50 - pct : 50) + "%";
 		lab.textContent = label;
 		lab.className = "mlabel" + (momentum > 0.25 ? " home" : momentum < -0.25 ? " away" : "");
+		const bf = $("bugFill"), bm = $("bugMood");
+		if (bf && bm) {
+			bf.classList.toggle("cpu", momentum < 0);
+			bf.style.width = pct + "%";
+			bf.style.left = fill.style.left;
+			bm.hidden = !(run || Math.abs(momentum) > 0.25);
+			bm.textContent = label;
+			bm.className = "bugmood" + ((run ? run > 0 : momentum > 0.25) ? " home" : (run ? run < 0 : momentum < -0.25) ? " away" : "");
+		}
 	}
 
 	function renderModeBadge () {
