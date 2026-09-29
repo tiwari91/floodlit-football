@@ -1058,6 +1058,7 @@
 		<p class="fine"><b>Keepers.</b> When your keeper has the ball, control switches to him: aim with the arrows, then S to roll it out to the teammate in the dashed ring, W to play a runner in, Q or D to kick it long. Do nothing for six seconds and he plays it himself. Goal kicks work the same way, and there is no offside from a goal kick.</p>
 		<p class="fine"><b>Saving.</b> Your season, squad, budget and upgrades are saved after every result and every change, to your account when the page can and always in this browser, so a refresh or another visit carries on the same season. A match in progress is kept too: reopen the page and it comes back paused at the same score and time.</p>
 		<p class="fine"><b>Premier Division.</b> Twenty clubs play each other home and away over 38 matchdays, three points for a win. The top four finish in the Champions Cup places and fifth in the Continental Cup place. The bottom three are relegated and replaced by three promoted clubs. If you finish in the bottom three, the board keeps you up but halves your budget. The transfer window opens before the season, in January before matchday 20, and at the end of the season. Short on time? Simulate a fixture from the kick-off card.</p>
+		<p class="fine"><b>Headers.</b> When a high ball drops toward your player, he jumps for it. Press D as it comes down to head it at goal, S to head it on to a teammate (the way you're facing), or Q to head it clear. Press nothing and he goes for it himself, or brings it down. The nearest man from each side goes up together, and the one better placed, and better in the air, wins it. The keeper claims high balls in his own area.</p>
 		<p class="fine"><b>How the teams play.</b> Players keep their spacing and wide players hold the width when their side has the ball. In eleven-a-side the full-back overlaps when the winger carries it down his flank. Wide in the final third, sides cross it in, and the forwards attack the near post, far post and penalty spot; press Q out wide to whip in your own cross. A cross that drops at head height in the box is headed at goal (or cleared by the defence). After you pass, the passer runs on for the return, so press S again for a one-two. Under pressure the computer may switch play to an open player on the far side.</p>
 		<p class="fine"><b>Team instructions.</b> Set how you play with Style and Defending, any time, even mid-match. Possession: teammates come short to support you, short passes are more accurate, and keeping the ball builds momentum much faster, so dominating the ball rattles the other side. Direct and Counter-attack: runners go early and long balls are more accurate (counter sides also sit deeper without the ball). High press: two players close the ball down and the team squeezes up the pitch, but space opens behind. Low block: deep and compact, with the covering player staying goal-side. Every computer club has its own style, shown on the kick-off card, and possession is shown live under the scoreboard.</p>
 		<p class="fine"><b>Tactics.</b> Change your team's mentality at any moment with 1 to 4 (or T to cycle, D-pad up/down on a controller). Attacking pushes the whole team up. All-out attack sends the centre-backs to halfway, brings the keeper off his line as a sweeper and leaves fewer players marking, which is great for chasing a late goal and risky on the break. Defensive drops everyone deep. The computer does the same: it chases a game it is losing late on and sits deep on a lead.</p>
@@ -2624,6 +2625,7 @@
 		ball.beaten = null;
 		ball.pen = null;
 		ball.lift = false;
+		ball.headed = false;
 		ball.lastBy = p;
 		ball.kickedAt = frame;
 		p.kickCd = 20;
@@ -2752,6 +2754,7 @@
 	// over the top when a red shirt is in the way or it is a very long way.
 	function humanLong () {
 		const p = human();
+		if (!ball.owner && ball.z > 4 && state === "play") { headIntent = { kind: "clear", at: frame }; }
 		if (ball.owner !== p) { return; }
 		if (tut) { tut.flags.long = true; }
 		if (p.role === "gk" && !setPiece) {
@@ -2805,6 +2808,7 @@
 
 	function humanPass () {
 		const p = human();
+		if (!ball.owner && ball.z > 4 && state === "play") { headIntent = { kind: "pass", at: frame }; }
 		if (ball.owner !== p) { switchToNearest(true); return; }
 		if (setPiece && setPiece.taker === p) { takeSetPiece(p, false); return; }
 		const best = passTarget(p);
@@ -2852,6 +2856,7 @@
 
 	function humanShootPress () {
 		const p = human();
+		if (!ball.owner && ball.z > 4 && state === "play") { headIntent = { kind: "goal", at: frame }; }
 		if (state !== "play" || freeze > 0) { return; }
 		if (p.role === "gk" && ball.owner === p) { humanLong(); return; }   // a keeper's D is a long kick
 		if (setPiece && setPiece.kind === "pen" && setPiece.taker === p && ball.owner === p) { takePenalty(p); return; }
@@ -3450,6 +3455,7 @@
 
 		for (const p of players) {
 			if (p.kickCd > 0) { p.kickCd--; }
+			if (p.jump > 0) { p.jump--; }
 			if (p.lungeCd > 0) { p.lungeCd--; }
 			const isHuman = p.team === 0 && players.indexOf(p) === ctrl;
 			// Only the player you control slides; leftovers would fire when you next control them.
@@ -3682,7 +3688,8 @@
 			const by = ball.lastBy;
 			const own = by && by.team !== scorer;
 			const name = by ? by.name || (by.team === 0 ? "You" : opp.short) : "";
-			logEvent(scorer, "goal", own ? `${name} (own goal)` : name || "Goal");
+			const headed = ball.headed && !own;
+			logEvent(scorer, "goal", own ? `${name} (own goal)` : headed ? `${name || "Goal"} (header)` : name || "Goal");
 			if (scorer === 0 && by && !own && by.name) { matchGoals.push(by.name); }
 		}
 		swing(scorer, 0.15);
@@ -3692,7 +3699,7 @@
 		charging = false;
 		state = "goal";
 		goalTimer = 110;
-		banner.textContent = scorer === 0 ? "Goal" : `${opp.short} score`;
+		banner.textContent = ball.headed && ball.lastBy && ball.lastBy.team === scorer ? (scorer === 0 ? "Header! Goal" : `Header! ${opp.short} score`) : scorer === 0 ? "Goal" : `${opp.short} score`;
 		banner.className = "banner " + (scorer === 0 ? "home" : "away");
 		banner.hidden = false;
 		$("announce").textContent = `${scorer === 0 ? "Goal for you" : `Goal for ${opp.name}`}. ${score[0]} to ${score[1]}.`;
@@ -4187,6 +4194,7 @@
 			return;
 		}
 		if (!ball.owner) {
+			if (aerial()) { return; }
 			let taker = null, td = Infinity;
 			for (const p of players) {
 				if (p.kickCd > 0) { continue; }
@@ -4200,11 +4208,6 @@
 				// A ball just struck is past the man closing the kicker down before he can react:
 				// pressing you forces a pass, it doesn't win it off your boot.
 				if (!isGk && p.team !== lastTouch && speed < 11 && frame - (ball.kickedAt || -99) < 7) { continue; }
-				// A ball dropping at head height: attackers go for goal, defenders clear it.
-				if (!isGk && ball.z > 8 && ball.z < 46 && ball.vz < 0 && d < 24) {
-					if (p.team === lastTouch && inAttackBox(p) && Math.random() < 0.6) { header(p); return; }
-					if (p.team !== lastTouch && inOwnBox(p) && Math.random() < 0.3 * defMul(p)) { clearance(p); return; }
-				}
 				if (ball.z > (isGk ? 45 : 16)) { continue; }   // over their head
 				// The intended receiver always controls a firm pass.
 				if (speed > 11 && !isReceiver) {
@@ -4273,6 +4276,8 @@
 		const aimY = FH / 2 + (Math.random() * 2 - 1) * (FMT.goal / 2) * clamp(1.55 - sho / 100, 0.55, 1.35);
 		kick(p, gx, aimY, 7.5 + sho * 0.035);
 		ball.vz = 1.2;
+		ball.headed = true;
+		p.jump = JUMP;
 		if (p.team === 0) { stats.shots++; burst(p.x, p.y, "Header"); } else { ooh(); }
 	}
 	// A defensive header: away from goal, high and far.
@@ -4280,7 +4285,70 @@
 		const away = p.team === 0 ? 1 : -1;
 		kick(p, p.x + away * 260 * Math.sqrt(S), clamp(p.y + (Math.random() * 2 - 1) * 200, 40, FH - 40), 12);
 		ball.vz = 4;
+		ball.headed = true;
+		p.jump = JUMP;
 		if (p.team === 0) { burst(p.x, p.y, "Cleared"); }
+	}
+
+	// A headed pass, or a flick-on: nodded down to a teammate ahead of him.
+	function headPass (p) {
+		let best = null, bs = -Infinity;
+		for (const m of outfield(p.team)) {
+			const d = dist(p, m);
+			if (m === p || d < 50 || d > 330) { continue; }
+			// Your player heads it where he's facing; the computer picks the man furthest on.
+			const s = p.team === 0 && players.indexOf(p) === ctrl
+				? Math.cos(Math.atan2(m.y - p.y, m.x - p.x) - p.dir) * 2 - d / 600
+				: (rel(p.team, m.x) - rel(p.team, p.x)) / 200 - d / 700 + clamp(openness(m) / 160, 0, 0.6);
+			if (s > bs) { bs = s; best = m; }
+		}
+		if (!best) { clearance(p); return; }
+		const d = dist(p, best), err = 14 + (100 - A(p, "pas")) * 0.35;
+		kick(p, best.x + best.vx * 8 + (Math.random() * 2 - 1) * err, best.y + best.vy * 8 + (Math.random() * 2 - 1) * err, clamp(d / 40 + 2.2, 4, 9.5));
+		ball.vz = 1.8;
+		ball.headed = true;
+		p.jump = JUMP;
+		if (p.team === 0) { handOff(best, 90); burst(p.x, p.y, "Headed on"); }
+	}
+
+	// A ball dropping at head height: the nearest two go up for it, one from each side if
+	// they are both close; the better placed (and the better in the air) wins it. The
+	// keeper claims it in his own area instead (see contest).
+	const JUMP = 22;
+	let headIntent = null;   // what you asked your player to do with a ball coming down to him
+	const jumpAmt = p => p.jump > 0 ? Math.sin(Math.PI * (1 - p.jump / JUMP)) : 0;
+	function aerial () {
+		if (!(ball.z > 8 && ball.z < 46 && ball.vz < 0) || frame - (ball.kickedAt || -99) < 6) { return false; }
+		let a = null, b = null, da = Infinity, db = Infinity;
+		for (const p of players) {
+			if (p.kickCd > 0 || p.jump > 0) { continue; }
+			const d = dist(p, ball);
+			if (p.role === "gk") { if (d < 30 && rel(p.team, p.x) < 160 * GH) { return false; } continue; }
+			if (d > 24) { continue; }
+			if (d < da) { b = a; db = da; a = p; da = d; } else if (d < db) { b = p; db = d; }
+		}
+		if (!a) { return false; }
+		const air = (p, d) => (24 - d) * 0.5 + (Math.max(A(p, "def"), A(p, "sho")) - 65) * 0.08 + Math.random() * 6;
+		let w = a, l = b && b.team !== a.team && db < 28 ? b : null;
+		if (l && air(l, db) > air(a, da)) { w = l; l = a; }
+		const isYou = w.team === 0 && players.indexOf(w) === ctrl;
+		const asked = isYou && headIntent && frame - headIntent.at < 45 ? headIntent.kind : null;
+		let act = asked;
+		if (!act) {
+			const r = Math.random();
+			if (w.team === lastTouch && inAttackBox(w)) { act = r < 0.6 ? "goal" : r < 0.68 ? "pass" : null; }
+			else if (w.team !== lastTouch && inOwnBox(w)) { act = r < 0.3 * defMul(w) ? "clear" : null; }
+			else { act = r < 0.06 ? "pass" : null; }
+		}
+		if (!act) { return false; }
+		headIntent = null;
+		if (l) {
+			l.jump = JUMP; l.kickCd = 26;   // beaten in the air, he comes down a step behind
+			// Now and then the man who lost it climbs all over the one who won it.
+			if (Math.random() < 0.04) { w.jump = JUMP; commitFoul(l, w, false); return true; }
+		}
+		if (act === "goal") { header(w); } else if (act === "clear") { clearance(w); } else { headPass(w); }
+		return true;
 	}
 
 	// A block: the ball comes off the defender at an angle, and it's their touch
@@ -4302,6 +4370,7 @@
 		lastTouch = p.team;
 		offside = { team: -1, set: new Set() };
 		ball.owner = p;
+		ball.headed = false;
 		p.hold = 0;
 		p.gotAt = frame;
 		p.think = 4;
@@ -5218,9 +5287,10 @@
 		ctx.beginPath(); ctx.arc(1.5, 0, 5.2, -0.9, 0.9); ctx.stroke();
 		ctx.restore();
 
-		// Arms swing against the legs; keepers wear gloves.
+		// Arms swing against the legs; keepers wear gloves. In the air they go up and out.
+		const up = jumpAmt(p);
 		for (const side of [ -1, 1 ]) {
-			const ax = X + sx * side * 11.5 - fx * side * sw * 0.6, ay = Y + sy * side * 11.5 - fy * side * sw * 0.6;
+			const ax = X + sx * side * (11.5 + up * 4) - fx * side * sw * 0.6 + fx * up * 5, ay = Y + sy * side * (11.5 + up * 4) - fy * side * sw * 0.6 + fy * up * 5;
 			ctx.fillStyle = trim;
 			ctx.beginPath(); ctx.arc(X + sx * side * 9.5, Y + sy * side * 9.5, 3.4, 0, Math.PI * 2); ctx.fill();
 			ctx.fillStyle = gk ? "#e8f7a1" : lk.skin;
@@ -5316,7 +5386,17 @@
 			ctx.restore();
 		}
 
-		drawFigure(p, X, Y, kit);
+		{
+			const j = reduceMotion ? 0 : jumpAmt(p);
+			if (j > 0) {
+				ctx.save();
+				ctx.translate(X - j * 3, Y - j * 5);
+				ctx.scale(1 + j * 0.16, 1 + j * 0.16);
+				drawFigure(p, 0, 0, kit);
+				ctx.restore();
+			}
+			else { drawFigure(p, X, Y, kit); }
+		}
 
 		// Your controlled player's name, above the marker.
 		if (isHuman && p.name) {
@@ -5989,7 +6069,12 @@
 		if (!b) { return; }
 		const kit = KITS[p.team], L = look(p), k = b.k;
 		const down = (p.lunge > 0 && players.indexOf(p) === ctrl) || p.slideAI > 0;
-		const H = 34 * k * (down ? 0.55 : 1), X = b.x, Y = b.y;
+		const jump = reduceMotion ? 0 : jumpAmt(p);
+		const H = 34 * k * (down ? 0.55 : 1), X = b.x, Y = b.y - jump * 34 * k * 0.32;
+		if (jump > 0) {   // his shadow stays on the grass while he's up
+			ctx.fillStyle = "rgba(0, 0, 0, 0.3)";
+			ctx.beginPath(); ctx.ellipse(X, b.y, H * 0.28, H * 0.06, 0, 0, Math.PI * 2); ctx.fill();
+		}
 		const shirt = p.role === "gk" ? kit.gk : kit.outfield, shorts = kit.second || "#1f2a36";
 		const cd = Math.cos(p.dir);
 		if (!p.faceTV || Math.abs(cd) > 0.3) { p.faceTV = cd >= 0 ? 1 : -1; }
@@ -6007,14 +6092,14 @@
 		const legPts = i => {
 			if (down) { return i ? [ [ X + face * H * 0.3, Y - H * 0.25 ], [ X + face * H * 0.62, Y - H * 0.05 ] ] : [ [ X + face * H * 0.2, Y - H * 0.12 ], [ X + face * H * 0.5, Y ] ]; }
 			const f = ph + i * Math.PI;
-			const th = (0.06 + a * 0.62) * Math.sin(f) + (i ? -0.04 : 0.04);
-			const kn = a * (0.18 + 1.35 * Math.max(0, Math.cos(f))) + (1 - a) * 0.05;
+			const th = jump > 0 ? (i ? -0.25 : 0.2) * jump : (0.06 + a * 0.62) * Math.sin(f) + (i ? -0.04 : 0.04);
+			const kn = jump > 0 ? 0.9 * jump : a * (0.18 + 1.35 * Math.max(0, Math.cos(f))) + (1 - a) * 0.05;
 			const kx = hipX + face * Math.sin(th) * Lt, ky = hipY + Math.cos(th) * Lt;
 			return [ [ kx, ky ], [ kx + face * Math.sin(th - kn) * Ls, ky + Math.cos(th - kn) * Ls ] ];
 		};
 		const armPts = i => {
 			const f = ph + i * Math.PI;
-			const ua = -(0.1 + a * 0.75) * Math.sin(f), eb = 0.25 + a * 1.25;
+			const ua = jump > 0 ? Math.PI * (0.55 + 0.3 * jump) + (i ? 0.25 : -0.1) : -(0.1 + a * 0.75) * Math.sin(f), eb = jump > 0 ? 0.3 : 0.25 + a * 1.25;
 			const ex = shX + face * Math.sin(ua) * Lu, ey = shY + Math.cos(ua) * Lu;
 			return [ [ ex, ey ], [ ex + face * Math.sin(ua + eb) * Lf, ey + Math.cos(ua + eb) * Lf ] ];
 		};
