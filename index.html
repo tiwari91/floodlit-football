@@ -1054,7 +1054,7 @@
 		<p class="fine"><b>Keepers.</b> A keeper holding the ball in their own area can't be challenged. Nobody presses them: both teams drop back into shape, opponents must stay outside the faint ring, and the keeper releases it within a second or two.</p>
 		<p class="fine"><b>The stadium and the clubs.</b> The stands fill with the home club's fans (with an away corner), the ground's name runs along the main stand, and on the near touchline both benches sit in their dugouts with each manager in his technical area. In the league panel, Clubs shows every club in the Premier Division (and the division below): rating, ground, how they play, danger man and best defender; tap one for its squad.</p>
 		<p class="fine"><b>Modes.</b> League matches count toward your Premier Division season. Friendly matches are practice: the result doesn't count, and you can pick the opponent's level, the weather and the ground. Tutorial walks you through every control step by step. The label above the score always shows which one you're playing.</p>
-		<p class="fine"><b>Half time.</b> At half time the whistle goes and you get the score, possession, passes, shots and tackles so far. Change your tactic, formation or style, then start the second half; the other side kicks off.</p>
+		<p class="fine"><b>Half time.</b> At half time the whistle goes and you get the score, possession, passes, shots and tackles so far. Change your tactic, formation or style, then start the second half; the teams change ends, so you attack the other goal, and the other side kicks off.</p>
 		<p class="fine"><b>Keepers.</b> When your keeper has the ball, control switches to him: aim with the arrows, then S to roll it out to the teammate in the dashed ring, W to play a runner in, Q or D to kick it long. Do nothing for six seconds and he plays it himself. Goal kicks work the same way, and there is no offside from a goal kick.</p>
 		<p class="fine"><b>Saving.</b> Your season, squad, budget and upgrades are saved after every result and every change, to your account when the page can and always in this browser, so a refresh or another visit carries on the same season. A match in progress is kept too: reopen the page and it comes back paused at the same score and time.</p>
 		<p class="fine"><b>Premier Division.</b> Twenty clubs play each other home and away over 38 matchdays, three points for a win. The top four finish in the Champions Cup places and fifth in the Continental Cup place. The bottom three are relegated and replaced by three promoted clubs. If you finish in the bottom three, the board keeps you up but halves your budget. The transfer window opens before the season, in January before matchday 20, and at the end of the season. Short on time? Simulate a fixture from the kick-off card.</p>
@@ -3321,6 +3321,7 @@
 		if (keys.has("ArrowUp")) { y -= 1; }
 		if (keys.has("ArrowDown")) { y += 1; }
 		x += stickVec.x + padVec.x; y += stickVec.y + padVec.y;
+		if (endsSwapped()) { x = -x; }   // right on screen is towards the other goal now
 		const m = Math.hypot(x, y);
 		if (m > 1) { x /= m; y /= m; }
 		return { x, y, m: Math.min(1, m), sprint: keys.has("KeyE") || keys.has("ShiftLeft") || keys.has("ShiftRight") || padSprint || padSprintBtn };
@@ -4461,6 +4462,28 @@
 
 	/* ---------- half time ---------- */
 	let halfDone = false;
+	// The teams change ends at half time. The match itself is always played with your side
+	// kicking towards x = FW; for the second half the picture (and your controls) are
+	// mirrored, so on screen you attack the other goal, like a real second half.
+	const endsSwapped = () => halfDone && mode !== "tutorial";
+	// In a mirrored picture, text still has to read the right way round.
+	if (typeof CanvasRenderingContext2D !== "undefined" && !CanvasRenderingContext2D.prototype.__ffMirror) {
+		const P = CanvasRenderingContext2D.prototype;
+		P.__ffMirror = true;
+		for (const fn of [ "fillText", "strokeText" ]) {
+			const orig = P[fn];
+			P[fn] = function (t, x, y, ...rest) {
+				const m = typeof this.getTransform === "function" ? this.getTransform() : null;
+				if (!m || m.a * m.d - m.b * m.c >= 0) { return orig.call(this, t, x, y, ...rest); }
+				this.save();
+				this.translate(x, y); this.scale(-1, 1);
+				const al = this.textAlign;
+				if (al === "left" || al === "start") { this.textAlign = "right"; } else if (al === "right" || al === "end") { this.textAlign = "left"; }
+				orig.call(this, t, 0, 0, ...rest);
+				this.restore();
+			};
+		}
+	}
 	function halfTime () {
 		halfDone = true;
 		state = "half";
@@ -4469,8 +4492,8 @@
 		sfx("final");
 		const [ h, a ] = leftIsYou ? score : [ score[1], score[0] ];
 		const tot = possFrames[0] + possFrames[1], poss = tot ? Math.round(100 * possFrames[0] / tot) : 50;
-		$("announce").textContent = `Half time. ${h} to ${a}.`;
-		showOverlay("Half time", `${leftIsYou ? "You" : opp.name} ${h}–${a} ${leftIsYou ? opp.name : "you"}. Change your tactic, formation or style now if you want to, then start the second half. ${opp.short === "CPU" ? "The CPU" : opp.name} kick off.`, "Start second half", [
+		$("announce").textContent = `Half time. ${h} to ${a}. The teams change ends.`;
+		showOverlay("Half time", `${leftIsYou ? "You" : opp.name} ${h}–${a} ${leftIsYou ? opp.name : "you"}. Change your tactic, formation or style now if you want to, then start the second half. The teams change ends, so you attack the other goal. ${opp.short === "CPU" ? "The CPU" : opp.name} kick off.`, "Start second half", [
 			[ `${poss}%`, "Possession" ],
 			[ `${stats.completed}/${stats.passes}`, "Passes" ],
 			[ String(stats.shots), "Shots" ],
@@ -4536,6 +4559,7 @@
 			newMatch();
 			freeze = KICKOFF_FREEZE;
 		}
+		if (state === "half") { toast("Second half: teams change ends", "#eef6ea"); }
 		state = "play";
 		pauseBtn.textContent = "Pause";
 		if (mode === "tutorial" && !tut) { tut = { step: 0 }; freeze = 0; setupTutStep(); }
@@ -4891,9 +4915,24 @@
 		}
 		stands = { top, bottom, left, right };
 	}
+	// The far stand carries the ground's name. In a mirrored second half it is drawn from a
+	// flipped copy, so the name still reads the right way.
+	function standTop () {
+		if (!endsSwapped() || !stands) { return stands && stands.top; }
+		if (stands.topM === undefined) {
+			stands.topM = null;
+			try {
+				const src = stands.top, c = document.createElement("canvas");
+				c.width = src.width; c.height = src.height;
+				const g = c.getContext && c.getContext("2d");
+				if (g && g.drawImage) { g.translate(c.width, 0); g.scale(-1, 1); g.drawImage(src, 0, 0); stands.topM = c; }
+			} catch (e) { stands.topM = null; }
+		}
+		return stands.topM || stands.top;
+	}
 	function drawStands (quiet = false) {
 		if (!stands) { return; }
-		ctx.drawImage(stands.top, 0, 0, WW, MY);
+		ctx.drawImage(standTop(), 0, 0, WW, MY);
 		ctx.drawImage(stands.bottom, 0, MY + FH, WW, MY);
 		ctx.drawImage(stands.left, 0, MY, MX, FH);
 		ctx.drawImage(stands.right, MX + FW, MY, MX, FH);
@@ -5612,20 +5651,21 @@
 		ctx.save();
 		ctx.beginPath(); ctx.rect(x0, y0, w, h); ctx.clip();
 		ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
-		ctx.strokeRect(x0 + (camX - MX) * k, y0 + (camY - MY) * k, VW * k, VH * k);
+		const sw = endsSwapped(), mx = x => (sw ? FW - x : x);
+		ctx.strokeRect(x0 + (sw ? FW - (camX - MX) - VW : camX - MX) * k, y0 + (camY - MY) * k, VW * k, VH * k);
 		for (const p of players) {
 			const kit = KITS[p.team];
 			ctx.fillStyle = p.role === "gk" ? kit.gk : kit.outfield;
-			ctx.beginPath(); ctx.arc(x0 + p.x * k, y0 + p.y * k, 2.6, 0, Math.PI * 2); ctx.fill();
+			ctx.beginPath(); ctx.arc(x0 + mx(p.x) * k, y0 + p.y * k, 2.6, 0, Math.PI * 2); ctx.fill();
 		}
 		const me = human();
 		if (me) {
 			ctx.strokeStyle = "#ffffff";
 			ctx.lineWidth = 1.5;
-			ctx.beginPath(); ctx.arc(x0 + me.x * k, y0 + me.y * k, 4.5, 0, Math.PI * 2); ctx.stroke();
+			ctx.beginPath(); ctx.arc(x0 + mx(me.x) * k, y0 + me.y * k, 4.5, 0, Math.PI * 2); ctx.stroke();
 		}
 		ctx.fillStyle = "#ffffff";
-		ctx.beginPath(); ctx.arc(x0 + ball.x * k, y0 + ball.y * k, 2.2, 0, Math.PI * 2); ctx.fill();
+		ctx.beginPath(); ctx.arc(x0 + mx(ball.x) * k, y0 + ball.y * k, 2.2, 0, Math.PI * 2); ctx.fill();
 		ctx.restore();
 	}
 
@@ -5633,7 +5673,7 @@
 	function drawOffscreenMarker () {
 		const me = human();
 		if (!me || state === "intro") { return; }
-		const sx = MX + me.x - camX, sy = MY + me.y - camY, pad = 26;
+		const sx0 = MX + me.x - camX, sx = endsSwapped() ? VW - sx0 : sx0, sy = MY + me.y - camY, pad = 26;
 		if (sx > 0 && sx < VW && sy > 0 && sy < VH) { return; }
 		const ex = clamp(sx, pad, VW - pad), ey = clamp(sy, pad, VH - pad);
 		const a = Math.atan2(sy - ey, sx - ex);
@@ -5714,7 +5754,7 @@
 		const ease = reduceMotion ? 1 : 1 - Math.exp(-frameDt / 190);
 		camX += (tx - camX) * ease;
 		camY += (ty - camY) * ease;
-		ctx.setTransform(scale, 0, 0, scale, -camX * scale, -camY * scale);
+		if (endsSwapped()) { ctx.setTransform(-scale, 0, 0, scale, (camX + VW) * scale, -camY * scale); } else { ctx.setTransform(scale, 0, 0, scale, -camX * scale, -camY * scale); }
 		drawPitch();
 		drawFreeKickSpray();
 		drawPassTarget();
@@ -5841,7 +5881,7 @@
 			drawFx(false);
 		} finally { ctx = keep; }
 
-		ctx.setTransform(scale, 0, 0, scale, 0, 0);
+		if (endsSwapped()) { ctx.setTransform(-scale, 0, 0, scale, VW * scale, 0); } else { ctx.setTransform(scale, 0, 0, scale, 0, 0); }
 		// 2. The night sky, the far stand standing up behind the far touchline, the floodlights.
 		const st = gstyle || { roof: true, lights: "pylons" };
 		// The far stand is a tier rising back from the touchline: each row of its picture is
@@ -5853,7 +5893,7 @@
 		sky.addColorStop(0, "#050a10"); sky.addColorStop(1, "#16232b");
 		ctx.fillStyle = sky; ctx.fillRect(0, 0, VW, VH);
 		if (stands && back && front) {
-			const img = stands.top, rows = 40, rh = img.height / rows;
+			const img = standTop(), rows = 40, rh = img.height / rows;
 			for (let i = 0; i < rows; i++) {
 				const u0 = 1 - i / rows, u1 = 1 - (i + 1) / rows;
 				const a = tvProj(xl, ...onTier(u0)), b = tvProj(xr, ...onTier(u0)), c = tvProj(xl, ...onTier(u1));
@@ -5913,6 +5953,7 @@
 			ctx.fillText(f.label.toUpperCase(), q.x, q.y - (reduceMotion ? 0 : k * 16));
 		}
 		ctx.globalAlpha = 1;
+		ctx.setTransform(scale, 0, 0, scale, 0, 0);
 		drawRain();
 		drawMinimap();
 		drawHints();
