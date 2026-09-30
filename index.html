@@ -219,6 +219,8 @@
 	}
 
 	canvas { display: block; width: 100%; height: 100%; }
+	#pitch3d { position: absolute; inset: 0; }   /* the 3D view, under the 2D canvas (which carries the HUD) */
+	#pitch { position: relative; }
 
 	.overlay {
 		position: absolute;
@@ -863,6 +865,7 @@
 	</div>
 
 	<div class="pitchwrap" id="pitchwrap">
+		<canvas id="pitch3d" hidden aria-hidden="true"></canvas>
 		<canvas id="pitch" aria-label="Football pitch"></canvas>
 		<button class="menutoggle" id="menuToggle" type="button" aria-pressed="true">Show menu</button>
 		<div class="scorebug" id="scoreBug" aria-hidden="true"><span id="bugHome">You</span><b id="bugScore">0 – 0</b><span id="bugAway">CPU</span><span class="t" id="bugClock">03:00</span><span class="bugbar"><span class="mfill" id="bugFill"></span></span><span class="bugmood" id="bugMood" hidden></span></div>
@@ -1053,7 +1056,7 @@
 		<p class="fine"><b>Weather and grounds.</b> Every club has a home ground: grass, muddy or artificial turf. Mud slows the ball and the players and kills the bounce. Turf is quick and true. Rain makes grass and turf skid, makes mud heavier, costs players grip on the turn, sends passes a little astray and makes shots harder for keepers to hold. In the league, matchdays 10 to 26 are the rainy season, and the forecast is shown in advance. In a friendly, pick the weather and ground yourself.</p>
 		<p class="fine"><b>Your season, backed up.</b> Your league saves in this browser. Export league saves it to a file; Import league loads a file back (press twice to confirm, since it replaces the season you have). Use it to keep a backup or carry your season to another browser or device.</p>
 		<p class="fine"><b>Big pitch.</b> The ground fills the screen with just a small score bug for the score and the clock. "Show menu" at the top right of the pitch (or F) brings back the title, the mode tabs and the full scoreboard; "Hide menu" puts it away again.</p>
-		<p class="fine"><b>Camera.</b> Overhead follows the ball from above. TV watches from high in the main stand, like a broadcast, and cuts to the benches at kick-off, the breaks and after goals. Switch with the Camera button or press C. Every ground has its own look: the stands, the roof, the floodlights, how full it is and how the grass is cut.</p>
+		<p class="fine"><b>Camera.</b> Overhead follows the ball from above. TV watches from high in the main stand, like a broadcast, and cuts to the benches at kick-off, the breaks and after goals. 3D draws the ground, the players and the ball in real 3D (three.js): a broadcast camera follows the ball along the near stand, cuts in close for free kicks and penalties, and pulls out wide at the breaks; lofted balls and headers show their true height. It needs WebGL; if your browser hasn't got it the 2D cameras stay. Switch with the Camera button or press C to cycle overhead, TV and 3D. Every ground has its own look: the stands, the roof, the floodlights, how full it is and how the grass is cut.</p>
 		<p class="fine"><b>Free kicks.</b> The other side stands 9.15 m back, and near your goal they build a wall. From shooting range, press W to curl it over the wall (up or down picks the corner, the far post if you don't choose), or D to drive it low and hard. S plays it short. Hold E (or Shift) to sprint at any time: you'll see speed streaks behind your player.</p>
 		<p class="fine"><b>Fouls and cards.</b> A slide that misses the ball and takes the man, above all from behind, is a foul: a free kick where it happened, or a penalty in the box (pick a side with ↑ ↓ and press D; the keeper guesses). Reckless tackles get a yellow card, a second yellow is a red, and a bad one from behind can be a straight red: the player walks off and his side plays a man down. In the league a red card is a ban (two games for a straight red), five yellows in a season is one, and a player hurt in a foul limps on and then misses one to three games. Banned and injured players come off the team sheet by themselves and go back on it when they're available.</p>
 		<p class="fine"><b>Throw-ins.</b> When the ball goes over a touchline, the other side throws it back in from that spot. On yours, aim with the arrows and press S for a short throw to feet or Q for a long throw. Opponents stand off the thrower, and there is no offside from a throw-in.</p>
@@ -1082,6 +1085,8 @@
 	</section>
 </main>
 
+<!-- three.js r147, for the 3D camera. Pinned; if it fails to load the game stays on its 2D cameras. -->
+<script id="threeLib" src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.147.0/three.min.js" integrity="sha384-vV17nr/rMaJqmeZkFUzXLpHdQ+ME5QHKdydaqqN+3Ga39RJlNrTatJxHwGV4ml2C" crossorigin="anonymous" async></script>
 <script>
 (() => {
 	/* ---------- pitch geometry (logical units) ---------- */
@@ -4968,6 +4973,7 @@
 		canvas.width = Math.round(rect.width * dpr);
 		canvas.height = Math.round(rect.height * dpr);
 		fitView();
+		resize3D();
 	}
 	// Keep the view the canvas's shape, 648 tall where it can be, never bigger than the ground.
 	function fitView () {
@@ -6026,7 +6032,8 @@
 	}
 
 	function drawScene () {
-		if (camMode === "tv" && !benchCam()) { drawSceneTV(); return; }
+		if (camMode === "3d" && drawScene3D()) { return; }   // while three.js loads, the TV camera stands in
+		if ((camMode === "tv" || camMode === "3d") && !benchCam()) { drawSceneTV(); return; }
 		drawSceneTop();
 	}
 	function drawSceneTop () {
@@ -6087,7 +6094,8 @@
 	// the goals and the far stand stand up on top of it.
 	// The TV camera by default on a laptop or desktop; on a phone the players would be tiny, so overhead.
 	const wideScreen = (() => { try { return window.matchMedia("(min-width: 700px)").matches; } catch (e) { return false; } })();
-	let camMode = store.get("ff-cam") === "tv" || (!store.get("ff-cam") && wideScreen) ? "tv" : "top";
+	// top: overhead. tv: from the main stand. 3d: WebGL (three.js), when the browser can.
+	let camMode = (() => { const s = store.get("ff-cam"); return s === "tv" || s === "top" || s === "3d" ? s : wideScreen ? "tv" : "top"; })();
 	const TV = { camX: null, Cy: 0, Hc: 0, th: 0, f: 1, cy: 0, key: "" };
 	const Z_W = 0.71;   // ball and crossbar heights are in their own units; this turns them into pitch pixels
 	function tvSetup () {
@@ -6419,12 +6427,626 @@
 		ctx.fillStyle = "#1a1a1a";
 		ctx.beginPath(); ctx.arc(q.x - r * 0.25, q.y - r * 0.2, r * 0.32, 0, Math.PI * 2); ctx.fill();
 	}
+	const CAM_LABEL = { top: "Camera: overhead", tv: "Camera: TV", "3d": "Camera: 3D" };
+	const CAM_NAME = { top: "Overhead camera", tv: "TV camera", "3d": "3D camera" };
+	const nextCam = () => (camMode === "top" ? "tv" : camMode === "tv" && webglOK ? "3d" : "top");
 	function setCam (m) {
+		if (m === "3d" && !webglOK) { m = wideScreen ? "tv" : "top"; }
+		if (!CAM_LABEL[m]) { m = "top"; }
 		camMode = m;
 		store.set("ff-cam", m);
 		const b = $("camBtn");
-		b.textContent = m === "tv" ? "Camera: TV" : "Camera: overhead";
-		b.setAttribute("aria-pressed", String(m === "tv"));
+		b.textContent = CAM_LABEL[m];
+		b.setAttribute("aria-pressed", String(m !== "top"));
+		show3D(m === "3d");
+	}
+
+	/* ---------- the 3D camera (three.js) ----------
+	   A third view of the same match, drawn with WebGL. The simulation is untouched: every frame
+	   the scene reads the players, the ball (with its height), the pitch, the goals and the
+	   stands, and a broadcast camera follows the ball. The 2D canvas stays on top, cleared to
+	   transparent, and carries the HUD: hints, toasts, the countdown, the minimap, names and
+	   markers. three.js comes from cdnjs; if WebGL or the script is unavailable, the view
+	   falls back to the 2D cameras. */
+	const webglOK = (() => {
+		try { const c = document.createElement("canvas"); return !!(window.WebGLRenderingContext && (c.getContext("webgl2") || c.getContext("webgl"))); } catch (e) { return false; }
+	})();
+	const canvas3d = $("pitch3d"), threeEl = $("threeLib");
+	let threeFailed = !threeEl || !canvas3d, threeWaitStart = 0, threeToldLoading = false;
+	if (threeEl) { threeEl.addEventListener("error", () => { threeFailed = true; }); }
+	if (canvas3d) {
+		canvas3d.addEventListener("webglcontextlost", e => { e.preventDefault(); G3.lost = true; });
+		canvas3d.addEventListener("webglcontextrestored", () => { G3.lost = false; });
+	}
+	const Z3 = Z_W;   // ball and crossbar heights, in pitch pixels
+	const G3 = {   // everything the WebGL view owns
+		renderer: null, scene: null, cam: null, lost: false, geo: null, mats: new Map(),
+		stadium: null, stadiumKey: "", standsRef: null, figs: new Map(), ball: null, ballShadow: null, marks: null,
+		eye: null, look: null, shot: "", v: null, glowTex: null
+	};
+	const threeState = () => {
+		if (threeFailed) { return "failed"; }
+		if (window.THREE) { return "ready"; }
+		if (!threeWaitStart) { threeWaitStart = performance.now(); }
+		else if (performance.now() - threeWaitStart > 15000) { threeFailed = true; return "failed"; }
+		return "loading";
+	};
+	function show3D (on) {
+		if (!canvas3d) { return; }
+		canvas3d.hidden = !on;
+		if (on) { resize3D(); }
+	}
+	function resize3D () {
+		if (!G3.renderer || !canvas3d || canvas3d.hidden) { return; }
+		const rect = canvas3d.getBoundingClientRect();
+		G3.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, coarse ? 1.5 : 2));
+		G3.renderer.setSize(Math.max(1, Math.round(rect.width)), Math.max(1, Math.round(rect.height)), false);
+	}
+	// One material per colour, shared by every mesh that wears it.
+	function mat3D (hex, lit = true) {
+		const key = (lit ? "L" : "B") + hex;
+		let m = G3.mats.get(key);
+		if (!m) {
+			m = lit ? new THREE.MeshLambertMaterial({ color: new THREE.Color(hex) }) : new THREE.MeshBasicMaterial({ color: new THREE.Color(hex) });
+			G3.mats.set(key, m);
+		}
+		return m;
+	}
+	const flat3D = (geo, color, opacity) => new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false }));
+	function init3D () {
+		try {
+			const renderer = new THREE.WebGLRenderer({ canvas: canvas3d, antialias: !coarse, powerPreference: "high-performance", alpha: false });
+			renderer.setClearColor(0x070c12, 1);
+			G3.renderer = renderer;
+			G3.scene = new THREE.Scene();
+			G3.cam = new THREE.PerspectiveCamera(36, 16 / 9, 8, 30000);
+			G3.eye = new THREE.Vector3(); G3.look = new THREE.Vector3(); G3.v = new THREE.Vector3();
+			// Shared geometry: a footballer's parts (32 units tall, feet at the origin), the ball, rings.
+			const g = G3.geo = {
+				torso: new THREE.CylinderGeometry(4.2, 3.5, 12, 10), shorts: new THREE.CylinderGeometry(4.7, 4.5, 6, 10),
+				leg: new THREE.CylinderGeometry(1.5, 1.3, 14, 6), sock: new THREE.CylinderGeometry(1.6, 1.5, 5.5, 6), boot: new THREE.BoxGeometry(4.2, 1.8, 2.6),
+				arm: new THREE.CylinderGeometry(1.4, 1.2, 6, 6), fore: new THREE.CylinderGeometry(1.2, 1.1, 6.5, 6),
+				head: new THREE.SphereGeometry(3.3, 12, 9), hair: new THREE.SphereGeometry(3.55, 12, 6, 0, Math.PI * 2, 0, Math.PI * 0.55),
+				ball: new THREE.SphereGeometry(5, 16, 12), shadow: new THREE.CircleGeometry(1, 14),
+				ring: new THREE.RingGeometry(0.9, 1, 40), disc: new THREE.CircleGeometry(1, 32), cone: new THREE.ConeGeometry(4.5, 9, 4),
+				arrow: (() => { const b = new THREE.BufferGeometry(); b.setAttribute("position", new THREE.Float32BufferAttribute([ 33, 0, 0, 25, 0, 6, 25, 0, -6 ], 3)); b.computeVertexNormals(); return b; })(),
+				box: new THREE.BoxGeometry(1, 1, 1)
+			};
+			for (const k of [ "leg", "sock", "arm", "fore" ]) { g[k].translate(0, -g[k].parameters.height / 2, 0); }   // hang from the joint
+			for (const k of [ "shadow", "ring", "disc" ]) { g[k].rotateX(-Math.PI / 2); }   // lie flat on the grass
+			g.cone.rotateX(Math.PI);   // point down
+			// The ball: white with dark patches, so its spin shows.
+			const bc = document.createElement("canvas"); bc.width = 128; bc.height = 64;
+			const bg = bc.getContext && bc.getContext("2d");
+			let ballMat = mat3D("#fbfdf9");
+			if (bg) {
+				bg.fillStyle = "#fbfdf9"; bg.fillRect(0, 0, 128, 64);
+				bg.fillStyle = "#1b2420";
+				for (const [ x, y ] of [ [ 16, 16 ], [ 64, 16 ], [ 112, 16 ], [ 40, 48 ], [ 88, 48 ], [ 64, 32 ] ]) { bg.beginPath(); bg.arc(x, y, 7, 0, Math.PI * 2); bg.fill(); }
+				const bt = new THREE.CanvasTexture(bc);
+				ballMat = new THREE.MeshLambertMaterial({ map: bt });
+			}
+			G3.ball = new THREE.Mesh(g.ball, ballMat);
+			G3.ballShadow = flat3D(g.shadow, 0x000000, 0.4);
+			G3.scene.add(G3.ball, G3.ballShadow);
+			// The markers painted on the grass: pass ring, your ring and arrow, the offside line, the
+			// referee's spray and the wall, the keeper's ring, the tutorial's ring.
+			const amber = 0xf2b52e;
+			const mk = {
+				pass: flat3D(g.ring, amber, 0.95), me: flat3D(g.ring, amber, 0.95), meFill: flat3D(g.disc, amber, 0.2), arrow: flat3D(g.arrow, amber, 1),
+				cone: new THREE.Mesh(g.cone, mat3D("#f2b52e", false)), offside: flat3D(g.box, 0xde4f5a, 0.55), fk: flat3D(g.ring, 0xffffff, 0.55),
+				wall: flat3D(g.box, 0xffffff, 0.8), keeper: flat3D(g.ring, 0xffffff, 0.28), tut: flat3D(g.ring, amber, 0.9), tutFill: flat3D(g.disc, amber, 0.25)
+			};
+			mk.arrow.material.side = THREE.DoubleSide;
+			for (const m of Object.values(mk)) { m.visible = false; G3.scene.add(m); }
+			G3.marks = mk;
+			// The glow round a floodlight.
+			const gc = document.createElement("canvas"); gc.width = gc.height = 64;
+			const gg = gc.getContext && gc.getContext("2d");
+			if (gg) {
+				const grad = gg.createRadialGradient(32, 32, 2, 32, 32, 32);
+				grad.addColorStop(0, "rgba(255, 244, 210, 0.9)"); grad.addColorStop(0.35, "rgba(255, 244, 210, 0.3)"); grad.addColorStop(1, "rgba(255, 244, 210, 0)");
+				gg.fillStyle = grad; gg.fillRect(0, 0, 64, 64);
+				G3.glowTex = new THREE.CanvasTexture(gc);
+			}
+			G3.shot = "";
+			return true;
+		} catch (e) {
+			threeFailed = true;
+			G3.renderer = null;
+			return false;
+		}
+	}
+	// A quad standing in space, with a picture on it: the stands.
+	function quad3D (a, b, c, d, uv, material) {
+		const geo = new THREE.BufferGeometry();
+		geo.setAttribute("position", new THREE.Float32BufferAttribute([ ...a, ...b, ...c, ...d ], 3));
+		geo.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+		geo.setIndex([ 0, 1, 2, 0, 2, 3 ]);
+		geo.computeVertexNormals();
+		return new THREE.Mesh(geo, material);
+	}
+	function canvasTex3D (c) {
+		const t = new THREE.CanvasTexture(c);
+		if (G3.renderer.capabilities.isWebGL2) { t.anisotropy = Math.min(8, G3.renderer.capabilities.getMaxAnisotropy()); }
+		else { t.generateMipmaps = false; t.minFilter = THREE.LinearFilter; }
+		return t;
+	}
+	// The ground: built once per match (it changes with the club, the format, the weather and the
+	// surface) from the same painting the 2D cameras use, then the stands stand up around it.
+	function buildStadium3D () {
+		const key = `${WW}x${WH}|${cond.label}|${cond.surfaceKey}|${gstyle ? gstyle.mow + gstyle.roof + gstyle.lights : ""}`;
+		if (G3.stadium && G3.stadiumKey === key && G3.standsRef === stands) { return; }
+		if (G3.stadium) {
+			G3.scene.remove(G3.stadium);
+			G3.stadium.traverse(o => {
+				if (o.geometry && o.userData.ownGeo) { o.geometry.dispose(); }
+				if (o.material && o.userData.ownMat) { if (o.material.map) { o.material.map.dispose(); } o.material.dispose(); }
+			});
+		}
+		G3.stadiumKey = key; G3.standsRef = stands;
+		const st = new THREE.Group();
+		// own: this mesh's geometry is its own; ownMat: so is its material (and picture). Shared ones stay.
+		const own = (o, mat = false) => { o.userData.ownGeo = true; o.userData.ownMat = mat; return o; };
+		const ownMat = o => { o.userData.ownMat = true; return o; };
+		// 1. The pitch: painted flat (no stands), laid on the ground.
+		const pc = document.createElement("canvas"); pc.width = Math.ceil(WW); pc.height = Math.ceil(WH);
+		const pg = pc.getContext && pc.getContext("2d");
+		if (pg) {
+			const keep = ctx, keepStands = stands;
+			ctx = pg; stands = null;
+			try { drawPitch(true); } finally { ctx = keep; stands = keepStands; }
+			const ground = own(new THREE.Mesh(new THREE.PlaneGeometry(WW, WH), new THREE.MeshBasicMaterial({ map: canvasTex3D(pc) })), true);
+			ground.rotation.x = -Math.PI / 2;
+			ground.position.set(WW / 2 - MX, 0, WH / 2 - MY);
+			st.add(ground);
+		}
+		const apron = new THREE.Mesh(new THREE.PlaneGeometry(WW * 4, WH * 4), mat3D("#0b1410", false));
+		apron.rotation.x = -Math.PI / 2; apron.position.set(FW / 2, -0.6, FH / 2);
+		st.add(own(apron));
+		// 2. The stands: each side's crowd picture on a tier rising back from the touchline.
+		const gs = gstyle || { roof: true, lights: "pylons" };
+		const f0 = 14, D = MY * 1.7, H = MY * 1.9, xl = -MX - 40, xr = FW + MX + 40, zl = -40, zr = FH + 40;
+		const standMat = c => new THREE.MeshBasicMaterial({ map: canvasTex3D(c), side: THREE.DoubleSide });
+		if (stands) {
+			st.add(own(quad3D([ xl, 0, -f0 ], [ xr, 0, -f0 ], [ xr, H, -f0 - D ], [ xl, H, -f0 - D ], [ 0, 0, 1, 0, 1, 1, 0, 1 ], standMat(stands.top)), true));
+			st.add(own(quad3D([ xl, 0, FH + f0 ], [ xr, 0, FH + f0 ], [ xr, H, FH + f0 + D ], [ xl, H, FH + f0 + D ], [ 0, 1, 1, 1, 1, 0, 0, 0 ], standMat(stands.bottom)), true));
+			st.add(own(quad3D([ -f0, 0, zl ], [ -f0, 0, zr ], [ -f0 - D, H, zr ], [ -f0 - D, H, zl ], [ 1, 1, 1, 0, 0, 0, 0, 1 ], standMat(stands.left)), true));
+			st.add(own(quad3D([ FW + f0, 0, zl ], [ FW + f0, 0, zr ], [ FW + f0 + D, H, zr ], [ FW + f0 + D, H, zl ], [ 0, 1, 0, 0, 1, 0, 1, 1 ], standMat(stands.right)), true));
+		}
+		// A roof over the two long stands, with the lights along its edge at some grounds.
+		const glow = (x, y, z, s) => {
+			if (!G3.glowTex) { return; }
+			const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: G3.glowTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.6 }));
+			sp.position.set(x, y, z); sp.scale.set(s, s, 1); st.add(ownMat(sp));
+		};
+		if (gs.roof) {
+			for (const z of [ -f0 - D * 0.55, FH + f0 + D * 0.55 ]) {
+				const roof = new THREE.Mesh(G3.geo.box, mat3D("#0a0d10", false));
+				roof.scale.set(xr - xl, 4, D * 0.95); roof.position.set((xl + xr) / 2, H * 1.14, z);
+				st.add(roof);
+			}
+			if (gs.lights === "roof") {
+				for (const [ z, side ] of [ [ -f0 - D * 0.1, -1 ], [ FH + f0 + D * 0.1, 1 ] ]) {
+					const strip = new THREE.Mesh(G3.geo.box, mat3D("#fff6d8", false));
+					strip.scale.set(xr - xl - 60, 2.5, 3); strip.position.set((xl + xr) / 2, H * 1.11, z);
+					st.add(strip);
+					for (let x = xl + 120; x < xr - 60; x += (xr - xl) / 6) { glow(x, H * 1.11, z - side * 2, 140); }
+				}
+			}
+		}
+		if (gs.lights === "pylons") {
+			const PH = H * 2.3;
+			for (const [ px, pz ] of [ [ -MX * 0.6, -40 ], [ FW + MX * 0.6, -40 ], [ -MX * 0.6, FH + 40 ], [ FW + MX * 0.6, FH + 40 ] ]) {
+				const pole = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 3.6, PH, 6), mat3D("#39434a", false));
+				pole.position.set(px, PH / 2, pz); st.add(own(pole));
+				const head = new THREE.Mesh(G3.geo.box, mat3D("#fff6d8", false));
+				head.scale.set(44, 14, 7); head.position.set(px, PH, pz); st.add(head);
+				glow(px, PH, pz + (pz < FH / 2 ? 6 : -6), 230);
+			}
+		}
+		// 3. The goals: posts and bar in white, the net a mesh back to the rear bar.
+		const cb = 55 * Z3, bb = cb * 0.72, gmid = (GOAL_T + GOAL_B) / 2, gw = GOAL_B - GOAL_T;
+		for (const left of [ true, false ]) {
+			const x0 = left ? 0 : FW, xb = left ? -NET : FW + NET, white = mat3D("#f7faf5", false);
+			for (const y of [ GOAL_T, GOAL_B ]) {
+				const post = new THREE.Mesh(new THREE.CylinderGeometry(1.7, 1.7, cb, 8), white);
+				post.position.set(x0, cb / 2, y); st.add(own(post));
+			}
+			const bar = new THREE.Mesh(new THREE.CylinderGeometry(1.7, 1.7, gw + 3.4, 8), white);
+			bar.rotation.x = Math.PI / 2; bar.position.set(x0, cb, gmid); st.add(own(bar));
+			const pts = [];
+			const seg = (a, b) => pts.push(...a, ...b);
+			for (let y = GOAL_T; y <= GOAL_B + 0.1; y += gw / 12) { seg([ x0, cb, y ], [ xb, bb, y ]); seg([ xb, bb, y ], [ xb, 0, y ]); }
+			for (let z = 0; z <= bb + 0.1; z += bb / 5) { seg([ xb, z, GOAL_T ], [ xb, z, GOAL_B ]); }
+			for (let t = 0; t <= 1.001; t += 0.2) { for (const y of [ GOAL_T, GOAL_B ]) { seg([ x0 + (xb - x0) * t, 0, y ], [ x0 + (xb - x0) * t, cb + (bb - cb) * t, y ]); } }
+			for (let t = 0.25; t < 1; t += 0.25) { seg([ x0 + (xb - x0) * t, cb + (bb - cb) * t, GOAL_T ], [ x0 + (xb - x0) * t, cb + (bb - cb) * t, GOAL_B ]); }
+			const ng = new THREE.BufferGeometry();
+			ng.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
+			st.add(own(new THREE.LineSegments(ng, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35 })), true));
+			for (const y of [ GOAL_T, GOAL_B ]) {
+				const rp = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, bb, 6), white);
+				rp.position.set(xb, bb / 2, y); st.add(own(rp));
+			}
+			const rb = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, gw, 6), white);
+			rb.rotation.x = Math.PI / 2; rb.position.set(xb, bb, gmid); st.add(own(rb));
+		}
+		// 4. The dugouts on the near touchline.
+		const dw = 190 * Math.sqrt(S);
+		for (const cx of [ FW / 2 - dw * 0.62 - 20, FW / 2 + dw * 0.62 + 20 ]) {
+			const dug = new THREE.Mesh(G3.geo.box, mat3D("#0c1214", false));
+			dug.scale.set(dw, 14, 34); dug.position.set(cx, 7, FH + 33); st.add(dug);
+			const roof = new THREE.Mesh(G3.geo.box, new THREE.MeshBasicMaterial({ color: 0x8cb4c8, transparent: true, opacity: 0.35 }));
+			roof.scale.set(dw + 6, 1.2, 40); roof.position.set(cx, 15, FH + 32); st.add(ownMat(roof));
+		}
+		// 5. The night: a sky that darkens overhead, a few stars, and the floodlights lighting the players.
+		const sc = document.createElement("canvas"); sc.width = 2; sc.height = 128;
+		const sg = sc.getContext && sc.getContext("2d");
+		if (sg) {
+			const grad = sg.createLinearGradient(0, 0, 0, 128);
+			grad.addColorStop(0, "#03060b"); grad.addColorStop(0.55, "#0b131b"); grad.addColorStop(1, "#1a2a33");
+			sg.fillStyle = grad; sg.fillRect(0, 0, 2, 128);
+			const sky = new THREE.Mesh(new THREE.SphereGeometry(FH * 9, 24, 12, 0, Math.PI * 2, 0, Math.PI * 0.52), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(sc), side: THREE.BackSide, fog: false }));
+			sky.position.set(FW / 2, -FH * 0.2, FH / 2); st.add(own(sky, true));
+		}
+		const starPts = [];
+		let sh = 12345;
+		const srnd = () => (sh = (sh * 48271) % 2147483647) / 2147483647;
+		for (let i = 0; i < 260; i++) {
+			const a = srnd() * Math.PI * 2, e = 0.15 + srnd() * 1.3, r = FH * 8;
+			starPts.push(FW / 2 + Math.cos(a) * Math.cos(e) * r, Math.sin(e) * r, FH / 2 + Math.sin(a) * Math.cos(e) * r);
+		}
+		const stg = new THREE.BufferGeometry(); stg.setAttribute("position", new THREE.Float32BufferAttribute(starPts, 3));
+		st.add(own(new THREE.Points(stg, new THREE.PointsMaterial({ color: 0xdde6ff, size: 1.8, sizeAttenuation: false, fog: false })), true));
+		st.add(new THREE.AmbientLight(0x66727c, 0.55));
+		st.add(new THREE.HemisphereLight(0x46586c, 0x1e3a2a, 0.5));
+		const key1 = new THREE.DirectionalLight(0xfff1d6, 0.75); key1.position.set(-FW * 0.2, FH * 1.6, FH * 1.6); key1.target.position.set(FW / 2, 0, FH / 2);
+		const key2 = new THREE.DirectionalLight(0xfff1d6, 0.45); key2.position.set(FW * 1.2, FH * 1.6, -FH * 0.5); key2.target.position.set(FW / 2, 0, FH / 2);
+		st.add(key1, key1.target, key2, key2.target);
+		G3.scene.fog = new THREE.Fog(0x0a121a, FH * 2.6, FH * 7);
+		G3.stadium = st;
+		G3.scene.add(st);
+	}
+	// A footballer: legs, shorts, shirt, arms and head, hung from joints so he can run and jump.
+	function figure3D (p) {
+		const g = G3.geo, kit = KITS[p.team], L = look(p);
+		const shirt = p.role === "gk" ? kit.gk : kit.outfield, trim = kit.second || "#1f2a36";
+		const M = hex => mat3D(hex);
+		const root = new THREE.Group(), body = new THREE.Group();
+		body.position.y = 14;
+		const mesh = (geo, m, x, y, z) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); return o; };
+		const legs = [ -1, 1 ].map(s => {
+			const j = new THREE.Group(); j.position.set(0, 14, s * 2.7);
+			j.add(mesh(g.leg, M(L.skin), 0, 0, 0), mesh(g.sock, M(shirt), 0, -8.5, 0), mesh(g.boot, M("#15181a"), 0.9, -14, 0));
+			return j;
+		});
+		const arms = [ -1, 1 ].map(s => {
+			const j = new THREE.Group(); j.position.set(0, 11.5, s * 5.6);
+			const upper = mesh(g.arm, M(shirt), 0, 0, 0), fore = mesh(g.fore, M(L.skin), 0, -6, 0);
+			j.add(upper, fore);
+			return j;
+		});
+		const torso = mesh(g.torso, M(shirt), 0, 6, 0), shorts = mesh(g.shorts, M(trim), 0, -1, 0);
+		const head = mesh(g.head, M(L.skin), 0.4, 15.6, 0);
+		const hair = mesh(g.hair, M(L.hair), 0.2, 15.9, 0);
+		hair.visible = !L.shaved;
+		body.add(torso, shorts, head, hair, ...arms);
+		root.add(body, ...legs);
+		const disc = flat3D(g.ring, new THREE.Color(shirt), 0.75);
+		disc.scale.set(16, 1, 16);
+		const shadow = flat3D(g.shadow, 0x000000, 0.35);
+		G3.scene.add(root, disc, shadow);
+		return { root, body, legs, arms, torso, shorts, head, hair, disc, shadow, shirt, trim, skin: L.skin };
+	}
+	function syncFigure3D (p, f, WX, WD) {
+		const kit = KITS[p.team], shirt = p.role === "gk" ? kit.gk : kit.outfield, trim = kit.second || "#1f2a36";
+		if (shirt !== f.shirt || trim !== f.trim) {   // a new opponent, or a change of kit
+			f.shirt = shirt; f.trim = trim;
+			f.torso.material = mat3D(shirt); f.shorts.material = mat3D(trim);
+			for (const a of f.arms) { a.children[0].material = mat3D(shirt); }
+			for (const l of f.legs) { l.children[1].material = mat3D(shirt); }
+			f.disc.material.color.set(shirt);
+		}
+		const x = WX(p.x), z = p.y, dir = WD(p.dir);
+		const down = (p.lunge > 0 && players.indexOf(p) === ctrl) || p.slideAI > 0;
+		const jump = reduceMotion ? 0 : jumpAmt(p);
+		const a = down ? 0 : clamp(p.runAmt || 0, 0, 1), ph = reduceMotion ? 0 : p.stride || 0, sw = Math.sin(ph) * a;
+		const shuf = down ? 0 : p.shuf || 0, cel = p.celebA || 0;
+		f.root.position.set(x, jump * 13 + (down ? -3 : 0), z);
+		f.root.rotation.set(0, -dir, down ? 1.05 : 0);
+		// Leaning into the run; a jump straightens him.
+		f.body.rotation.z = -(a * a * 0.22 * (1 - 0.6 * shuf)) * (1 - jump);
+		const bob = reduceMotion ? 0 : Math.abs(Math.cos(ph)) * a * 1.1;
+		f.body.position.y = 14 + bob;
+		for (let i = 0; i < 2; i++) {
+			const s = i ? -1 : 1, leg = f.legs[i], arm = f.arms[i];
+			leg.position.y = 14 + bob;
+			leg.rotation.z = down ? 0.15 : jump > 0 ? (i ? -0.3 : 0.5) * jump : s * sw * (0.75 - 0.35 * shuf);
+			// Arms swing against the legs; in the air or celebrating they go up and out.
+			const up = Math.max(jump, cel * 1.2);
+			arm.rotation.z = down ? 0.6 : -s * sw * 0.7 * (1 - up) + (up > 0 ? -0.4 * up : 0);
+			arm.rotation.x = -s * (0.12 + up * 2.6);
+			arm.children[1].rotation.z = 0.45 + a * 0.9;
+		}
+		f.disc.position.set(x, 0.25, z);
+		f.shadow.position.set(x + 3, 0.2, z + 2);
+		f.shadow.scale.set(12 + jump * 3, 1, 6 + jump * 1.5);
+		f.shadow.material.opacity = 0.35 / (1 + jump * 1.5);
+	}
+	// Which shot the broadcast is on: wide from the gantry between the action, tight behind a
+	// set piece, otherwise following the ball along the near stand.
+	function shot3D (out) {
+		const wideDrift = reduceMotion ? 0 : Math.sin(performance.now() / 9000) * FW * 0.1;
+		if (benchCam()) {
+			out.kind = "wide";
+			out.eye.set(FW / 2 + wideDrift, FH * 0.92, FH + FH * 1.02);
+			out.look.set(FW / 2, 10, FH * 0.4);
+			return out;
+		}
+		const sw = endsSwapped(), WX = x => (sw ? FW - x : x);
+		const o = ball.owner;
+		if (setPiece && setPiece.taker && o === setPiece.taker && state === "play" && (setPiece.kind === "free" || setPiece.kind === "pen")) {
+			const gx = attackX(setPiece.team), dx0 = gx - ball.x, dy0 = FH / 2 - ball.y, L = Math.hypot(dx0, dy0) || 1, dx = dx0 / L, dy = dy0 / L;
+			out.kind = "set" + setPiece.kind + setPiece.team;
+			out.eye.set(WX(clamp(ball.x - dx * 250, -MX * 0.5, FW + MX * 0.5)), 110, clamp(ball.y - dy * 250 + 90, -MY * 0.4, FH + MY * 0.5));
+			out.look.set(WX(ball.x + dx * 140), 12, ball.y + dy * 140);
+			return out;
+		}
+		const fx0 = o ? o.x : ball.x, fy0 = o ? o.y : ball.y, vx = o ? o.vx : ball.vx, vy = o ? o.vy : ball.vy;
+		let tx = fx0 + vx * 14;
+		const ty = clamp(fy0 + vy * 14, FH * 0.22, FH * 0.78);
+		const eyeH = FH * 0.5, eyeZ = FH * 1.32, lookZ = FH * 0.5;
+		const d = Math.hypot(eyeH, eyeZ - lookZ), half = d * Math.tan(G3.cam.fov * Math.PI / 360) * G3.cam.aspect;
+		tx = half * 2 >= FW ? FW / 2 : clamp(tx, half - MX * 0.6, FW - half + MX * 0.6);
+		out.kind = "follow";
+		out.eye.set(WX(tx), eyeH, eyeZ);
+		out.look.set(WX(tx), 0, ty);
+		return out;
+	}
+	const shotWant = { kind: "", eye: null, look: null };
+	function camera3D () {
+		if (!shotWant.eye) { shotWant.eye = new THREE.Vector3(); shotWant.look = new THREE.Vector3(); }
+		G3.cam.aspect = VW / VH;
+		G3.cam.updateProjectionMatrix();
+		shot3D(shotWant);
+		// A new shot is a cut; within a shot the camera glides, eased by elapsed time.
+		if (shotWant.kind !== G3.shot) { G3.shot = shotWant.kind; G3.eye.copy(shotWant.eye); G3.look.copy(shotWant.look); }
+		else {
+			const ease = reduceMotion ? 1 : 1 - Math.exp(-frameDt / 240);
+			G3.eye.lerp(shotWant.eye, ease); G3.look.lerp(shotWant.look, ease);
+		}
+		G3.cam.position.copy(G3.eye);
+		G3.cam.lookAt(G3.look);
+		G3.cam.updateMatrixWorld();
+	}
+	function sync3D () {
+		buildStadium3D();
+		const sw = endsSwapped(), WX = x => (sw ? FW - x : x), WD = d => (sw ? Math.PI - d : d);
+		camera3D();
+		// Players: one figure each, made the first time he appears, dropped when he goes off.
+		const seen = new Set();
+		for (const p of players) {
+			let f = G3.figs.get(p);
+			if (!f) { f = figure3D(p); G3.figs.set(p, f); }
+			seen.add(p);
+			syncFigure3D(p, f, WX, WD);
+		}
+		for (const [ p, f ] of G3.figs) {
+			if (seen.has(p)) { continue; }
+			G3.scene.remove(f.root, f.disc, f.shadow);
+			f.disc.material.dispose(); f.shadow.material.dispose();
+			G3.figs.delete(p);
+		}
+		// The ball, at its true height, rolling; its shadow stays on the grass.
+		const h = Math.max(0, ball.z || 0), bx = WX(ball.x), bz = ball.y;
+		G3.ball.position.set(bx, h * Z3 + 5, bz);
+		const spd = Math.hypot(ball.vx, ball.vy);
+		if (spd > 0.01 && !reduceMotion) {
+			G3.v.set(ball.vy, 0, -(sw ? -ball.vx : ball.vx)).normalize();
+			G3.ball.rotateOnWorldAxis(G3.v, spd / 5 * frameDt / 16.7);
+		}
+		const sh = 1 / (1 + h / 90);
+		G3.ballShadow.position.set(bx + 2 + h * 0.06, 0.3, bz + 1.5 + h * 0.04);
+		G3.ballShadow.scale.set(4.5 * sh + 2, 1, 4.5 * sh + 2);
+		G3.ballShadow.material.opacity = 0.3 * sh + 0.08;
+		// The markers on the grass.
+		const mk = G3.marks, me = human(), playing = state === "play" && freeze <= 0;
+		const isHuman = me && state !== "intro";
+		for (const m of Object.values(mk)) { m.visible = false; }
+		if (isHuman) {
+			const x = WX(me.x), z = me.y;
+			mk.me.visible = mk.meFill.visible = mk.arrow.visible = mk.cone.visible = true;
+			mk.me.position.set(x, 0.45, z); mk.me.scale.set(22, 1, 22);
+			mk.meFill.position.set(x, 0.4, z); mk.meFill.scale.set(22, 1, 22);
+			mk.arrow.position.set(x, 0.5, z); mk.arrow.rotation.y = -WD(me.dir);
+			mk.cone.position.set(x, 46 + (reduceMotion ? 0 : Math.sin(frame * 0.15) * 1.5), z);
+		}
+		if (playing && me && ball.owner === me) {
+			const t = passTarget(me);
+			if (t) { mk.pass.visible = true; mk.pass.position.set(WX(t.x), 0.5, t.y); mk.pass.scale.set(24, 1, 24); mk.pass.rotation.y = reduceMotion ? 0 : frame * 0.02; }
+			if (offsideOn()) {
+				const line = offsideLine(0);
+				if (line > FW / 2 + 1) { mk.offside.visible = true; mk.offside.position.set(WX(line), 0.4, FH / 2); mk.offside.scale.set(2.2, 0.5, FH); }
+			}
+		}
+		if (setPiece && setPiece.kind === "free" && ball.owner === setPiece.taker) {
+			const R = fkDist();
+			mk.fk.visible = true; mk.fk.position.set(bx, 0.45, bz); mk.fk.scale.set(R, 1, R);
+			if (setPiece.wall && setPiece.wall.length) {
+				const w = setPiece.wall, a = w[0], b = w[w.length - 1];
+				const dx = b.x - a.x, dy = b.y - a.y, L = Math.hypot(dx, dy) || 1;
+				const nx = ball.x - (a.x + b.x) / 2, ny = ball.y - (a.y + b.y) / 2, nl = Math.hypot(nx, ny) || 1;
+				mk.wall.visible = true;
+				mk.wall.position.set(WX((a.x + b.x) / 2 + nx / nl * 13), 0.5, (a.y + b.y) / 2 + ny / nl * 13);
+				mk.wall.scale.set(L + 28, 0.6, 3);
+				mk.wall.rotation.y = -WD(Math.atan2(dy, dx));
+			}
+		}
+		if (ball.owner && inHands(ball.owner) && state === "play") {
+			mk.keeper.visible = true; mk.keeper.position.set(WX(ball.owner.x), 0.4, ball.owner.y); mk.keeper.scale.set(KEEPER_CLEAR, 1, KEEPER_CLEAR);
+		}
+		if (tut && tut.marker) {
+			const r = 22 + (reduceMotion ? 0 : Math.sin(frame * 0.12) * 4);
+			mk.tut.visible = mk.tutFill.visible = true;
+			mk.tut.position.set(WX(tut.marker.x), 0.5, tut.marker.y); mk.tut.scale.set(r, 1, r);
+			mk.tutFill.position.set(WX(tut.marker.x), 0.45, tut.marker.y); mk.tutFill.scale.set(r, 1, r);
+		}
+	}
+	// A point on the pitch (x, y, height) to the screen, in the HUD's units; null when it is behind the camera.
+	function proj3D (x, y, z) {
+		const sw = endsSwapped();
+		G3.v.set(sw ? FW - x : x, z, y);
+		const d = G3.v.distanceTo(G3.cam.position);
+		G3.v.project(G3.cam);
+		if (G3.v.z > 1 || G3.v.z < -1) { return null; }
+		return { x: (G3.v.x + 1) / 2 * VW, y: (1 - G3.v.y) / 2 * VH, k: VH / (2 * d * Math.tan(G3.cam.fov * Math.PI / 360)) };
+	}
+	// The HUD over the 3D picture: everything the 2D cameras write in words and marks.
+	function hud3D () {
+		ctx.setTransform(1, 0, 0, 1, 0, 0);
+		ctx.clearRect(0, 0, canvas.width, canvas.height);
+		ctx.setTransform(scale, 0, 0, scale, 0, 0);
+		const me = human(), playing = state === "play" && freeze <= 0;
+		ctx.textAlign = "center"; ctx.textBaseline = "middle";
+		for (const p of players) {
+			if (!p.yellow && !p.injured) { continue; }
+			const q = proj3D(p.x, p.y, 36);
+			if (!q) { continue; }
+			if (p.yellow) {
+				ctx.fillStyle = "#ffd21f"; ctx.fillRect(q.x + 6, q.y - 10, 5, 7);
+				if (p.yellow > 1) { ctx.fillRect(q.x + 9, q.y - 8, 5, 7); }
+			}
+			if (p.injured) { ctx.fillStyle = "#ffffff"; ctx.fillRect(q.x - 13, q.y - 10, 7, 7); ctx.fillStyle = "#d8343f"; ctx.fillRect(q.x - 10.5, q.y - 9, 2, 5); ctx.fillRect(q.x - 12, q.y - 7.5, 5, 2); }
+		}
+		if (me && state !== "intro") {
+			const foot = proj3D(me.x, me.y, 0), top = proj3D(me.x, me.y, 56);
+			if (foot) {
+				drawSprintBar(me, foot.x, foot.y + Math.max(5, 7 * foot.k), Math.max(22, 30 * foot.k));
+				if (me.lungeCd > 0 && ball.owner !== me) {   // tackle recharging
+					const c = 1 - me.lungeCd / LUNGE_CD, r = 26 * foot.k;
+					ctx.strokeStyle = "rgba(255, 255, 255, 0.35)"; ctx.lineWidth = 3;
+					ctx.beginPath(); ctx.ellipse(foot.x, foot.y, r, r * 0.42, 0, -Math.PI / 2, -Math.PI / 2 + c * Math.PI * 2); ctx.stroke();
+				}
+				if (charging) {
+					const c = clamp((frame - chargeStart) / 50, 0, 1), r = 28 * foot.k;
+					ctx.strokeStyle = "#f2b52e"; ctx.lineWidth = 4;
+					ctx.beginPath(); ctx.ellipse(foot.x, foot.y, r, r * 0.42, 0, -Math.PI / 2, -Math.PI / 2 + c * Math.PI * 2); ctx.stroke();
+				}
+			}
+			if (top && me.name) {
+				ctx.font = "700 12px Barlow, Arial, sans-serif";
+				const label = `${me.num} ${me.name}`, w = ctx.measureText(label).width;
+				ctx.fillStyle = "rgba(8, 13, 11, 0.8)"; ctx.fillRect(top.x - w / 2 - 5, top.y - 18, w + 10, 16);
+				ctx.fillStyle = "#eef6ea"; ctx.fillText(label, top.x, top.y - 10);
+			}
+		}
+		if (playing && me && ball.owner === me) {
+			const m = strikerTarget(me), q = m && proj3D(m.x, m.y, 44);
+			if (q) {
+				ctx.fillStyle = "rgba(242, 181, 46, 0.95)"; ctx.font = "800 15px 'Big Shoulders Display', 'Arial Narrow', Arial, sans-serif";
+				ctx.fillText("Q", q.x, q.y);
+			}
+			if (offsideOn()) {
+				const line = offsideLine(0);
+				if (line > FW / 2 + 1) {
+					ctx.fillStyle = "rgba(222, 79, 90, 0.95)"; ctx.font = "800 11px Barlow, Arial, sans-serif";
+					for (const o of players) {
+						if (o.team !== 0 || o === me || o.role === "gk" || !isOffside(o, line)) { continue; }
+						const r = proj3D(o.x, o.y, 0);
+						if (r) { ctx.fillText("OFF", r.x, r.y + 12); }
+					}
+				}
+			}
+			if (charging && aimY !== null && shotInRange(me)) {   // the shot: where it could end up, and the crosshair
+				const power = clamp((frame - chargeStart) / 50, 0, 1), spread = shotSpread(me, power), cb = 55 * Z3;
+				const c = [ proj3D(FW, aimY - spread, 0), proj3D(FW, aimY + spread, 0), proj3D(FW, aimY + spread, cb), proj3D(FW, aimY - spread, cb) ];
+				if (c.every(Boolean)) {
+					ctx.fillStyle = "rgba(242, 181, 46, 0.28)";
+					ctx.beginPath(); ctx.moveTo(c[0].x, c[0].y); for (let i = 1; i < 4; i++) { ctx.lineTo(c[i].x, c[i].y); } ctx.closePath(); ctx.fill();
+				}
+				const g = proj3D(FW, aimY, 16), b = proj3D(ball.x, ball.y, 3);
+				if (g && b) {
+					ctx.save();
+					ctx.strokeStyle = "rgba(242, 181, 46, 0.7)"; ctx.lineWidth = 1.5; ctx.setLineDash([ 6, 6 ]);
+					ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(g.x, g.y); ctx.stroke();
+					ctx.setLineDash([]); ctx.strokeStyle = "#f2b52e"; ctx.lineWidth = 2.5;
+					ctx.beginPath(); ctx.arc(g.x, g.y, 8, 0, Math.PI * 2); ctx.stroke();
+					ctx.beginPath(); ctx.moveTo(g.x - 12, g.y); ctx.lineTo(g.x + 12, g.y); ctx.moveTo(g.x, g.y - 12); ctx.lineTo(g.x, g.y + 12); ctx.stroke();
+					ctx.restore();
+				}
+			}
+		}
+		if (playing && !receiver && !(ball.owner && ball.owner.team === 0)) {   // who S switches you to
+			const m = nextSwitchTarget(), q = m && proj3D(m.x, m.y, 46);
+			if (q) {
+				ctx.strokeStyle = "rgba(255, 255, 255, 0.75)"; ctx.lineWidth = 2;
+				ctx.beginPath(); ctx.moveTo(q.x - 7, q.y - 8); ctx.lineTo(q.x + 7, q.y - 8); ctx.lineTo(q.x, q.y); ctx.closePath(); ctx.stroke();
+				ctx.fillStyle = "rgba(255, 255, 255, 0.75)"; ctx.font = "700 12px Barlow, Arial, sans-serif";
+				ctx.fillText("S", q.x, q.y - 18);
+			}
+		}
+		// Pop-up rings and words (goal, won it, saved) over the spot.
+		for (const f of fx) {
+			if (f.toast) { continue; }
+			const k = f.t / (f.life || 40), q = proj3D(f.p ? f.p.x : f.x, f.p ? f.p.y : f.y, 0);
+			if (!q) { continue; }
+			const r = (20 + (reduceMotion ? 0 : k * 26)) * q.k;
+			ctx.globalAlpha = 1 - k;
+			ctx.strokeStyle = f.color; ctx.lineWidth = 3;
+			ctx.beginPath(); ctx.ellipse(q.x, q.y, r, r * 0.42, 0, 0, Math.PI * 2); ctx.stroke();
+			if (f.label) {
+				ctx.fillStyle = f.color; ctx.font = "800 22px 'Big Shoulders Display', 'Arial Narrow', Arial, sans-serif";
+				ctx.fillText(f.label.toUpperCase(), q.x, q.y - 60 * q.k - 14 - (reduceMotion ? 0 : k * 16));
+			}
+		}
+		ctx.globalAlpha = 1;
+		drawRain();
+		// An arrow at the screen edge when your player is out of the picture.
+		if (me && state !== "intro") {
+			const q = proj3D(me.x, me.y, 16);
+			const sx = q ? q.x : VW / 2, sy = q ? q.y : VH + 100, pad = 26;
+			if (!q || sx < 0 || sx > VW || sy < 0 || sy > VH) {
+				const ex = clamp(sx, pad, VW - pad), ey = clamp(sy, pad, VH - pad), a = Math.atan2(sy - ey, sx - ex);
+				ctx.save(); ctx.translate(ex, ey); ctx.rotate(a);
+				ctx.fillStyle = "#ffffff";
+				ctx.beginPath(); ctx.moveTo(14, 0); ctx.lineTo(-8, -10); ctx.lineTo(-8, 10); ctx.closePath(); ctx.fill();
+				ctx.restore();
+			}
+		}
+		drawMinimap();
+		drawHints();
+		drawToasts();
+		drawCountdown();
+	}
+	// One frame of the 3D view. False means "not this frame" (still loading, or unavailable),
+	// and the caller paints a 2D camera instead.
+	function drawScene3D () {
+		const st = threeState();
+		if (st === "failed") {
+			setCam(wideScreen ? "tv" : "top");
+			toast("3D view unavailable here", "#eef6ea");
+			return false;
+		}
+		if (st === "loading") {
+			if (!threeToldLoading) { threeToldLoading = true; toast("Loading 3D view", "#eef6ea"); }
+			return false;
+		}
+		if (!G3.renderer && !init3D()) { return false; }
+		if (G3.lost) { return false; }
+		fitView();
+		if (G3.w !== canvas.width || G3.h !== canvas.height) { G3.w = canvas.width; G3.h = canvas.height; resize3D(); }
+		// Keep the 2D cameras' target moving too, so a switch back is smooth (and the minimap frame is right).
+		const [ tx, ty ] = camTarget(), ease = reduceMotion ? 1 : 1 - Math.exp(-frameDt / 190);
+		camX += (tx - camX) * ease; camY += (ty - camY) * ease;
+		try {
+			sync3D();
+			G3.renderer.render(G3.scene, G3.cam);
+			hud3D();
+		} catch (e) {
+			threeFailed = true;
+			return false;
+		}
+		return true;
 	}
 
 	// The simulation runs at 60 steps a second; screens often refresh faster. Remember
@@ -6501,7 +7123,7 @@
 		}
 		if ((state === "play" || state === "goal") && GAME_KEYS.has(e.code)) { e.preventDefault(); }
 		if (e.repeat) { return; }
-		if (e.code === "KeyC") { setCam(camMode === "tv" ? "top" : "tv"); toast(camMode === "tv" ? "TV camera" : "Overhead camera", "#f2b52e"); return; }
+		if (e.code === "KeyC") { setCam(nextCam()); toast(CAM_NAME[camMode], "#f2b52e"); return; }
 		if (e.code === "KeyF") { setBig(!(document.body && document.body.classList.contains("big"))); return; }
 		padOn = false;
 		keys.add(e.code);
@@ -6698,7 +7320,7 @@
 	// Leave the tab or the window and the match waits for you.
 	document.addEventListener("visibilitychange", () => { if (document.hidden && state === "play") { pause(); } });
 	window.addEventListener("blur", () => { if (state === "play" && document.hasFocus && !document.hasFocus()) { pause(); } });
-	$("camBtn").addEventListener("click", e => { setCam(camMode === "tv" ? "top" : "tv"); e.currentTarget.blur(); toast(camMode === "tv" ? "TV camera" : "Overhead camera", "#f2b52e"); });
+	$("camBtn").addEventListener("click", e => { setCam(nextCam()); e.currentTarget.blur(); toast(CAM_NAME[camMode], "#f2b52e"); });
 	setCam(camMode);
 	$("offsideBtn").addEventListener("click", e => {
 		offsideRule = !offsideRule;
