@@ -933,6 +933,13 @@
 				<option value="low">Low block</option>
 			</select>
 		</label>
+		<label class="field" for="autoswitch">Auto switch
+			<select id="autoswitch">
+				<option value="assisted" selected>Assisted</option>
+				<option value="manual">Manual only</option>
+				<option value="aggressive">Aggressive</option>
+			</select>
+		</label>
 		<label class="field" for="difficulty" id="diffField">Opponent
 			<select id="difficulty">
 				<option value="easy">Sunday league</option>
@@ -1084,7 +1091,7 @@
 		<p class="fine"><b>Transfers and upgrades.</b> Your players have pace, shooting, passing and defending ratings that change how they play. When a season ends you earn prize money by where you finish. Until your first match of the next season, sign players from the transfer list (they join the bench, or replace your weakest player in that position once it is full) and build club upgrades that lift the whole squad. Rival clubs get stronger or weaker between seasons too.</p>
 		<p class="fine"><b>Eleven-a-side.</b> The camera follows the ball, and an arrow at the screen edge points to your player when they are out of view. Turn on the Minimap button for a small view of the whole pitch.</p>
 		<p class="fine"><b>Momentum.</b> Keep the ball and the bar under the clock swings your way. Tackles, completed passes and goals push it further. Once you are on top, the CPU gets rattled: it reacts slower, misplaces passes, shoots wider and tackles less, and your players run a little quicker. The same happens to you if the CPU keeps the ball.</p>
-		<p class="fine">The dashed ring shows who your pass will reach, and it avoids teammates with a red shirt in the way. Your receiver runs onto the ball by itself, and the arrows take over once they have it. When you defend, control moves to the player who can get to the ball first (allowing for where it is going, and preferring players goal-side of the attacker) as soon as the ball is lost or goes past your man, and otherwise only when they are clearly better placed than yours. A white pulse shows who you now control. The dashed ring with an S shows who S will switch you to; press S again to cycle to the next best, and control stays with your choice for a second and a half. Your teammates cover and mark while you press: chase the ball with E, or hold A and your man closes the carrier down and jockeys him for you.</p>
+		<p class="fine">The dashed ring shows who your pass will reach, and it avoids teammates with a red shirt in the way. Your receiver runs onto the ball by itself, and the arrows take over once they have it. When you defend, the Auto switch setting decides who you control. <b>Assisted</b> (the default) switches you once when the ball is lost, to the defender who can get to it first (allowing for where it is going, and preferring players goal-side of the attacker), and then leaves you alone: while you hold the arrows or A, control stays with your man unless he is clearly out of the play, and that happens at most once a spell with a message on screen. Let go of the arrows and the game moves you to a clearly better-placed defender, never more than once a second and never straight back to the man you just left. <b>Manual only</b> never switches by itself (except at restarts, or if your man is sent off or subbed): S is the only way to change player. <b>Aggressive</b> switches as soon as another defender is better placed, whatever you are doing. A white pulse shows who you now control. The dashed ring with an S shows who S will switch you to; press S again to cycle to the next best, and control stays with your choice for two and a half seconds or until the ball changes hands. Your teammates cover and mark while you press: chase the ball with E, or hold A and your man closes the carrier down and jockeys him for you.</p>
 	</section>
 </main>
 
@@ -1100,7 +1107,11 @@
 	const NET = 30;                     // goal depth
 	const BASE_SPD = 2.5;
 	const KICKOFF_FREEZE = 90;          // 3-2-1 countdown, 30 frames per number
-	const MANUAL_LOCK = 90;             // frames a manual switch overrides auto-switch
+	const MANUAL_LOCK = 150;            // frames a manual switch (S) overrides auto-switch: 2.5 s, or until possession changes
+	const AUTO_HOLD = 60;               // least frames between auto-switches (1 s)
+	const AUTO_HOLD_TURNOVER = 110;     // frames the turnover switch is kept (about 1.8 s)
+	const HANDBACK_GUARD = 120;         // frames before auto-switch may return to the man it just left (2 s)
+	const STEER_RECENT = 24;            // frames since the last direction input that still count as steering (0.4 s)
 	const GOAL_CELEB = 420;             // frames of goal celebration (7 s); any key or tap skips it
 	const ASSIST_ANGLE = 0.62;          // ~35 degrees either side of the goal
 	const LUNGE_CD = 45;
@@ -1441,7 +1452,7 @@
 	const overlay = $("overlay"), ovTitle = $("ovTitle"), ovText = $("ovText"), ovButton = $("ovButton");
 	const banner = $("banner");
 	const scoreHomeEl = $("scoreHome"), scoreAwayEl = $("scoreAway"), clockEl = $("clock");
-	const weatherSel = $("weather"), groundSel = $("ground"), shapeSel = $("shape"), styleSel = $("style"), pressSel = $("press");
+	const weatherSel = $("weather"), groundSel = $("ground"), shapeSel = $("shape"), styleSel = $("style"), pressSel = $("press"), autoSwitchSel = $("autoswitch");
 	const diffSel = $("difficulty"), lenSel = $("length"), fmtSel = $("format"), nextNote = $("nextNote");
 	const pauseBtn = $("pauseBtn"), restartBtn = $("restartBtn"), soundBtn = $("soundBtn");
 	const padTackle = $("padTackle"), ovStats = $("ovStats");
@@ -1454,6 +1465,12 @@
 	let autoPilot = false;   // test harness: the computer drives your player too (batch sims)
 	let pressHeld = false, touchPress = false, padPressBtn = false;   // A / Tackle button / X held: the press assist
 	let possLostAt = -1000;  // frame your side last lost the ball
+	let autoSwitchMode = "assisted";   // assisted | manual | aggressive (the Auto switch setting)
+	let steerAt = -1000;      // frame of the last direction input from you
+	let autoHold = 0;         // frames before the next auto-switch may happen
+	let turnoverPending = false;   // the other side has just won the ball: one switch to the best defender is due
+	let steerSwitchDone = false;   // the one out-of-the-play switch allowed while you steer has been used this spell
+	let lastSwitchKind = "";       // why control last moved by itself (for the test harness)
 	let possTeam = -1;
 	let receiver = null, receiveTimer = 0;  // teammate a pass is travelling to
 	let stats = { passes: 0, completed: 0, shots: 0, tackles: 0 };
@@ -2560,6 +2577,7 @@
 	// Team instructions, per team: how you play with the ball, and how you defend without it.
 	const STYLES = { possession: "Possession", balanced: "Balanced", direct: "Direct", counter: "Counter-attack" };
 	const PRESSES = { high: "High press", mid: "Mid block", low: "Low block" };
+	const AUTO_SWITCH = { assisted: "Auto switch: assisted", manual: "Auto switch: manual only", aggressive: "Auto switch: aggressive" };
 	let style = [ "balanced", "balanced" ], press = [ "mid", "mid" ];
 	// Your instructions from the pickers; anything unrecognised falls back to the defaults.
 	function readInstructions () {
@@ -3015,33 +3033,70 @@
 
 	let leftPlayer = null, leftAt = -1000;
 	let supporter = [ null, null ];
+	const steeringNow = () => frame - steerAt < STEER_RECENT || pressHeld || touchPress || padPressBtn;
+	// Who you control while defending. S (force) always wins and holds for MANUAL_LOCK.
+	// Otherwise the Auto switch setting decides:
+	//   assisted   one switch when the ball is lost, then held; while you steer or press, only an
+	//              out-of-the-play rescue (once a spell, with a message); idle, a clearly better man,
+	//              at most once a second and never straight back to the man just left.
+	//   manual     no auto-switch at all (restarts, send-offs and subs are handled elsewhere).
+	//   aggressive the quick rules: any clearly better-placed defender, whatever you are doing.
 	function switchToNearest (force) {
 		const cur = human();
-		let best;
+		let best, hold = AUTO_HOLD, cue = null, kind = force ? "manual" : "idle";
 		if (force) {
 			best = nextSwitchTarget();
 			if (frame - cycleAt >= 75) { cycleSeen = new Set([ cur ]); }
 			if (best) { cycleSeen.add(best); }
 			cycleAt = frame;
 			manualLock = MANUAL_LOCK;   // keep the auto-switch from snapping straight back
+			turnoverPending = false;
+			autoHold = 0;
 			if (tut) { tut.flags.switched = true; }
 		} else {
+			if (autoSwitchMode === "manual") { turnoverPending = false; return; }
 			if (cur.lunge > 0) { return; }   // never take the player away mid-slide
+			const turnover = turnoverPending;
+			turnoverPending = false;
 			const cs0 = switchScore(cur);
-			if (cs0 < 14) { return; }         // they are about to get there: leave them be
-			best = bestDefender(frame - leftAt < 45 ? leftPlayer : null);   // don't hand straight back
-			// Change when the other player is clearly better placed: sooner by a fifth and by at
-			// least a tenth of a second. Just after losing the ball, or once it has gone past your
-			// man, the bar is lower still, so you are on the right defender at once.
-			const fresh = frame - possLostAt < 40 || (ball.owner && ball.owner.team === 1 && cur.x > ball.owner.x + 30);
-			const bs = best ? switchScore(best) : Infinity;
-			if (!best || best === cur || !(bs < cs0 * (fresh ? 0.9 : 0.8) && cs0 - bs > (fresh ? 3 : 6))) { return; }
+			if (autoSwitchMode === "aggressive") {
+				if (cs0 < 14) { return; }         // they are about to get there: leave them be
+				best = bestDefender(frame - leftAt < 45 ? leftPlayer : null);   // don't hand straight back
+				const fresh = frame - possLostAt < 40 || (ball.owner && ball.owner.team === 1 && cur.x > ball.owner.x + 30);
+				const bs = best ? switchScore(best) : Infinity;
+				if (!best || best === cur || !(bs < cs0 * (fresh ? 0.9 : 0.8) && cs0 - bs > (fresh ? 3 : 6))) { return; }
+				hold = 0; kind = "aggressive";
+			} else if (turnover) {
+				// The ball has just been lost: once, to the best goal-side defender, then hold that choice.
+				best = bestDefender(null);
+				const bs = best ? switchScore(best) : Infinity;
+				if (!best || best === cur || !(bs < cs0 * 0.85 && cs0 - bs > 4)) { autoHold = AUTO_HOLD; return; }
+				hold = AUTO_HOLD_TURNOVER; kind = "turnover";
+			} else {
+				if (autoHold > 0) { return; }
+				if (cs0 < 14) { return; }         // they are about to get there: leave them be
+				best = bestDefender(frame - leftAt < HANDBACK_GUARD ? leftPlayer : null);   // never straight back
+				const bs = best ? switchScore(best) : Infinity;
+				if (!best || best === cur) { return; }
+				if (steeringNow()) {
+					// You are driving this man: he stays yours unless he is clearly out of the play
+					// (the ball well past him toward your goal and a teammate far quicker to it).
+					if (steerSwitchDone) { return; }
+					const bx = ball.owner ? ball.owner.x : ball.x;
+					if (!(cur.x > bx + 140 * Math.sqrt(S) && bs < cs0 * 0.5 && cs0 - bs > 30)) { return; }
+					steerSwitchDone = true;
+					cue = "Switched: your man was out of the play"; kind = "rescue";
+				} else if (!(bs < cs0 * 0.8 && cs0 - bs > 6)) { return; }   // clearly better placed: sooner by a fifth and a tenth of a second
+			}
 		}
 		if (!best || best === cur) { return; }
 		leftPlayer = cur;
 		leftAt = frame;
 		ctrl = players.indexOf(best);
 		switchCd = force ? 15 : 24;
+		if (!force) { autoHold = hold; }
+		lastSwitchKind = kind;
+		if (cue) { toast(cue, "#eef6ea"); }
 		flashPlayer(best);
 	}
 	/* ---------- effects ---------- */
@@ -3534,6 +3589,7 @@
 		x += stickVec.x + padVec.x; y += stickVec.y + padVec.y;
 		if (endsSwapped()) { x = -x; }   // right on screen is towards the other goal now
 		const m = Math.hypot(x, y);
+		if (m > 0.2) { steerAt = frame; }
 		if (m > 1) { x /= m; y /= m; }
 		return { x, y, m: Math.min(1, m), sprint: keys.has("KeyE") || keys.has("ShiftLeft") || keys.has("ShiftRight") || padSprint || padSprintBtn };
 	}
@@ -3605,6 +3661,7 @@
 		}
 		if (switchCd > 0) { switchCd--; }
 		if (manualLock > 0) { manualLock--; }
+		if (autoHold > 0) { autoHold--; }
 		// A pass in flight belongs to its receiver until someone touches the ball
 		// or it dies; auto-switch stays off meanwhile.
 		if (receiver) {
@@ -3614,7 +3671,7 @@
 		// Once your keeper has played it, control leaves him at once: you never run him out of goal by accident.
 		if (human().role === "gk" && ball.owner !== human() && !receiver) {
 			const b = bestDefender(human());
-			if (b) { ctrl = players.indexOf(b); switchCd = 20; }
+			if (b) { ctrl = players.indexOf(b); switchCd = 20; autoHold = AUTO_HOLD; lastSwitchKind = "gk"; }
 		}
 		if (!receiver && !(ball.owner && ball.owner.team === 0) && switchCd <= 0 && manualLock <= 0) { switchToNearest(false); }
 
@@ -4713,7 +4770,11 @@
 		p.think = 4;
 		// A change of possession is a new situation, so drop any manual-switch hold.
 		const lostBy = p.team !== possTeam ? possTeam : -1;
-		if (p.team !== possTeam) { manualLock = 0; if (p.team === 1) { possLostAt = frame; switchCd = 0; } possTeam = p.team; }
+		if (p.team !== possTeam) {
+			manualLock = 0;
+			if (p.team === 1) { possLostAt = frame; switchCd = 0; autoHold = 0; turnoverPending = true; steerSwitchDone = false; }
+			possTeam = p.team;
+		}
 		if (pendingPass) { if (p.team === 0) { stats.completed++; } pendingPass = false; }
 		const by = ball.lastBy, fromMate = by && by !== p && by.team === p.team && frame - (ball.kickedAt ?? -999) < 300;
 		if (fromMate) { completedPass(p.team); } else if (by && by.team !== p.team) { breakStreak(by.team, p.team); }
@@ -5578,7 +5639,7 @@
 	// Hollow marker over the player S would switch to while you defend.
 	function drawSwitchPreview () {
 		if (state !== "play" || freeze > 0 || receiver) { return; }
-		if (ball.owner && ball.owner.team === 0) { return; }
+		if ((ball.owner && ball.owner.team === 0) || inHands(ball.owner)) { return; }
 		const m = nextSwitchTarget();
 		if (!m) { return; }
 		const X = MX + m.x, Y = MY + m.y;
@@ -7113,7 +7174,7 @@
 			mk.arrow.position.set(x, 0.5, z); mk.arrow.rotation.y = -WD(me.dir);
 			mk.cone.position.set(x, 46 + (reduceMotion ? 0 : Math.sin(frame * 0.15) * 1.5), z);
 		}
-		if (playing && !receiver && !(ball.owner && ball.owner.team === 0)) {   // who S switches you to: a dashed ring at his feet
+		if (playing && !receiver && !(ball.owner && ball.owner.team === 0) && !inHands(ball.owner)) {   // who S switches you to: a dashed ring at his feet
 			const m = nextSwitchTarget();
 			if (m) { mk.next.visible = true; mk.next.position.set(WX(m.x), 0.45, m.y); mk.next.scale.set(19, 1, 19); mk.next.rotation.y = reduceMotion ? 0 : -frame * 0.03; }
 		}
@@ -7232,7 +7293,7 @@
 				}
 			}
 		}
-		if (playing && !receiver && !(ball.owner && ball.owner.team === 0)) {   // who S switches you to
+		if (playing && !receiver && !(ball.owner && ball.owner.team === 0) && !inHands(ball.owner)) {   // who S switches you to
 			const m = nextSwitchTarget(), q = m && proj3D(m.x, m.y, 46);
 			if (q) {
 				ctx.strokeStyle = "rgba(255, 255, 255, 0.75)"; ctx.lineWidth = 2;
@@ -7649,6 +7710,12 @@
 			sel.blur();
 		});
 	}
+	autoSwitchSel.addEventListener("change", () => {
+		autoSwitchMode = AUTO_SWITCH[autoSwitchSel.value] ? autoSwitchSel.value : "assisted";
+		store.set("ff-autoswitch", autoSwitchMode);
+		if (state === "play" || state === "goal" || state === "paused") { toast(AUTO_SWITCH[autoSwitchMode], "#f2b52e"); }
+		autoSwitchSel.blur();
+	});
 	shapeSel.addEventListener("change", () => {
 		const fmt = currentFmt();
 		if (SHAPES[fmt] && (SHAPES[fmt][shapeSel.value] || shapeSel.value === "auto")) { shapePref[fmt] = shapeSel.value; store.set("ff-shape-" + fmt, shapeSel.value); }
@@ -7699,6 +7766,8 @@
 		const sw = store.get("ff-weather"), sg = store.get("ff-ground"), ss = store.get("ff-style"), spr = store.get("ff-press");
 		if (ss && STYLES[ss]) { styleSel.value = ss; }
 		if (spr && PRESSES[spr]) { pressSel.value = spr; }
+		const asw = store.get("ff-autoswitch");
+		if (asw && AUTO_SWITCH[asw]) { autoSwitchSel.value = asw; autoSwitchMode = asw; }
 		if (sw && WEATHER[sw]) { weatherSel.value = sw; }
 		if (sg && SURFACES[sg]) { groundSel.value = sg; }
 		if (l && [ ...lenSel.options ].some(o => o.value === l)) { lenSel.value = l; }
@@ -7749,6 +7818,9 @@
 			get ball () { return ball; }, get score () { return score; }, get possFrames () { return possFrames; }, get possTeam () { return possTeam; },
 			get goalTimer () { return goalTimer; }, get timeLeft () { return timeLeft; }, get freeze () { return freeze; }, get FW () { return FW; }, get FH () { return FH; },
 			get manualLock () { return manualLock; }, get celeb () { return typeof celeb === "undefined" ? null : celeb; },
+			get autoSwitchMode () { return autoSwitchMode; }, set autoSwitchMode (v) { autoSwitchMode = v; autoSwitchSel.value = v; },
+			get autoHold () { return autoHold; }, get steerAt () { return steerAt; }, set possTeam (v) { possTeam = v; },
+			get lastSwitchKind () { return lastSwitchKind; }, set lastSwitchKind (v) { lastSwitchKind = v; }, get setPiece () { return setPiece; },
 			human, switchScore, outfield, dist,
 			step (n = 1) { for (let i = 0; i < n; i++) { snapshotPrev(); update(); } },
 			key (code, on) { if (on) { keys.add(code); } else { keys.delete(code); } },
