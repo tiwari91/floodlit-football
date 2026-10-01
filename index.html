@@ -92,6 +92,14 @@
 	}
 	.scorebug b { font-size: 24px; font-variant-numeric: tabular-nums; }
 	.scorebug .t { color: #f2b52e; font-size: 18px; font-variant-numeric: tabular-nums; }
+	@media (max-width: 640px) {
+		.scorebug { left: 10px; transform: none; gap: 7px; padding: 3px 9px 4px; font-size: 15px; max-width: calc(100% - 118px); }
+		.scorebug > span:not(.t):not(.bugbar):not(.bugmood) { overflow: hidden; text-overflow: ellipsis; max-width: 9ch; }
+		.scorebug b { font-size: 19px; }
+		.scorebug .t { font-size: 15px; }
+		.scorebug .bugmood { left: 0; transform: none; }
+		.menutoggle { padding: 4px 8px; font-size: 12px; }
+	}
 	/* Big pitch keeps the momentum: a strip along the bottom of the bug and a word under it. */
 	.scorebug .bugbar { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; overflow: hidden; border-radius: 0 0 4px 4px; background: rgba(255, 255, 255, 0.08); }
 	.scorebug .bugmood { position: absolute; top: calc(100% + 4px); left: 50%; transform: translateX(-50%); font-size: 12px; font-weight: 700; letter-spacing: 0.08em; padding: 2px 8px; border-radius: 3px; background: rgba(7, 12, 10, 0.78); color: var(--chalk, #eef6ea); }
@@ -218,6 +226,30 @@
 		touch-action: none;
 	}
 
+	@media (pointer: coarse) and (orientation: portrait) {
+		.pitchwrap, body.big .pitchwrap { height: max(300px, min(calc(100svh - 330px), calc(var(--pw) * 1.12), 760px)); }
+	}
+	/* Landscape phones: the pitch takes the screen and the touch controls float over its bottom corners. */
+	@media (pointer: coarse) and (orientation: landscape) and (max-height: 520px) {
+		body.big { padding: 0; }
+		body.big .wrap { position: relative; gap: 0; }
+		body.big .pitchwrap { height: 100svh; border-radius: 0; margin-inline: 0; width: 100%; --pw: 100cqw; }
+		body.big .touch {
+			position: absolute; left: 0; right: 0; top: calc(100svh - 10px); transform: translateY(-100%);
+			padding-inline: 14px; align-items: flex-end; pointer-events: none; z-index: 5;
+		}
+		body.big .touch > * { pointer-events: auto; }
+		body.big .stick { width: 112px; height: 112px; background: rgba(19, 33, 26, 0.55); border-color: rgba(238, 246, 234, 0.25); }
+		body.big .knob { background: rgba(72, 110, 88, 0.85); }
+		body.big .pads { grid-template-columns: repeat(3, 62px); gap: 8px; }
+		body.big .pad { height: 54px; background: rgba(24, 42, 33, 0.72); border-color: rgba(238, 246, 234, 0.25); font-size: 15px; }
+		body.big .pad.through, body.big .pad.long, body.big .pad.sprint, body.big .pad.tactic { height: 40px; font-size: 13px; }
+		body.big .pad.shoot { background: rgba(242, 181, 46, 0.9); border-color: rgba(242, 181, 46, 0.9); }
+		body.big .pad.sprint.on { background: rgba(127, 212, 155, 0.9); }
+		body.big .bar { margin-top: 12px; padding-inline: 14px; }
+		body.big .league, body.big .help { padding-inline: 14px; }
+	}
+
 	canvas { display: block; width: 100%; height: 100%; }
 	#pitch3d { position: absolute; inset: 0; }   /* the 3D view, under the 2D canvas (which carries the HUD) */
 	#pitch { position: relative; }
@@ -232,16 +264,29 @@
 	}
 
 	.card {
-		display: grid;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
 		gap: 10px;
-		justify-items: center;
 		text-align: center;
 		max-width: 38ch;
+		max-height: 100%;
 		padding: 20px 24px;
-		background: rgba(13, 22, 18, 0.92);
+		background: rgba(13, 22, 18, 0.94);
 		border: 1px solid var(--rule);
 		border-radius: 6px;
+		box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
+		animation: card-in 0.22s ease-out;
 	}
+
+	/* The title and the buttons stay put; only the words in between scroll on a short screen. */
+	.card-body { display: grid; gap: 10px; justify-items: center; width: 100%; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+	.card > .actions, .card > .quick { flex: none; }
+	@keyframes card-in {
+		from { transform: translateY(8px) scale(0.98); opacity: 0; }
+		to { transform: none; opacity: 1; }
+	}
+	@media (prefers-reduced-motion: reduce) { .card { animation: none; } }
 
 	.card h2 {
 		margin: 0;
@@ -254,11 +299,23 @@
 	}
 
 	.card p { margin: 0; color: var(--muted); }
+	@media (max-height: 560px), (max-width: 440px) {
+		.overlay { padding: 10px; }
+		.card { padding: 12px 16px; gap: 8px; }
+		.card h2 { font-size: 24px; }
+		.card p { font-size: 13px; line-height: 1.4; }
+		.card-body { gap: 6px; }
+		.stats { gap: 4px 14px; }
+		.stats b { font-size: 22px; }
+		.stats span { font-size: 10px; }
+		.card .actions { gap: 6px; }
+		.card .actions button { padding: 6px 10px; font-size: 13px; }
+		.card button.primary { font-size: 17px; padding: 6px 18px; }
+	}
 	.card.wide { max-width: min(680px, 100%); }
-	.card { max-height: 100%; overflow-y: auto; }
 	/* While picking a change, the panel has the card to itself. */
-	.card.wide > p, .card.wide > .actions, .card.wide > .stats, .card.wide > .report { display: none; }
-	.subs { display: grid; gap: 10px; width: 100%; }
+	.card.wide > .card-body, .card.wide > .actions, .card.wide > .quick { display: none; }
+	.subs { display: grid; gap: 10px; width: 100%; min-height: 0; overflow-y: auto; }
 	.subs h3 { margin: 0; font-family: var(--display); font-weight: 800; font-size: 22px; text-transform: uppercase; letter-spacing: 0.04em; }
 	.subcols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; text-align: left; }
 	.subcol { display: grid; gap: 4px; align-content: start; max-height: max(120px, calc(100svh - 520px)); overflow-y: auto; padding-right: 2px; }
@@ -773,7 +830,7 @@
 		border: 1px solid #3d5a4a;
 	}
 
-	.pads { display: grid; grid-template-columns: repeat(3, 68px); gap: 10px; }
+	.pads { display: grid; grid-template-columns: repeat(3, minmax(0, 68px)); gap: 10px; }
 
 	.pad {
 		height: 60px;
@@ -879,9 +936,13 @@
 		<div class="overlay" id="overlay">
 			<div class="card">
 				<h2 id="ovTitle">Kick off</h2>
-				<p id="ovText">You kick off, attacking the goal on the right. Move with the arrows. S passes, W plays a through ball, D shoots, Q hits a long ball to the striker, A tackles, E sprints.</p>
-				<div class="stats" id="ovStats" hidden></div>
-				<ol class="report" id="ovReport" hidden></ol>
+				<div class="card-body" id="ovBody">
+					<p id="ovText">You kick off, attacking the goal on the right. Move with the arrows. S passes, W plays a through ball, D shoots, Q hits a long ball to the striker, A tackles, E sprints.</p>
+					<div class="keystrip" id="ovKeys" hidden></div>
+					<div class="stats" id="ovStats" hidden></div>
+					<ol class="report" id="ovReport" hidden></ol>
+				</div>
+				<div class="quick" id="ovQuick" hidden></div>
 				<div class="actions">
 					<button class="primary" id="ovButton" type="button">Kick off</button>
 					<button id="ovSim" type="button" hidden>Simulate match</button>
