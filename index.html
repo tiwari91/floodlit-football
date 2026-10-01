@@ -737,16 +737,70 @@
 		white-space: nowrap;
 	}
 
-	.bar {
+	/* Settings: the match actions on one row, then the settings in four labelled groups. */
+	.bar { display: grid; gap: 10px; }
+	.baractions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+	#pauseBtn { border-color: var(--amber); color: var(--amber); min-width: 6em; }
+	.bargroups { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr)); gap: 10px; align-items: start; }
+
+	.bargroup {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
-		gap: 10px 14px;
+		gap: 8px 12px;
+		padding: 10px 12px 12px;
+		background: var(--panel);
+		border: 1px solid var(--rule);
+		border-radius: 6px;
 	}
 
-	.bar .spacer { flex: 1 1 auto; }
+	.bargroup .eyebrow { flex-basis: 100%; }
+	.bargroup button { padding: 6px 10px; font-size: 13px; }
+	.bargroup button[aria-pressed="true"]:not(#camBtn) { border-color: #3f8f5a; box-shadow: inset 3px 0 0 #3f8f5a; }
 
 	.bar .note { color: var(--amber); font-size: 13px; font-weight: 600; }
+
+	/* Quick settings on the pause and half-time cards: the same switches as the bar, in reach mid-match. */
+	.quick { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; width: 100%; padding-top: 2px; }
+	.quick button { padding: 4px 9px; font-size: 12px; }
+	.quick button.on { border-color: #3f8f5a; box-shadow: inset 3px 0 0 #3f8f5a; }
+
+	/* First matches: the keys, right on the kick-off card. */
+	.keystrip { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 12px; font-size: 13px; color: var(--text); }
+	.keystrip span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+	.keystrip kbd { font-size: 11px; }
+
+	/* How to play: a sheet over the page. */
+	.sheet { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(7, 12, 10, 0.72); }
+	.sheet-card {
+		display: flex; flex-direction: column; gap: 12px;
+		width: min(760px, 100%); max-height: 100%; padding: 18px 22px 20px;
+		background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; box-shadow: 0 24px 70px rgba(0, 0, 0, 0.6);
+		animation: card-in 0.22s ease-out;
+	}
+	@media (prefers-reduced-motion: reduce) { .sheet-card { animation: none; } }
+	.sheet-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+	.sheet-head h2 { margin: 0; font-family: var(--display); font-weight: 900; font-size: 30px; text-transform: uppercase; letter-spacing: 0.04em; line-height: 1; margin-right: auto; }
+	.sheet-close { padding: 2px 10px; font-size: 20px; line-height: 1.2; }
+	.sheet-body { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 14px 22px; align-content: start; flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; }
+	@media (max-width: 640px) { .sheet-head .tabs { order: 3; flex-basis: 100%; } .sheet-head .tabs button { flex: 1 1 auto; } }
+	.sheet-body h3 { margin: 0 0 6px; font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--amber); }
+	.how-row { display: grid; grid-template-columns: minmax(74px, auto) 1fr; gap: 10px; align-items: start; padding: 5px 0; border-top: 1px solid var(--rule); }
+	.how-row:first-of-type { border-top: 0; }
+	.how-row kbd { justify-self: start; }
+	.how-row b { display: block; color: var(--text); font-weight: 600; }
+	.how-row span { color: var(--muted); font-size: 13px; }
+	.how-legend { display: grid; gap: 6px; font-size: 13px; color: var(--muted); }
+	.how-legend li { display: flex; align-items: center; gap: 10px; }
+	.how-legend i { flex: none; width: 18px; height: 18px; border-radius: 50%; border: 2px solid; }
+	.sheet-foot { margin: 0; color: var(--muted); font-size: 13px; }
+	.sheet .actions { display: flex; justify-content: center; }
+	@media (max-height: 560px), (max-width: 440px) {
+		.sheet { padding: 8px; }
+		.sheet-card { padding: 12px 14px; gap: 8px; }
+		.sheet-head h2 { font-size: 22px; }
+		.sheet-foot { display: none; }
+	}
 
 	label.field {
 		display: flex;
@@ -949,6 +1003,7 @@
 					<button id="ovFix" type="button" hidden>Rest tired players</button>
 					<button id="ovSubs" type="button" hidden>Substitutions</button>
 					<button id="ovSeason" type="button" hidden>Simulate the season</button>
+					<button id="ovHelp" type="button" hidden title="How to play (H)">How to play</button>
 				</div>
 				<div class="subs" id="subPanel" hidden></div>
 			</div>
@@ -968,84 +1023,101 @@
 		</div>
 	</div>
 
-	<div class="bar">
-		<label class="field" for="format">Teams
-			<select id="format">
-				<option value="11" selected>11-a-side</option>
-				<option value="6">6-a-side</option>
-				<option value="5">5-a-side</option>
-			</select>
-		</label>
-		<label class="field" for="shape" id="shapeField">Shape
-			<select id="shape"></select>
-		</label>
-		<label class="field" for="style">Style
-			<select id="style">
-				<option value="possession">Possession</option>
-				<option value="balanced" selected>Balanced</option>
-				<option value="direct">Direct</option>
-				<option value="counter">Counter-attack</option>
-			</select>
-		</label>
-		<label class="field" for="press">Defending
-			<select id="press">
-				<option value="high">High press</option>
-				<option value="mid" selected>Mid block</option>
-				<option value="low">Low block</option>
-			</select>
-		</label>
-		<label class="field" for="autoswitch">Auto switch
-			<select id="autoswitch">
-				<option value="assisted" selected>Assisted</option>
-				<option value="manual">Manual only</option>
-				<option value="aggressive">Aggressive</option>
-			</select>
-		</label>
-		<label class="field" for="difficulty" id="diffField">Opponent
-			<select id="difficulty">
-				<option value="easy">Sunday league</option>
-				<option value="normal" selected>Club</option>
-				<option value="hard">Academy</option>
-			</select>
-		</label>
-		<label class="field" for="weather" id="weatherField">Weather
-			<select id="weather">
-				<option value="clear" selected>Clear</option>
-				<option value="rain">Rain</option>
-				<option value="heavy">Heavy rain</option>
-			</select>
-		</label>
-		<label class="field" for="ground" id="groundField">Ground
-			<select id="ground">
-				<option value="grass" selected>Grass</option>
-				<option value="mud">Muddy</option>
-				<option value="turf">Artificial turf</option>
-			</select>
-		</label>
-		<label class="field" for="length">Match
-			<select id="length">
-				<option value="120">2 minutes</option>
-				<option value="180" selected>3 minutes</option>
-				<option value="300">5 minutes</option>
-				<option value="420">7 minutes</option>
-				<option value="600">10 minutes</option>
-				<option value="900">15 minutes</option>
-				<option value="1200">20 minutes</option>
-			</select>
-		</label>
-		<span class="note" id="nextNote" hidden>Applies from the next match</span>
-		<span class="spacer"></span>
-		<button id="pauseBtn" type="button">Pause</button>
-		<button id="simBtn" type="button">Simulate match</button>
-		<button id="subsBtn" type="button">Subs</button>
-		<button id="restartBtn" type="button">New match</button>
-		<button id="soundBtn" type="button" aria-pressed="true">Sound on</button>
-		<button id="musicBtn" type="button" aria-pressed="true">Music on</button>
-		<button id="hintsBtn" type="button" aria-pressed="true">Hints on</button>
-		<button id="mapBtn" type="button" aria-pressed="false">Minimap off</button>
-		<button id="offsideBtn" type="button" aria-pressed="true">Offside on</button>
-		<button id="camBtn" type="button" aria-pressed="false" title="Switch camera (C): overhead, TV or 3D">Camera: overhead</button>
-		<button id="bigBtn" type="button" aria-pressed="false">Big pitch: off</button>
+	<div class="bar" id="bar">
+		<div class="baractions" role="group" aria-label="Match actions">
+			<button id="pauseBtn" type="button">Pause</button>
+			<button id="simBtn" type="button">Simulate match</button>
+			<button id="subsBtn" type="button">Subs</button>
+			<button id="restartBtn" type="button">New match</button>
+			<button id="howtoBtn" type="button" title="How to play (H)">How to play</button>
+			<span class="note" id="nextNote" hidden>Applies from the next match</span>
+		</div>
+		<div class="bargroups">
+			<div class="bargroup" role="group" aria-labelledby="bgTeam">
+			<span class="eyebrow" id="bgTeam">Your team</span>
+			<label class="field" for="format">Teams
+				<select id="format">
+					<option value="11" selected>11-a-side</option>
+					<option value="6">6-a-side</option>
+					<option value="5">5-a-side</option>
+				</select>
+			</label>
+			<label class="field" for="shape" id="shapeField">Shape
+				<select id="shape"></select>
+			</label>
+			<label class="field" for="style">Style
+				<select id="style">
+					<option value="possession">Possession</option>
+					<option value="balanced" selected>Balanced</option>
+					<option value="direct">Direct</option>
+					<option value="counter">Counter-attack</option>
+				</select>
+			</label>
+			<label class="field" for="press">Defending
+				<select id="press">
+					<option value="high">High press</option>
+					<option value="mid" selected>Mid block</option>
+					<option value="low">Low block</option>
+				</select>
+			</label>
+			</div>
+			<div class="bargroup" role="group" aria-labelledby="bgMatch">
+			<span class="eyebrow" id="bgMatch">Match</span>
+			<label class="field" for="difficulty" id="diffField">Opponent
+				<select id="difficulty">
+					<option value="easy">Sunday league</option>
+					<option value="normal" selected>Club</option>
+					<option value="hard">Academy</option>
+				</select>
+			</label>
+			<label class="field" for="weather" id="weatherField">Weather
+				<select id="weather">
+					<option value="clear" selected>Clear</option>
+					<option value="rain">Rain</option>
+					<option value="heavy">Heavy rain</option>
+				</select>
+			</label>
+			<label class="field" for="ground" id="groundField">Ground
+				<select id="ground">
+					<option value="grass" selected>Grass</option>
+					<option value="mud">Muddy</option>
+					<option value="turf">Artificial turf</option>
+				</select>
+			</label>
+			<label class="field" for="length">Match
+				<select id="length">
+					<option value="120">2 minutes</option>
+					<option value="180" selected>3 minutes</option>
+					<option value="300">5 minutes</option>
+					<option value="420">7 minutes</option>
+					<option value="600">10 minutes</option>
+					<option value="900">15 minutes</option>
+					<option value="1200">20 minutes</option>
+				</select>
+			</label>
+			</div>
+			<div class="bargroup" role="group" aria-labelledby="bgView">
+			<span class="eyebrow" id="bgView">Controls and view</span>
+			<label class="field" for="autoswitch">Auto switch
+				<select id="autoswitch">
+					<option value="assisted" selected>Assisted</option>
+					<option value="manual">Manual only</option>
+					<option value="aggressive">Aggressive</option>
+				</select>
+			</label>
+			<button id="camBtn" type="button" aria-pressed="false" title="Switch camera (C): overhead, TV or 3D">Camera: overhead</button>
+			<button id="hintsBtn" type="button" aria-pressed="true">Hints on</button>
+			<button id="mapBtn" type="button" aria-pressed="false">Minimap off</button>
+			<button id="bigBtn" type="button" aria-pressed="false">Big pitch: off</button>
+			<button id="contrastBtn" type="button" aria-pressed="false" title="High-contrast kits: the other side plays in white or black, with a dashed ring, so the teams never blur together">Kit contrast off</button>
+			</div>
+			<div class="bargroup" role="group" aria-labelledby="bgSound">
+			<span class="eyebrow" id="bgSound">Sound and rules</span>
+			<button id="soundBtn" type="button" aria-pressed="true">Sound on</button>
+			<button id="musicBtn" type="button" aria-pressed="true">Music on</button>
+			<button id="offsideBtn" type="button" aria-pressed="true">Offside on</button>
+			</div>
+		</div>
 	</div>
 
 	<section class="league" id="league" aria-label="League">
@@ -1155,6 +1227,23 @@
 		<p class="fine">The dashed ring shows who your pass will reach, and it avoids teammates with a red shirt in the way. Your receiver runs onto the ball by itself, and the arrows take over once they have it. When you defend, the Auto switch setting decides who you control. <b>Assisted</b> (the default) switches you once when the ball is lost, to the defender who can get to it first (allowing for where it is going, and preferring players goal-side of the attacker), and then leaves you alone: while you hold the arrows or A, control stays with your man unless he is clearly out of the play, and that happens at most once a spell with a message on screen. Let go of the arrows and the game moves you to a clearly better-placed defender, never more than once a second and never straight back to the man you just left. <b>Manual only</b> never switches by itself (except at restarts, or if your man is sent off or subbed): S is the only way to change player. <b>Aggressive</b> switches as soon as another defender is better placed, whatever you are doing. A white pulse shows who you now control. The dashed ring with an S shows who S will switch you to; press S again to cycle to the next best, and control stays with your choice for two and a half seconds or until the ball changes hands. Your teammates cover and mark while you press: chase the ball with E, or hold A and your man closes the carrier down and jockeys him for you.</p>
 	</section>
 </main>
+
+<div class="sheet" id="howto" role="dialog" aria-modal="true" aria-labelledby="howtoTitle" hidden>
+	<div class="sheet-card">
+		<div class="sheet-head">
+			<h2 id="howtoTitle">How to play</h2>
+			<div class="tabs" role="group" aria-label="Controls for">
+				<button type="button" id="howKeys" aria-pressed="true">Keyboard</button>
+				<button type="button" id="howTouch" aria-pressed="false">Touch</button>
+				<button type="button" id="howPad" aria-pressed="false">Controller</button>
+			</div>
+			<button type="button" class="sheet-close" id="howtoClose" aria-label="Close">×</button>
+		</div>
+		<div class="sheet-body" id="howtoBody"></div>
+		<p class="sheet-foot">Press <kbd>H</kbd> any time for this screen. Formations, tactics and the laws are under Controls below the pitch.</p>
+		<div class="actions"><button class="primary" id="howtoDone" type="button">Got it</button></div>
+	</div>
+</div>
 
 <!-- three.js r147, for the 3D camera. Pinned; if it fails to load the game stays on its 2D cameras. -->
 <script id="threeLib" src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.147.0/three.min.js" integrity="sha384-vV17nr/rMaJqmeZkFUzXLpHdQ+ME5QHKdydaqqN+3Ga39RJlNrTatJxHwGV4ml2C" crossorigin="anonymous" async></script>
@@ -1631,6 +1720,13 @@
 				you.second = lum(you.outfield) > 0.5 ? "#1f2a36" : "#f2b52e";
 				you.ink = lum(you.outfield) > 0.55 ? "#1b2420" : "#ffffff";
 			}
+		}
+		// Kit contrast: the other side plays in white (or black when you are in white), which reads
+		// against the grass and against any colour of yours for every kind of colour vision.
+		if (highContrast) {
+			shirt = deltaE("#f4f4f4", you.outfield) > 60 ? "#f4f4f4" : "#15171a";
+			trim = shirt === "#f4f4f4" ? "#15171a" : "#f4f4f4";
+			pattern = "plain";
 		}
 		// Shorts and sleeves too: if they're alike, the away side wears different ones.
 		if (deltaE(trim, you.second) < 25) {
@@ -2411,7 +2507,12 @@
 		return (fw && df ? `Watch ${fw.name} (shooting ${fw.sho}) up front and ${df.name} (defending ${df.def}) at the back. ` : "") + how;
 	}
 
+	// The first few matches carry the controls on the card itself; How to play is always there.
 	function showIntro () {
+		showIntroCard();
+		if (state === "intro" || state === "full") { $("ovHelp").hidden = false; renderKeyStrip(); }
+	}
+	function showIntroCard () {
 		pauseBtn.textContent = "Pause";
 		if (leagueMatch) {
 			const o = TEAMS[leagueMatch.opp];
@@ -5050,7 +5151,7 @@
 			[ String(bestStreak[0]), "Best pass run" ]
 		]);
 		pauseBtn.textContent = "Pause";
-		if (!tut) { $("ovSubs").hidden = false; }
+		if (!tut) { $("ovSubs").hidden = false; renderQuick(); }
 		kickoff(1);   // the other side kicks off the second half
 		saveLive();
 	}
@@ -5108,6 +5209,7 @@
 			clearLive();
 			newMatch();
 			freeze = KICKOFF_FREEZE;
+			if (mode !== "tutorial") { store.set("ff-played", String(playedCount() + 1)); }
 		}
 		if (state === "half") { toast("Second half: teams change ends", "#eef6ea"); }
 		state = "play";
@@ -5122,6 +5224,8 @@
 		charging = false;
 		showOverlay("Paused", mode === "tutorial" ? "Take a breather." : "Take a breather. The clock is stopped. Or simulate the rest: the score so far stands and the time left is played out.", "Resume");
 		if (mode !== "tutorial") { $("ovSim").textContent = "Simulate the rest"; $("ovSim").hidden = false; $("ovSubs").hidden = false; }
+		$("ovHelp").hidden = false;
+		renderQuick();
 		pauseBtn.textContent = "Resume";
 	}
 
@@ -5166,6 +5270,7 @@
 			[ String(bestStreak[0]), "Best pass run" ]
 		]);
 		if (leagueMatch && !seasonDone() && tiredStarters().length) { $("ovFix").textContent = "Rotate now"; $("ovFix").hidden = false; }
+		$("ovHelp").hidden = false;
 		renderReport();
 		if (leagueMatch) { offerSeasonSim(); }
 		pauseBtn.textContent = "Pause";
@@ -5182,6 +5287,9 @@
 		$("ovSeason").hidden = true;
 		$("ovReport").hidden = true;
 		$("subPanel").hidden = true;
+		$("ovKeys").hidden = true;
+		$("ovQuick").hidden = true;
+		$("ovHelp").hidden = true;
 		ovCard()?.classList.toggle("wide", false);
 		ovStats.replaceChildren();
 		ovStats.hidden = !statRows;
@@ -5863,7 +5971,8 @@
 		ctx.beginPath(); ctx.arc(X, Y, 17, 0, Math.PI * 2); ctx.fill();
 		ctx.globalAlpha = 0.95;
 		ctx.strokeStyle = disc;
-		ctx.lineWidth = 2;
+		ctx.lineWidth = highContrast && p.team === 1 ? 3 : 2;
+		if (highContrast && p.team === 1) { ctx.setLineDash([ 5, 4 ]); }   // shape as well as colour tells the sides apart
 		ctx.beginPath(); ctx.arc(X, Y, 17, 0, Math.PI * 2); ctx.stroke();
 		ctx.restore();
 
@@ -6171,6 +6280,7 @@
 
 	// What your buttons do right now, in the bottom-left corner.
 	let hintsOn = true, padOn = false;
+	let highContrast = false;   // Kit contrast: the other side in white or black with a dashed ring
 	const coarse = (() => { try { return window.matchMedia("(pointer: coarse)").matches; } catch (e) { return false; } })();
 	function drawHints () {
 		if (!hintsOn || coarse || state !== "play" || freeze > 0) { return; }
@@ -7503,6 +7613,11 @@
 
 	window.addEventListener("keydown", e => {
 		if (e.target instanceof HTMLSelectElement) { return; }
+		if (!$("howto").hidden) {
+			if (e.code === "Escape" || e.code === "KeyH" || e.key === "?") { e.preventDefault(); closeHowto(); }
+			return;
+		}
+		if (e.code === "KeyH" || e.key === "?") { if (!e.repeat) { openHowto(); } return; }
 		if (e.code === "KeyP" || e.code === "Escape") {
 			if (state === "play") { pause(); } else if (state === "paused") { startPlay(); }
 			return;
@@ -7736,6 +7851,124 @@
 		e.currentTarget.blur();
 		store.set("ff-hints", hintsOn ? "1" : "0");
 	});
+	$("contrastBtn").addEventListener("click", e => {
+		highContrast = !highContrast;
+		e.currentTarget.textContent = highContrast ? "Kit contrast on" : "Kit contrast off";
+		e.currentTarget.setAttribute("aria-pressed", String(highContrast));
+		e.currentTarget.blur();
+		store.set("ff-contrast", highContrast ? "1" : "0");
+		setOpponent(opp, leftIsYou);   // re-dress the other side for this match
+		if (state === "play" || state === "goal" || state === "paused") { toast(highContrast ? "Kit contrast on" : "Kit contrast off", "#f2b52e"); }
+	});
+
+	/* ---------- how to play ----------
+	   One screen with every control, for the keyboard, touch or a controller, and what the
+	   markers on the pitch mean. H opens it any time (and pauses the match). */
+	const HOWTO = {
+		keys: { move: "← ↑ → ↓", sprint: "E", pass: "S", through: "W", long: "Q", shoot: "D", tackle: "A", switch: "S", tactic: "1 – 4", pause: "P", cam: "C", big: "F", help: "H" },
+		touch: { move: "Joystick", sprint: "Sprint", pass: "Pass", through: "Through", long: "Long", shoot: "Shoot", tackle: "Tackle", switch: "Pass", tactic: "Tactic", pause: "Pause", cam: "Camera", big: "Big pitch", help: "How to play" },
+		pad: { move: "Left stick", sprint: "RT / LT", pass: "A / ✕", through: "Y / △", long: "RB / R1", shoot: "B / ○", tackle: "X / □", switch: "A / ✕", tactic: "D-pad ↑ ↓", pause: "Start", cam: "Camera", big: "F", help: "H" }
+	};
+	let howScheme = coarse ? "touch" : "keys", howtoReturn = null;
+	function renderHowto () {
+		const K = HOWTO[howScheme], hold = howScheme === "touch" ? "hold the pad" : "hold it";
+		const row = (key, title, text) => `<div class="how-row"><kbd>${key}</kbd><div><b>${title}</b><span>${text}</span></div></div>`;
+		const sec = (title, rows) => `<section><h3>${title}</h3>${rows.join("")}</section>`;
+		$("howtoBody").innerHTML = [   // static copy; no user data
+			sec("With the ball", [
+				row(K.move, "Move", "Run with the ball. Your player is the one in the amber ring, with his name above him."),
+				row(K.pass, "Pass", "To the teammate in the dashed amber ring. It avoids opponents in the way, and the receiver runs onto it."),
+				row(K.through, "Through ball", "Into the space ahead of a runner, toward goal."),
+				row(K.long, "Long ball", "To the striker marked Q. From out wide it becomes a cross into the box."),
+				row(K.shoot, "Shoot", `Tap for a quick shot; ${hold} for power. While holding, ${howScheme === "keys" ? "↑ ↓ move" : howScheme === "pad" ? "the stick moves" : "the joystick moves"} the crosshair along the goal; the amber band shows how far it could stray.`),
+				row(K.sprint, "Sprint", "Hold while moving. The bar under your player is what is left; run it dry and he jogs until it refills.")
+			]),
+			sec("Without the ball", [
+				row(K.tackle, "Tackle", `Alongside the carrier: a shoulder challenge. From further out: a slide. ${cap(hold)} from further away and your man closes him down and jockeys him for you.`),
+				row(K.switch, "Switch player", "To the teammate under the S marker (the defender best placed to win it). Press again for the next best."),
+				row(K.sprint, "Sprint", "Close the carrier down faster; the same bar drains.")
+			]),
+			sec("Any time", [
+				row(K.tactic, "Tactic", `${howScheme === "keys" ? "1 Defensive, 2 Balanced, 3 Attacking, 4 All-out attack (T cycles)" : "Cycle Defensive, Balanced, Attacking, All-out attack"}. The tag at the top left of the pitch shows the current one.`),
+				row(K.pause, "Pause", "The clock stops. The pause card has the camera, sound and switching settings, substitutions, and Simulate the rest."),
+				row(K.cam, "Camera", "Overhead, TV or 3D. The one you pick is remembered."),
+				row(K.big, "Big pitch", "The ground fills the screen with a small score bug; Show menu brings the page back."),
+				row(K.help, "How to play", "This screen.")
+			]),
+			`<section><h3>Reading the pitch</h3><ul class="how-legend">
+				<li><i style="border-color:#f2b52e;background:rgba(242,181,46,0.25)"></i>Amber ring, arrow and name: the player you control</li>
+				<li><i style="border-color:#f2b52e;border-style:dashed"></i>Dashed amber ring: who your pass will reach</li>
+				<li><i style="border-color:#fff;border-style:dashed"></i>White dashed ring with an S: who Switch will give you</li>
+				<li><i style="border-color:#f2b52e;border-width:3px"></i>Amber arc round your player: shot power while you hold Shoot (also the bar at the bottom)</li>
+				<li><i style="border-color:rgba(255,255,255,0.4);border-width:3px"></i>Grey arc: tackle recharging</li>
+				<li><i style="border-color:#de4f5a;border-radius:2px;height:4px;border-width:2px 0 0"></i>Red dashed line: the offside line while you have the ball; OFF marks anyone beyond it</li>
+			</ul></section>`
+		].join("");
+		for (const [ id, s ] of [ [ "howKeys", "keys" ], [ "howTouch", "touch" ], [ "howPad", "pad" ] ]) { $(id).setAttribute("aria-pressed", String(howScheme === s)); }
+	}
+	function openHowto () {
+		if (!$("howto").hidden) { return; }
+		if (padOn) { howScheme = "pad"; } else if (coarse) { howScheme = "touch"; }
+		howtoReturn = document.activeElement;
+		if (state === "play") { pause(); }
+		renderHowto();
+		$("howto").hidden = false;
+		$("howtoClose").focus();
+		store.set("ff-howto", "1");
+	}
+	function closeHowto () {
+		if ($("howto").hidden) { return; }
+		$("howto").hidden = true;
+		if (howtoReturn && typeof howtoReturn.focus === "function" && document.contains(howtoReturn)) { howtoReturn.focus(); }
+		howtoReturn = null;
+	}
+	$("howtoBtn").addEventListener("click", e => { e.currentTarget.blur(); openHowto(); });
+	$("ovHelp").addEventListener("click", () => openHowto());
+	$("howtoClose").addEventListener("click", closeHowto);
+	$("howtoDone").addEventListener("click", closeHowto);
+	$("howto").addEventListener("click", e => { if (e.target === e.currentTarget) { closeHowto(); } });
+	for (const [ id, s ] of [ [ "howKeys", "keys" ], [ "howTouch", "touch" ], [ "howPad", "pad" ] ]) { $(id).addEventListener("click", () => { howScheme = s; renderHowto(); }); }
+
+	// The keys on the kick-off card, for a player's first three matches.
+	const playedCount = () => Number(store.get("ff-played") || 0) || 0;
+	function renderKeyStrip () {
+		const el = $("ovKeys");
+		if (playedCount() >= 3 || mode === "tutorial") { el.hidden = true; return; }
+		const items = padOn
+			? [ [ "Stick", "Move" ], [ "A", "Pass" ], [ "Y", "Through" ], [ "B", "Shoot, hold" ], [ "RB", "Long" ], [ "X", "Tackle" ], [ "RT", "Sprint" ] ]
+			: coarse
+				? [ [ "Joystick", "Move" ], [ "Pass", "to the ringed teammate" ], [ "Shoot", "hold for power" ], [ "Tackle", "tap or hold" ], [ "Through", "runner" ], [ "Long", "striker" ], [ "Sprint", "hold" ] ]
+				: [ [ "← ↑ → ↓", "Move" ], [ "S", "Pass" ], [ "W", "Through" ], [ "D", "Shoot, hold" ], [ "Q", "Long" ], [ "A", "Tackle" ], [ "E", "Sprint" ], [ "H", "How to play" ] ];
+		el.replaceChildren(...items.map(([ key, label ]) => {
+			const s = document.createElement("span"), kb = document.createElement("kbd");
+			kb.textContent = key; s.append(kb, document.createTextNode(label));
+			return s;
+		}));
+		el.hidden = false;
+	}
+
+	// Quick settings on the pause and half-time cards: each one is the bar's own button,
+	// so there is one source of truth for every setting.
+	function renderQuick () {
+		const q = $("ovQuick");
+		const items = [
+			[ `Tactic: ${MENTALITY[mentality[0] + 1]}`, false, () => setMentality(0, mentality[0] >= 2 ? -1 : mentality[0] + 1, false) ],
+			[ $("camBtn").textContent, false, () => $("camBtn").click() ],
+			[ AUTO_SWITCH[autoSwitchMode], false, () => { const keys = Object.keys(AUTO_SWITCH); autoSwitchSel.value = keys[(keys.indexOf(autoSwitchMode) + 1) % keys.length]; autoSwitchSel.dispatchEvent(new Event("change")); } ],
+			[ soundOn ? "Sound on" : "Sound off", soundOn, () => soundBtn.click() ],
+			[ musicOn ? "Music on" : "Music off", musicOn, () => $("musicBtn").click() ],
+			[ hintsOn ? "Hints on" : "Hints off", hintsOn, () => $("hintsBtn").click() ],
+			[ highContrast ? "Kit contrast on" : "Kit contrast off", highContrast, () => $("contrastBtn").click() ]
+		];
+		q.replaceChildren(...items.map(([ label, on, act ]) => {
+			const b = document.createElement("button");
+			b.type = "button"; b.textContent = label; b.className = on ? "on" : "";
+			b.addEventListener("click", () => { act(); fx = fx.filter(f => !f.toast); renderQuick(); });
+			return b;
+		}));
+		q.hidden = false;
+	}
+
 	$("musicBtn").addEventListener("click", e => {
 		musicOn = !musicOn;
 		e.currentTarget.textContent = musicOn ? "Music on" : "Music off";
@@ -7843,6 +8076,7 @@
 		if (store.get("ff-map") === "1") { minimapOn = true; $("mapBtn").textContent = "Minimap on"; $("mapBtn").setAttribute("aria-pressed", "true"); }
 		if (store.get("ff-hints") === "0") { hintsOn = false; $("hintsBtn").textContent = "Hints off"; $("hintsBtn").setAttribute("aria-pressed", "false"); }
 		if (store.get("ff-music") === "0") { musicOn = false; $("musicBtn").textContent = "Music off"; $("musicBtn").setAttribute("aria-pressed", "false"); }
+		if (store.get("ff-contrast") === "1") { highContrast = true; $("contrastBtn").textContent = "Kit contrast on"; $("contrastBtn").setAttribute("aria-pressed", "true"); }
 
 		try {
 			const saved = JSON.parse(store.get("ff-league") || "null");
