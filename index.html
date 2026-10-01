@@ -339,6 +339,21 @@
 
 	.stats div { display: grid; justify-items: center; }
 
+	/* You against them: a three-column strip, your number on the left. */
+	.stats.cmp { display: grid; gap: 2px; width: 100%; max-width: 330px; padding-block: 2px; }
+	.cmp-head { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: baseline; padding-bottom: 4px; border-bottom: 1px solid var(--rule); font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+	.cmp-head .you { text-align: left; color: var(--amber); }
+	.cmp-head .them { text-align: right; color: var(--opp-text); }
+	.cmp-row { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: center; }
+	.cmp-row b { font-family: var(--display); font-weight: 800; font-size: 20px; line-height: 1.2; color: var(--text); font-variant-numeric: tabular-nums; text-align: left; opacity: 0.8; }
+	.cmp-row b.them { text-align: right; }
+	.cmp-row b.lead { opacity: 1; color: var(--chalk); }
+	.cmp-row span { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+	.cmp-row.poss b { font-size: 24px; }
+	.cmp-bar { grid-column: 1 / -1; display: block; height: 6px; margin-bottom: 4px; border-radius: 3px; background: var(--opp); overflow: hidden; }
+	.cmp-bar em { display: block; height: 100%; background: var(--amber); border-radius: 3px 0 0 3px; }
+	@media (max-height: 560px), (max-width: 440px) { .cmp-row b { font-size: 17px; } .cmp-row.poss b { font-size: 20px; } .cmp-row span { font-size: 10px; } }
+
 	.stats b {
 		font-family: var(--display);
 		font-weight: 800;
@@ -1623,7 +1638,9 @@
 	let lastSwitchKind = "";       // why control last moved by itself (for the test harness)
 	let possTeam = -1;
 	let receiver = null, receiveTimer = 0;  // teammate a pass is travelling to
-	let stats = { passes: 0, completed: 0, shots: 0, tackles: 0 };
+	let stats = { passes: 0, completed: 0, shots: 0, tackles: 0, aiTackles: 0, corners: 0, fouls: 0, cards: 0 };
+	let oppStats = { passes: 0, completed: 0, shots: 0, tackles: 0, corners: 0, fouls: 0, cards: 0 }, oppPending = false;   // the other side's, for the half-time and full-time comparison
+	const notePass = p => { if (p.team === 1) { oppStats.passes++; oppPending = true; } };
 	let matchInjuries = [];   // squad slots of your players hurt this match (they miss games after it)
 	let matchCards = [];      // { sqi, kind: "y" | "r2" | "r" } for your players this match
 	let dismissed = [];       // [ team, idx ] of everyone sent off this match
@@ -2658,7 +2675,10 @@
 		try { audio = new AudioContext(); } catch (e) { audio = null; }
 	}
 
+	// A short buzz on a phone for the moments you feel: a tackle, a foul, a goal.
+	const buzz = pattern => { if (coarse && navigator.vibrate && !bulkSim) { try { navigator.vibrate(pattern); } catch (e) { /* not allowed here */ } } };
 	function sfx (kind) {
+		if (kind === "tackle") { buzz(25); }
 		if (!soundOn || !audio || bulkSim) { return; }
 		const t = audio.currentTime;
 		if (kind === "whistle" || kind === "final") {
@@ -2869,6 +2889,7 @@
 	}
 
 	function passTo (p, m) {
+		notePass(p);
 		// A rattled side's passes stray (yours a little, the computer-run ones more).
 		const err = p.team === 0 && players.indexOf(p) === ctrl ? passErr(p) : 45 * edge(1 - p.team) + cond.wet * 8;
 		const lx = m.x + m.vx * 10 + (Math.random() * 2 - 1) * err;
@@ -2881,6 +2902,7 @@
 
 	// Lofted ball that comes down on (tx, ty): over any defender in the lane.
 	function loftTo (p, tx, ty) {
+		notePass(p);
 		const d = Math.hypot(tx - ball.x, ty - ball.y);
 		const T = clamp(d / 9, 24, 70);                       // frames in the air
 		kick(p, tx, ty, d * (1 - AIR_DRAG) / (1 - Math.pow(AIR_DRAG, T)));
@@ -2897,6 +2919,7 @@
 	}
 
 	function shootAt (p, power01, aimY) {
+		if (p.team === 1) { oppStats.shots++; }
 		const gx = p.team === 0 ? FW + 20 : -20;
 		kick(p, gx, aimY, 9.5 + power01 * 8.5);
 	}
@@ -3589,6 +3612,7 @@
 					const [ lx, ly ] = leadPoint(p, runner);
 					if (laneBlockers(p, { x: lx, y: ly }, 1 - p.team) === 0) {
 						const err = 20 + 50 * edge(1 - p.team), d = Math.hypot(lx - ball.x, ly - ball.y);
+						notePass(p);
 						kick(p, lx + (Math.random() * 2 - 1) * err, ly + (Math.random() * 2 - 1) * err, clamp((d / 55 + 2) * cond.passComp, 6, 16));
 						return null;
 					}
@@ -4260,6 +4284,7 @@
 		banner.hidden = false;
 		$("announce").textContent = `${scorer === 0 ? "Goal for you" : `Goal for ${opp.name}`}. ${score[0]} to ${score[1]}.`;
 		sfx("whistle");
+		buzz(scorer === 0 ? [ 70, 50, 70 ] : 120);
 		if (scorer === homeSide) { roar(1); } else { groan(); roar(0.35); }
 		renderHud();
 	}
@@ -4379,7 +4404,7 @@
 		}
 		setPieceStart(taker, 70);
 		setPiece = { kind: "corner", team: att, taker };
-		if (att === 0) { stats.corners = (stats.corners || 0) + 1; }
+		if (att === 0) { stats.corners = (stats.corners || 0) + 1; } else { oppStats.corners++; }
 		restartBanner("Corner", att);
 	}
 
@@ -4425,6 +4450,7 @@
 			if (vic.attr) { vic.attr = { ...vic.attr, pac: Math.round(vic.attr.pac * 0.85), sho: Math.round(vic.attr.sho * 0.92) }; }
 		}
 		burst(off.x, off.y, card ? card.split(":")[0] : "Foul");
+		{ const s = off.team === 0 ? stats : oppStats; s.fouls = (s.fouls || 0) + 1; if (card) { s.cards = (s.cards || 0) + 1; } }
 		sfx("tackle");
 		const inBox = inAttackBox(vic) && Math.abs(vic.x - attackX(t)) < FMT.box + 20;
 		const who = off.name ? ` by ${off.name}` : "";
@@ -4646,7 +4672,7 @@
 		// On target, the keeper gets across more often than not; into the corner, less so.
 		const gk = team(1 - p.team).find(q => q.role === "gk"), off = Math.abs(ty - FH / 2) / (FMT.goal / 2);
 		if (gk && off < 1 && zGoal < 50) { ball.pen = { gk, saved: Math.random() < clamp(0.72 - off * 0.3 - (sho - 65) * 0.006, 0.3, 0.85) }; }
-		if (p.team === 0) { stats.shots++; burst(p.x, p.y, "Over the wall"); } else { ooh(); }
+		if (p.team === 0) { stats.shots++; burst(p.x, p.y, "Over the wall"); } else { oppStats.shots++; ooh(); }
 	}
 	function gauss () { let u = 0, v = 0; while (!u) { u = Math.random(); } while (!v) { v = Math.random(); } return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
 
@@ -4665,7 +4691,7 @@
 			const saved = guess === lean ? Math.random() < (lean === 0 ? 0.75 : 0.55) : false;
 			ball.pen = { gk, saved };
 		}
-		if (p.team === 0) { stats.shots++; burst(p.x, p.y, "Penalty"); } else { ooh(); }
+		if (p.team === 0) { stats.shots++; burst(p.x, p.y, "Penalty"); } else { oppStats.shots++; ooh(); }
 	}
 
 	function awardThrow (t, spotX, top) {
@@ -4824,7 +4850,7 @@
 				o.kickCd = 40;
 				gainBall(q);
 				swing(q.team, 0.08);
-				if (isHuman) { burst(q.x, q.y, "Won it"); sfx("tackle"); stats.tackles++; }
+				if (isHuman) { burst(q.x, q.y, "Won it"); sfx("tackle"); stats.tackles++; } else if (q.team === 1) { oppStats.tackles++; } else { stats.aiTackles = (stats.aiTackles || 0) + 1; }
 				break;
 			}
 		}
@@ -4839,7 +4865,7 @@
 		ball.vz = 1.2;
 		ball.headed = true;
 		p.jump = JUMP;
-		if (p.team === 0) { stats.shots++; burst(p.x, p.y, "Header"); } else { ooh(); }
+		if (p.team === 0) { stats.shots++; burst(p.x, p.y, "Header"); } else { oppStats.shots++; ooh(); }
 	}
 	// A defensive header: away from goal, high and far.
 	function clearance (p) {
@@ -4944,6 +4970,7 @@
 			possTeam = p.team;
 		}
 		if (pendingPass) { if (p.team === 0) { stats.completed++; } pendingPass = false; }
+		if (oppPending) { if (p.team === 1) { oppStats.completed++; } oppPending = false; }
 		const by = ball.lastBy, fromMate = by && by !== p && by.team === p.team && frame - (ball.kickedAt ?? -999) < 300;
 		if (fromMate) { completedPass(p.team); } else if (by && by.team !== p.team) { breakStreak(by.team, p.team); }
 		if (lostBy === 1 - p.team && passStreak[lostBy]) { breakStreak(lostBy, p.team); }   // a loose ball or tackle ends the run too
@@ -4989,7 +5016,8 @@
 		oppSquad = cpuSquad(leagueMatch ? leagueMatch.opp : 99, oppStr);
 		$("fmtName").textContent = FMT.label;
 		score = [ 0, 0 ];
-		stats = { passes: 0, completed: 0, shots: 0, tackles: 0 };
+		stats = { passes: 0, completed: 0, shots: 0, tackles: 0, aiTackles: 0, corners: 0, fouls: 0, cards: 0 };
+		oppStats = { passes: 0, completed: 0, shots: 0, tackles: 0, corners: 0, fouls: 0, cards: 0 }; oppPending = false;
 		matchInjuries = [];
 		matchCards = []; dismissed = [];
 		matchLog = []; matchGoals = [];
@@ -5143,13 +5171,7 @@
 		const [ h, a ] = leftIsYou ? score : [ score[1], score[0] ];
 		const tot = possFrames[0] + possFrames[1], poss = tot ? Math.round(100 * possFrames[0] / tot) : 50;
 		$("announce").textContent = `Half time. ${h} to ${a}. The teams change ends.`;
-		showOverlay("Half time", `${leftIsYou ? "You" : opp.name} ${h}–${a} ${leftIsYou ? opp.name : "you"}. Change your tactic, formation or style now if you want to, then start the second half. The teams change ends, so you attack the other goal. ${opp.short === "CPU" ? "The CPU" : opp.name} kick off.`, "Start second half", [
-			[ `${poss}%`, "Possession" ],
-			[ `${stats.completed}/${stats.passes}`, "Passes" ],
-			[ String(stats.shots), "Shots" ],
-			[ String(stats.tackles), "Tackles won" ],
-			[ String(bestStreak[0]), "Best pass run" ]
-		]);
+		showOverlay("Half time", `${leftIsYou ? "You" : opp.name} ${h}–${a} ${leftIsYou ? opp.name : "you"}. Change your tactic, formation or style now if you want to, then start the second half. The teams change ends, so you attack the other goal. ${opp.short === "CPU" ? "The CPU" : opp.name} kick off.`, "Start second half", matchStats(poss));
 		pauseBtn.textContent = "Pause";
 		if (!tut) { $("ovSubs").hidden = false; renderQuick(); }
 		kickoff(1);   // the other side kicks off the second half
@@ -5164,7 +5186,7 @@
 	function saveLive () {
 		if (tut || mode === "tutorial" || !(state === "play" || state === "paused" || state === "goal" || state === "half") || !(timeLeft > 0)) { return; }
 		store.set("ff-live", JSON.stringify({
-			v: 1, key: liveKey(), score, timeLeft, momentum, possFrames, stats, ment: mentality[0], lastConceded, half: halfDone, at: Date.now(),
+			v: 1, key: liveKey(), score, timeLeft, momentum, possFrames, stats, ostats: oppStats, best: bestStreak, ment: mentality[0], lastConceded, half: halfDone, at: Date.now(),
 			off: dismissed, cards: matchCards, hurt: matchInjuries, subs: subLog, log: matchLog, goals: matchGoals,
 			marks: players.filter(p => p.yellow || p.injured).map(p => [ p.team, p.idx, p.yellow || 0, p.injured ? 1 : 0 ])
 		}));
@@ -5179,6 +5201,8 @@
 		momentum = clamp(Number(v.momentum) || 0, -1, 1);
 		if (Array.isArray(v.possFrames)) { possFrames = v.possFrames.slice(0, 2).map(n => Number(n) || 0); }
 		if (v.stats && typeof v.stats === "object") { stats = { ...stats, ...v.stats }; }
+		if (v.ostats && typeof v.ostats === "object") { oppStats = { ...oppStats, ...v.ostats }; }
+		if (Array.isArray(v.best)) { bestStreak = v.best.slice(0, 2).map(n => Number(n) || 0); }
 		mentality[0] = clamp(Number(v.ment) || 0, -1, 2);
 		lastConceded = v.lastConceded === 1 ? 1 : 0;
 		halfDone = !!v.half || timeLeft <= matchLen / 2;
@@ -5261,20 +5285,31 @@
 		$("announce").textContent = `Full time. ${line}`;
 		const wasSim = simulated;
 		simulated = false;
-		showOverlay(wasSim ? (leagueMatch ? "Simulated result" : "Simulated friendly") : "Full time", `${line} ${nudge}`, btn, wasSim ? null : [
-			[ `${stats.completed}/${stats.passes}`, "Passes" ],
-			[ String(stats.shots), "Shots" ],
-			[ String(stats.tackles), "Tackles won" ],
-			[ String(stats.corners || 0), "Corners" ],
-			[ `${Math.round(100 * possFrames[0] / Math.max(1, possFrames[0] + possFrames[1]))}%`, "Possession" ],
-			[ String(bestStreak[0]), "Best pass run" ]
-		]);
+		showOverlay(wasSim ? (leagueMatch ? "Simulated result" : "Simulated friendly") : "Full time", `${line} ${nudge}`, btn,
+			wasSim ? null : matchStats(Math.round(100 * possFrames[0] / Math.max(1, possFrames[0] + possFrames[1]))));
 		if (leagueMatch && !seasonDone() && tiredStarters().length) { $("ovFix").textContent = "Rotate now"; $("ovFix").hidden = false; }
 		$("ovHelp").hidden = false;
 		renderReport();
 		if (leagueMatch) { offerSeasonSim(); }
 		pauseBtn.textContent = "Pause";
 		renderHud();
+	}
+
+	// Both sides' numbers, you against them, for the half-time and full-time cards.
+	function matchStats (poss) {
+		const pct = (c, n) => (n ? `${Math.round(100 * c / n)}%` : "–");
+		const rows = [
+			[ "Possession", `${poss}%`, `${100 - poss}%`, poss, 100 - poss, "poss" ],
+			[ "Shots", stats.shots, oppStats.shots ],
+			[ "Passes", `${stats.completed}/${stats.passes}`, `${oppStats.completed}/${oppStats.passes}`, stats.completed, oppStats.completed ],
+			[ "Pass accuracy", pct(stats.completed, stats.passes), pct(oppStats.completed, oppStats.passes), stats.passes ? stats.completed / stats.passes : 0, oppStats.passes ? oppStats.completed / oppStats.passes : 0 ],
+			[ "Tackles won", stats.tackles + (stats.aiTackles || 0), oppStats.tackles ],
+			[ "Corners", stats.corners || 0, oppStats.corners ],
+			[ "Fouls", stats.fouls || 0, oppStats.fouls, -(stats.fouls || 0), -oppStats.fouls ],
+			[ "Best pass run", bestStreak[0], bestStreak[1] ]
+		];
+		if ((stats.cards || 0) + oppStats.cards > 0) { rows.push([ "Cards", stats.cards || 0, oppStats.cards, -(stats.cards || 0), -oppStats.cards ]); }
+		return { you: "You", them: opp.short, rows };
 	}
 
 	function showOverlay (title, text, btn, statRows) {
@@ -5293,6 +5328,22 @@
 		ovCard()?.classList.toggle("wide", false);
 		ovStats.replaceChildren();
 		ovStats.hidden = !statRows;
+		ovStats.classList.toggle("cmp", !!(statRows && statRows.rows));
+		if (statRows && statRows.rows) {
+			const head = el("div", "cmp-head");
+			head.append(el("span", "you", statRows.you), el("span", "", "Match stats"), el("span", "them", statRows.them));
+			ovStats.append(head);
+			for (const [ label, a, b, na, nb, kind ] of statRows.rows) {
+				const row = el("div", "cmp-row" + (kind ? " " + kind : ""));
+				const va = Number.isFinite(na) ? na : Number(a), vb = Number.isFinite(nb) ? nb : Number(b);
+				const A = el("b", "", String(a)), B = el("b", "them", String(b));
+				if (Number.isFinite(va) && Number.isFinite(vb) && va !== vb) { (va > vb ? A : B).classList.add("lead"); }
+				row.append(A, el("span", "", label), B);
+				if (kind === "poss") { const bar = el("i", "cmp-bar"); const fill = el("em"); fill.style.width = `${clamp(va, 0, 100)}%`; bar.append(fill); row.append(bar); }
+				ovStats.append(row);
+			}
+			statRows = [];
+		}
 		for (const [ value, label ] of statRows || []) {
 			const cell = document.createElement("div");
 			const v = document.createElement("b");
@@ -5826,11 +5877,25 @@
 		ctx.beginPath();
 		ctx.moveTo(X - 7, Y - 37); ctx.lineTo(X + 7, Y - 37); ctx.lineTo(X, Y - 29);
 		ctx.closePath(); ctx.stroke();
-		ctx.fillStyle = "rgba(255, 255, 255, 0.75)";
-		ctx.font = "700 12px Barlow, Arial, sans-serif";
+		drawKeyChip(X, Y - 47, "S");
+	}
+
+	// A key cap on the pitch: dark chip, white letter, so it reads against grass, chalk and kits.
+	function drawKeyChip (x, y, key) {
+		ctx.save();
+		ctx.font = "800 11px Barlow, Arial, sans-serif";
 		ctx.textAlign = "center";
 		ctx.textBaseline = "middle";
-		ctx.fillText("S", X, Y - 47);
+		const w = Math.max(16, ctx.measureText(key).width + 9);
+		ctx.fillStyle = "rgba(7, 12, 10, 0.78)";
+		ctx.beginPath();
+		if (ctx.roundRect) { ctx.roundRect(x - w / 2, y - 8, w, 16, 3); } else { ctx.rect(x - w / 2, y - 8, w, 16); }
+		ctx.fill();
+		ctx.strokeStyle = "rgba(255, 255, 255, 0.55)"; ctx.lineWidth = 1;
+		ctx.stroke();
+		ctx.fillStyle = "#ffffff";
+		ctx.fillText(key, x, y + 0.5);
+		ctx.restore();
 	}
 
 	// A top-down footballer: legs that stride, shorts, a two-tone shirt, swinging
@@ -6115,16 +6180,18 @@
 		ctx.textAlign = "left";
 		ctx.textBaseline = "middle";
 		const text = cond.label.toUpperCase(), w = ctx.measureText(text).width;
+		// On a narrow screen the score bug sits top left too, so the tags drop below it.
+		const top = canvas.clientWidth < 640 && document.body.classList.contains("big") && overlay.hidden ? 78 : 10;
 		ctx.fillStyle = "rgba(7, 12, 10, 0.6)";
-		ctx.fillRect(10, 10, w + 16, 22);
+		ctx.fillRect(10, top, w + 16, 22);
 		ctx.fillStyle = "rgba(238, 246, 234, 0.9)";
-		ctx.fillText(text, 18, 21.5);
+		ctx.fillText(text, 18, top + 11.5);
 		if (state === "play" || state === "goal" || state === "paused") {
 			const m = mentality[0], tag = `TACTIC: ${MENTALITY[m + 1].toUpperCase()}${coarse ? "" : "  (1-4 / T)"}`, tw = ctx.measureText(tag).width;
 			ctx.fillStyle = m > 0 ? "rgba(120, 70, 10, 0.75)" : m < 0 ? "rgba(20, 45, 80, 0.75)" : "rgba(7, 12, 10, 0.6)";
-			ctx.fillRect(10, 36, tw + 16, 22);
+			ctx.fillRect(10, top + 26, tw + 16, 22);
 			ctx.fillStyle = m > 0 ? "#ffd27a" : m < 0 ? "#bcd8f5" : "rgba(238, 246, 234, 0.9)";
-			ctx.fillText(tag, 18, 47.5);
+			ctx.fillText(tag, 18, top + 37.5);
 		}
 	}
 
@@ -6334,6 +6401,37 @@
 		}
 	}
 
+	// Shot power, big enough to read from any camera: a bar along the bottom while you hold Shoot.
+	let meterRect = null;
+	function drawPowerMeter () {
+		const me = human();
+		if (!charging || state !== "play" || !me || ball.owner !== me) { meterRect = null; return; }
+		const power = clamp((frame - chargeStart) / 50, 0, 1);
+		const w = Math.min(220, VW - 40), h = 10, x = (VW - w) / 2, y = VH - (coarse || !hintsOn ? 30 : 56);
+		meterRect = { x, y, w, h, power };
+		ctx.save();
+		ctx.fillStyle = "rgba(7, 12, 10, 0.7)";
+		ctx.fillRect(x - 8, y - 22, w + 16, h + 30);
+		ctx.fillStyle = "rgba(238, 246, 234, 0.14)";
+		ctx.fillRect(x, y, w, h);
+		// Green into amber, then red at full power, where a poor finisher can blaze it over.
+		ctx.fillStyle = power < 0.5 ? `rgb(${Math.round(127 + (242 - 127) * power * 2)}, ${Math.round(212 + (181 - 212) * power * 2)}, ${Math.round(155 + (46 - 155) * power * 2)})`
+			: power < 0.8 ? "#f2b52e" : "#e2594a";
+		ctx.fillRect(x, y, w * power, h);
+		ctx.fillStyle = "rgba(238, 246, 234, 0.7)";
+		ctx.fillRect(x + w * 0.8 - 1, y - 3, 2, h + 6);   // the mark where the ball starts to rise
+		ctx.font = "800 11px Barlow, Arial, sans-serif";
+		ctx.textBaseline = "middle";
+		ctx.textAlign = "left";
+		ctx.fillStyle = "#eef6ea";
+		ctx.fillText("POWER", x, y - 11);
+		ctx.textAlign = "right";
+		ctx.fillStyle = "rgba(238, 246, 234, 0.8)";
+		ctx.font = "600 11px Barlow, Arial, sans-serif";
+		ctx.fillText(padOn ? "Release B to shoot" : coarse ? "Let go to shoot" : "Release D to shoot", x + w, y - 11);
+		ctx.restore();
+	}
+
 	// Match-wide messages, drawn on the screen rather than the pitch.
 	function drawToasts () {
 		ctx.textAlign = "center";
@@ -6400,7 +6498,7 @@
 
 	// 3-2-1 before each kickoff, then a brief "Go".
 	function drawCountdown () {
-		if (state !== "play" && state !== "paused") { return; }
+		if (state !== "play") { return; }
 		let text = null, alpha = 1;
 		if (freeze > 0 && freezeKind === "kickoff") {
 			text = String(Math.ceil(freeze / 30));
@@ -6510,6 +6608,7 @@
 		drawOffscreenMarker();
 		drawMinimap();
 		drawHints();
+		drawPowerMeter();
 		drawToasts();
 		drawCountdown();
 	}
@@ -6686,6 +6785,7 @@
 		drawRain();
 		drawMinimap();
 		drawHints();
+		drawPowerMeter();
 		drawToasts();
 		drawCountdown();
 	}
@@ -7475,8 +7575,8 @@
 			if (q) {
 				ctx.strokeStyle = "rgba(255, 255, 255, 0.75)"; ctx.lineWidth = 2;
 				ctx.beginPath(); ctx.moveTo(q.x - 7, q.y - 8); ctx.lineTo(q.x + 7, q.y - 8); ctx.lineTo(q.x, q.y); ctx.closePath(); ctx.stroke();
-				ctx.fillStyle = "rgba(255, 255, 255, 0.75)"; ctx.font = "700 12px Barlow, Arial, sans-serif";
-				ctx.fillText("S", q.x, q.y - 18);
+				drawKeyChip(q.x, q.y - 19, "S");
+				ctx.textAlign = "center"; ctx.textBaseline = "middle";
 			}
 		}
 		// Pop-up rings and words (goal, won it, saved) over the spot.
@@ -7509,6 +7609,7 @@
 		}
 		drawMinimap();
 		drawHints();
+		drawPowerMeter();
 		drawToasts();
 		drawCountdown();
 	}
@@ -7536,6 +7637,7 @@
 			sync3D();
 			G3.renderer.render(G3.scene, G3.cam);
 			hud3D();
+			if (threeToldLoading) { threeToldLoading = false; fx = fx.filter(f => !(f.toast && f.label === "Loading 3D view")); }
 		} catch (e) {
 			threeFailed = true;
 			return false;
@@ -7551,7 +7653,7 @@
 	}
 
 	/* ---------- loop ---------- */
-	let last = performance.now(), acc = 0;
+	let last = performance.now(), acc = 0, drawMs = 0;
 	const STEP = 1000 / 60;
 	let frameDt = 16.7;
 	function loop (now) {
@@ -7560,7 +7662,9 @@
 		acc = Math.min(acc + (now - last), 250);
 		last = now;
 		while (acc >= STEP) { snapshotPrev(); update(); acc -= STEP; }
+		const d0 = performance.now();
 		draw(acc / STEP);
+		drawMs += (performance.now() - d0 - drawMs) * 0.1;   // smoothed cost of a drawn frame, for the test harness
 		renderHud();
 		updateRainSound();
 		updateCrowd();
@@ -8120,7 +8224,8 @@
 			get goalTimer () { return goalTimer; }, get timeLeft () { return timeLeft; }, get freeze () { return freeze; }, get FW () { return FW; }, get FH () { return FH; },
 			get manualLock () { return manualLock; }, get celeb () { return typeof celeb === "undefined" ? null : celeb; },
 			get autoSwitchMode () { return autoSwitchMode; }, set autoSwitchMode (v) { autoSwitchMode = v; autoSwitchSel.value = v; },
-			get autoHold () { return autoHold; }, set autoHold (v) { autoHold = v; }, get steerAt () { return steerAt; }, set steerAt (v) { steerAt = v; }, set possTeam (v) { possTeam = v; },
+			get autoHold () { return autoHold; }, set autoHold (v) { autoHold = v; },
+			get charging () { return charging; }, get meterRect () { return meterRect; }, get drawMs () { return drawMs; }, get scale () { return scale; }, get kits () { return KITS; }, get stats () { return stats; }, get oppStats () { return oppStats; }, get steerAt () { return steerAt; }, set steerAt (v) { steerAt = v; }, set possTeam (v) { possTeam = v; },
 			set steerSwitchDone (v) { steerSwitchDone = !!v; },
 			get lastSwitchKind () { return lastSwitchKind; }, set lastSwitchKind (v) { lastSwitchKind = v; }, get setPiece () { return setPiece; },
 			human, switchScore, outfield, dist,
