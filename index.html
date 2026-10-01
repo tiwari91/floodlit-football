@@ -3033,7 +3033,9 @@
 
 	let leftPlayer = null, leftAt = -1000;
 	let supporter = [ null, null ];
-	const steeringNow = () => frame - steerAt < STEER_RECENT || pressHeld || touchPress || padPressBtn;
+	// Direction input held right now (arrows, touch stick or pad), so a fresh press counts at once.
+	const dirHeld = () => keys.has("ArrowLeft") || keys.has("ArrowRight") || keys.has("ArrowUp") || keys.has("ArrowDown") || Math.hypot(stickVec.x + padVec.x, stickVec.y + padVec.y) > 0.2;
+	const steeringNow = () => dirHeld() || frame - steerAt < STEER_RECENT || pressHeld || touchPress || padPressBtn;
 	// Who you control while defending. S (force) always wins and holds for MANUAL_LOCK.
 	// Otherwise the Auto switch setting decides:
 	//   assisted   one switch when the ball is lost, then held; while you steer or press, only an
@@ -3079,13 +3081,17 @@
 				const bs = best ? switchScore(best) : Infinity;
 				if (!best || best === cur) { return; }
 				if (steeringNow()) {
-					// You are driving this man: he stays yours unless he is clearly out of the play
-					// (the ball well past him toward your goal and a teammate far quicker to it).
-					if (steerSwitchDone) { return; }
-					const bx = ball.owner ? ball.owner.x : ball.x;
-					if (!(cur.x > bx + 140 * Math.sqrt(S) && bs < cs0 * 0.5 && cs0 - bs > 30)) { return; }
-					steerSwitchDone = true;
-					cue = "Switched: your man was out of the play"; kind = "rescue";
+					// You are driving this man: he stays yours while he is near the ball or closing on it.
+					// Two rescues, both needing a teammate twice as quick to the ball and half a second clearer:
+					// far from the ball (steering a man well away from the play is not steering into it), or
+					// beaten (the ball well past him toward your goal), the latter once a spell.
+					const bp = ball.owner || ball, dc = dist(cur, bp);
+					const far = dc > 260 && dist(best, bp) < dc * 0.5;
+					const beaten = cur.x > bp.x + 140 * Math.sqrt(S) && !steerSwitchDone;
+					if (!(bs < cs0 * 0.5 && cs0 - bs > 30) || !(far || beaten)) { return; }
+					if (!far) { steerSwitchDone = true; }
+					hold = AUTO_HOLD_TURNOVER;
+					cue = far ? "Switched: your man was far from the ball" : "Switched: your man was out of the play"; kind = "rescue";
 				} else if (!(bs < cs0 * 0.8 && cs0 - bs > 6)) { return; }   // clearly better placed: sooner by a fifth and a tenth of a second
 			}
 		}
@@ -7819,7 +7825,8 @@
 			get goalTimer () { return goalTimer; }, get timeLeft () { return timeLeft; }, get freeze () { return freeze; }, get FW () { return FW; }, get FH () { return FH; },
 			get manualLock () { return manualLock; }, get celeb () { return typeof celeb === "undefined" ? null : celeb; },
 			get autoSwitchMode () { return autoSwitchMode; }, set autoSwitchMode (v) { autoSwitchMode = v; autoSwitchSel.value = v; },
-			get autoHold () { return autoHold; }, get steerAt () { return steerAt; }, set possTeam (v) { possTeam = v; },
+			get autoHold () { return autoHold; }, set autoHold (v) { autoHold = v; }, get steerAt () { return steerAt; }, set steerAt (v) { steerAt = v; }, set possTeam (v) { possTeam = v; },
+			set steerSwitchDone (v) { steerSwitchDone = !!v; },
 			get lastSwitchKind () { return lastSwitchKind; }, set lastSwitchKind (v) { lastSwitchKind = v; }, get setPiece () { return setPiece; },
 			human, switchScore, outfield, dist,
 			step (n = 1) { for (let i = 0; i < n; i++) { snapshotPrev(); update(); } },
