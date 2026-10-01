@@ -975,7 +975,7 @@
 		<button id="hintsBtn" type="button" aria-pressed="true">Hints on</button>
 		<button id="mapBtn" type="button" aria-pressed="false">Minimap off</button>
 		<button id="offsideBtn" type="button" aria-pressed="true">Offside on</button>
-		<button id="camBtn" type="button" aria-pressed="false">Camera: overhead</button>
+		<button id="camBtn" type="button" aria-pressed="false" title="Switch camera (C): overhead, TV or 3D">Camera: overhead</button>
 		<button id="bigBtn" type="button" aria-pressed="false">Big pitch: off</button>
 	</div>
 
@@ -1048,6 +1048,7 @@
 		<div class="key"><kbd>D</kbd><b>Shoot</b>, hold for power. While you hold it, <kbd>↑</kbd> <kbd>↓</kbd> move the crosshair along the goal: pick your corner. The amber band shows how far it could stray; it widens with power.</div>
 		<div class="key"><kbd>1</kbd>–<kbd>4</kbd> or <kbd>T</kbd><b>Tactic</b>: Defensive, Balanced, Attacking, All-out attack</div>
 		<div class="key"><kbd>P</kbd> or <kbd>Esc</kbd><b>Pause</b></div>
+		<div class="key"><kbd>C</kbd><b>Camera</b>: cycle overhead, TV and 3D (the Camera button does the same; it names the view you are on)</div>
 		<div class="key"><b>Simulate</b> button (next to Pause): the whole match before kick-off, or the rest of it once it's on. The score so far stands.</div>
 		<p class="fine"><b>Controller.</b> Plug in or pair an Xbox or PlayStation controller and press a button. Left stick moves; A (✕) passes or switches; B (○) shoots, hold for power; X (□) slide tackles; Y (△) plays a through ball; RB (R1) hits a long ball; RT or LT sprints; Start pauses. The hints at the bottom of the pitch show what each button does at that moment; turn them off with Hints.</p>
 		<p class="fine"><b>Home and away.</b> The home side has the crowd behind it: it starts with a little momentum and the visitors play slightly below their rating. The stands fill with the home club's colours, with a corner of away fans. On a kit clash the away side changes, so you'll wear white on some away days. The scoreboard lists the home team first.</p>
@@ -1056,7 +1057,7 @@
 		<p class="fine"><b>Weather and grounds.</b> Every club has a home ground: grass, muddy or artificial turf. Mud slows the ball and the players and kills the bounce. Turf is quick and true. Rain makes grass and turf skid, makes mud heavier, costs players grip on the turn, sends passes a little astray and makes shots harder for keepers to hold. In the league, matchdays 10 to 26 are the rainy season, and the forecast is shown in advance. In a friendly, pick the weather and ground yourself.</p>
 		<p class="fine"><b>Your season, backed up.</b> Your league saves in this browser. Export league saves it to a file; Import league loads a file back (press twice to confirm, since it replaces the season you have). Use it to keep a backup or carry your season to another browser or device.</p>
 		<p class="fine"><b>Big pitch.</b> The ground fills the screen with just a small score bug for the score and the clock. "Show menu" at the top right of the pitch (or F) brings back the title, the mode tabs and the full scoreboard; "Hide menu" puts it away again.</p>
-		<p class="fine"><b>Camera.</b> Overhead follows the ball from above. TV watches from high in the main stand, like a broadcast, and cuts to the benches at kick-off, the breaks and after goals. 3D draws the ground, the players and the ball in real 3D (three.js): a broadcast camera follows the ball along the near stand, cuts in close for free kicks and penalties, and pulls out wide at the breaks; lofted balls and headers show their true height. It needs WebGL; if your browser hasn't got it the 2D cameras stay. Switch with the Camera button or press C to cycle overhead, TV and 3D. Every ground has its own look: the stands, the roof, the floodlights, how full it is and how the grass is cut.</p>
+		<p class="fine"><b>Camera.</b> On a laptop or desktop the match opens in 3D; on a phone, overhead. 3D draws the ground, the players and the ball in real 3D (three.js): a broadcast camera follows the ball along the near stand, cuts in close for free kicks and penalties, and pulls out wide at the breaks; lofted balls and headers show their true height. Overhead follows the ball from above. TV watches from high in the main stand, like a broadcast, and cuts to the benches at kick-off, the breaks and after goals. 3D needs WebGL and loads three.js from cdnjs; if either is missing or blocked you are told and the 2D cameras stay. Press C, or the Camera button (it reads "Camera: 3D", "Camera: TV" or "Camera: overhead" for the view you are on), to cycle overhead, TV and 3D; the camera you pick is remembered. Every ground has its own look: the stands, the roof, the floodlights, how full it is and how the grass is cut.</p>
 		<p class="fine"><b>Free kicks.</b> The other side stands 9.15 m back, and near your goal they build a wall. From shooting range, press W to curl it over the wall (up or down picks the corner, the far post if you don't choose), or D to drive it low and hard. S plays it short. Hold E (or Shift) to sprint at any time: you'll see speed streaks behind your player.</p>
 		<p class="fine"><b>Fouls and cards.</b> A slide that misses the ball and takes the man, above all from behind, is a foul: a free kick where it happened, or a penalty in the box (pick a side with ↑ ↓ and press D; the keeper guesses). Reckless tackles get a yellow card, a second yellow is a red, and a bad one from behind can be a straight red: the player walks off and his side plays a man down. In the league a red card is a ban (two games for a straight red), five yellows in a season is one, and a player hurt in a foul limps on and then misses one to three games. Banned and injured players come off the team sheet by themselves and go back on it when they're available.</p>
 		<p class="fine"><b>Throw-ins.</b> When the ball goes over a touchline, the other side throws it back in from that spot. On yours, aim with the arrows and press S for a short throw to feet or Q for a long throw. Opponents stand off the thrower, and there is no offside from a throw-in.</p>
@@ -6158,10 +6159,22 @@
 	// The pitch (with everything painted on it: shadows, rings, lines) is drawn flat into an
 	// offscreen picture, then laid down in perspective one strip at a time; players, the ball,
 	// the goals and the far stand stand up on top of it.
-	// The TV camera by default on a laptop or desktop; on a phone the players would be tiny, so overhead.
+	// The 3D camera by default on a laptop or desktop with WebGL (TV without it); on a phone the
+	// players would be tiny, so overhead.
 	const wideScreen = (() => { try { return window.matchMedia("(min-width: 700px)").matches; } catch (e) { return false; } })();
+	const webglOK = (() => {
+		try { const c = document.createElement("canvas"); return !!(window.WebGLRenderingContext && (c.getContext("webgl2") || c.getContext("webgl"))); } catch (e) { return false; }
+	})();
 	// top: overhead. tv: from the main stand. 3d: WebGL (three.js), when the browser can.
-	let camMode = (() => { const s = store.get("ff-cam"); return s === "tv" || s === "top" || s === "3d" ? s : wideScreen ? "tv" : "top"; })();
+	// The player's own choice is saved under CAM_KEY, and only when they pick a camera themselves.
+	// Older builds saved under "ff-cam" with a 2D default; that value is ignored (except an explicit
+	// 3D) so it cannot hide the 3D view from someone who never chose a camera at all.
+	const CAM_KEY = "ff-cam2";
+	const defaultCam = () => (wideScreen && !coarse && webglOK ? "3d" : wideScreen ? "tv" : "top");
+	let camMode = (() => {
+		const s = store.get(CAM_KEY) || (store.get("ff-cam") === "3d" ? "3d" : null);
+		return s === "tv" || s === "top" || s === "3d" ? s : defaultCam();
+	})();
 	const TV = { camX: null, Cy: 0, Hc: 0, th: 0, f: 1, cy: 0, key: "" };
 	const Z_W = 0.71;   // ball and crossbar heights are in their own units; this turns them into pitch pixels
 	function tvSetup () {
@@ -6496,13 +6509,16 @@
 	const CAM_LABEL = { top: "Camera: overhead", tv: "Camera: TV", "3d": "Camera: 3D" };
 	const CAM_NAME = { top: "Overhead camera", tv: "TV camera", "3d": "3D camera" };
 	const nextCam = () => (camMode === "top" ? "tv" : camMode === "tv" && webglOK ? "3d" : "top");
-	function setCam (m) {
+	// chosen: the player picked this camera (button or C), so remember it. Defaults and the
+	// fallback when 3D cannot be shown are not saved, so 3D comes back once it can.
+	function setCam (m, chosen = false) {
 		if (m === "3d" && !webglOK) { m = wideScreen ? "tv" : "top"; }
 		if (!CAM_LABEL[m]) { m = "top"; }
 		camMode = m;
-		store.set("ff-cam", m);
+		if (chosen) { store.set(CAM_KEY, m); }
 		const b = $("camBtn");
 		b.textContent = CAM_LABEL[m];
+		b.title = webglOK ? "Switch camera (C): overhead, TV or 3D" : "Switch camera (C): overhead or TV";
 		b.setAttribute("aria-pressed", String(m !== "top"));
 		show3D(m === "3d");
 	}
@@ -6514,9 +6530,6 @@
 	   transparent, and carries the HUD: hints, toasts, the countdown, the minimap, names and
 	   markers. three.js comes from cdnjs; if WebGL or the script is unavailable, the view
 	   falls back to the 2D cameras. */
-	const webglOK = (() => {
-		try { const c = document.createElement("canvas"); return !!(window.WebGLRenderingContext && (c.getContext("webgl2") || c.getContext("webgl"))); } catch (e) { return false; }
-	})();
 	const canvas3d = $("pitch3d"), threeEl = $("threeLib");
 	let threeFailed = !threeEl || !canvas3d, threeWaitStart = 0, threeToldLoading = false;
 	if (threeEl) { threeEl.addEventListener("error", () => { threeFailed = true; }); }
@@ -7096,7 +7109,7 @@
 		const st = threeState();
 		if (st === "failed") {
 			setCam(wideScreen ? "tv" : "top");
-			toast("3D view unavailable here", "#eef6ea");
+			toast("3D view unavailable here (three.js did not load): showing the " + (wideScreen ? "TV" : "overhead") + " camera", "#eef6ea");
 			return false;
 		}
 		if (st === "loading") {
@@ -7195,7 +7208,7 @@
 		}
 		if ((state === "play" || state === "goal") && GAME_KEYS.has(e.code)) { e.preventDefault(); }
 		if (e.repeat) { return; }
-		if (e.code === "KeyC") { setCam(nextCam()); toast(CAM_NAME[camMode], "#f2b52e"); return; }
+		if (e.code === "KeyC") { setCam(nextCam(), true); toast(CAM_NAME[camMode], "#f2b52e"); return; }
 		if (e.code === "KeyF") { setBig(!(document.body && document.body.classList.contains("big"))); return; }
 		padOn = false;
 		keys.add(e.code);
@@ -7392,7 +7405,7 @@
 	// Leave the tab or the window and the match waits for you.
 	document.addEventListener("visibilitychange", () => { if (document.hidden && state === "play") { pause(); } });
 	window.addEventListener("blur", () => { if (state === "play" && document.hasFocus && !document.hasFocus()) { pause(); } });
-	$("camBtn").addEventListener("click", e => { setCam(nextCam()); e.currentTarget.blur(); toast(CAM_NAME[camMode], "#f2b52e"); });
+	$("camBtn").addEventListener("click", e => { setCam(nextCam(), true); e.currentTarget.blur(); toast(CAM_NAME[camMode], "#f2b52e"); });
 	setCam(camMode);
 	$("offsideBtn").addEventListener("click", e => {
 		offsideRule = !offsideRule;
