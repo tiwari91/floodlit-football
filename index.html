@@ -7355,6 +7355,7 @@
 	}
 	// Which shot the broadcast is on: wide from the gantry between the action, tight behind a
 	// set piece, otherwise following the ball along the near stand.
+	const FOLLOW_FOV = 40;
 	function shot3D (out) {
 		const wideDrift = reduceMotion ? 0 : Math.sin(performance.now() / 9000) * FW * 0.1;
 		if (benchCam()) {
@@ -7383,9 +7384,13 @@
 		const fx0 = o ? o.x : ball.x, fy0 = o ? o.y : ball.y, vx = o ? o.vx : ball.vx, vy = o ? o.vy : ball.vy;
 		let tx = fx0 + vx * 14;
 		const ty = clamp(fy0 + vy * 14, FH * 0.22, FH * 0.78);
+		// The near touchline is closest to the lens, so the view is narrowest there. Clamp the camera
+		// against that width, not the mid-pitch width, so it can travel far enough to keep the near
+		// corner flags and both goals in shot.
 		const eyeH = FH * 0.5, eyeZ = FH * 1.32, lookZ = FH * 0.5;
-		const d = Math.hypot(eyeH, eyeZ - lookZ), half = d * Math.tan(G3.cam.fov * Math.PI / 360) * G3.cam.aspect;
-		tx = half * 2 >= FW ? FW / 2 : clamp(tx, half - MX * 0.6, FW - half + MX * 0.6);
+		const tanX = Math.tan(FOLLOW_FOV * Math.PI / 360) * G3.cam.aspect;
+		const half = Math.hypot(eyeH, eyeZ - lookZ) * tanX, halfNear = Math.hypot(eyeH, eyeZ - FH) * tanX;
+		tx = half * 2 >= FW ? FW / 2 : clamp(tx, halfNear - MX * 0.55, FW - halfNear + MX * 0.55);
 		out.kind = "follow";
 		out.eye.set(WX(tx), eyeH, eyeZ);
 		out.look.set(WX(tx), 0, ty);
@@ -7395,8 +7400,10 @@
 	function camera3D () {
 		if (!shotWant.eye) { shotWant.eye = new THREE.Vector3(); shotWant.look = new THREE.Vector3(); }
 		G3.cam.aspect = VW / VH;
-		G3.cam.updateProjectionMatrix();
 		shot3D(shotWant);
+		// Open play uses a wider lens so the near touchline and corner flags fit; other shots keep 36.
+		G3.cam.fov = shotWant.kind === "follow" ? FOLLOW_FOV : 36;
+		G3.cam.updateProjectionMatrix();
 		// A new shot is a cut; within a shot the camera glides, eased by elapsed time.
 		if (shotWant.kind !== G3.shot) { G3.shot = shotWant.kind; G3.eye.copy(shotWant.eye); G3.look.copy(shotWant.look); }
 		else {
