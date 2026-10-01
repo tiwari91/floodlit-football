@@ -2442,6 +2442,7 @@
 			p.dir = p.team === 0 ? 0 : Math.PI;
 			p.kickCd = 0; p.lunge = 0; p.lungeCd = 0; p.hold = 0;
 			p.celeb = null; p.celebA = 0; p.kickA = 0; p.plant = 0;
+			p.run = null; p.tFrom = null; p.tKind = undefined; p.tx = undefined;
 		}
 		const side = outfield(kickTeam);   // (a side can be a man down after a red card)
 		const taker = side.find(p => p.idx === KICKER) || side.find(p => p.role === "fwd") || side[side.length - 1];
@@ -3046,81 +3047,169 @@
 		return [ clamp(t[0], 20, FW - 20), clamp(t[1], 20, FH - 20) ];
 	}
 
-	function formationTarget (p) {
+	/* ---------- team shape ----------
+	   A side moves as three lines. Each line has one depth a frame, set from where the ball is,
+	   the tactic (style with the ball, press without it) and the mentality; a player keeps only a
+	   flattened trace of his formation stagger inside his line. So the back four slides as a back
+	   four, the gaps between the lines open with the ball and close without it, and the whole side
+	   shifts across towards the ball by the same amount. */
+	const shapeCache = [ { frame: -1 }, { frame: -1 } ];
+	function teamShapeInfo (t) {
+		const c = shapeCache[t];
+		if (c.frame === frame && c.FW === FW && c.n === players.length) { return c; }
+		const inPoss = ball.owner ? ball.owner.team === t : possTeam === t;
+		const st = style[t], pr = press[t], ment = mentality[t];
+		const bx = rel(t, ball.x);
+		const sum = { def: [ 0, 0 ], mid: [ 0, 0 ], fwd: [ 0, 0 ] };
+		for (const p of players) { if (p.team === t && sum[p.role]) { sum[p.role][0] += rel(t, p.bx); sum[p.role][1]++; } }
+		const base = { def: sum.def[1] ? sum.def[0] / sum.def[1] : FW * 0.18, fwd: sum.fwd[1] ? sum.fwd[0] / sum.fwd[1] : FW * 0.56 };
+		base.mid = sum.mid[1] ? sum.mid[0] / sum.mid[1] : (base.def + base.fwd) / 2;
+		// The back line follows the ball's depth: from the edge of the box when the ball is deep to
+		// the halfway line pressing high or going all out. On top, the side pushes on; rattled, it sits.
+		const up = (inPoss ? { possession: 40, balanced: 70, direct: 95, counter: 105 }[st]
+			: { high: 40, mid: -30, low: -100 }[pr] - (st === "counter" ? 20 : 0)) + ment * 55 + 20 * edge(t) - 15 * edge(1 - t);
+		const defLo = FW * (ment < 0 ? 0.06 : 0.09), defHi = FW * clamp(0.5 + ment * 0.06 + (inPoss ? 0.06 : 0), 0.4, 0.68);
+		let defX = clamp(base.def + (bx - FW * 0.5) * (inPoss ? 0.5 : 0.42) + up * S, defLo, defHi);
+		if (!inPoss) { defX = Math.min(defX, Math.max(defLo, bx - 90 * S)); }   // defending, always goal-side of the ball
+		// The gaps between the lines: stretched with the ball, compact without it, and squeezed
+		// tighter still as the ball comes towards our goal.
+		let stretch = inPoss ? { possession: 0.95, balanced: 1.1, direct: 1.25, counter: 1.3 }[st] : { high: 0.9, mid: 0.8, low: 0.7 }[pr];
+		if (!inPoss) { stretch *= clamp(0.6 + bx / FW * 0.6, 0.6, 1); }
+		const midX = clamp(defX + (base.mid - base.def) * stretch, FW * 0.18, FW * 0.85);
+		let fwdX = midX + (base.fwd - base.mid) * stretch;
+		if (inPoss && offsideOn()) { fwdX = Math.min(fwdX, offsideLine(t) - 25 * S); }   // the front line plays on the shoulder
+		fwdX = clamp(fwdX, FW * 0.3, FW - 80 * S);
+		// Across the pitch the side slides towards the ball as one, and narrows without it.
+		const shiftY = (ball.y - FH / 2) * (inPoss ? 0.22 : 0.36);
+		const width = inPoss ? (st === "possession" ? 0.95 : 1) : { high: 0.8, mid: 0.7, low: 0.62 }[pr];
+		Object.assign(c, { frame, FW, n: players.length, inPoss, defX, midX, fwdX, base, shiftY, width });
+		return c;
+	}
+
+	// A player's slot in that shape: his line's depth plus a trace of his formation stagger (a
+	// wing-back a touch ahead of the centre-backs, a number ten ahead of the holding pair).
+	function slotTarget (p) {
+		const sh = teamShapeInfo(p.team);
+		const stagger = (rel(p.team, p.bx) - sh.base[p.role]) * (p.role === "def" ? 0.3 : p.role === "mid" ? 0.7 : 0.8);
+		let r = sh[p.role + "X"] + stagger;
+		if (sh.inPoss && offsideOn()) { r = Math.min(r, offsideLine(p.team) - 10); }
+		const ty = FH / 2 + (p.by - FH / 2) * sh.width + sh.shiftY;
+		return [ p.team === 0 ? r : FW - r, clamp(ty, 40, FH - 40) ];
+	}
+
+	/* ---------- runs off the ball ----------
+	   With the ball, one player at a time (two in eleven-a-side) makes a run: in behind the back
+	   line, round the outside to overlap, or into a pocket between the lines. He is picked on
+	   purpose, for the space he would run into and a lane the carrier could find him down, stays
+	   onside, runs for a couple of seconds, then tucks back into his slot. Everyone else holds
+	   the shape, so the lines read as lines and the runner shows up as the pass. */
+	const runPlan = [ { next: 0 }, { next: 0 } ];
+	function planRuns (t) {
+		const c = ball.owner, ours = c ? c.team === t : possTeam === t;
+		const mine = outfield(t);
+		let running = 0;
+		for (const p of mine) {
+			if (p.run && (frame > p.run.until || !ours || p === c || p === receiver)) { p.run = null; p.runCd = frame + 90 + Math.floor(Math.random() * 60); }
+			if (p.run) { running++; }
+		}
+		if (!ours || !c || c.role === "gk" || state !== "play" || setPiece || (freeze > 0)) { return; }
+		const rp = runPlan[t];
+		if (running >= (N >= 11 ? 2 : 1) || frame < rp.next) { return; }
+		rp.next = frame + 30 + Math.floor(Math.random() * 40);   // a new idea about every second
+		if (frame - (c.gotAt || 0) < 12) { return; }   // he has only just got it: let him look up first
+		const cr = rel(t, c.x), line = offsideOn() ? offsideLine(t) : FW - 60 * S, root = Math.sqrt(S);
+		const space = q => { let d = Infinity; for (const o of players) { if (o.team !== t) { d = Math.min(d, Math.hypot(o.x - q.x, o.y - q.y)); } } return Math.min(d, 220 * root); };
+		let best = null, bs = 0.15;
+		for (const p of mine) {
+			if (p === c || p.run || p === receiver || (p.runCd || 0) > frame || supporter[t] === p || (t === 0 && players.indexOf(p) === ctrl)) { continue; }
+			const pr = rel(t, p.x), wide = isWide(p.by, 0.25);
+			const consider = (kind, rr, y, bonus) => {
+				if (offsideOn()) { rr = Math.min(rr, line - 8); }
+				rr = clamp(rr, 30, FW - 40); y = clamp(y, 50, FH - 50);
+				const q = { x: t === 0 ? rr : FW - rr, y };
+				const far = Math.hypot(q.x - p.x, q.y - p.y);
+				if (far < 60 * root || far > 420 * root) { return; }
+				const s = space(q) / 90 + bonus - laneBlockers(c, q, 1 - t) * 0.45 - Math.max(0, Math.hypot(q.x - c.x, q.y - c.y) - 380 * root) / 300;
+				if (s > bs) { bs = s; best = { p, run: { kind, x: q.x, y: q.y, until: frame + 90 + Math.floor(Math.random() * 60) } }; }
+			};
+			// In behind: a forward, or an attacking midfielder once the ball is over halfway.
+			if ((p.role === "fwd" || p.cam || (p.role === "mid" && cr > FW * 0.5)) && pr > cr - 80 * S && cr > FW * 0.3) {
+				consider("behind", Math.max(line - 6, pr + 110 * S, cr + 90 * S), p.y + (p.y - c.y) * 0.3, p.role === "fwd" ? 0.5 : 0.2);
+			}
+			// Overlap: a wide player on the carrier's flank goes round the outside of him.
+			if (wide && isWide(c.y, 0.18) && Math.sign(c.y - FH / 2) === Math.sign(p.by - FH / 2) && pr < cr + 40 && cr > FW * 0.35 && style[t] !== "counter") {
+				consider("overlap", cr + 130 * S, FH / 2 + Math.sign(p.by - FH / 2) * FH * 0.44, p.role === "def" ? 0.35 : 0.25);
+			}
+			// A pocket: a midfielder steps up into the space between their lines, off the ball's side.
+			if (p.role === "mid" && pr < cr + 60 * S && cr > FW * 0.3) {
+				consider("pocket", cr + 120 * S, FH / 2 + (p.by - FH / 2) * 0.5 + (c.y < FH / 2 ? 70 : -70) * root, 0.1);
+			}
+		}
+		if (best) { best.p.run = best.run; }
+	}
+
+	// Where a player without the ball wants to be, and why (the kind). One idea at a time.
+	function rawFormationTarget (p) {
 		const dirX = p.team === 0 ? 1 : -1;
 		const inPoss = ball.owner && ball.owner.team === p.team;
-		// Forwards without the ball run ahead of the carrier in their own channel,
-		// stepping out of a defender's shadow, so there is a pass on. Yours always
-		// do; the CPU's do in eleven-a-side, where midfield is too crowded otherwise.
 		// Short support: the teammate nearest the carrier comes close, at an angle, to offer a pass.
 		if (inPoss && ball.owner !== p && p.role !== "gk" && supporter[p.team] === p) {
 			const c = ball.owner, side = p.y < c.y ? -1 : 1, back = style[p.team] === "possession" ? 0.1 : 0.35;
 			const sx = c.x - dirX * 55 * S * back + dirX * 40 * S, sy = c.y + side * 85 * Math.sqrt(S);
-			return [ clamp(sx, 20, FW - 20), clamp(sy, 30, FH - 30) ];
+			return [ clamp(sx, 20, FW - 20), clamp(sy, 30, FH - 30), "support" ];
 		}
 		// A one-two: having just passed, go for the return in the space ahead.
 		if (inPoss && ball.owner !== p && p.oneTwo > frame) {
 			let rr = rel(p.team, p.oneTwoX);
 			if (offsideOn()) { rr = Math.min(rr, offsideLine(p.team) - 10); }
-			return [ p.team === 0 ? rr : FW - rr, p.oneTwoY ];
+			return [ p.team === 0 ? rr : FW - rr, p.oneTwoY, "onetwo" ];
+		}
+		// His run: to the spot he picked, held onside as the line moves.
+		if (p.run && inPoss) {
+			let rr = rel(p.team, p.run.x);
+			if (offsideOn()) { rr = Math.min(rr, offsideLine(p.team) - 8); }
+			return [ p.team === 0 ? rr : FW - rr, p.run.y, "run" ];
 		}
 		// The ball is wide in the final third: forwards attack the box (near post, far post, spot).
-		if (inPoss && p.role === "fwd" && ball.owner !== p && ball.owner && isWide(ball.owner.y) && rel(p.team, ball.owner.x) > FW * 0.68) {
+		if (inPoss && p.role === "fwd" && ball.owner !== p && isWide(ball.owner.y) && rel(p.team, ball.owner.x) > FW * 0.68) {
 			const c = ball.owner, k = outfield(p.team).filter(m => m.role === "fwd").indexOf(p), side = Math.sign(c.y - FH / 2) || 1;
 			const [ fx, fy ] = [ [ 0.1, 0.11 * side ], [ 0.12, -0.13 * side ], [ 0.17, 0 ] ][Math.max(0, k) % 3];
 			let rr = FW - fx * FW;
 			if (offsideOn()) { rr = Math.min(rr, offsideLine(p.team) - 6); }
-			return [ p.team === 0 ? rr : FW - rr, FH / 2 + fy * FH ];
+			return [ p.team === 0 ? rr : FW - rr, FH / 2 + fy * FH, "box" ];
 		}
-		// Overlapping full-back (eleven-a-side): the carrier is on your flank ahead of you, so go round him.
-		if (inPoss && N === 11 && p.role === "def" && isWide(p.by, 0.25) && ball.owner !== p && ball.owner && style[p.team] !== "counter" && mentality[p.team] >= 0) {
-			const c = ball.owner;
-			if (Math.sign(c.y - FH / 2) === Math.sign(p.by - FH / 2) && isWide(c.y, 0.2) && rel(p.team, c.x) > rel(p.team, p.x) + 40 && dist(p, c) < 380 * Math.sqrt(S)) {
-				let rr = rel(p.team, c.x) + 110 * S;
-				if (offsideOn()) { rr = Math.min(rr, offsideLine(p.team) - 10); }
-				return [ p.team === 0 ? rr : FW - rr, clamp(FH / 2 + Math.sign(p.by - FH / 2) * FH * 0.44, 30, FH - 30) ];
-			}
-		}
-		if (inPoss && p.role === "fwd" && ball.owner !== p && (p.team === 0 || N > 5)) {
-			const c = ball.owner;
-			let rr = clamp(rel(p.team, c.x) + 170 * Math.sqrt(S), FW * 0.32, FW - 90);
-			if (offsideOn()) { rr = Math.min(rr, offsideLine(p.team) - 10); }   // time the run: stay onside
-			const rx = p.team === 0 ? rr : FW - rr;
-			let ry = p.by + (p.by - c.y) * 0.25;
-			if (laneBlockers(c, { x: rx, y: ry }, 1 - p.team) > 0) { ry += ry < FH / 2 ? -70 : 70; }
-			return [ rx, clamp(ry, 50, FH - 50) ];
-		}
-		// The attacking midfielder: with the ball on, find the pocket between the
-		// carrier and the striker, on the other side from the ball, as a short option.
+		// The attacking midfielder: with the ball on, the pocket between the carrier and the
+		// striker, on the other side from the ball, as a short option.
 		if (inPoss && p.cam && ball.owner !== p) {
 			const c = ball.owner, st = outfield(p.team).filter(m => m.role === "fwd").sort((a, b) => rel(p.team, b.x) - rel(p.team, a.x))[0];
 			const cr = rel(p.team, c.x), sr = st ? rel(p.team, st.x) : cr + 250;
 			let r = clamp((cr + sr) / 2, cr + 70, FW * 0.85);
 			if (offsideOn()) { r = Math.min(r, offsideLine(p.team) - 20); }
 			const y = FH / 2 + (p.by - FH / 2) * 0.4 + (c.y < FH / 2 ? 55 : -55);
-			return [ p.team === 0 ? r : FW - r, clamp(y, 50, FH - 50) ];
+			return [ p.team === 0 ? r : FW - r, clamp(y, 50, FH - 50), "cam" ];
 		}
-		const ment = mentality[p.team];
-		const st = style[p.team], pr = press[p.team];
-		// With the ball: possession sides stay close to support, direct and counter sides go long.
-		// Without it: a high press squeezes up the pitch, a low block drops off.
-		// On top, the side pushes on to support; under the cosh it sits a little deeper.
-		const up = (inPoss ? { possession: 95, balanced: 140, direct: 185, counter: 200 }[st]
-			: { high: 20, mid: -50, low: -120 }[pr] - (st === "counter" ? 30 : 0)) + 25 * edge(p.team) - 20 * edge(1 - p.team);
-		let tx = p.bx + dirX * up * S + (ball.x - FW / 2) * (inPoss && st === "possession" ? 0.5 : 0.35);
-		// Mentality pushes the whole block up or drops it off; defenders move least.
-		tx += dirX * ment * (p.role === "def" ? 75 : p.role === "mid" ? 90 : 60) * S;
-		let ty = inPoss && st === "possession" ? p.by * 0.45 + ball.y * 0.55 : p.by * 0.62 + ball.y * 0.38;
-		if (inPoss && isWide(p.by, 0.25)) { ty = p.by * 0.82 + ball.y * 0.18; }   // wide players hold the width
-		const r = rel(p.team, tx);
-		let [ lo, hi ] = (p.role === "def" ? [ 0.09, 0.64 ] : p.role === "mid" ? [ 0.2, 0.8 ] : [ 0.28, 0.92 ]).map(f => f * FW);
-		if (ment > 0) { hi = Math.min(FW * 0.95, hi + ment * 0.08 * FW); lo += ment * 0.06 * FW; }   // centre-backs up to halfway at all-out
-		if (ment < 0) { lo = Math.max(FW * 0.05, lo - 0.04 * FW); hi -= 0.1 * FW; }
-		let rc = clamp(r, lo, hi);
-		if (offsideOn() && inPoss) { rc = Math.min(rc, offsideLine(p.team) - 10); }
-		tx = p.team === 0 ? rc : FW - rc;
-		ty = clamp(ty, 40, FH - 40);
-		return [ tx, ty ];
+		const [ x, y ] = slotTarget(p);
+		return [ x, y, "slot" ];
+	}
+
+	// A change of idea eases in over about three quarters of a second, from where he was heading,
+	// rather than snapping the target across the pitch and turning him on the spot.
+	const BLEND = 45;
+	function formationTarget (p) {
+		const [ x, y, kind ] = rawFormationTarget(p);
+		if (p.tKind !== kind) {
+			const recent = p.tRaw && frame - p.tRawF <= 2;
+			p.tFrom = recent ? p.tRaw : p.tx !== undefined ? [ p.tx, p.ty ] : null;
+			p.tBlend = frame;
+			p.tKind = kind;
+		}
+		let ex = x, ey = y;
+		if (p.tFrom) {
+			const s = (frame - p.tBlend) / BLEND;
+			if (s >= 1) { p.tFrom = null; } else { const e = s * s * (3 - 2 * s); ex += (p.tFrom[0] - x) * (1 - e); ey += (p.tFrom[1] - y) * (1 - e); }
+		}
+		p.tRaw = [ ex, ey ]; p.tRawF = frame;
+		return [ ex, ey ];
 	}
 
 	// Is a loose ball on its way into this keeper's goal? Where will it cross his line?
@@ -3328,32 +3417,6 @@
 		return p.build;
 	}
 
-	// Movement off the ball. When his side has it, a player doesn't just stand in his slot:
-	// every second or two he has a new idea: forwards run in behind or come short, midfielders
-	// drift into pockets, full-backs push on. Onside, and never off the pitch. Without the ball the
-	// ideas fade and he tucks back into shape.
-	function offBallRun (p, target) {
-		const ours = ball.owner ? ball.owner.team === p.team : possTeam === p.team;
-		if (!ours || state !== "play") {
-			p.runDX = (p.runDX || 0) * 0.94; p.runDY = (p.runDY || 0) * 0.94;
-		} else if (!p.runT || frame > p.runT) {
-			p.runT = frame + 60 + Math.floor(Math.random() * 110);
-			const r = Math.sqrt(S), fwd = p.team === 0 ? 1 : -1;
-			const ahead = p.role === "fwd" ? [ -50, 150 ] : p.role === "mid" ? [ -70, 120 ] : [ -40, 90 ];
-			p.runDX = (ahead[0] + Math.random() * (ahead[1] - ahead[0])) * r * fwd;
-			p.runDY = (Math.random() * 2 - 1) * 100 * r;
-		}
-		let x = target[0] + (p.runDX || 0), y = target[1] + (p.runDY || 0);
-		if (ours && offsideOn()) {
-			const line = offsideLine(p.team) - 8, rx = rel(p.team, x);
-			if (rx > line) { x = p.team === 0 ? line : FW - line; }
-		}
-		x = clamp(x, 20, FW - 20); y = clamp(y, 20, FH - 20);
-		// Got there: the next idea comes quickly, as it would.
-		if (ours && Math.hypot(x - p.x, y - p.y) < 22 && p.runT > frame + 18) { p.runT = frame + 12 + Math.floor(Math.random() * 20); }
-		return [ x, y ];
-	}
-
 	// Rotate an angle toward a target by at most `rate` radians.
 	function turnToward (a, b, rate) {
 		const d = Math.atan2(Math.sin(b - a), Math.cos(b - a));
@@ -3553,6 +3616,7 @@
 			const t = ball.owner.team, c = ball.owner;
 			supporter[t] = outfield(t).filter(q => q !== c && q !== receiver && !(t === 0 && players.indexOf(q) === ctrl)).reduce((a, b) => (!a || dist(b, c) < dist(a, c) ? b : a), null);
 		}
+		planRuns(0); planRuns(1);
 		// The computer's defenders mark your attackers goal-side, too.
 		const marks1 = new Map();
 		if (ball.owner && ball.owner.team === 0 && !keeperHolds) {
@@ -3686,7 +3750,7 @@
 				const gap = clamp(40 - (A(p, "def") - 65) * 0.6, 22, 55);   // tight, tighter for good markers
 				target = [ q.x + gx / gd * gap, q.y + gy / gd * gap ];
 			} else {
-				target = offBallRun(p, spreadTarget(p, formationTarget(p)));
+				target = spreadTarget(p, formationTarget(p));
 			}
 			// The CPU carrier dribbles a touch slower than you run, so you can close it down.
 			// A keeper facing a shot moves at full stretch; how quickly depends on his handling.
@@ -3951,8 +4015,10 @@
 		const corner = { x: leftEnd ? 10 : FW - 10, y: top ? 10 : FH - 10 };
 		const atk = outfield(att), dfs = outfield(def);
 		// Big men up: forwards and the two tallest (first) defenders attack the ball.
-		const runners = [ ...atk.filter(p => p.role === "fwd"), ...atk.filter(p => p.role === "def") ].slice(0, 4);
-		const taker = atk.filter(p => !runners.includes(p)).reduce((a, b) => (dist(a, corner) < dist(b, corner) ? a : b));
+		const runners = [ ...atk.filter(p => p.role === "fwd"), ...atk.filter(p => p.role === "def") ].slice(0, Math.min(4, atk.length - 1));   // someone must be left to take it
+		const rest = atk.filter(p => !runners.includes(p));
+		if (!rest.length) { awardGoalKick(def, leftEnd); return; }   // nobody left to take it (a side down to the bare few)
+		const taker = rest.reduce((a, b) => (dist(a, corner) < dist(b, corner) ? a : b));
 		taker.x = corner.x; taker.y = corner.y; taker.dir = Math.atan2(FH / 2 - corner.y, gx + inward * 90 - corner.x);
 		const spots = [ [ 70, -55 ], [ 95, 15 ], [ 125, -10 ], [ 80, 70 ] ].map(([ dx, dy ]) => [ gx + inward * dx * GH, FH / 2 + dy * GH ]);
 		const markers = dfs.slice().sort((a, b) => Math.abs(a.x - gx) - Math.abs(b.x - gx)).slice(0, runners.length);
@@ -6586,6 +6652,7 @@
 		}
 		G3.stadiumKey = key; G3.standsRef = stands;
 		const st = new THREE.Group();
+		G3.nearRoof = [];   // the near stand's roof and its lights: hidden when the camera sits behind them
 		// own: this mesh's geometry is its own; ownMat: so is its material (and picture). Shared ones stay.
 		const own = (o, mat = false) => { o.userData.ownGeo = true; o.userData.ownMat = mat; return o; };
 		const ownMat = o => { o.userData.ownMat = true; return o; };
@@ -6625,13 +6692,16 @@
 				const roof = new THREE.Mesh(G3.geo.box, mat3D("#0a0d10", false));
 				roof.scale.set(xr - xl, 4, D * 0.95); roof.position.set((xl + xr) / 2, H * 1.14, z);
 				st.add(roof);
+				if (z > FH) { G3.nearRoof.push(roof); }
 			}
 			if (gs.lights === "roof") {
 				for (const [ z, side ] of [ [ -f0 - D * 0.1, -1 ], [ FH + f0 + D * 0.1, 1 ] ]) {
 					const strip = new THREE.Mesh(G3.geo.box, mat3D("#fff6d8", false));
 					strip.scale.set(xr - xl - 60, 2.5, 3); strip.position.set((xl + xr) / 2, H * 1.11, z);
 					st.add(strip);
+					const before = st.children.length;
 					for (let x = xl + 120; x < xr - 60; x += (xr - xl) / 6) { glow(x, H * 1.11, z - side * 2, 140); }
+					if (z > FH) { G3.nearRoof.push(strip, ...st.children.slice(before)); }
 				}
 			}
 		}
@@ -6823,6 +6893,8 @@
 		buildStadium3D();
 		const sw = endsSwapped(), WX = x => (sw ? FW - x : x), WD = d => (sw ? Math.PI - d : d);
 		camera3D();
+		// From the gantry behind the near stand its roof would fill the bottom of the picture: only the wide shot keeps it.
+		if (G3.nearRoof) { for (const o of G3.nearRoof) { o.visible = G3.shot === "wide"; } }
 		// Players: one figure each, made the first time he appears, dropped when he goes off.
 		const seen = new Set();
 		for (const p of players) {
