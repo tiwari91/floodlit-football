@@ -2903,7 +2903,7 @@
 		}
 		if (announce) { toast(t === 0 ? `Tactic: ${MENTALITY[m + 1]}` : `${opp.short} go ${MENTALITY[m + 1].toLowerCase()}`, t === 0 ? "#f2b52e" : textFor(KITS[1].outfield)); }
 	}
-	let crowdHeat = 0;     // 0 quiet .. 1 on its feet   // what a freeze is for: a kickoff countdown, or a free kick
+	let crowdHeat = 0, crowdTense = 0;     // 0 quiet .. 1 on its feet; how nervous the home end is   // what a freeze is for: a kickoff countdown, or a free kick
 	function callOffside (p) {
 		const spot = { x: p.x, y: p.y };
 		raiseFlag(p.x, "off");
@@ -3031,7 +3031,8 @@
 		ball.vz = (zGoal + 0.5 * GRAV * T * T) / T;
 		predictLanding();
 		tally.shots[p.team]++;
-		if (p.team === 0) { stats.shots++; burst(p.x, p.y, "Chip"); } else { oppStats.shots++; crowdReact("chance", 1); }
+		if (p.team === 0) { stats.shots++; burst(p.x, p.y, "Chip"); } else { oppStats.shots++; }
+		crowdReact("chance", p.team);
 	}
 
 	// A point in the space ahead of a runner, toward the goal they attack.
@@ -3044,6 +3045,7 @@
 	function shootAt (p, power01, aimY) {
 		if (p.team === 1) { oppStats.shots++; }
 		tally.shots[p.team]++;
+		crowdReact("chance", p.team);
 		const gx = p.team === 0 ? FW + 20 : -20;
 		kick(p, gx, aimY, 9.5 + power01 * 8.5);
 		ball.shot = true;
@@ -3213,6 +3215,8 @@
 		const sho = A(p, "sho");
 		const speed = (9 + power * 9) * (1 + (sho - 65) * 0.004);   // better finishers hit it harder
 		stats.shots++;
+		tally.shots[0]++;
+		if (shotInRange(p)) { crowdReact("chance", 0); }
 		// Aim assist: keyboard facing only has 8 directions, so a shot taken
 		// roughly toward goal bends onto target. Lean up or down picks the corner;
 		// more power means closer to the post (and a little more risk).
@@ -3936,9 +3940,13 @@
 		if (flagCall && --flagCall.t <= 0) { flagCall = null; }
 		// The crowd gets louder as the ball nears either goal, and goes up for goals.
 		if (ball) {
-			const near = 1 - clamp(Math.min(ball.x, FW - ball.x) / (FW * 0.33), 0, 1);
-			const heatTarget = state === "goal" ? 1 : state === "play" ? near * near * 0.9 : 0.1;
+			// Louder when the home side is bearing down on goal; when the visitors are, the noise
+			// tightens into a nervous hum (crowdTense) rather than rising.
+			const homeGoalX = homeSide === 0 ? 0 : FW, nearHome = 1 - clamp(Math.abs(ball.x - homeGoalX) / (FW * 0.33), 0, 1), nearAway = 1 - clamp(Math.abs(ball.x - (FW - homeGoalX)) / (FW * 0.33), 0, 1);
+			const heatTarget = state === "goal" ? (lastScorer === homeSide ? 1 : 0.25) : state === "play" ? Math.max(nearAway * nearAway * 0.95, nearHome * nearHome * 0.45) : 0.1;
 			crowdHeat += (heatTarget - crowdHeat) * 0.03;
+			crowdTense += ((state === "play" ? nearHome * nearHome : 0) - crowdTense) * 0.03;
+			stepCrowdMood(1 / 60);
 		}
 		if (fx.length) {
 			for (const f of fx) { f.t++; }
@@ -4534,7 +4542,7 @@
 		if (shoot) { shootEnd(ball.shot ? "Off target" : "Out of play"); return; }
 		const defTeam = leftEnd ? 0 : 1;   // you defend the left goal
 		raiseFlag(ball.x, "out");
-		if (ball.shot && frame - (ball.kickedAt || -999) < 120 && Math.abs(ball.y - FH / 2) < FMT.goal / 2 + 70 * GH && (ball.z || 0) < 95) { ooh(); ev3d("near"); }
+		if (ball.shot && frame - (ball.kickedAt || -999) < 120 && Math.abs(ball.y - FH / 2) < FMT.goal / 2 + 70 * GH && (ball.z || 0) < 95) { ooh(); ev3d("near"); if (ball.lastBy) { crowdReact("near", ball.lastBy.team); } }
 		if (lastTouch === defTeam) { awardCorner(1 - defTeam, leftEnd, ball.y < FH / 2); } else { awardGoalKick(defTeam, leftEnd); }
 	}
 
@@ -4630,6 +4638,7 @@
 		if (state !== "play" || setPiece || tut || inHands(vic)) { return; }
 		if (shoot) { if (shoot.live) { sfx("whistle"); shootEnd(off.team === shoot.att ? "Foul by the attacker" : "Foul in the box: no goal, retaken next round"); } return; }
 		const t = vic.team;
+		crowdReact("foul", off.team);
 		// Cards, as the laws have them: reckless (mostly from behind) is a yellow, a second
 		// yellow is a red, and a really bad one from behind is a straight red.
 		// (Keepers are booked but not sent off here: there is no sub to put in goal.)
@@ -5053,6 +5062,7 @@
 			ball.pen = null;
 			ooh();
 			burst(gk.x, gk.y, "Saved");
+			crowdReact("save", gk.team);
 			gainBall(gk);
 			return;
 		}
@@ -5092,7 +5102,7 @@
 				}
 				taker = p; td = d;
 			}
-			if (taker && taker.role === "gk" && speed > 11) { ooh(); ev3d("save", taker.team); }   // a keeper holds a hard shot
+			if (taker && taker.role === "gk" && speed > 11) { ooh(); ev3d("save", taker.team); crowdReact("save", taker.team); }   // a keeper holds a hard shot
 			if (taker) { gainBall(taker); }
 			return;
 		}
@@ -5130,6 +5140,7 @@
 				gainBall(q);
 				swing(q.team, 0.08);
 				if (isHuman) { burst(q.x, q.y, "Won it"); sfx("tackle"); stats.tackles++; } else if (q.team === 1) { oppStats.tackles++; } else { stats.aiTackles = (stats.aiTackles || 0) + 1; }
+				crowdReact("tackle", q.team);
 				break;
 			}
 		}
@@ -6202,6 +6213,27 @@
 		ctx.drawImage(stands.bottom, 0, MY + FH, WW, MY);
 		ctx.drawImage(stands.left, 0, MY, MX, FH);
 		ctx.drawImage(stands.right, MX + FW, MY, MX, FH);
+		// A home cheer runs through the stands as a wave of the home colours; the away corner flickers
+		// in theirs when their side does something; a groan dims the home stands.
+		if (!quiet && !reduceMotion) {
+			const m = crowdMood, tt = performance.now() / 1000;
+			const hk = KITS[homeSide] ? KITS[homeSide].outfield : "#f2b52e", ak = KITS[1 - homeSide] ? KITS[1 - homeSide].outfield : "#de4f5a";
+			if (m.home > 0.08) {
+				ctx.fillStyle = hk;
+				for (let i = 0; i < 28; i++) {
+					const x = i / 28 * WW, a = m.home * 0.32 * (0.5 + 0.5 * Math.sin(tt * 7 - i * 0.7));
+					ctx.globalAlpha = a; ctx.fillRect(x, 0, WW / 28 + 1, MY); ctx.fillRect(x, MY + FH, WW / 28 + 1, MY);
+				}
+			} else if (m.home < -0.08) {
+				ctx.fillStyle = "#000"; ctx.globalAlpha = Math.min(0.35, -m.home * 0.4);
+				ctx.fillRect(0, 0, WW, MY); ctx.fillRect(0, MY + FH, WW, MY);
+			}
+			if (m.away > 0.08) {
+				ctx.fillStyle = ak; ctx.globalAlpha = m.away * 0.45 * (0.6 + 0.4 * Math.sin(tt * 11));
+				ctx.fillRect(WW * 0.8, 0, WW * 0.2, MY);
+			}
+			ctx.globalAlpha = 1;
+		}
 		// When the crowd is on its feet, the odd camera flash goes off.
 		if (!quiet && !reduceMotion && crowdHeat > 0.55 && Math.random() < crowdHeat * 0.5) {
 			ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
@@ -6865,6 +6897,55 @@
 		}
 	}
 
+	// A partisan crowd. The home end cheers its side's chances, saves, tackles and clearances, and
+	// applauds; the visitors' good moments get a murmur, a groan or, for a foul on one of the home
+	// side, whistles and boos. The away corner (and the 3D stands' away fans) celebrate theirs.
+	const reactAt = {};
+	function crowdReactImpl (kind, t) {
+		if (bulkSim || (state !== "play" && state !== "goal") || !(t === 0 || t === 1)) { return; }
+		const key = kind + t, now = frame;
+		if (now - (reactAt[key] ?? -999) < (kind === "tackle" || kind === "clear" ? 150 : 50)) { return; }
+		reactAt[key] = now;
+		const home = t === homeSide, m = crowdMood;
+		const lvl = { chance: 0.75, save: 0.9, near: 0.8, tackle: 0.45, clear: 0.4, foul: 0.7 }[kind] || 0.5;
+		if (kind === "foul") {
+			// t committed it: the home end jeers a visitor's foul; its own player's gets a shrug.
+			if (!home) { m.home = Math.min(m.home, -0.3); m.ooh = Math.max(m.ooh, 0.6); } else { m.away = Math.min(m.away, -0.3); }
+		} else if (home) {
+			m.home = Math.max(m.home, lvl * 0.8); m.excite = Math.min(1, m.excite + lvl * 0.3);
+			if (kind === "chance" || kind === "near") { m.ooh = Math.max(m.ooh, 0.8); }
+		} else {
+			m.away = Math.max(m.away, lvl * 0.8); m.home = Math.min(m.home, -0.25 * lvl);
+			if (kind === "chance") { m.ooh = Math.max(m.ooh, 0.5); }
+		}
+		if (!soundOn || !audio) { return; }
+		const at = audio.currentTime + 0.02;
+		const clapping = (g, dur, pan) => { for (let i = 0; i < 18; i++) { const f = 1400 + Math.random() * 1100; noiseBurst("white", at + Math.random() * dur, 0.045, g * (0.6 + Math.random() * 0.6), "bandpass", f, f, 1.3, pan + (Math.random() - 0.5) * 0.4); } };
+		const cheer = (g, pan = -0.2) => { noiseBurst("pink", at, 1.5, 0.09 * g, "bandpass", 650, 1250, 0.6, pan); voices(at, 5, 250, 330, 1.2, 0.016 * g, 1050, pan); };
+		const murmur = (g, pan = 0) => { noiseBurst("brown", at, 1.3, 0.05 * g, "lowpass", 520, 300, 0.7, pan); voices(at, 4, 210, 190, 1.1, 0.007 * g, 600, pan); };
+		const jeer = g => {
+			voices(at, 5, 150, 128, 1.5, 0.014 * g, 520, -0.2);   // a boo
+			for (let i = 0; i < 4; i++) {   // and whistles
+				const o = audio.createOscillator(), wg = audio.createGain(), s0 = at + Math.random() * 0.4, f = 2300 + Math.random() * 900;
+				o.type = "sine"; o.frequency.setValueAtTime(f, s0); o.frequency.linearRampToValueAtTime(f * 1.12, s0 + 0.35); o.frequency.linearRampToValueAtTime(f * 0.96, s0 + 0.8);
+				wg.gain.setValueAtTime(0.0001, s0); wg.gain.linearRampToValueAtTime(0.006 * g, s0 + 0.06); wg.gain.exponentialRampToValueAtTime(0.0001, s0 + 0.9);
+				o.connect(wg); connectPan(wg, (Math.random() - 0.5) * 0.8); o.start(s0); o.stop(s0 + 0.95);
+			}
+		};
+		const awayPan = 0.5;
+		if (kind === "foul") { if (!home) { jeer(1); } else { murmur(0.4, awayPan); } return; }
+		if (home) {
+			if (kind === "chance") { cheer(0.75); }
+			else if (kind === "near") { clapping(0.05, 1.6, -0.1); }
+			else if (kind === "save") { cheer(0.9); clapping(0.06, 1.8, -0.1); }
+			else { clapping(kind === "tackle" ? 0.05 : 0.04, 1.2, -0.1); if (kind === "tackle") { cheer(0.35); } }
+		} else {
+			// The home end goes quiet and anxious; the away corner gets its moment.
+			murmur(kind === "chance" || kind === "save" ? 1 : 0.5);
+			if (kind === "save" || kind === "chance") { cheer(0.25, awayPan); }
+		}
+	}
+
 	// The crowd bed: a rumble, the wash of voices and the air above them, each breathing a little,
 	// all of it swelling with the heat of the match.
 	function updateCrowd () {
@@ -6885,7 +6966,7 @@
 		crowd.rumble.g.gain.setTargetAtTime(live ? (0.045 + 0.08 * heat) * breathe * quiet : 0, t, 0.4);
 		crowd.vox.g.gain.setTargetAtTime(live ? (0.022 + 0.085 * heat) * breathe * quiet : 0, t, 0.35);
 		crowd.air.g.gain.setTargetAtTime(live ? (0.004 + 0.01 * heat) * quiet : 0, t, 0.5);
-		crowd.vox.f.frequency.setTargetAtTime(620 + 650 * heat + 70 * Math.sin(t * 0.9), t, 0.4);
+		crowd.vox.f.frequency.setTargetAtTime(620 + 650 * heat - 180 * crowdTense + 70 * Math.sin(t * 0.9), t, 0.4);
 		if (crowd.pan) { crowd.pan.pan.setTargetAtTime(0.22 * Math.sin(t * 0.21), t, 0.5); }
 		if (live && state === "play" && freeze <= 0 && t > crowd.nextChant) {
 			// The home end sings, louder when the home side is on top; the away corner answers when theirs is.
@@ -8875,8 +8956,6 @@
 	function animateCrowd3D () {
 		const k = frameDt / 1000, m = crowdMood;
 		m.excite += ((state === "play" || state === "goal" ? crowdHeat : 0.15) - m.excite) * Math.min(1, k * 2.5);
-		m.home *= Math.pow(0.5, k / 2.2); m.away *= Math.pow(0.5, k / 2.2);
-		m.ooh *= Math.pow(0.5, k / 0.6); m.wave *= Math.pow(0.5, k / 3);
 		CROWD_U.uTime.value = reduceMotion ? 0 : performance.now() / 1000;
 		CROWD_U.uExcite.value = reduceMotion ? 0.2 : m.excite;
 		CROWD_U.uHome.value = m.home; CROWD_U.uAway.value = m.away; CROWD_U.uOoh.value = m.ooh; CROWD_U.uWave.value = m.wave;
@@ -8892,6 +8971,12 @@
 		CROWD_U.uOla.value = reduceMotion ? 0 : m.ola;
 		CROWD_U.uOlaA.value = m.olaA || 0;
 		const mid = CROWD_U.uMid.value; mid[0] = FW / 2; mid[1] = FH / 2; mid[2] = FW / 2 + 160; mid[3] = FH / 2 + 160;
+	}
+	// The stands' jolts fade: a cheer in a couple of seconds, a gasp quicker.
+	function stepCrowdMood (k) {
+		const m = crowdMood;
+		m.home *= Math.pow(0.5, k / 2.2); m.away *= Math.pow(0.5, k / 2.2);
+		m.ooh *= Math.pow(0.5, k / 0.6); m.wave *= Math.pow(0.5, k / 3);
 	}
 	// Match events, for the stands. home/away here are the home club's fans and the visitors'.
 	function ev3d (kind, data) {
@@ -9936,7 +10021,7 @@
 			get charging () { return charging; }, get meterRect () { return meterRect; }, get drawMs () { return drawMs; }, get scale () { return scale; }, get kits () { return KITS; }, get stats () { return stats; }, get oppStats () { return oppStats; }, get steerAt () { return steerAt; }, set steerAt (v) { steerAt = v; }, set possTeam (v) { possTeam = v; },
 			set steerSwitchDone (v) { steerSwitchDone = !!v; },
 			get lastSwitchKind () { return lastSwitchKind; }, set lastSwitchKind (v) { lastSwitchKind = v; }, get setPiece () { return setPiece; },
-			get G3 () { return G3; }, get matchLog () { return matchLog; }, get shoot () { return shoot; }, cornerTest (att, top = true) { if (state !== "play") { return; } freeze = 0; awardCorner(att, att === 1, top); }, get cornerPlan () { return cornerPlan; }, simExtra () { return { tally, poss: possFrames.slice() }; }, get setPieceKind () { return setPiece ? setPiece.kind : null; }, get gfxLevel () { return gfxLevel; }, setGfx, get musicBar () { return music ? music.bar : -1; }, get audioState () { return audio ? audio.state : "none"; }, get replayOn () { return replayOn(); }, get replay () { return replay; }, get recFrames () { return rec.n; }, REPLAY_AT, REPLAY_FR, GOAL_CELEB, get lastCaption () { return lastCaption; }, caption, get camMode () { return camMode; }, get crowdMood () { return crowdMood; }, get frameDt () { return frameDt; }, get crowdBed () { return crowd; }, get soundOn () { return soundOn; },
+			get G3 () { return G3; }, get matchLog () { return matchLog; }, crowdReactTest (k, t) { crowdReactImpl(k, t); }, get shoot () { return shoot; }, cornerTest (att, top = true) { if (state !== "play") { return; } freeze = 0; awardCorner(att, att === 1, top); }, get cornerPlan () { return cornerPlan; }, simExtra () { return { tally, poss: possFrames.slice() }; }, get setPieceKind () { return setPiece ? setPiece.kind : null; }, get gfxLevel () { return gfxLevel; }, setGfx, get musicBar () { return music ? music.bar : -1; }, get audioState () { return audio ? audio.state : "none"; }, get replayOn () { return replayOn(); }, get replay () { return replay; }, get recFrames () { return rec.n; }, REPLAY_AT, REPLAY_FR, GOAL_CELEB, get lastCaption () { return lastCaption; }, caption, get camMode () { return camMode; }, get crowdMood () { return crowdMood; }, get frameDt () { return frameDt; }, get crowdBed () { return crowd; }, get soundOn () { return soundOn; },
 			human, switchScore, outfield, dist,
 			get officials () { return officials3; }, get flagCall () { return flagCall; }, refKit, deltaE,
 			proj (x, y, z) { return G3.cam ? proj3D(x, y, z) : null; }, get viewScale () { return scale; },
