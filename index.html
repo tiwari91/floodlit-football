@@ -728,6 +728,10 @@
 	.market .ratings, .market .swap, .upgrades .eff { grid-column: 2 / 3; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 	.market .ovr { font-family: var(--display); font-weight: 800; font-size: 20px; color: var(--chalk); }
 	.market button, .upgrades button { grid-row: span 2; padding: 5px 10px; font-size: 13px; white-space: nowrap; }
+	.market .bids { grid-row: span 3; display: grid; gap: 4px; justify-items: stretch; }
+	.market .bids button { grid-row: auto; padding: 3px 8px; font-size: 12px; }
+	.market .swap { grid-column: 2 / 3; }
+	.mk-tabs { flex-wrap: wrap; margin-bottom: 6px; }
 	button:disabled { opacity: 0.45; cursor: not-allowed; }
 	.lg-clubs { display: grid; gap: 6px; }
 	.tabs { display: inline-flex; gap: 4px; }
@@ -1248,6 +1252,8 @@
 			<div class="win">
 				<div class="sq-head"><h4 id="winTitle">Transfer window</h4><span class="budget" id="winBudget"></span></div>
 				<p class="win-note" id="winNote"></p>
+				<div class="tabs mk-tabs" id="mkTabs" role="group" aria-label="Which market"></div>
+				<p class="win-note" id="mkScout"></p>
 				<ul class="market" id="winMarket"></ul>
 				<h4 class="up-title">Club upgrades</h4>
 				<ul class="upgrades" id="winUpgrades"></ul>
@@ -1670,10 +1676,37 @@
 
 	const priceOf = p => Math.max(0.2, Number.isFinite(p.age) ? valueOf(p) : round1(Math.pow(Math.max(0, ovrOf(p) - 50), 2) * 0.004));
 
+	/* ---------- the transfer market, at home and abroad ----------
+	   Each window brings a list from five markets. Abroad is cheaper for the quality but needs a
+	   work permit outside Europe (68+ overall) and a spell settling in. Unless your scout has looked
+	   at a player, you only see a range for how good he is. */
+	const MARKETS = {
+		home: { label: "Home", lo: 58, hi: 80, mult: 1, adapt: 0, permit: false, n: 4, clubs: [ "Ashby Town", "Caldermoor", "Wexley United", "Fordham Rovers" ] },
+		europe: { label: "Europe", lo: 62, hi: 86, mult: 1.15, adapt: 3, permit: false, n: 4, clubs: [ "Ribera CF", "AS Vence", "SV Kahlberg", "FC Arade", "Sporting Lusa", "Veendam AFC" ] },
+		samerica: { label: "South America", lo: 60, hi: 85, mult: 0.85, adapt: 6, permit: true, n: 3, clubs: [ "Atlético Paraná", "CA Rosales", "Deportivo Salto", "Club Cuyo" ] },
+		africa: { label: "Africa", lo: 58, hi: 82, mult: 0.7, adapt: 5, permit: true, n: 3, clubs: [ "Lagos Harbour", "Accra Stars", "Dakar Lions", "Casablanca Athletic" ] },
+		asia: { label: "Asia and the Americas", lo: 58, hi: 78, mult: 0.75, adapt: 4, permit: true, n: 2, clubs: [ "Osaka Bay", "Busan Mariners", "Sydney Harbour", "Austin Union", "Monterrey Norte" ] }
+	};
+	const PERMIT_OVR = 68;
 	function genMarket () {
-		const pool = [ "gk", "def", "def", "mid", "mid", "fwd", "fwd" ];
-		return Array.from({ length: 6 }, () => genPlayer(pool[Math.floor(Math.random() * pool.length)], 60 + Math.floor(Math.random() * 28)));
+		const pool = [ "gk", "def", "def", "mid", "mid", "fwd", "fwd" ], out = [];
+		for (const [ region, m ] of Object.entries(MARKETS)) {
+			for (let k = 0; k < m.n; k++) {
+				const pl = genPlayer(pool[Math.floor(Math.random() * pool.length)], m.lo + Math.floor(Math.random() * (m.hi - m.lo + 1)));
+				const nats = natsOf(region);
+				pl.nat = nats[Math.floor(Math.random() * nats.length)];
+				pl.age = 18 + Math.floor(Math.random() * 15);
+				pl.pot = clamp(ovrOf(pl) + Math.max(0, 27 - pl.age) * 1.5 + Math.floor(Math.random() * 6), ovrOf(pl), 94);
+				pl.region = region; pl.from = m.clubs[Math.floor(Math.random() * m.clubs.length)];
+				pl.ask = Math.max(0.2, round1(valueOf(pl) * m.mult * (0.9 + Math.random() * 0.25)));
+				pl.contract = 3; pl.morale = 75; pl.bids = 0;
+				out.push(pl);
+			}
+		}
+		return out;
 	}
+	const askOf = pl => (Number.isFinite(pl.ask) ? pl.ask : priceOf(pl));
+	const permitOk = pl => !(MARKETS[pl.region] && MARKETS[pl.region].permit) || ovrOf(pl) >= PERMIT_OVR;
 
 	const BENCH = 7, BENCH_POS = [ "gk", "def", "def", "mid", "mid", "fwd", "fwd" ];
 	function newClub () {
@@ -1684,7 +1717,8 @@
 			squad: POS_OF_SLOT.map((pos, i) => genPlayer(pos, 57 + Math.floor(Math.random() * 9), nm(i))),
 			bench: BENCH_POS.map((pos, i) => genPlayer(pos, 53 + Math.floor(Math.random() * 9), nm(i + POS_OF_SLOT.length))),
 			upgrades: { training: 0, coaching: 0, defence: 0 },
-			market: genMarket()
+			market: genMarket(),
+			scoutLeft: 2
 		};
 	}
 
@@ -1704,6 +1738,7 @@
 		c.market = c.market.filter(pl => pl && POS_LABEL[pl.pos] && typeof pl.name === "string");
 		for (const pl of [ ...c.squad, ...c.bench, ...c.market ]) { ensurePlayer(pl); }
 		ensureCoaching(c, null);
+		if (!Number.isFinite(c.scoutLeft)) { c.scoutLeft = 2 + staffLvl(c, "scout"); }
 		if (!Array.isArray(c.log)) { c.log = []; }
 		return c;
 	}
@@ -2073,6 +2108,7 @@
 		league.round = lm.round + 1;
 		updateFitness();
 		weeklyClub(lm, h, a);
+		if (league.round === JANUARY) { league.club.market = genMarket(); league.club.scoutLeft = 2 + staffLvl(league.club, "scout"); if (typeof windowEvents === "function") { windowEvents("January"); } }
 		// Knocks from this match: out for one to three games, and off the team sheet.
 		const byName = n => [ ...league.club.squad, ...league.club.bench ].find(pl => pl.name === n);
 		for (const n of matchGoals) { const pl = byName(n); if (pl) { pl.goals = (pl.goals || 0) + 1; } }
@@ -2101,6 +2137,7 @@
 			league.prize = round1(1 + (DIVISION - pos) * 0.2 + rows[pos - 1].pts * 0.02);
 			league.club.budget = round1(league.club.budget + league.prize);
 			league.club.market = genMarket();
+			league.club.scoutLeft = 2 + staffLvl(league.club, "scout");
 			league.paid = true;
 		}
 		saveLeague();
@@ -2395,16 +2432,34 @@
 		const mk = $("winMarket");
 		mk.replaceChildren();
 		mk.hidden = !open;
+		const tabs = $("mkTabs");
+		tabs.replaceChildren();
+		tabs.hidden = !open;
+		for (const [ key, m ] of [ [ "all", { label: "All" } ], ...Object.entries(MARKETS) ]) {
+			const b = el("button", "", m.label); b.type = "button"; b.setAttribute("aria-pressed", String(mkTab === key));
+			b.addEventListener("click", () => { mkTab = key; renderClub(); });
+			tabs.append(b);
+		}
+		$("mkScout").textContent = open ? `Scouting: ${c.scoutLeft || 0} report${c.scoutLeft === 1 ? "" : "s"} left this window${staffLvl(c, "scout") ? "" : " (hire a chief scout for more, and sharper estimates)"}` : "";
 		c.market.forEach((pl, i) => {
-			const price = priceOf(pl), tgt = signingTarget(pl.pos), out = tgt.out;
+			if (mkTab !== "all" && (pl.region || "home") !== mkTab) { return; }
+			ensurePlayer(pl);
+			const ask = askOf(pl), tgt = signingTarget(pl.pos), out = tgt.out, rr = ratingRange(pl), ok = permitOk(pl), talks = pl.bids >= 0 || pl.bids === undefined;
 			const li = el("li");
-			li.append(el("span", "pos", POS_LABEL[pl.pos]), el("span", "who", pl.name));
-			const b = el("button", "", `Sign ${money(price)}`);
-			b.type = "button";
-			b.disabled = c.budget + 1e-9 < price;
-			b.addEventListener("click", () => signPlayer(i));
-			li.append(b);
-			li.append(el("span", "ratings", `OVR ${ovrOf(pl)} · PAC ${pl.pac} SHO ${pl.sho} PAS ${pl.pas} DEF ${pl.def}`));
+			li.append(el("span", "pos", POS_LABEL[pl.pos]), el("span", "who", `${pl.name} · ${pl.age} · ${pl.nat}`));
+			const btns = el("span", "bids");
+			const b = el("button", "", `Bid ${money(ask)}`);
+			b.type = "button"; b.disabled = !ok || !talks || c.budget + 1e-9 < ask || c.budget < 0;
+			b.addEventListener("click", () => bidFor(i, false));
+			const b2 = el("button", "", `Offer ${money(round1(ask * 0.8))}`);
+			b2.type = "button"; b2.disabled = !ok || !talks || c.budget + 1e-9 < round1(ask * 0.8) || c.budget < 0; b2.title = "A cheeky bid: they may accept, or turn it down and raise the price";
+			b2.addEventListener("click", () => bidFor(i, true));
+			btns.append(b, b2);
+			if (!pl.scouted && rr) { const b3 = el("button", "", "Scout"); b3.type = "button"; b3.disabled = !(c.scoutLeft > 0); b3.addEventListener("click", () => scoutPlayer(i)); btns.append(b3); }
+			li.append(btns);
+			li.append(el("span", "ratings", rr ? `OVR about ${rr[0]}–${rr[1]} · not scouted` : `OVR ${ovrOf(pl)} · PAC ${pl.pac} SHO ${pl.sho} PAS ${pl.pas} DEF ${pl.def} · potential ${Math.round(pl.pot)}`));
+			const m = MARKETS[pl.region];
+			li.append(el("span", "swap", `${pl.from ? `${pl.from}, ` : ""}${m ? m.label : "Home"}${m && m.permit ? (ok ? " · work permit: yes" : ` · work permit: refused (needs ${PERMIT_OVR}+)`) : ""}${m && m.adapt ? ` · settles in about ${Math.max(0, Math.ceil(m.adapt - staffLvl(c, "scout") * 0.5))} games` : ""}${!talks ? " · talks broken off" : ""}`));
 			li.append(el("span", "swap", out ? `Replaces ${out.name} (${ovrNow(out)}), sold for ${money(round1(priceOf(out) * 0.5))}` : "Joins your bench"));
 			mk.append(li);
 		});
@@ -2698,24 +2753,61 @@
 	}
 	const tiredText = list => `${list.length === 1 ? "1 starter is" : `${list.length} starters are`} tired: ${list.slice(0, 4).map(pl => `${pl.name} ${fitOf(pl)}%`).join(", ")}${list.length > 4 ? ` and ${list.length - 4} more` : ""}.`;
 
-	let lastDeal = "";
+	let lastDeal = "", mkTab = "all";
 	function afterClubChange () {
 		saveLeague();
 		if (state === "intro") { newMatch(); showIntro(); }
 		renderLeague();
 	}
 
-	function signPlayer (i) {
+	// A bid: the asking price is always accepted; a lower one may be, or may be turned down (and the
+	// price goes up); turn a club down twice and it stops talking.
+	function bidFor (i, low) {
+		const c = league.club, pl = c.market[i];
+		if (!pl || !windowOpen() || !permitOk(pl) || pl.bids < 0) { return; }
+		const ask = askOf(pl), offer = low ? round1(ask * 0.8) : ask;
+		if (c.budget + 1e-9 < offer || c.budget < 0) { return; }
+		if (low) {
+			const yes = Math.random() < 0.3 + (pl.age >= 29 ? 0.15 : 0) + staffLvl(c, "scout") * 0.05;
+			if (!yes) {
+				pl.bids = (pl.bids || 0) + 1;
+				if (pl.bids >= 2) { pl.bids = -1; lastDeal = `${pl.from} have broken off talks over ${pl.name}.`; }
+				else { pl.ask = round1(ask * 1.08); lastDeal = `${pl.from} turned down ${money(offer)} for ${pl.name}; they now want ${money(pl.ask)}.`; }
+				afterClubChange();
+				return;
+			}
+		}
+		signPlayer(i, offer);
+	}
+	function scoutPlayer (i) {
+		const c = league.club, pl = c.market[i];
+		if (!pl || pl.scouted || !(c.scoutLeft > 0)) { return; }
+		pl.scouted = true; c.scoutLeft--;
+		lastDeal = `Scouted ${pl.name}: overall ${ovrOf(pl)}, potential ${Math.round(pl.pot)}.`;
+		afterClubChange();
+	}
+	// How well you know a player you haven't scouted: a range around the truth, narrower with a better scout.
+	function ratingRange (pl) {
+		const c = league.club, w = pl.scouted ? 0 : Math.max(0, ((pl.region || "home") === "home" ? 6 : 12) - staffLvl(c, "scout") * 2), o = ovrOf(pl);
+		if (!w) { return null; }
+		const off = (hashStr(pl.name + "rng") % (w + 1)) - Math.floor(w / 2);
+		return [ clamp(o - Math.floor(w / 2) + off, 30, 99 - w), clamp(o + Math.ceil(w / 2) + off, 30 + w, 99) ];
+	}
+	function signPlayer (i, offer) {
 		const c = league.club, pl = c.market[i];
 		if (!pl || !windowOpen()) { return; }
-		const price = priceOf(pl);
+		const price = Number.isFinite(offer) ? offer : askOf(pl);
 		if (c.budget + 1e-9 < price || c.budget < 0) { return; }
+		const m = MARKETS[pl.region];
+		pl.adapt = m ? Math.max(0, m.adapt - staffLvl(c, "scout") * 0.5) : 0;
+		delete pl.ask; delete pl.bids; delete pl.from; delete pl.scouted;
 		const tgt = signingTarget(pl.pos), out = tgt.out, fee = out ? round1(priceOf(out) * 0.5) : 0;
 		c.budget = round1(c.budget - price + fee);
 		c[tgt.list][tgt.i] = pl;
 		c.market.splice(i, 1);
 		picked = null;
-		lastDeal = out ? `Signed ${pl.name} for ${money(price)}; ${out.name} left for ${money(fee)}.` : `Signed ${pl.name} for ${money(price)}, straight onto the bench.`;
+		lastDeal = (out ? `Signed ${pl.name} for ${money(price)}; ${out.name} left for ${money(fee)}.` : `Signed ${pl.name} for ${money(price)}, straight onto the bench.`) + (pl.adapt > 0 ? ` He'll need a few games to settle.` : "");
+		league.club.log = [ ...(league.club.log || []), `Signed ${pl.name} (${pl.nat}) for ${money(price)}` ].slice(-10);
 		afterClubChange();
 	}
 
