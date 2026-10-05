@@ -2846,6 +2846,7 @@
 	let crowdHeat = 0;     // 0 quiet .. 1 on its feet   // what a freeze is for: a kickoff countdown, or a free kick
 	function callOffside (p) {
 		const spot = { x: p.x, y: p.y };
+		raiseFlag(p.x, "off");
 		offside = { team: -1, set: new Set() };
 		const defs = players.filter(q => q.team !== p.team && q.role !== "gk");
 		const taker = defs.reduce((a, b) => (dist(a, spot) < dist(b, spot) ? a : b));
@@ -3814,6 +3815,7 @@
 	function update () {
 		frame++;
 		for (const p of players) { if (p.fall > 0) { p.fall--; } if (p.dive > 0) { p.dive--; } if (p.diveCd > 0) { p.diveCd--; } if (p.throwA > 0) { p.throwA--; } }
+		if (flagCall && --flagCall.t <= 0) { flagCall = null; }
 		// The crowd gets louder as the ball nears either goal, and goes up for goals.
 		if (ball) {
 			const near = 1 - clamp(Math.min(ball.x, FW - ball.x) / (FW * 0.33), 0, 1);
@@ -4342,6 +4344,7 @@
 		const inMouth = ball.y > GOAL_T + 4 && ball.y < GOAL_B - 4 && ball.z <= 55;   // higher is over the bar
 		if (state === "play" && (ball.y < -4 || ball.y > FH + 4)) {
 			// Over a touchline: a throw-in to the side that didn't touch it last.
+			raiseFlag(ball.x, "out");
 			awardThrow(lastTouch === 0 ? 1 : 0, ball.x, ball.y < 0);
 			return;
 		}
@@ -4378,6 +4381,7 @@
 	let setPiece = null;    // { kind: "corner", team, taker } until the corner is taken
 	function outOfPlay (leftEnd) {
 		const defTeam = leftEnd ? 0 : 1;   // you defend the left goal
+		raiseFlag(ball.x, "out");
 		if (ball.shot && frame - (ball.kickedAt || -999) < 120 && Math.abs(ball.y - FH / 2) < FMT.goal / 2 + 70 * GH && (ball.z || 0) < 95) { ooh(); ev3d("near"); }
 		if (lastTouch === defTeam) { awardCorner(1 - defTeam, leftEnd, ball.y < FH / 2); } else { awardGoalKick(defTeam, leftEnd); }
 	}
@@ -7216,6 +7220,57 @@
 		else { t.generateMipmaps = false; t.minFilter = THREE.LinearFilter; }
 		return t;
 	}
+	// Static geometry merged into one mesh, a colour on every vertex: the stands, roofs, pylons and
+	// goal frames are hundreds of boxes and quads but cost one draw call each.
+	const acc3 = () => ({ pos: [], nor: [], col: [] });
+	const col3 = c => (Array.isArray(c) ? c : (() => { const k = new THREE.Color(c); return [ k.r, k.g, k.b ]; })());
+	function accGeo3 (A, geo, c, m) {
+		const g = geo.index ? geo.toNonIndexed() : geo.clone();
+		if (m) { g.applyMatrix4(m); }
+		const p = g.attributes.position.array, n = g.attributes.normal.array, k = col3(c);
+		for (let i = 0; i < p.length; i++) { A.pos.push(p[i]); A.nor.push(n[i]); }
+		for (let i = 0; i < p.length; i += 3) { A.col.push(k[0], k[1], k[2]); }
+		g.dispose();
+	}
+	// A quad; want (optional) is the side it should face: the winding is turned to match.
+	function accQuad3 (A, a, b, c, d, col, want) {
+		const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+		let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+		const L = Math.hypot(nx, ny, nz) || 1; nx /= L; ny /= L; nz /= L;
+		const k = col3(col);
+		const flip = want && nx * want[0] + ny * want[1] + nz * want[2] < 0;
+		if (flip) { nx = -nx; ny = -ny; nz = -nz; }
+		for (const v of flip ? [ a, c, b, a, d, c ] : [ a, b, c, a, c, d ]) { A.pos.push(v[0], v[1], v[2]); A.nor.push(nx, ny, nz); A.col.push(k[0], k[1], k[2]); }
+	}
+	let box3Geo = null;
+	const M3 = { m: null, q: null, p: null, s: null, e: null };
+	function box3Init () { if (!box3Geo) { box3Geo = new THREE.BoxGeometry(1, 1, 1); M3.m = new THREE.Matrix4(); M3.q = new THREE.Quaternion(); M3.p = new THREE.Vector3(); M3.s = new THREE.Vector3(); M3.e = new THREE.Euler(); } }
+	function accBox3 (A, cx, cy, cz, sx, sy, sz, col, ry = 0, rx = 0, rz = 0) {
+		box3Init();
+		M3.m.compose(M3.p.set(cx, cy, cz), M3.q.setFromEuler(M3.e.set(rx, ry, rz, "YXZ")), M3.s.set(sx, sy, sz));
+		accGeo3(A, box3Geo, col, M3.m);
+	}
+	// A thin box from one point to another: a strut, a cable, a lattice member.
+	function accBeam3 (A, a, b, w, col) {
+		const dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2], L = Math.hypot(dx, dy, dz) || 1;
+		box3Init();
+		M3.q.setFromUnitVectors(M3.p.set(0, 1, 0), M3.s.set(dx / L, dy / L, dz / L));
+		M3.m.compose(M3.p.set((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2), M3.q, M3.s.set(w, L, w));
+		accGeo3(A, box3Geo, col, M3.m);
+	}
+	function geoAcc3 (A) {
+		const g = new THREE.BufferGeometry();
+		g.setAttribute("position", new THREE.Float32BufferAttribute(A.pos, 3));
+		g.setAttribute("normal", new THREE.Float32BufferAttribute(A.nor, 3));
+		g.setAttribute("color", new THREE.Float32BufferAttribute(A.col, 3));
+		return g;
+	}
+	function meshAcc3 (A, material) {
+		if (!A.pos.length) { return null; }
+		const m = new THREE.Mesh(geoAcc3(A), material);
+		m.userData.ownGeo = true;
+		return m;
+	}
 	// The ground: built once per match (it changes with the club, the format, the weather and the
 	// surface) from the same painting the 2D cameras use, then the stands stand up around it.
 	function buildStadium3D () {
@@ -7507,6 +7562,18 @@
 		const blobs = new T.InstancedMesh(G3.geo.shadow, new T.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.32, depthWrite: false }), MAXF3);
 		for (const m of [ rings, blobs ]) { m.instanceMatrix.setUsage(T.DynamicDrawUsage); m.frustumCulled = false; m.count = 0; G3.scene.add(m); }
 		rings.setColorAt(0, white);
+		// The assistants' flags, held in the hand: a pole and a red-and-yellow chequered cloth.
+		const FA = acc3();
+		accBox3(FA, 0, -6.0, 0, 0.45, 11, 0.45, "#2a2d31");
+		for (let a = 0; a < 2; a++) {
+			for (let b = 0; b < 2; b++) {
+				const y0 = -11.2 + a * 2.25, z0 = 0.3 + b * 2.8;
+				accQuad3(FA, [ 0, y0, z0 ], [ 0, y0, z0 + 2.8 ], [ 0, y0 + 2.25, z0 + 2.8 ], [ 0, y0 + 2.25, z0 ], (a + b) % 2 ? "#ffd21f" : "#e8262b");
+			}
+		}
+		const flags = new T.InstancedMesh(geoAcc3(FA), new T.MeshLambertMaterial({ vertexColors: true, side: T.DoubleSide }), 2);
+		flags.instanceMatrix.setUsage(T.DynamicDrawUsage); flags.frustumCulled = false; flags.count = 0;
+		G3.scene.add(flags);
 		const node = (parent, x, y, z) => { const o = new T.Object3D(); o.position.set(x, y, z); parent.add(o); return o; };
 		const rigs = [];
 		for (let i = 0; i < MAXF3; i++) {
@@ -7517,7 +7584,7 @@
 			const hip = [ node(hips, 0, -1.0, -2.7), node(hips, 0, -1.0, 2.7) ], kn = hip.map(h => node(h, 0, -7.3, 0)), an = kn.map(k => node(k, 0, -6.5, 0));
 			rigs.push({ root, hips, spine, chest, neck, head, sh, el, ha, hip, kn, an });
 		}
-		G3.fig = { parts, nums, rings, blobs, rigs, cnt: {}, n: 0, M: new T.Matrix4(), M2: new T.Matrix4(), C: new T.Color(), V: new T.Vector3(), S: new T.Vector3(), Q: new T.Quaternion(), prevDir: new WeakMap() };
+		G3.fig = { parts, nums, rings, blobs, flags, rigs, cnt: {}, n: 0, M: new T.Matrix4(), M2: new T.Matrix4(), C: new T.Color(), V: new T.Vector3(), S: new T.Vector3(), Q: new T.Quaternion(), prevDir: new WeakMap() };
 	}
 	// Reset a rig to standing.
 	function resetRig3D (r) {
@@ -7684,7 +7751,23 @@
 	/* ---------- the officials ----------
 	   Not part of the simulation: the referee keeps a diagonal to the ball, the assistants run the
 	   far touchline level with the second-last defender. */
-	const REF_KIT3 = { shirt: "#17191c", shorts: "#17191c", socks: "#17191c", second: "#17191c", pattern: 0, ink: "#f2b52e", gloves: null, sleeves: false, boots: "#15181a", ring: null };
+	// The referees' kit: whichever of the bright officials' colours sits furthest from both sides'
+	// shirts, both keepers and the grass, so the officials never blend into a team or the night.
+	const REF_COLOURS3 = [ "#f4d61e", "#ff5fa2", "#2ad0f5", "#ff8a1f", "#9b7bff", "#b8f03c", "#f4f4f4" ];
+	let refKit3 = null, refKitKey3 = "";
+	function refKit () {
+		const key = `${KITS[0].outfield}${KITS[1].outfield}${KITS[0].gk}${KITS[1].gk}`;
+		if (refKit3 && refKitKey3 === key) { return refKit3; }
+		const avoid = [ KITS[0].outfield, KITS[1].outfield, KITS[0].gk, KITS[1].gk, KITS[0].second || KITS[0].outfield, KITS[1].second || KITS[1].outfield ];
+		const score = c => Math.min(...avoid.map(a => deltaE(c, a)), deltaE(c, "#1f6a3b") * 1.4);
+		const shirt = REF_COLOURS3.reduce((a, b) => (score(b) > score(a) ? b : a));
+		refKitKey3 = key;
+		refKit3 = { shirt, shorts: "#15171a", socks: "#15171a", second: shirt, pattern: 0, ink: "#15171a", gloves: null, sleeves: false, boots: "#15181a", ring: null };
+		return refKit3;
+	}
+	// The assistants' flags: raised straight up for offside, up and out when the ball goes out of play.
+	let flagCall = null;   // { k: 1 or 2 (which assistant), kind: "off" | "out", t: frames left }
+	function raiseFlag (x, kind) { if (!bulkSim) { flagCall = { k: x < FW / 2 ? 1 : 2, kind, t: kind === "off" ? 100 : 70 }; } }
 	const officials3 = [ 0, 1, 2 ].map(i => ({ x: 0, y: 0, vx: 0, vy: 0, dir: -Math.PI / 2, stride: 0, runAmt: 0, idlePh: i * 2, role: "ref", team: -1,
 		look: { skin: [ "#e0ac86", "#9c6a44", "#f1c9a5" ][i], hair: "#1b1410", style: [ "buzz", "short", "shaved" ][i] } }));
 	let officialsFor3 = null;
@@ -7705,7 +7788,7 @@
 		if (officialsFor3 !== players) {   // a new match: back to their marks
 			officialsFor3 = players;
 			officials3[0].x = FW / 2 - 120; officials3[0].y = FH / 2 + 160;
-			officials3[1].x = FW * 0.25; officials3[1].y = -14; officials3[2].x = FW * 0.75; officials3[2].y = -14;
+			officials3[1].x = FW * 0.25; officials3[1].y = -6; officials3[2].x = FW * 0.75; officials3[2].y = -6;
 		}
 		const live = state === "play" || state === "goal";
 		{
@@ -7723,7 +7806,8 @@
 			const second = defs.length > 1 ? defs[1] : 0;
 			let lineX = defTeam === 0 ? second : FW - second;
 			lineX = defTeam === 0 ? Math.min(lineX, ball.x, FW / 2) : Math.max(lineX, ball.x, FW / 2);
-			stepOfficial3(o, clamp(lineX, k === 1 ? 10 : FW / 2, k === 1 ? FW / 2 : FW - 10), -16, live ? 2.6 : 1, dt);
+			const flagUp = flagCall && flagCall.k === k;   // he stands still with his flag up
+			stepOfficial3(o, flagUp ? o.x : clamp(lineX, k === 1 ? 10 : FW / 2, k === 1 ? FW / 2 : FW - 10), -6, live ? 2.6 : 1, dt);
 			o.dir = Math.PI / 2;   // facing the pitch, running sideways
 		}
 	}
@@ -7744,13 +7828,23 @@
 			commitFigure3D(rig, look(p), kit3D(p), p.num);
 		}
 		if (state === "play" || state === "goal" || state === "half" || state === "paused") { updateOfficials3(state === "play" || state === "goal" ? dt : 0); }
-		for (const o of officials3) {
-			if (F.n >= MAXF3) { break; }
+		const rk = refKit();
+		F.flags.count = 0;
+		officials3.forEach((o, k) => {
+			if (F.n >= MAXF3) { return; }
 			const rig = F.rigs[F.n];
 			pose3D(rig, o, WX(o.x), o.y, WD(o.dir), 0, 0);
-			if (o !== officials3[0]) { rig.sh[1].rotation.z = -0.2; rig.sh[1].rotation.x = 0.35; rig.el[1].rotation.z = 0.25; }   // the flag hand
-			commitFigure3D(rig, o.look, REF_KIT3, null);
-		}
+			if (k > 0) {
+				// The flag hand: down by his side and a little forward, or up for a call (and waved).
+				const up = flagCall && flagCall.k === k ? flagCall : null, wave = reduceMotion || !up ? 0 : Math.sin(frame * 0.5) * 0.25;
+				if (up && up.kind === "off") { rig.sh[1].rotation.set(0, 0, -3.05); rig.el[1].rotation.z = 0; rig.ha[1].rotation.set(wave, 0, 0); }
+				else if (up) { rig.sh[1].rotation.set(0.75, 0, -2.2); rig.el[1].rotation.z = 0.05; rig.ha[1].rotation.set(wave, 0, 0); }
+				else { rig.sh[1].rotation.z = -0.35; rig.sh[1].rotation.x = 0.3; rig.el[1].rotation.z = 0.3; rig.ha[1].rotation.z = -0.55; }
+			}
+			commitFigure3D(rig, o.look, rk, null);
+			if (k > 0 && F.flags.count < 2) { F.flags.setMatrixAt(F.flags.count++, rig.ha[1].matrixWorld); }
+		});
+		F.flags.instanceMatrix.needsUpdate = true;
 		for (const k in F.parts) {
 			const m = F.parts[k];
 			m.count = F.cnt[k]; m.instanceMatrix.needsUpdate = true;
@@ -7772,14 +7866,41 @@
 	const CROWD_U = { uTime: { value: 0 }, uExcite: { value: 0 }, uHome: { value: 0 }, uAway: { value: 0 }, uOoh: { value: 0 }, uWave: { value: 0 } };
 	// A fan's shape, facing +z (the pitch). Every camera looks at the stands from the pitch side, so
 	// the faces turned away from it (backs and bottoms) are left out.
-	function fanGeometry3D (lite) {
+	function fanGeometry3D (kind) {   // "lite", "full" or "hi" (the rounded shape for the front rows)
+		const lite = kind === "lite" || kind === true;
 		const pos = [], nor = [], part = [], idx = [];
 		const quad = (q, n, pt) => {
 			const b = pos.length / 3;
-			for (const [ x, y, z ] of q) { pos.push(x, y, z); nor.push(...n); part.push(pt); }
+			for (let i = 0; i < 4; i++) { const [ x, y, z ] = q[i]; pos.push(x, y, z); nor.push(...(Array.isArray(n[0]) ? n[i] : n)); part.push(pt); }
 			idx.push(b, b + 1, b + 2, b, b + 2, b + 3);
 		};
-		// A box narrower at the bottom than the top (wt, wb), its top face tagged topPt.
+		// A rounded body part: rings [ y, r ] from bottom to top round (cx, cz), squashed front to back
+		// by kz; the faces turned away from the pitch are left out. Rings from hairFrom up are hair.
+		const lathe = (cx, cz, rings, segs, kz, pt, hairFrom = 99) => {
+			for (let j = 0; j < rings.length - 1; j++) {
+				const [ y0, r0 ] = rings[j], [ y1, r1 ] = rings[j + 1], dy = y1 - y0, dr = r1 - r0, L = Math.hypot(dy, dr) || 1;
+				const ny = -dr / L, nr = dy / L, p = y0 >= hairFrom ? 4 : pt;
+				for (let k = 0; k < segs; k++) {
+					const a0 = k / segs * Math.PI * 2, a1 = (k + 1) / segs * Math.PI * 2;
+					if (Math.sin((a0 + a1) / 2) < -0.35) { continue; }
+					const v = (a, y, r) => [ cx + Math.cos(a) * r, y, cz + Math.sin(a) * r * kz ];
+					const n = a => { const x = Math.cos(a) * nr, z = Math.sin(a) * nr / kz, l = Math.hypot(x, ny, z) || 1; return [ x / l, ny / l, z / l ]; };
+					quad([ v(a1, y0, r0), v(a0, y0, r0), v(a0, y1, r1), v(a1, y1, r1) ], [ n(a1), n(a0), n(a0), n(a1) ], p);
+				}
+			}
+		};
+		if (kind === "hi") {
+			// Legs (seen when he stands), a torso with sloping shoulders, a neck, a rounded head with
+			// hair, arms with hands modelled raised (the shader swings them down), and the flag.
+			for (const sx of [ -0.95, 0.95 ]) { lathe(sx, 0.3, [ [ -2.8, 0.72 ], [ 0.9, 0.92 ] ], 6, 1, 6); }
+			lathe(0, 0, [ [ 0.4, 1.8 ], [ 3.2, 2.05 ], [ 6.0, 2.55 ], [ 7.25, 2.45 ], [ 7.95, 1.65 ], [ 8.35, 0.85 ] ], 9, 0.62, 7);
+			lathe(0, 0, [ [ 8.0, 0.68 ], [ 9.3, 0.72 ] ], 6, 1, 1);
+			lathe(0.05, 0, [ [ 8.95, 0.55 ], [ 9.3, 1.22 ], [ 9.95, 1.52 ], [ 10.65, 1.6 ], [ 11.2, 1.46 ], [ 11.7, 1.02 ], [ 11.98, 0.3 ] ], 10, 0.94, 1, 11.2);
+			for (const sx of [ -2.6, 2.6 ]) {
+				lathe(sx * 1.04, 0, [ [ 7.2, 0.78 ], [ 10.4, 0.7 ], [ 13.5, 0.6 ] ], 6, 1, 8);
+				lathe(sx * 1.04, 0, [ [ 13.4, 0.62 ], [ 14.4, 0.58 ], [ 15.1, 0.2 ] ], 5, 0.8, 5);
+			}
+		}
 		const box = (cx, cy, cz, wt, wb, sy, sz, pt, topPt = pt) => {
 			const ht = wt / 2, hb = wb / 2, hy = sy / 2, hz = sz / 2, y0 = cy - hy, y1 = cy + hy;
 			const sl = (ht - hb) / sy, ln = Math.hypot(1, sl);
@@ -7788,6 +7909,15 @@
 			quad([ [ cx + hb, y0, cz + hz ], [ cx + hb, y0, cz - hz ], [ cx + ht, y1, cz - hz ], [ cx + ht, y1, cz + hz ] ], [ 1 / ln, -sl / ln, 0 ], pt);
 			quad([ [ cx - hb, y0, cz - hz ], [ cx - hb, y0, cz + hz ], [ cx - ht, y1, cz + hz ], [ cx - ht, y1, cz - hz ] ], [ -1 / ln, -sl / ln, 0 ], pt);
 		};
+		const finish = () => {
+			const g = new THREE.BufferGeometry();
+			g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+			g.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3));
+			g.setAttribute("aPart", new THREE.Float32BufferAttribute(part, 1));
+			g.setIndex(idx);
+			return g;
+		};
+		if (kind === "hi") { box(0, 14.5, 0, 6, 6, 4, 0.2, 3); return finish(); }
 		// A head: an eight-sided prism (its front half and sides) with hair on top.
 		const head = (cx, cy, r, hh) => {
 			const y0 = cy - hh / 2, y1 = cy + hh / 2, ring = [];
@@ -7808,12 +7938,7 @@
 			box(3.3, 9.5, 0, 1.1, 1.1, 6.5, 1.1, 2);
 			box(0, 14.5, 0, 6, 6, 4, 0.2, 3);           // a flag or scarf held up (folded away unless he has one)
 		}
-		const g = new THREE.BufferGeometry();
-		g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
-		g.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3));
-		g.setAttribute("aPart", new THREE.Float32BufferAttribute(part, 1));
-		g.setIndex(idx);
-		return g;
+		return finish();
 	}
 	let crowdMat3 = null;
 	function crowdMaterial3D () {
@@ -7826,8 +7951,10 @@
 					attribute float aPart; attribute vec4 aFan; attribute vec3 aSkin;
 					uniform float uTime, uExcite, uHome, uAway, uOoh, uWave;`)
 				.replace("#include <color_vertex>", `#include <color_vertex>
-					if (aPart > 0.5 && aPart < 1.5) { vColor.rgb = aSkin; }
-					if (aPart > 3.5) { float hq = fract(aFan.x * 7.31); vColor.rgb = hq > 0.9 ? vec3(0.62, 0.5, 0.3) : hq > 0.8 ? vec3(0.45, 0.45, 0.45) : aSkin * 0.22 + vec3(0.02); }`)
+					int pt = int(aPart + 0.5);
+					if (pt == 1 || pt == 5) { vColor.rgb = aSkin; }
+					if (pt == 4) { float hq = fract(aFan.x * 7.31); vColor.rgb = hq > 0.9 ? vec3(0.62, 0.5, 0.3) : hq > 0.8 ? vec3(0.45, 0.45, 0.45) : aSkin * 0.22 + vec3(0.02); }
+					if (pt == 6) { vColor.rgb = vColor.rgb * 0.12 + (fract(aFan.x * 3.7) > 0.5 ? vec3(0.1, 0.12, 0.18) : vec3(0.16, 0.15, 0.13)); }`)
 				.replace("#include <begin_vertex>", `
 					vec3 transformed = vec3(position);
 					float phase = aFan.x, side = aFan.y, standy = aFan.z, hasFlag = aFan.w;
@@ -7840,9 +7967,20 @@
 					float bounce = up * abs(sin(t * (5.5 + phase * 2.5) + phase * 6.2832)) * (3.0 + 3.0 * phase) * step(0.35, standy + up * 0.5);
 					float ooh = uOoh * step(0.3, phase);
 					float armsUp = clamp(up * 1.3 * step(0.25, phase) + ooh * 1.2 + (excite - 0.75) * 2.0 * step(0.6, phase), 0.0, 1.0);
-					if (aPart < 0.5) { transformed.y *= 1.0 + 0.45 * stand; }
-					if ((aPart > 0.5 && aPart < 1.5) || aPart > 3.5) { transformed.y += 3.3 * stand - down * 1.2; transformed.z += down * 0.8; }
-					if (aPart > 1.5 && aPart < 2.5) {
+					int ptv = int(aPart + 0.5);
+					if (ptv == 0) { transformed.y *= 1.0 + 0.45 * stand; }
+					if (ptv == 1 || ptv == 4 || ptv == 7) { transformed.y += 3.3 * stand - down * 1.2; transformed.z += down * 0.8; }
+					if (ptv == 6) { transformed.y += 3.3 * stand; }
+					if (ptv == 5 || ptv == 8) {
+						// The rounded fans' arms swing about the shoulder: down by their sides, up, or hands to heads.
+						float lift = armsUp, sg = transformed.x > 0.0 ? 1.0 : -1.0;
+						vec2 pv = vec2(sg * 2.7, 7.3), d = transformed.xy - pv;
+						float th = -sg * ((1.0 - lift) * 2.9 - ooh * 0.6), cs = cos(th), sn = sin(th);
+						transformed.xy = pv + vec2(d.x * cs - d.y * sn, d.x * sn + d.y * cs);
+						transformed.y += 3.3 * stand + lift * abs(sin(t * 6.0 + phase * 6.2832)) * 1.4 * up - down * 1.2 * (1.0 - lift);
+						transformed.z += ooh * 0.5 * (1.0 - up) + down * 0.8;
+					}
+					if (ptv == 2) {
 						transformed.y += 3.3 * stand;
 						float lift = armsUp;
 						transformed.y -= (1.0 - lift) * 7.0;
@@ -7850,7 +7988,7 @@
 						transformed.y += lift * abs(sin(t * 6.0 + phase * 6.2832)) * 1.4 * up;
 						transformed.z += ooh * 0.9 * (1.0 - up);
 					}
-					if (aPart > 2.5 && aPart < 3.5) {
+					if (ptv == 3) {
 						float show = hasFlag * clamp(uWave + up * 1.5 + (excite - 0.55) * 2.0, 0.0, 1.0) * stand;
 						transformed = vec3(0.0, 11.0, 0.0) + (transformed - vec3(0.0, 11.0, 0.0)) * show;
 						transformed.y += 3.3 * stand;
@@ -7874,7 +8012,7 @@
 		let h = 7919;
 		const rnd = () => (h = (h * 48271) % 2147483647) / 2147483647;
 		const cb = 55 * Z3 + 14, gHalf = (GOAL_B - GOAL_T) / 2 + 24;
-		const lists = { full: [], lite: [], near: [] };
+		const lists = { full: [], lite: [], near: [], hi: [], nearHi: [] };
 		// Each stand in its own frame: u along it, t from the front (0) to the back (1).
 		const sides = [
 			{ u: [ xl + 12, xr - 12 ], at: (u, t) => [ u, t * H, -f0 - t * D ], ry: 0, list: "far", away: [ 0.82, 1 ] },
@@ -7897,14 +8035,14 @@
 						: q < 0.55 ? homeC : q < 0.65 ? homeC2 : neutrals[Math.floor(rnd() * neutrals.length)];
 					const side = away ? 0 : color === homeC || color === homeC2 ? 1 : 0.5;
 					const fan = { x, y: y + 0.4, z, ry: sd.ry + (rnd() - 0.5) * 0.3, side, phase: rnd(), stand: rnd(), flag: rnd() < 0.07 ? 1 : 0, skin: skins[Math.floor(rnd() * skins.length)], color, scale: 1.5 + rnd() * 0.2, wide: 0.88 + rnd() * 0.26, tall: 0.9 + rnd() * 0.2 };
-					lists[sd.list === "near" ? "near" : i >= LITE_ROW ? "lite" : "full"].push(fan);
+					lists[sd.list === "near" ? (i < 4 ? "nearHi" : "near") : sd.list === "far" && i < 2 && !away ? "hi" : i >= LITE_ROW ? "lite" : "full"].push(fan);
 				}
 			}
 		}
 		const mat = crowdMaterial3D(), M = new T.Matrix4(), P = new T.Vector3(), Sc = new T.Vector3(), Q = new T.Quaternion(), E = new T.Euler(), C = new T.Color();
-		const make = (fans, lite) => {
+		const make = (fans, kind) => {
 			if (!fans.length) { return null; }
-			const geo = fanGeometry3D(lite), n = fans.length;
+			const geo = fanGeometry3D(kind), n = fans.length;
 			const mesh = new T.InstancedMesh(geo, mat, n);
 			const fa = new Float32Array(n * 4), sk = new Float32Array(n * 3);
 			fans.forEach((f, i) => {
@@ -7920,8 +8058,8 @@
 			st.add(mesh);
 			return mesh;
 		};
-		G3.crowd = { full: make(lists.full, false), lite: make(lists.lite, true), near: make(lists.near, false) };
-		G3.crowd.count = lists.full.length + lists.lite.length + lists.near.length;
+		G3.crowd = { full: make(lists.full, "full"), lite: make(lists.lite, "lite"), near: make(lists.near, "full"), hi: make(lists.hi, "hi"), nearHi: make(lists.nearHi, "hi") };
+		G3.crowd.count = Object.values(lists).reduce((n, l) => n + l.length, 0);
 	}
 	// The stands' moods: excitement follows the match's heat; goals, chances and fouls give jolts that fade.
 	function animateCrowd3D () {
@@ -8021,7 +8159,7 @@
 		// The camera sits in the near stand, so the stand and its roof are only drawn when a shot looks back at them.
 		if (G3.nearRoof) { for (const o of G3.nearRoof) { o.visible = G3.shot === "celeb"; } }
 		if (G3.nearStand) { G3.nearStand.visible = G3.shot === "celeb"; }
-		if (G3.crowd && G3.crowd.near) { G3.crowd.near.visible = G3.shot === "celeb"; }
+		if (G3.crowd) { for (const m of [ G3.crowd.near, G3.crowd.nearHi ]) { if (m) { m.visible = G3.shot === "celeb"; } } }
 		// The players and the officials, posed and drawn as instances; the stands breathe with the match.
 		drawFigures3D(WX, WD);
 		animateCrowd3D();
@@ -8828,6 +8966,9 @@
 			get lastSwitchKind () { return lastSwitchKind; }, set lastSwitchKind (v) { lastSwitchKind = v; }, get setPiece () { return setPiece; },
 			get G3 () { return G3; }, get camMode () { return camMode; }, get crowdMood () { return crowdMood; }, get frameDt () { return frameDt; }, get crowdBed () { return crowd; }, get soundOn () { return soundOn; },
 			human, switchScore, outfield, dist,
+			get officials () { return officials3; }, get flagCall () { return flagCall; }, refKit, deltaE,
+			proj (x, y, z) { return G3.cam ? proj3D(x, y, z) : null; }, get viewScale () { return scale; },
+			raiseFlagTest (kind) { raiseFlag(ball.x, kind === "offside" ? "off" : "out"); flagCall.t = 600; },
 			step (n = 1) { for (let i = 0; i < n; i++) { snapshotPrev(); update(); } },
 			key (code, on) { if (on) { keys.add(code); } else { keys.delete(code); } },
 			press (code) { window.dispatchEvent(new KeyboardEvent("keydown", { code })); },
