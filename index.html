@@ -1215,7 +1215,7 @@
 		<p class="fine"><b>Kit contrast.</b> For colour vision that struggles with red against green, or any two kits that blur together: turn on Kit contrast and the other side plays in white (black when you are in white) with a dashed ring under every player, whatever club they are. It is remembered.</p>
 		<p class="fine"><b>Shot power.</b> While you hold D the arc round your player fills and a power bar runs along the bottom of the pitch; the mark near the end is where the ball starts to rise. Harder shots stray further, so a three-quarter strike is usually the one.</p>
 		<p class="fine"><b>Phones.</b> Turn the phone sideways and the pitch fills the screen with the joystick and the pads floating over it; upright, the pitch is nearly square and the controls sit below it. Tackles, fouls and goals give a short buzz where the phone allows it.</p>
-		<p class="fine"><b>Camera.</b> On a laptop or desktop the match opens in 3D; on a phone, overhead. 3D draws the ground, the players and the ball in real 3D (three.js): a broadcast camera follows the ball along the near stand, cuts in close for free kicks and penalties, and pulls out wide at the breaks; lofted balls and headers show their true height. Overhead follows the ball from above. TV watches from high in the main stand, like a broadcast, and cuts to the benches at kick-off, the breaks and after goals. 3D needs WebGL and loads three.js from cdnjs; if either is missing or blocked you are told and the 2D cameras stay. Press C, or the Camera button (it reads "Camera: 3D", "Camera: TV" or "Camera: overhead" for the view you are on), to cycle overhead, TV and 3D; the camera you pick is remembered. Every ground has its own look: the stands, the roof, the floodlights, how full it is and how the grass is cut.</p>
+		<p class="fine"><b>Camera.</b> On a laptop or desktop the match opens in 3D; on a phone, overhead. 3D draws the ground, the players and the ball in real 3D (three.js). The players are jointed figures in their kits, numbers on their backs and keepers in their own colours, who jog, sprint, turn, pass, shoot, head, slide in, dive, take throw-ins and go down when fouled; a referee and two assistants keep up with play; and every seat holds a fan in the home or away colours, swaying, rising for a chance, holding their heads at a near miss and leaping at a goal, while the crowd's noise swells with an attack and roars for a goal. A broadcast camera follows the ball along the near stand, cuts in close for free kicks and penalties, and pulls out wide at the breaks; lofted balls and headers show their true height. Overhead follows the ball from above. TV watches from high in the main stand, like a broadcast, and cuts to the benches at kick-off, the breaks and after goals. 3D needs WebGL and loads three.js from cdnjs; if either is missing or blocked you are told and the 2D cameras stay. Press C, or the Camera button (it reads "Camera: 3D", "Camera: TV" or "Camera: overhead" for the view you are on), to cycle overhead, TV and 3D; the camera you pick is remembered. Every ground has its own look: the stands, the roof, the floodlights, how full it is and how the grass is cut.</p>
 		<p class="fine"><b>Free kicks.</b> The other side stands 9.15 m back, and near your goal they build a wall. From shooting range, press W to curl it over the wall (up or down picks the corner, the far post if you don't choose), or D to drive it low and hard. S plays it short. Hold E (or Shift) to sprint at any time: you'll see speed streaks behind your player.</p>
 		<p class="fine"><b>Fouls and cards.</b> A slide that misses the ball and takes the man, above all from behind, is a foul: a free kick where it happened, or a penalty in the box (pick a side with ↑ ↓ and press D; the keeper guesses). Reckless tackles get a yellow card, a second yellow is a red, and a bad one from behind can be a straight red: the player walks off and his side plays a man down. In the league a red card is a ban (two games for a straight red), five yellows in a season is one, and a player hurt in a foul limps on and then misses one to three games. Banned and injured players come off the team sheet by themselves and go back on it when they're available.</p>
 		<p class="fine"><b>Throw-ins.</b> When the ball goes over a touchline, the other side throws it back in from that spot. On yours, aim with the arrows and press S for a short throw to feet or Q for a long throw. Opponents stand off the thrower, and there is no offside from a throw-in.</p>
@@ -1279,6 +1279,7 @@
 	const HANDBACK_GUARD = 120;         // frames before auto-switch may return to the man it just left (2 s)
 	const STEER_RECENT = 24;            // frames since the last direction input that still count as steering (0.4 s)
 	const GOAL_CELEB = 420;             // frames of goal celebration (7 s); any key or tap skips it
+	const FALL_T = 55, DIVE_T = 26, THROW_T = 20;   // frames: a fouled player down and up, a keeper's dive, a throw-in's arms
 	const ASSIST_ANGLE = 0.62;          // ~35 degrees either side of the goal
 	const LUNGE_CD = 45;
 	const GRAV = 0.35;                  // ball height: gravity per frame
@@ -2645,7 +2646,7 @@
 			p.x = x; p.y = p.by; p.vx = p.vy = 0;
 			p.dir = p.team === 0 ? 0 : Math.PI;
 			p.kickCd = 0; p.lunge = 0; p.lungeCd = 0; p.hold = 0;
-			p.celebA = 0; p.kneel = 0; p.sulk = 0; p.kickA = 0; p.plant = 0;
+			p.celebA = 0; p.kneel = 0; p.sulk = 0; p.kickA = 0; p.plant = 0; p.fall = 0; p.dive = 0; p.diveCd = 0; p.throwA = 0;
 			p.run = null; p.tFrom = null; p.tKind = undefined; p.tx = undefined;
 		}
 		const side = outfield(kickTeam);   // (a side can be a man down after a red card)
@@ -2670,57 +2671,73 @@
 		snapCamera();
 	}
 
-	/* ---------- audio ---------- */
+	/* ---------- audio ----------
+	   Everything is synthesised in WebAudio: the ball off a boot, the referee's whistle, and a
+	   crowd built from layered noise and detuned voices that breathes with the match. */
+	let master = null;
 	function ensureAudio () {
 		if (audio || !window.AudioContext) { return; }
-		try { audio = new AudioContext(); } catch (e) { audio = null; }
+		try {
+			audio = new AudioContext();
+			master = audio.createDynamicsCompressor();
+			master.threshold.value = -16; master.knee.value = 20; master.ratio.value = 4; master.attack.value = 0.008; master.release.value = 0.3;
+			master.connect(audio.destination);
+		} catch (e) { audio = null; master = null; }
 	}
+	const out = () => master || audio.destination;
+	// Sounds on the pitch fade with distance from the camera (the 3D view knows where it is).
+	const gainAt = (x, y) => { const d = x === undefined ? 0 : listenerDist3D(x, y); return d ? clamp(1.3 / (1 + d / 900), 0.3, 1) : 1; };
 
 	// A short buzz on a phone for the moments you feel: a tackle, a foul, a goal.
 	const buzz = pattern => { if (coarse && navigator.vibrate && !bulkSim) { try { navigator.vibrate(pattern); } catch (e) { /* not allowed here */ } } };
-	function sfx (kind) {
-		if (kind === "tackle") { buzz(25); }
+	function peep (s, len, gain = 0.07) {
+		const o = audio.createOscillator(), g = audio.createGain(), lfo = audio.createOscillator(), lg = audio.createGain();
+		o.frequency.value = 2850; lfo.frequency.value = 42; lg.gain.value = 140;
+		lfo.connect(lg).connect(o.frequency);
+		g.gain.setValueAtTime(0, s);
+		g.gain.linearRampToValueAtTime(gain, s + 0.015);
+		g.gain.setValueAtTime(gain, s + len - 0.05);
+		g.gain.linearRampToValueAtTime(0, s + len);
+		o.connect(g).connect(out());
+		o.start(s); lfo.start(s); o.stop(s + len); lfo.stop(s + len);
+	}
+	function thump (t, f0, f1, dur, gain, type = "triangle") {
+		const o = audio.createOscillator(), g = audio.createGain();
+		o.type = type;
+		o.frequency.setValueAtTime(f0, t);
+		o.frequency.exponentialRampToValueAtTime(f1, t + dur * 0.8);
+		g.gain.setValueAtTime(gain, t);
+		g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+		o.connect(g).connect(out());
+		o.start(t); o.stop(t + dur + 0.02);
+	}
+	function sfx (kind, opt) {
+		if (kind === "tackle" || kind === "foul") { buzz(25); }
+		if (kind === "whistle" || kind === "final" || kind === "half" || kind === "foul") { ev3d(kind); }
 		if (!soundOn || !audio || bulkSim) { return; }
-		const t = audio.currentTime;
-		if (kind === "whistle" || kind === "final") {
-			const blasts = kind === "final" ? 3 : 1;
-			for (let b = 0; b < blasts; b++) {
-				const o = audio.createOscillator(), g = audio.createGain(), lfo = audio.createOscillator(), lg = audio.createGain();
-				o.frequency.value = 2900; lfo.frequency.value = 38; lg.gain.value = 120;
-				lfo.connect(lg).connect(o.frequency);
-				const s = t + b * 0.42, len = b === blasts - 1 ? 0.55 : 0.28;
-				g.gain.setValueAtTime(0, s);
-				g.gain.linearRampToValueAtTime(0.06, s + 0.02);
-				g.gain.setValueAtTime(0.06, s + len - 0.05);
-				g.gain.linearRampToValueAtTime(0, s + len);
-				o.connect(g).connect(audio.destination);
-				o.start(s); lfo.start(s); o.stop(s + len); lfo.stop(s + len);
-			}
-		} else if (kind === "kick") {
-			const o = audio.createOscillator(), g = audio.createGain();
-			o.type = "triangle";
-			o.frequency.setValueAtTime(160, t);
-			o.frequency.exponentialRampToValueAtTime(55, t + 0.09);
-			g.gain.setValueAtTime(0.18, t);
-			g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
-			o.connect(g).connect(audio.destination);
-			o.start(t); o.stop(t + 0.13);
+		const t = audio.currentTime, o = opt || {}, pow = o.pow === undefined ? 0.5 : o.pow, dist = gainAt(o.x, o.y);
+		if (kind === "whistle") { peep(t, 0.6); }
+		else if (kind === "foul") { peep(t, 0.16); peep(t + 0.22, 0.16); }
+		else if (kind === "half") { peep(t, 0.5); peep(t + 0.6, 0.5); }
+		else if (kind === "final") { peep(t, 0.3); peep(t + 0.4, 0.3); peep(t + 0.8, 0.9); }
+		else if (kind === "kick") {
+			thump(t, 150 + 60 * pow, 48, 0.1 + 0.05 * pow, (0.1 + 0.2 * pow) * dist);
+			noiseBurst("white", t, 0.035 + 0.02 * pow, (0.07 + 0.12 * pow) * dist, "bandpass", 2200 - 600 * pow, 1200, 0.9);
+		} else if (kind === "header") {
+			thump(t, 110, 60, 0.09, 0.09 * dist, "sine");
+			noiseBurst("brown", t, 0.07, 0.14 * dist, "lowpass", 600, 300);
 		} else if (kind === "tackle") {
-			const o = audio.createOscillator(), g = audio.createGain();
-			o.type = "square";
-			o.frequency.setValueAtTime(240, t);
-			o.frequency.exponentialRampToValueAtTime(90, t + 0.1);
-			g.gain.setValueAtTime(0.05, t);
-			g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
-			o.connect(g).connect(audio.destination);
-			o.start(t); o.stop(t + 0.13);
+			thump(t, 220, 80, 0.11, 0.05, "square");
+			noiseBurst("brown", t, 0.12, 0.12, "lowpass", 700, 250);
+		} else if (kind === "net") {
+			noiseBurst("white", t + 0.05, 0.28, 0.05, "highpass", 2500, 4000, 0.5);
 		} else if (kind === "tick") {
-			const o = audio.createOscillator(), g = audio.createGain();
-			o.frequency.value = 880;
+			const osc = audio.createOscillator(), g = audio.createGain();
+			osc.frequency.value = 880;
 			g.gain.setValueAtTime(0.04, t);
 			g.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
-			o.connect(g).connect(audio.destination);
-			o.start(t); o.stop(t + 0.09);
+			osc.connect(g).connect(out());
+			osc.start(t); osc.stop(t + 0.09);
 		}
 	}
 
@@ -2868,7 +2885,7 @@
 		return { s, bend: t < 0.18 ? 1.1 * (1 - t / 0.18) : 0.1 + 0.3 * Math.max(0, t - 0.55) };
 	}
 
-	function kick (p, tx, ty, speed) {
+	function kick (p, tx, ty, speed, snd = "kick") {
 		lastTouch = p.team;
 		markOffside(p);
 		if (p.team === 1) { switchCd = 0; }
@@ -2881,12 +2898,13 @@
 		ball.pen = null;
 		ball.lift = false;
 		ball.headed = false;
+		ball.shot = false;
 		ball.lastBy = p;
 		ball.kickedAt = frame;
 		p.kickCd = 20;
 		p.dir = Math.atan2(dy, dx);
 		if (!(p.jump > 0)) { p.kickA = KICK_T; p.kickPow = clamp((speed - 5) / 9, 0.25, 1); }
-		sfx("kick");
+		sfx(snd, { pow: clamp((speed - 4) / 12, 0, 1), x: ball.x, y: ball.y });
 	}
 
 	function passTo (p, m) {
@@ -2923,6 +2941,7 @@
 		if (p.team === 1) { oppStats.shots++; }
 		const gx = p.team === 0 ? FW + 20 : -20;
 		kick(p, gx, aimY, 9.5 + power01 * 8.5);
+		ball.shot = true;
 	}
 
 	const openness = m => Math.min(...players.filter(q => q.team !== m.team).map(q => dist(q, m)));
@@ -3510,7 +3529,12 @@
 			// Cut across the ball's path: the nearest point on it between here and the line.
 			const vx = ball.vx, vy = ball.vy, v2 = vx * vx + vy * vy || 1;
 			const tt = clamp(((p.x - ball.x) * vx + (p.y - ball.y) * vy) / v2, 2, sh.tt);
-			return [ ball.x + vx * tt, clamp(ball.y + vy * tt, GOAL_T - 10, GOAL_B + 10) ];
+			const cx = ball.x + vx * tt, cy = clamp(ball.y + vy * tt, GOAL_T - 10, GOAL_B + 10);
+			if (!(p.dive > 0) && !(p.diveCd > 0) && sh.tt < 26 && Math.abs(cy - p.y) > 15 && Math.hypot(vx, vy) > 8) {
+				const lat = (cy - p.y) * Math.cos(p.dir) - (cx - p.x) * Math.sin(p.dir);
+				p.dive = DIVE_T; p.diveSide = lat > 0 ? -1 : 1; p.diveCd = 70;
+			}
+			return [ cx, cy ];
 		}
 		const loose = !ball.owner;
 		const r = rel(p.team, ball.x);
@@ -3789,6 +3813,7 @@
 
 	function update () {
 		frame++;
+		for (const p of players) { if (p.fall > 0) { p.fall--; } if (p.dive > 0) { p.dive--; } if (p.diveCd > 0) { p.diveCd--; } if (p.throwA > 0) { p.throwA--; } }
 		// The crowd gets louder as the ball nears either goal, and goes up for goals.
 		if (ball) {
 			const near = 1 - clamp(Math.min(ball.x, FW - ball.x) / (FW * 0.33), 0, 1);
@@ -4285,8 +4310,10 @@
 		banner.hidden = false;
 		$("announce").textContent = `${scorer === 0 ? "Goal for you" : `Goal for ${opp.name}`}. ${score[0]} to ${score[1]}.`;
 		sfx("whistle");
+		sfx("net");
 		buzz(scorer === 0 ? [ 70, 50, 70 ] : 120);
 		if (scorer === homeSide) { roar(1); } else { groan(); roar(0.35); }
+		ev3d("goal", { scorer });
 		renderHud();
 	}
 
@@ -4351,6 +4378,7 @@
 	let setPiece = null;    // { kind: "corner", team, taker } until the corner is taken
 	function outOfPlay (leftEnd) {
 		const defTeam = leftEnd ? 0 : 1;   // you defend the left goal
+		if (ball.shot && frame - (ball.kickedAt || -999) < 120 && Math.abs(ball.y - FH / 2) < FMT.goal / 2 + 70 * GH && (ball.z || 0) < 95) { ooh(); ev3d("near"); }
 		if (lastTouch === defTeam) { awardCorner(1 - defTeam, leftEnd, ball.y < FH / 2); } else { awardGoalKick(defTeam, leftEnd); }
 	}
 
@@ -4451,8 +4479,10 @@
 			if (vic.attr) { vic.attr = { ...vic.attr, pac: Math.round(vic.attr.pac * 0.85), sho: Math.round(vic.attr.sho * 0.92) }; }
 		}
 		burst(off.x, off.y, card ? card.split(":")[0] : "Foul");
+		vic.fall = FALL_T; vic.vx = vic.vy = 0;
+		ev3d("foul");
 		{ const s = off.team === 0 ? stats : oppStats; s.fouls = (s.fouls || 0) + 1; if (card) { s.cards = (s.cards || 0) + 1; } }
-		sfx("tackle");
+		sfx("foul");
 		const inBox = inAttackBox(vic) && Math.abs(vic.x - attackX(t)) < FMT.box + 20;
 		const who = off.name ? ` by ${off.name}` : "";
 		let hurtText = hurt ? `${vic.name || "He"} is hurt and limping.${t === 0 && subsLeft > 0 ? " Press Subs to bring someone on." : ""}` : "";
@@ -4668,6 +4698,7 @@
 		// Height as it reaches the goal: under the bar (55) most of the time, over it now and then.
 		const zGoal = clamp(38 + gauss() * (13 + Math.max(0, 70 - sho) * 0.3), 6, 90);
 		kick(p, gx, ty, vh);
+		ball.shot = true;
 		ball.vz = (zGoal + 0.5 * GRAV * T * T) / T;
 		ball.lift = true;   // slower than a driven shot: the keeper has longer to get across
 		// On target, the keeper gets across more often than not; into the corner, less so.
@@ -4691,6 +4722,7 @@
 			const guess = Math.random() < 0.3 ? 0 : Math.random() < 0.5 ? -1 : 1;
 			const saved = guess === lean ? Math.random() < (lean === 0 ? 0.75 : 0.55) : false;
 			ball.pen = { gk, saved };
+			if (guess !== 0) { gk.dive = DIVE_T; gk.diveSide = guess * Math.cos(gk.dir) > 0 ? -1 : 1; gk.diveCd = 70; }
 		}
 		if (p.team === 0) { stats.shots++; burst(p.x, p.y, "Penalty"); } else { oppStats.shots++; ooh(); }
 	}
@@ -4718,6 +4750,7 @@
 		const d = Math.hypot(tx - p.x, ty - p.y);
 		if (d > reach) { tx = p.x + (tx - p.x) / d * reach; ty = p.y + (ty - p.y) / d * reach; }
 		loftTo(p, tx, ty);
+		p.throwA = THROW_T;
 		setPiece = null;
 	}
 
@@ -4814,7 +4847,7 @@
 				}
 				taker = p; td = d;
 			}
-			if (taker && taker.role === "gk" && speed > 11) { ooh(); }   // a keeper holds a hard shot
+			if (taker && taker.role === "gk" && speed > 11) { ooh(); ev3d("save", taker.team); }   // a keeper holds a hard shot
 			if (taker) { gainBall(taker); }
 			return;
 		}
@@ -4862,16 +4895,17 @@
 		const gx = attackX(p.team) + (p.team === 0 ? 20 : -20), sho = A(p, "sho");
 		// Headers are softer than shots (keepers can reach them) and less accurate (some miss).
 		const aimY = FH / 2 + (Math.random() * 2 - 1) * (FMT.goal / 2) * clamp(1.55 - sho / 100, 0.55, 1.35);
-		kick(p, gx, aimY, 7.5 + sho * 0.035);
+		kick(p, gx, aimY, 7.5 + sho * 0.035, "header");
 		ball.vz = 1.2;
 		ball.headed = true;
+		ball.shot = true;
 		p.jump = JUMP;
 		if (p.team === 0) { stats.shots++; burst(p.x, p.y, "Header"); } else { oppStats.shots++; ooh(); }
 	}
 	// A defensive header: away from goal, high and far.
 	function clearance (p) {
 		const away = p.team === 0 ? 1 : -1;
-		kick(p, p.x + away * 260 * Math.sqrt(S), clamp(p.y + (Math.random() * 2 - 1) * 200, 40, FH - 40), 12);
+		kick(p, p.x + away * 260 * Math.sqrt(S), clamp(p.y + (Math.random() * 2 - 1) * 200, 40, FH - 40), 12, "header");
 		ball.vz = 4;
 		ball.headed = true;
 		p.jump = JUMP;
@@ -4892,7 +4926,7 @@
 		}
 		if (!best) { clearance(p); return; }
 		const d = dist(p, best), err = 14 + (100 - A(p, "pas")) * 0.35;
-		kick(p, best.x + best.vx * 8 + (Math.random() * 2 - 1) * err, best.y + best.vy * 8 + (Math.random() * 2 - 1) * err, clamp(d / 40 + 2.2, 4, 9.5));
+		kick(p, best.x + best.vx * 8 + (Math.random() * 2 - 1) * err, best.y + best.vy * 8 + (Math.random() * 2 - 1) * err, clamp(d / 40 + 2.2, 4, 9.5), "header");
 		ball.vz = 1.8;
 		ball.headed = true;
 		p.jump = JUMP;
@@ -5168,7 +5202,7 @@
 		state = "half";
 		charging = false;
 		banner.hidden = true;
-		sfx("final");
+		sfx("half");
 		const [ h, a ] = leftIsYou ? score : [ score[1], score[0] ];
 		const tot = possFrames[0] + possFrames[1], poss = tot ? Math.round(100 * possFrames[0] / tot) : 50;
 		$("announce").textContent = `Half time. ${h} to ${a}. The teams change ends.`;
@@ -6201,15 +6235,17 @@
 	const bufs = {};
 	function noise (kind) {
 		if (bufs[kind]) { return bufs[kind]; }
-		const len = audio.sampleRate * 2, b = audio.createBuffer(1, len, audio.sampleRate), d = b.getChannelData(0);
-		let last = 0;
+		const len = audio.sampleRate * 3, b = audio.createBuffer(1, len, audio.sampleRate), d = b.getChannelData(0);
+		let last = 0, b0 = 0, b1 = 0, b2 = 0;
 		for (let i = 0; i < len; i++) {
 			const w = Math.random() * 2 - 1;
-			if (kind === "brown") { last = (last + 0.02 * w) / 1.02; d[i] = last * 3.5; } else { d[i] = w; }
+			if (kind === "brown") { last = (last + 0.02 * w) / 1.02; d[i] = last * 3.5; }
+			else if (kind === "pink") { b0 = 0.99765 * b0 + w * 0.099046; b1 = 0.963 * b1 + w * 0.2965164; b2 = 0.57 * b2 + w * 1.0526913; d[i] = (b0 + b1 + b2 + w * 0.1848) * 0.25; }
+			else { d[i] = w; }
 		}
 		return (bufs[kind] = b);
 	}
-	function noiseBurst (kind, t, dur, gain, filterType, f0, f1, q = 0.7) {
+	function noiseBurst (kind, t, dur, gain, filterType, f0, f1, q = 0.7, pan = 0) {
 		const src = audio.createBufferSource(), f = audio.createBiquadFilter(), g = audio.createGain();
 		src.buffer = noise(kind);
 		f.type = filterType; f.Q.value = q;
@@ -6219,58 +6255,129 @@
 		g.gain.linearRampToValueAtTime(gain, t + Math.min(0.3, dur * 0.25));
 		g.gain.setValueAtTime(gain, t + dur * 0.55);
 		g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-		src.connect(f).connect(g).connect(audio.destination);
-		src.start(t, Math.random() * 1.2);
+		src.connect(f).connect(g);
+		connectPan(g, pan);
+		src.start(t, Math.random() * 1.8);
 		src.stop(t + dur + 0.05);
 	}
-	const roar = big => { if (soundOn && audio) { noiseBurst("white", audio.currentTime, 3.6, 0.14 * big, "bandpass", 700, 1100, 0.45); noiseBurst("brown", audio.currentTime, 3.2, 0.12 * big, "lowpass", 900, 600); } };
-	const groan = () => { if (soundOn && audio) { noiseBurst("brown", audio.currentTime, 1.6, 0.1, "lowpass", 800, 260); } };
-	const ooh = () => { if (soundOn && audio) { noiseBurst("brown", audio.currentTime, 0.9, 0.08, "bandpass", 450, 900, 1.2); } };
-
-	// A terrace chant: claps, then a few hundred voices on a simple tune.
-	function chant (loud) {
-		const t = audio.currentTime + 0.05, g = 0.035 * loud;
-		for (let k = 0; k < 3; k++) {
-			for (const b of [ 0, 0.28, 0.56 ]) { noiseBurst("white", t + k * 1.1 + b, 0.09, g * 1.6, "bandpass", 1800, 1600, 0.9); }
+	function connectPan (node, pan) {
+		if (pan && audio.createStereoPanner) { const p = audio.createStereoPanner(); p.pan.value = pan; node.connect(p).connect(out()); } else { node.connect(out()); }
+	}
+	// A few hundred voices: detuned saws through a vowel-ish filter, gliding from f0 to f1.
+	function voices (t, n, f0, f1, dur, gain, lp = 900, pan = 0) {
+		const g = audio.createGain(), f = audio.createBiquadFilter();
+		f.type = "lowpass"; f.frequency.value = lp; f.Q.value = 0.8;
+		g.gain.setValueAtTime(0.0001, t);
+		g.gain.linearRampToValueAtTime(gain, t + Math.min(0.25, dur * 0.3));
+		g.gain.setValueAtTime(gain, t + dur * 0.6);
+		g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+		g.connect(f);
+		connectPan(f, pan);
+		for (let v = 0; v < n; v++) {
+			const o = audio.createOscillator();
+			o.type = "sawtooth";
+			o.detune.value = (Math.random() * 2 - 1) * 45;
+			const k = 0.5 + (v % 3) * 0.5;   // octaves: men, women, the kids
+			o.frequency.setValueAtTime(f0 * k, t);
+			o.frequency.linearRampToValueAtTime(f1 * k, t + dur);
+			o.connect(g);
+			o.start(t); o.stop(t + dur + 0.05);
 		}
-		const tune = [ 392, 392, 440, 392, 330, 392, 440, 494 ], dur = 0.34, t0 = t + 3.4;
-		const out = audio.createGain(), lp = audio.createBiquadFilter();
+	}
+	const roar = big => {
+		ev3d("roar", big);
+		if (!soundOn || !audio) { return; }
+		const t = audio.currentTime;
+		noiseBurst("white", t, 3.8 + big, 0.16 * big, "bandpass", 650, 1150, 0.4);
+		noiseBurst("pink", t, 3.4 + big, 0.14 * big, "bandpass", 1200, 800, 0.5, 0.2);
+		noiseBurst("brown", t, 3.2, 0.14 * big, "lowpass", 900, 500);
+		voices(t, 6, 230, 290, 1.4, 0.022 * big, 1100, -0.15);
+		voices(t + 0.25, 5, 300, 260, 1.8, 0.016 * big, 900, 0.2);
+		if (big >= 0.9) {
+			// An air horn in the home end, and a second surge as the stand catches up.
+			const h = audio.createOscillator(), h2 = audio.createOscillator(), hg = audio.createGain(), hf = audio.createBiquadFilter();
+			h.type = "square"; h2.type = "square"; h.frequency.value = 311; h2.frequency.value = 466; hf.type = "lowpass"; hf.frequency.value = 1400;
+			hg.gain.setValueAtTime(0.0001, t + 0.9); hg.gain.linearRampToValueAtTime(0.02, t + 1.0); hg.gain.setValueAtTime(0.02, t + 1.7); hg.gain.exponentialRampToValueAtTime(0.0001, t + 2.0);
+			h.connect(hf); h2.connect(hf); hf.connect(hg); connectPan(hg, 0.35);
+			h.start(t + 0.9); h2.start(t + 0.9); h.stop(t + 2.05); h2.stop(t + 2.05);
+			noiseBurst("white", t + 1.6, 3, 0.1, "bandpass", 800, 1000, 0.5);
+		}
+	};
+	const groan = () => {
+		ev3d("groan");
+		if (!soundOn || !audio) { return; }
+		const t = audio.currentTime;
+		noiseBurst("brown", t, 1.8, 0.11, "lowpass", 800, 240);
+		voices(t, 5, 260, 185, 1.6, 0.014, 700);
+	};
+	const ooh = () => {
+		ev3d("ooh");
+		if (!soundOn || !audio) { return; }
+		const t = audio.currentTime;
+		noiseBurst("brown", t, 1.0, 0.09, "bandpass", 380, 750, 1.4);
+		noiseBurst("pink", t + 0.05, 0.9, 0.05, "bandpass", 600, 1100, 1.2);
+		voices(t, 5, 240, 320, 0.7, 0.012, 800);
+		voices(t + 0.45, 4, 310, 230, 0.6, 0.009, 700);
+	};
+
+	// Terrace chants: claps, then a few hundred voices on a simple tune (one of three), from the
+	// home end, or from the away corner when the visitors are on top.
+	const CHANTS = [
+		[ 392, 392, 440, 392, 330, 392, 440, 494 ],
+		[ 330, 330, 392, 330, 294, 262, 294, 330 ],
+		[ 440, 494, 523, 494, 440, 392, 440, 440 ]
+	];
+	function chant (loud, away = false) {
+		ev3d("chant");
+		const t = audio.currentTime + 0.05, g = 0.035 * loud, pan = away ? 0.5 : -0.3;
+		for (let k = 0; k < 3; k++) {
+			for (const b of [ 0, 0.28, 0.56 ]) { noiseBurst("white", t + k * 1.1 + b, 0.09, g * 1.6, "bandpass", 1800, 1600, 0.9, pan); }
+		}
+		const tune = CHANTS[Math.floor(Math.random() * CHANTS.length)], dur = 0.34, t0 = t + 3.4;
+		const outG = audio.createGain(), lp = audio.createBiquadFilter();
 		lp.type = "lowpass"; lp.frequency.value = 1100;
-		out.gain.setValueAtTime(0.0001, t0);
-		out.gain.linearRampToValueAtTime(g, t0 + 0.2);
-		out.gain.setValueAtTime(g, t0 + tune.length * dur - 0.2);
-		out.gain.linearRampToValueAtTime(0.0001, t0 + tune.length * dur + 0.3);
-		out.connect(lp).connect(audio.destination);
-		for (let v = 0; v < 5; v++) {
+		outG.gain.setValueAtTime(0.0001, t0);
+		outG.gain.linearRampToValueAtTime(g, t0 + 0.2);
+		outG.gain.setValueAtTime(g, t0 + tune.length * dur - 0.2);
+		outG.gain.linearRampToValueAtTime(0.0001, t0 + tune.length * dur + 0.3);
+		outG.connect(lp); connectPan(lp, pan);
+		for (let v = 0; v < 6; v++) {
 			const o = audio.createOscillator();
 			o.type = "sawtooth";
 			o.detune.value = (Math.random() * 2 - 1) * 30;
-			tune.forEach((f, i) => o.frequency.setTargetAtTime(f * (v === 4 ? 0.5 : 1), t0 + i * dur, 0.03));
-			o.connect(out);
+			tune.forEach((f, i) => o.frequency.setTargetAtTime(f * (v >= 4 ? 0.5 : 1), t0 + i * dur, 0.03));
+			o.connect(outG);
 			o.start(t0); o.stop(t0 + tune.length * dur + 0.4);
 		}
 	}
 
+	// The crowd bed: a rumble, the wash of voices and the air above them, each breathing a little,
+	// all of it swelling with the heat of the match.
 	function updateCrowd () {
 		if (!audio) { return; }
-		const live = soundOn && (state === "play" || state === "goal");
+		const live = soundOn && (state === "play" || state === "goal" || state === "half");
 		if (!crowd && live) {
-			const src = audio.createBufferSource(), f = audio.createBiquadFilter(), g = audio.createGain();
-			src.buffer = noise("brown"); src.loop = true;
-			f.type = "bandpass"; f.frequency.value = 700; f.Q.value = 0.5;
-			g.gain.value = 0;
-			src.connect(f).connect(g).connect(audio.destination);
-			src.start();
-			crowd = { f, g, nextChant: audio.currentTime + 5 };
+			const mk = (kind, type, f, q) => { const src = audio.createBufferSource(), fl = audio.createBiquadFilter(), g = audio.createGain(); src.buffer = noise(kind); src.loop = true; fl.type = type; fl.frequency.value = f; fl.Q.value = q; g.gain.value = 0; src.connect(fl).connect(g); src.start(0, Math.random()); return { src, f: fl, g }; };
+			const rumble = mk("brown", "lowpass", 320, 0.6), vox = mk("pink", "bandpass", 750, 0.55), air = mk("white", "highpass", 2400, 0.4);
+			let pan = null;
+			if (audio.createStereoPanner) { pan = audio.createStereoPanner(); vox.g.connect(pan).connect(out()); } else { vox.g.connect(out()); }
+			rumble.g.connect(out()); air.g.connect(out());
+			crowd = { rumble, vox, air, pan, nextChant: audio.currentTime + 6 };
 		}
 		if (!crowd) { return; }
-		const t = audio.currentTime;
-		crowd.g.gain.setTargetAtTime(live ? 0.05 + 0.09 * crowdHeat : 0, t, 0.35);
-		crowd.f.frequency.setTargetAtTime(600 + 700 * crowdHeat, t, 0.4);
+		const t = audio.currentTime, heat = live ? crowdHeat : 0;
+		const breathe = 1 + 0.12 * Math.sin(t * 0.63) + 0.08 * Math.sin(t * 1.71 + 1);
+		const quiet = state === "half" ? 0.5 : 1;
+		crowd.rumble.g.gain.setTargetAtTime(live ? (0.045 + 0.08 * heat) * breathe * quiet : 0, t, 0.4);
+		crowd.vox.g.gain.setTargetAtTime(live ? (0.022 + 0.085 * heat) * breathe * quiet : 0, t, 0.35);
+		crowd.air.g.gain.setTargetAtTime(live ? (0.004 + 0.01 * heat) * quiet : 0, t, 0.5);
+		crowd.vox.f.frequency.setTargetAtTime(620 + 650 * heat + 70 * Math.sin(t * 0.9), t, 0.4);
+		if (crowd.pan) { crowd.pan.pan.setTargetAtTime(0.22 * Math.sin(t * 0.21), t, 0.5); }
 		if (live && state === "play" && freeze <= 0 && t > crowd.nextChant) {
-			// The home end sings, louder when the home side is on top.
-			chant(0.7 + 0.6 * edge(homeSide));
-			crowd.nextChant = t + 10 + Math.random() * 9 - 5 * edge(homeSide);
+			// The home end sings, louder when the home side is on top; the away corner answers when theirs is.
+			const awayUp = edge(1 - homeSide) > 0.35 && Math.random() < 0.5;
+			chant(awayUp ? 0.5 : 0.7 + 0.6 * edge(homeSide), awayUp);
+			crowd.nextChant = t + 12 + Math.random() * 10 - 5 * edge(homeSide);
 		}
 	}
 
@@ -7001,7 +7108,7 @@
 	const Z3 = Z_W;   // ball and crossbar heights, in pitch pixels
 	const G3 = {   // everything the WebGL view owns
 		renderer: null, scene: null, cam: null, lost: false, geo: null, mats: new Map(),
-		stadium: null, stadiumKey: "", standsRef: null, figs: new Map(), ball: null, ballShadow: null, marks: null,
+		stadium: null, stadiumKey: "", standsRef: null, fig: null, crowd: null, ball: null, ballShadow: null, marks: null,
 		eye: null, look: null, shot: "", v: null, glowTex: null
 	};
 	const threeState = () => {
@@ -7041,18 +7148,13 @@
 			G3.scene = new THREE.Scene();
 			G3.cam = new THREE.PerspectiveCamera(36, 16 / 9, 8, 30000);
 			G3.eye = new THREE.Vector3(); G3.look = new THREE.Vector3(); G3.v = new THREE.Vector3();
-			// Shared geometry: a footballer's parts (32 units tall, feet at the origin), the ball, rings.
+			// Shared geometry: the ball, rings and markers. (The footballers are built in initFigures3D.)
 			const g = G3.geo = {
-				torso: new THREE.CylinderGeometry(4.2, 3.5, 12, 10), shorts: new THREE.CylinderGeometry(4.7, 4.5, 6, 10),
-				leg: new THREE.CylinderGeometry(1.5, 1.3, 14, 6), sock: new THREE.CylinderGeometry(1.6, 1.5, 5.5, 6), boot: new THREE.BoxGeometry(4.2, 1.8, 2.6),
-				arm: new THREE.CylinderGeometry(1.4, 1.2, 6, 6), fore: new THREE.CylinderGeometry(1.2, 1.1, 6.5, 6),
-				head: new THREE.SphereGeometry(3.3, 12, 9), hair: new THREE.SphereGeometry(3.55, 12, 6, 0, Math.PI * 2, 0, Math.PI * 0.55),
 				ball: new THREE.SphereGeometry(5, 16, 12), shadow: new THREE.CircleGeometry(1, 14),
 				ring: new THREE.RingGeometry(0.9, 1, 40), disc: new THREE.CircleGeometry(1, 32), cone: new THREE.ConeGeometry(4.5, 9, 4),
 				arrow: (() => { const b = new THREE.BufferGeometry(); b.setAttribute("position", new THREE.Float32BufferAttribute([ 33, 0, 0, 25, 0, 6, 25, 0, -6 ], 3)); b.computeVertexNormals(); return b; })(),
 				box: new THREE.BoxGeometry(1, 1, 1)
 			};
-			for (const k of [ "leg", "sock", "arm", "fore" ]) { g[k].translate(0, -g[k].parameters.height / 2, 0); }   // hang from the joint
 			for (const k of [ "shadow", "ring", "disc" ]) { g[k].rotateX(-Math.PI / 2); }   // lie flat on the grass
 			g.cone.rotateX(Math.PI);   // point down
 			// The ball: white with dark patches, so its spin shows.
@@ -7081,6 +7183,7 @@
 			mk.arrow.material.side = THREE.DoubleSide;
 			for (const m of Object.values(mk)) { m.visible = false; G3.scene.add(m); }
 			G3.marks = mk;
+			initFigures3D();
 			// The glow round a floodlight.
 			const gc = document.createElement("canvas"); gc.width = gc.height = 64;
 			const gg = gc.getContext && gc.getContext("2d");
@@ -7116,13 +7219,13 @@
 	// The ground: built once per match (it changes with the club, the format, the weather and the
 	// surface) from the same painting the 2D cameras use, then the stands stand up around it.
 	function buildStadium3D () {
-		const key = `${WW}x${WH}|${cond.label}|${cond.surfaceKey}|${gstyle ? gstyle.mow + gstyle.roof + gstyle.lights : ""}`;
+		const key = `${WW}x${WH}|${cond.label}|${cond.surfaceKey}|${gstyle ? gstyle.mow + gstyle.roof + gstyle.lights + gstyle.fill : ""}|${KITS[0].outfield}${KITS[1].outfield}${homeSide}`;
 		if (G3.stadium && G3.stadiumKey === key && G3.standsRef === stands) { return; }
 		if (G3.stadium) {
 			G3.nearStand = null;
 			G3.scene.remove(G3.stadium);
 			G3.stadium.traverse(o => {
-				if (o.geometry && o.userData.ownGeo) { o.geometry.dispose(); }
+				if (o.geometry && o.userData.ownGeo) { o.geometry.dispose(); if (o.isInstancedMesh) { o.dispose(); } }
 				if (o.material && o.userData.ownMat) { if (o.material.map) { o.material.map.dispose(); } o.material.dispose(); }
 			});
 		}
@@ -7150,15 +7253,42 @@
 		// 2. The stands: each side's crowd picture on a tier rising back from the touchline.
 		const gs = gstyle || { roof: true, lights: "pylons" };
 		const f0 = 14, D = MY * 1.7, H = MY * 1.9, xl = -MX - 40, xr = FW + MX + 40, zl = -40, zr = FH + 40;
-		const standMat = c => new THREE.MeshBasicMaterial({ map: canvasTex3D(c), side: THREE.DoubleSide });
+		// The terraces: twelve steps of concrete with a row of seats on each (the fans sit on them below).
+		const terrace = across => {
+			const c = document.createElement("canvas"); c.width = c.height = 192;
+			const tg = c.getContext && c.getContext("2d");
+			if (tg && tg.fillRect) {
+				tg.fillStyle = gs.concrete || "#1b2520"; tg.fillRect(0, 0, 192, 192);
+				for (let i = 0; i < 12; i++) {
+					const a = i * 16;
+					const band = (o, w, col) => { tg.fillStyle = col; if (across) { tg.fillRect(a + o, 0, w, 192); } else { tg.fillRect(0, a + o, 192, w); } };
+					band(0, 5, gs.steps || "#262f21"); band(9, 5, gs.seat || "#3b4a58"); band(14, 2, "rgba(0, 0, 0, 0.35)");
+				}
+			}
+			return new THREE.MeshLambertMaterial({ map: canvasTex3D(c), side: THREE.DoubleSide });
+		};
 		if (stands) {
-			st.add(own(quad3D([ xl, 0, -f0 ], [ xr, 0, -f0 ], [ xr, H, -f0 - D ], [ xl, H, -f0 - D ], [ 0, 0, 1, 0, 1, 1, 0, 1 ], standMat(stands.top)), true));
+			const rows = terrace(false), cols = terrace(true);
+			st.add(own(quad3D([ xl, 0, -f0 ], [ xr, 0, -f0 ], [ xr, H, -f0 - D ], [ xl, H, -f0 - D ], [ 0, 0, 1, 0, 1, 1, 0, 1 ], rows), true));
 			// The near stand is the one the broadcast camera sits in, so it is only drawn when the
 			// camera is out on the pitch looking back at it (the goal celebration).
-			G3.nearStand = own(quad3D([ xl, 0, FH + f0 ], [ xr, 0, FH + f0 ], [ xr, H, FH + f0 + D ], [ xl, H, FH + f0 + D ], [ 0, 1, 1, 1, 1, 0, 0, 0 ], standMat(stands.bottom)), true);
+			G3.nearStand = own(quad3D([ xl, 0, FH + f0 ], [ xr, 0, FH + f0 ], [ xr, H, FH + f0 + D ], [ xl, H, FH + f0 + D ], [ 0, 1, 1, 1, 1, 0, 0, 0 ], rows));
 			st.add(G3.nearStand);
-			st.add(own(quad3D([ -f0, 0, zl ], [ -f0, 0, zr ], [ -f0 - D, H, zr ], [ -f0 - D, H, zl ], [ 1, 1, 1, 0, 0, 0, 0, 1 ], standMat(stands.left)), true));
-			st.add(own(quad3D([ FW + f0, 0, zl ], [ FW + f0, 0, zr ], [ FW + f0 + D, H, zr ], [ FW + f0 + D, H, zl ], [ 0, 1, 0, 0, 1, 0, 1, 1 ], standMat(stands.right)), true));
+			st.add(own(quad3D([ -f0, 0, zl ], [ -f0, 0, zr ], [ -f0 - D, H, zr ], [ -f0 - D, H, zl ], [ 1, 1, 1, 0, 0, 0, 0, 1 ], cols), true));
+			st.add(own(quad3D([ FW + f0, 0, zl ], [ FW + f0, 0, zr ], [ FW + f0 + D, H, zr ], [ FW + f0 + D, H, zl ], [ 0, 1, 0, 0, 1, 0, 1, 1 ], cols)));
+			// The ground's name along the back of the main stand.
+			const nc = document.createElement("canvas"); nc.width = 1024; nc.height = 64;
+			const ng = nc.getContext && nc.getContext("2d");
+			if (ng && ng.fillText) {
+				const name = (leagueMatch ? (leagueMatch.home ? YOU : TEAMS[leagueMatch.opp]).ground : YOU.ground).toUpperCase();
+				ng.fillStyle = "#0d1612"; ng.fillRect(0, 0, 1024, 64);
+				ng.font = "900 46px 'Big Shoulders Display', 'Arial Narrow', Arial, sans-serif"; ng.textAlign = "center"; ng.textBaseline = "middle";
+				ng.fillStyle = "#eef2ec"; ng.fillText(name, 512, 34);
+				const sign = new THREE.Mesh(new THREE.PlaneGeometry(512, 32), new THREE.MeshBasicMaterial({ map: canvasTex3D(nc) }));
+				sign.position.set(FW / 2, gs.roof ? H * 1.14 + 19 : H + 17, -f0 - D - 3);
+				st.add(own(sign, true));
+			}
+			buildCrowd3D(st, f0, D, H, xl, xr, zl, zr);
 		}
 		// A roof over the two long stands, with the lights along its edge at some grounds.
 		const glow = (x, y, z, s) => {
@@ -7286,72 +7416,542 @@
 		G3.stadium = st;
 		G3.scene.add(st);
 	}
-	// A footballer: legs, shorts, shirt, arms and head, hung from joints so he can run and jump.
-	function figure3D (p) {
-		const g = G3.geo, kit = KITS[p.team], L = look(p);
-		const shirt = p.role === "gk" ? kit.gk : kit.outfield, trim = kit.second || "#1f2a36";
-		const M = hex => mat3D(hex);
-		const root = new THREE.Group(), body = new THREE.Group();
-		body.position.y = 14;
-		const mesh = (geo, m, x, y, z) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); return o; };
-		const legs = [ -1, 1 ].map(s => {
-			const j = new THREE.Group(); j.position.set(0, 14, s * 2.7);
-			j.add(mesh(g.leg, M(L.skin), 0, 0, 0), mesh(g.sock, M(shirt), 0, -8.5, 0), mesh(g.boot, M("#15181a"), 0.9, -14, 0));
-			return j;
-		});
-		const arms = [ -1, 1 ].map(s => {
-			const j = new THREE.Group(); j.position.set(0, 11.5, s * 5.6);
-			const upper = mesh(g.arm, M(shirt), 0, 0, 0), fore = mesh(g.fore, M(L.skin), 0, -6, 0);
-			j.add(upper, fore);
-			return j;
-		});
-		const torso = mesh(g.torso, M(shirt), 0, 6, 0), shorts = mesh(g.shorts, M(trim), 0, -1, 0);
-		const head = mesh(g.head, M(L.skin), 0.4, 15.6, 0);
-		const hair = mesh(g.hair, M(L.hair), 0.2, 15.9, 0);
-		hair.visible = !L.shaved;
-		body.add(torso, shorts, head, hair, ...arms);
-		root.add(body, ...legs);
-		const disc = flat3D(g.ring, new THREE.Color(shirt), 0.75);
-		disc.scale.set(16, 1, 16);
-		const shadow = flat3D(g.shadow, 0x000000, 0.35);
-		G3.scene.add(root, disc, shadow);
-		return { root, body, legs, arms, torso, shorts, head, hair, disc, shadow, shirt, trim, skin: L.skin };
+	/* ---------- the footballers in 3D ----------
+	   One articulated rig per figure (hips, spine, chest, neck, head, shoulders, elbows, hands,
+	   hips, knees and ankles), posed from the simulation every frame. The body parts are instances
+	   of a dozen shared shapes, so every player and official together costs about fifteen draw
+	   calls. A figure is 32 units tall, about 1.95 m against the goal. */
+	const MAXF3 = 32;   // figures the instanced parts can hold: 22 players, 3 officials, room to spare
+	// Which joint carries which part. Limbs appear twice (left, right); the instance buffers are
+	// sized from this plan, so a pair of limbs always has two slots per figure.
+	const PART_PLAN3 = [
+		[ "torso", "spine" ], [ "shoulders", "spine" ], [ "shorts", "hips" ], [ "neck", "neck" ], [ "head", "head" ], [ "hair", "head" ],
+		[ "upperArm", "sh", 0 ], [ "upperArm", "sh", 1 ], [ "foreArm", "el", 0 ], [ "foreArm", "el", 1 ], [ "hand", "ha", 0 ], [ "hand", "ha", 1 ],
+		[ "thigh", "hip", 0 ], [ "thigh", "hip", 1 ], [ "shin", "kn", 0 ], [ "shin", "kn", 1 ], [ "boot", "an", 0 ], [ "boot", "an", 1 ]
+	];
+	const PER_FIG3 = PART_PLAN3.reduce((m, [ n ]) => { m[n] = (m[n] || 0) + 1; return m; }, {});
+	const PATTERN3 = { plain: 0, stripes: 1, hoops: 2, halves: 3, sash: 4 };
+	const HAIR_SCALE3 = { short: [ 1, 1, 1 ], curly: [ 1.14, 1.2, 1.14 ], long: [ 1.06, 1.35, 1.06 ], buzz: [ 0.98, 0.96, 0.98 ], shaved: null };
+	const BOOTS3 = [ "#15181a", "#f2f2f2", "#15181a", "#2bd1ff", "#ff4f6a", "#15181a", "#f2b52e", "#8cff5a" ];
+	function initFigures3D () {
+		const T = THREE;
+		const defs = {
+			torso: () => { const g = new T.CylinderGeometry(4.4, 3.4, 9.4, 14); g.translate(0, 4.7, 0); g.scale(0.74, 1, 1); return g; },
+			shoulders: () => { const g = new T.CapsuleGeometry(1.95, 6.2, 4, 10); g.rotateX(Math.PI / 2); g.translate(0, 8.6, 0); g.scale(0.8, 1, 1); return g; },
+			shorts: () => { const g = new T.CylinderGeometry(3.75, 4.25, 4.6, 12); g.translate(0, -1.9, 0); g.scale(0.8, 1, 1); return g; },
+			neck: () => { const g = new T.CylinderGeometry(1.0, 1.15, 2, 8); g.translate(0, 0.7, 0); return g; },
+			head: () => { const g = new T.SphereGeometry(2.55, 14, 10); g.scale(0.96, 1.12, 0.94); g.translate(0.2, 2.5, 0); return g; },
+			hair: () => { const g = new T.SphereGeometry(2.78, 12, 7, 0, Math.PI * 2, 0, 1.8); g.scale(0.98, 1.08, 0.98); g.translate(-0.1, 2.6, 0); return g; },
+			upperArm: () => { const g = new T.CapsuleGeometry(1.15, 4.4, 3, 7); g.translate(0, -2.4, 0); return g; },
+			foreArm: () => { const g = new T.CapsuleGeometry(0.95, 4.2, 3, 7); g.translate(0, -2.3, 0); return g; },
+			hand: () => { const g = new T.SphereGeometry(1.05, 7, 5); g.scale(1, 1.25, 0.8); g.translate(0, -0.7, 0); return g; },
+			thigh: () => { const g = new T.CapsuleGeometry(1.6, 5.4, 3, 7); g.translate(0, -2.9, 0); return g; },
+			shin: () => { const g = new T.CapsuleGeometry(1.25, 5.0, 3, 7); g.translate(0, -2.9, 0); return g; },
+			boot: () => { const g = new T.BoxGeometry(4.3, 1.7, 2.3); g.translate(1.0, -0.2, 0); return g; }
+		};
+		const plain = new T.MeshLambertMaterial({ color: 0xffffff });
+		// The shirt: the kit's pattern (stripes, hoops, halves, a sash) drawn in its second colour.
+		const shirtMat = new T.MeshLambertMaterial({ color: 0xffffff });
+		shirtMat.onBeforeCompile = sh => {
+			sh.vertexShader = sh.vertexShader
+				.replace("#include <common>", "#include <common>\nattribute float aPat; attribute vec3 aCol2; varying float vPat; varying vec3 vCol2; varying vec3 vKp;")
+				.replace("#include <begin_vertex>", "#include <begin_vertex>\nvPat = aPat; vCol2 = aCol2; vKp = position;");
+			sh.fragmentShader = sh.fragmentShader
+				.replace("#include <common>", "#include <common>\nvarying float vPat; varying vec3 vCol2; varying vec3 vKp;")
+				.replace("#include <color_fragment>", `#include <color_fragment>
+					float km = 0.0;
+					if (vPat > 0.5 && vPat < 1.5) { km = step(0.0, sin(atan(vKp.z, vKp.x) * 5.0)); }
+					else if (vPat > 1.5 && vPat < 2.5) { km = step(0.0, sin(vKp.y * 1.7)); }
+					else if (vPat > 2.5 && vPat < 3.5) { km = step(0.0, vKp.z); }
+					else if (vPat > 3.5) { km = 1.0 - step(1.5, abs(vKp.y - 4.7 + vKp.z * 0.95)); }
+					diffuseColor.rgb = mix(diffuseColor.rgb, vCol2, km);`);
+		};
+		shirtMat.customProgramCacheKey = () => "ff-shirt";
+		const parts = {}, white = new T.Color(1, 1, 1);
+		for (const name of Object.keys(defs)) {
+			const geo = defs[name], cap = MAXF3 * PER_FIG3[name];
+			const g = geo();
+			if (name === "torso") {
+				g.setAttribute("aPat", new T.InstancedBufferAttribute(new Float32Array(cap), 1).setUsage(T.DynamicDrawUsage));
+				g.setAttribute("aCol2", new T.InstancedBufferAttribute(new Float32Array(cap * 3), 3).setUsage(T.DynamicDrawUsage));
+			}
+			const m = new T.InstancedMesh(g, name === "torso" ? shirtMat : plain, cap);
+			m.instanceMatrix.setUsage(T.DynamicDrawUsage);
+			m.setColorAt(0, white);   // so the colour buffer exists before the first frame
+			m.frustumCulled = false; m.count = 0;
+			parts[name] = m;
+			G3.scene.add(m);
+		}
+		// Numbers on the backs: one atlas of 0-99, a plane per figure picking its cell.
+		const ac = document.createElement("canvas"); ac.width = ac.height = 640;
+		const ag = ac.getContext && ac.getContext("2d");
+		if (ag) {
+			ag.textAlign = "center"; ag.textBaseline = "middle"; ag.font = "700 46px 'Barlow', 'Helvetica Neue', Arial, sans-serif";
+			ag.lineWidth = 5; ag.strokeStyle = "rgba(0, 0, 0, 0.45)"; ag.fillStyle = "#ffffff";
+			for (let n = 0; n < 100; n++) { const x = (n % 10) * 64 + 32, y = Math.floor(n / 10) * 64 + 35; ag.strokeText(String(n), x, y); ag.fillText(String(n), x, y); }
+		}
+		const numMat = new T.MeshLambertMaterial({ color: 0xffffff, map: new T.CanvasTexture(ac), alphaTest: 0.35, polygonOffset: true, polygonOffsetFactor: -2 });
+		numMat.onBeforeCompile = sh => {
+			sh.vertexShader = sh.vertexShader
+				.replace("#include <common>", "#include <common>\nattribute float aCell;")
+				.replace("#include <uv_vertex>", "#include <uv_vertex>\nvUv = (uv + vec2(mod(aCell, 10.0), 9.0 - floor(aCell / 10.0))) / 10.0;");
+		};
+		numMat.customProgramCacheKey = () => "ff-num";
+		const ng = new T.PlaneGeometry(5.0, 5.6).rotateY(-Math.PI / 2).translate(-3.35, 5.4, 0);
+		ng.setAttribute("aCell", new T.InstancedBufferAttribute(new Float32Array(MAXF3), 1).setUsage(T.DynamicDrawUsage));
+		const nums = new T.InstancedMesh(ng, numMat, MAXF3);
+		nums.instanceMatrix.setUsage(T.DynamicDrawUsage); nums.setColorAt(0, white); nums.frustumCulled = false; nums.count = 0;
+		G3.scene.add(nums);
+		// A kit-coloured ring at each player's feet (it keeps the sides readable from the gantry) and a soft shadow.
+		const rings = new T.InstancedMesh(G3.geo.ring, new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7, depthWrite: false }), MAXF3);
+		const blobs = new T.InstancedMesh(G3.geo.shadow, new T.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.32, depthWrite: false }), MAXF3);
+		for (const m of [ rings, blobs ]) { m.instanceMatrix.setUsage(T.DynamicDrawUsage); m.frustumCulled = false; m.count = 0; G3.scene.add(m); }
+		rings.setColorAt(0, white);
+		const node = (parent, x, y, z) => { const o = new T.Object3D(); o.position.set(x, y, z); parent.add(o); return o; };
+		const rigs = [];
+		for (let i = 0; i < MAXF3; i++) {
+			const root = new T.Object3D();
+			root.rotation.order = "YXZ";   // lean and roll in his own frame, then face the way he runs
+			const hips = node(root, 0, 15.6, 0), spine = node(hips, 0, 0.6, 0), chest = node(spine, 0, 5.4, 0), neck = node(chest, 0, 3.4, 0), head = node(neck, 0, 1.6, 0);
+			const sh = [ node(chest, 0, 3.0, -5.3), node(chest, 0, 3.0, 5.3) ], el = sh.map(s => node(s, 0, -5.6, 0)), ha = el.map(e => node(e, 0, -5.2, 0));
+			const hip = [ node(hips, 0, -1.0, -2.7), node(hips, 0, -1.0, 2.7) ], kn = hip.map(h => node(h, 0, -7.3, 0)), an = kn.map(k => node(k, 0, -6.5, 0));
+			rigs.push({ root, hips, spine, chest, neck, head, sh, el, ha, hip, kn, an });
+		}
+		G3.fig = { parts, nums, rings, blobs, rigs, cnt: {}, n: 0, M: new T.Matrix4(), M2: new T.Matrix4(), C: new T.Color(), V: new T.Vector3(), S: new T.Vector3(), Q: new T.Quaternion(), prevDir: new WeakMap() };
 	}
-	function syncFigure3D (p, f, WX, WD) {
-		const kit = KITS[p.team], shirt = p.role === "gk" ? kit.gk : kit.outfield, trim = kit.second || "#1f2a36";
-		if (shirt !== f.shirt || trim !== f.trim) {   // a new opponent, or a change of kit
-			f.shirt = shirt; f.trim = trim;
-			f.torso.material = mat3D(shirt); f.shorts.material = mat3D(trim);
-			for (const a of f.arms) { a.children[0].material = mat3D(shirt); }
-			for (const l of f.legs) { l.children[1].material = mat3D(shirt); }
-			f.disc.material.color.set(shirt);
-		}
-		const x = WX(p.x), z = p.y, dir = WD(p.dir);
+	// Reset a rig to standing.
+	function resetRig3D (r) {
+		r.hips.position.set(0, 15.6, 0); r.hips.rotation.set(0, 0, 0);
+		r.spine.rotation.set(0, 0, 0); r.chest.rotation.set(0, 0, 0); r.neck.rotation.set(0, 0, 0); r.head.rotation.set(0, 0, 0);
+		for (let i = 0; i < 2; i++) { r.sh[i].rotation.set(0, 0, 0); r.el[i].rotation.set(0, 0, 0); r.ha[i].rotation.set(0, 0, 0); r.hip[i].rotation.set(0, 0, 0); r.kn[i].rotation.set(0, 0, 0); r.an[i].rotation.set(0, 0, 0); }
+		r.root.rotation.set(0, 0, 0); r.root.position.set(0, 0, 0); r.root.scale.setScalar(1);
+	}
+	const smooth3 = t => t * t * (3 - 2 * t);
+	const lerp3 = (a, b, t) => a + (b - a) * t;
+	// A footballer's pose from the simulation: the run (its stride and how hard he is running), the
+	// idle weight shift, the keeper's set, a kick (pass or shot, its backswing from the power), a
+	// throw-in, a header, a slide, the keeper's dive, a fall when fouled, and the celebrations.
+	function pose3D (r, p, x, z, dir, turn, ballNear) {
+		resetRig3D(r);
+		const rm = reduceMotion;
+		const spd = Math.hypot(p.vx || 0, p.vy || 0);
+		const a = clamp(p.runAmt || 0, 0, 1), ph = rm ? 0 : p.stride || 0, jump = rm ? 0 : jumpAmt(p);
+		const shuf = clamp(p.shuf || 0, 0, 1), cel = clamp(p.celebA || 0, 0, 1), kneel = clamp(p.kneel || 0, 0, 1), sulk = clamp(p.sulk || 0, 0, 1);
 		const down = (p.lunge > 0 && players.indexOf(p) === ctrl) || p.slideAI > 0;
-		const jump = reduceMotion ? 0 : jumpAmt(p);
-		const a = down ? 0 : clamp(p.runAmt || 0, 0, 1), ph = reduceMotion ? 0 : p.stride || 0, sw = Math.sin(ph) * a;
-		const shuf = down ? 0 : p.shuf || 0, cel = p.celebA || 0, kneel = p.kneel || 0, sulk = p.sulk || 0;
-		f.root.position.set(x, jump * 13 + (down ? -3 : 0) - 9 * kneel, z);
-		f.root.rotation.set(0, -dir, down ? 1.05 : 0);
-		// Leaning into the run; a jump straightens him. On his knees he arches back; beaten, he hangs his head.
-		f.body.rotation.z = -(a * a * 0.22 * (1 - 0.6 * shuf)) * (1 - jump) + 0.3 * kneel - 0.28 * sulk;
-		f.head.position.set(0.4 + 1.6 * sulk, 15.6 - 2 * sulk, 0); f.hair.position.set(0.2 + 1.6 * sulk, 15.9 - 2 * sulk, 0);
-		const bob = reduceMotion ? 0 : Math.abs(Math.cos(ph)) * a * 1.1;
-		f.body.position.y = 14 + bob;
+		const fall = p.fall > 0 ? 1 - p.fall / FALL_T : -1, dive = p.dive > 0 ? 1 - p.dive / DIVE_T : -1, thr = p.throwA > 0 ? 1 - p.throwA / THROW_T : -1;
+		const idle = rm ? 0 : p.idlePh || 0, gk = p.role === "gk";
+		let y = 0;
+		// The running cycle: hips swing the thighs, knees fold on the recovery, arms counter-swing.
+		const A = 0.22 + 0.62 * a * (1 - 0.4 * shuf), K = 0.5 + 1.3 * a, armA = (0.25 + 0.65 * a) * (1 - 0.5 * shuf);
 		for (let i = 0; i < 2; i++) {
-			const s = i ? -1 : 1, leg = f.legs[i], arm = f.arms[i];
-			leg.position.y = 14 + bob;
-			leg.rotation.z = (down ? 0.15 : jump > 0 ? (i ? -0.3 : 0.5) * jump : s * sw * (0.75 - 0.35 * shuf)) * (1 - kneel) - 1.5 * kneel;
-			// Arms swing against the legs; in the air or celebrating they go up and out.
-			const up = Math.max(jump, cel * 1.2);
-			arm.rotation.z = down ? 0.6 : -s * sw * 0.7 * (1 - up) + (up > 0 ? -0.4 * up : 0);
-			arm.rotation.x = -s * (0.12 + up * 2.6);
-			arm.children[1].rotation.z = 0.45 + a * 0.9;
+			const s = i ? 1 : -1, phi = ph + (i ? Math.PI : 0), sn = Math.sin(phi), cs = Math.cos(phi);
+			const limp = p.injured && i === 0 ? 0.55 : 1;
+			r.hip[i].rotation.z = A * sn * limp;
+			r.kn[i].rotation.z = -(K * clamp(cs, 0, 1) * clamp(a + 0.15, 0, 1) + 0.12 + 0.1 * a) * limp;
+			r.an[i].rotation.z = 0.25 * a * clamp(-sn, 0, 1) - 0.1 * clamp(cs, 0, 1) * a;
+			r.sh[i].rotation.z = -armA * sn; r.sh[i].rotation.x = s * (0.1 + 0.08 * a);
+			r.el[i].rotation.z = 0.45 + 0.95 * a;
 		}
-		f.disc.position.set(x, 0.25, z);
-		f.shadow.position.set(x + 3, 0.2, z + 2);
-		f.shadow.scale.set(12 + jump * 3, 1, 6 + jump * 1.5);
-		f.shadow.material.opacity = 0.35 / (1 + jump * 1.5);
+		r.hips.position.y = 15.6 - 0.5 * a + Math.abs(Math.cos(ph)) * 0.9 * a + (a < 0.2 ? Math.sin(idle) * 0.12 : 0);
+		r.spine.rotation.z = 0.06 + 0.2 * a * a;
+		r.hips.rotation.x = clamp(turn * 1.4, -0.3, 0.3) * clamp(spd, 0, 1);
+		r.neck.rotation.z = -r.spine.rotation.z * 0.6;
+		if (a < 0.2) { r.chest.rotation.y = Math.sin(idle * 0.5) * 0.05; r.sh[0].rotation.z += Math.sin(idle) * 0.03; r.sh[1].rotation.z -= Math.sin(idle) * 0.03; r.head.rotation.y = Math.sin(idle * 0.37) * 0.25; }
+		// The keeper on his toes when the ball is near: knees bent, hands ready.
+		if (gk && ballNear > 0 && !down && jump <= 0 && fall < 0 && dive < 0 && !(p.kickA > 0)) {
+			const g = ballNear * (1 - a);
+			for (let i = 0; i < 2; i++) { r.hip[i].rotation.z += 0.42 * g; r.kn[i].rotation.z -= 0.75 * g; r.sh[i].rotation.z += 0.75 * g; r.sh[i].rotation.x += (i ? 1 : -1) * 0.55 * g; r.el[i].rotation.z += 0.6 * g; }
+			r.hips.position.y -= 2.6 * g; r.spine.rotation.z += 0.3 * g;
+		}
+		// Kicking: a backswing, the strike and the follow-through on the kicking leg; the other leg
+		// plants and the arms open for balance. Shots swing further than passes (kickPow).
+		const ks = rm || jump > 0 || down ? null : kickSwing(p);
+		if (ks) {
+			const kf = build(p).left ? 0 : 1, pl = 1 - kf, pw = p.kickPow || 0.5;
+			r.hip[kf].rotation.z = ks.s * 1.15; r.kn[kf].rotation.z = -ks.bend * 1.25; r.an[kf].rotation.z = 0.35;
+			r.hip[pl].rotation.z = -0.12; r.kn[pl].rotation.z = -0.38;
+			r.spine.rotation.z = 0.05 - 0.18 * ks.s - 0.1 * pw; r.hips.rotation.x += (kf ? -1 : 1) * 0.12;
+			r.sh[pl].rotation.z = 0.5 * ks.s + 0.2; r.sh[kf].rotation.z = -0.4 * ks.s; r.sh[kf].rotation.x = (kf ? 1 : -1) * (0.35 + 0.5 * Math.abs(ks.s) * (0.6 + pw)); r.sh[pl].rotation.x = (pl ? 1 : -1) * (0.4 + 0.3 * pw);
+			r.el[kf].rotation.z = 0.5; r.el[pl].rotation.z = 0.7;
+		}
+		// A throw-in: ball over the head, arching back, then whipping forward.
+		if (thr >= 0) {
+			const back = thr < 0.35 ? thr / 0.35 : 1 - (thr - 0.35) / 0.65, fwd = thr > 0.35 ? 1 : 0;
+			for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = -2.6 + 1.2 * (1 - back) * fwd; r.sh[i].rotation.x = (i ? 1 : -1) * 0.2; r.el[i].rotation.z = 1.5 * back; }
+			r.spine.rotation.z = -0.35 * back + 0.25 * (1 - back) * fwd;
+			r.hip[1].rotation.z = 0.3; r.kn[1].rotation.z = -0.3; r.hip[0].rotation.z = -0.3;
+		}
+		// Up for a header: legs tucked, arms out, the head snaps forward at the top.
+		if (jump > 0) {
+			y += jump * 13;
+			for (let i = 0; i < 2; i++) { r.hip[i].rotation.z = 0.35 * jump + (i ? 0.25 : -0.1) * jump; r.kn[i].rotation.z = -1.1 * jump; r.sh[i].rotation.x = (i ? 1 : -1) * 2.2 * jump; r.sh[i].rotation.z = -0.5 * jump; r.el[i].rotation.z = 0.35; }
+			r.spine.rotation.z = -0.2 * jump + 0.35 * Math.max(0, jump - 0.75) * 4;
+			r.neck.rotation.z = -0.3 * jump + 0.9 * Math.max(0, jump - 0.8) * 5;
+		}
+		// Sliding in: on his side, one leg out at the ball, an arm on the turf.
+		if (down) {
+			r.root.rotation.z = 1.05; y -= 5.5;
+			r.hip[1].rotation.z = 1.25; r.kn[1].rotation.z = -0.05; r.hip[0].rotation.z = 0.35; r.kn[0].rotation.z = -1.7;
+			r.sh[0].rotation.z = -1.7; r.sh[0].rotation.x = -0.5; r.el[0].rotation.z = 0.2;
+			r.sh[1].rotation.z = 0.8; r.sh[1].rotation.x = 1.3; r.el[1].rotation.z = 0.5;
+			r.spine.rotation.z = -0.2; r.neck.rotation.z = 0.35;
+		}
+		// The keeper's dive: flat out to one side, arms at full stretch.
+		if (dive >= 0) {
+			const side = p.diveSide || 1, arc = Math.sin(Math.PI * Math.min(1, dive * 1.15)), lay = smooth3(Math.min(1, dive * 1.6));
+			r.root.rotation.x = -side * 1.35 * lay; r.root.rotation.z = -0.25 * arc;
+			y += 9 * arc - 6 * lay + 4;
+			for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = -2.75; r.sh[i].rotation.x = (i ? 1 : -1) * 0.25; r.el[i].rotation.z = 0.1; r.hip[i].rotation.z = -0.15 + 0.15 * i; r.kn[i].rotation.z = -0.3 - 0.4 * i; }
+			r.spine.rotation.z = -0.15;
+		}
+		// Fouled: he goes down, lies there, then picks himself up.
+		if (fall >= 0) {
+			const k = fall < 0.22 ? smooth3(fall / 0.22) : fall < 0.62 ? 1 : 1 - smooth3((fall - 0.62) / 0.38);
+			r.root.rotation.z = -1.45 * k; r.root.rotation.x = 0.35 * k * Math.sin(idle * 2);
+			y += 2.8 * k;
+			for (let i = 0; i < 2; i++) { r.hip[i].rotation.z = (0.4 + 0.5 * i) * k; r.kn[i].rotation.z = -(0.9 + 0.6 * i) * k; r.sh[i].rotation.z = (-0.6 + 1.2 * i) * k; r.sh[i].rotation.x = (i ? 1 : -1) * 0.6 * k; r.el[i].rotation.z = 1.2 * k; }
+			r.spine.rotation.z = 0.35 * k; r.neck.rotation.z = 0.5 * k;
+		}
+		// Celebrating: arms up and out; on his knees he arches back and spreads them wide.
+		if (cel > 0 && fall < 0) {
+			const w = cel * (1 - 0.4 * kneel), wave = Math.sin(idle * 3 + x * 0.01) * 0.25 * cel;
+			for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, -0.45 + wave * (i ? -1 : 1), w); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, (i ? 1 : -1) * (2.35 + 0.5 * kneel), w); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.3, w); }
+			r.neck.rotation.z = lerp3(r.neck.rotation.z, -0.35 * cel, cel);
+		}
+		if (kneel > 0) {
+			r.hips.position.y = lerp3(r.hips.position.y, 8, kneel);
+			for (let i = 0; i < 2; i++) { r.hip[i].rotation.z = lerp3(r.hip[i].rotation.z, 0.05, kneel); r.kn[i].rotation.z = lerp3(r.kn[i].rotation.z, -1.6, kneel); r.an[i].rotation.z = 0.6 * kneel; }
+			r.spine.rotation.z = lerp3(r.spine.rotation.z, -0.4, kneel);
+		}
+		// Beaten: head down, shoulders rounded, arms hanging.
+		if (sulk > 0) {
+			r.spine.rotation.z += 0.28 * sulk; r.neck.rotation.z += 0.6 * sulk;
+			for (let i = 0; i < 2; i++) { r.sh[i].rotation.z *= 1 - 0.7 * sulk; r.el[i].rotation.z *= 1 - 0.6 * sulk; }
+		}
+		r.root.position.set(x, y, z);
+		r.root.rotation.y = -dir;
+	}
+	// What a figure wears. Keepers in their own colour with gloves and long sleeves.
+	function kit3D (p) {
+		const kit = KITS[p.team] || KITS[0], gk = p.role === "gk";
+		const shirt = gk ? kit.gk : kit.outfield, shorts = gk ? "#1f2a36" : kit.second || "#1f2a36";
+		return {
+			shirt, shorts, socks: gk ? "#1f2a36" : shirt, second: kit.second || shirt, pattern: gk ? 0 : PATTERN3[kit.pattern] || 0,
+			ink: gk ? "#0e1a24" : kit.ink || "#ffffff", gloves: gk ? (lum(shirt) > 0.5 ? "#15181a" : "#f2f2f2") : null, sleeves: gk,
+			boots: BOOTS3[(p.num || 0) % BOOTS3.length], ring: shirt
+		};
+	}
+	// Commit one posed rig to the instanced parts.
+	function commitFigure3D (rig, lk, kit, num) {
+		const F = G3.fig, M = F.M, C = F.C;
+		if (F.n >= MAXF3) { return; }
+		F.n++;
+		rig.root.updateMatrixWorld(true);
+		for (const [ name, joint, side ] of PART_PLAN3) {
+			const mesh = F.parts[name], node = side === undefined ? rig[joint] : rig[joint][side];
+			let mtx = node.matrixWorld;
+			if (name === "hair") {
+				const s = HAIR_SCALE3[lk.style] === undefined ? HAIR_SCALE3.short : HAIR_SCALE3[lk.style];
+				if (!s) { continue; }
+				mtx = M.makeScale(s[0], s[1], s[2]).premultiply(node.matrixWorld);
+			} else if (name === "hand" && kit.gloves) { mtx = M.makeScale(1.45, 1.3, 1.5).premultiply(node.matrixWorld); }
+			const k = F.cnt[name]++;
+			if (k >= mesh.instanceMatrix.count) { F.cnt[name]--; continue; }   // never past the buffer
+			mesh.setMatrixAt(k, mtx);
+			const c = name === "torso" || name === "shoulders" || name === "upperArm" || (name === "foreArm" && kit.sleeves) ? kit.shirt
+				: name === "shorts" ? kit.shorts : name === "shin" ? kit.socks : name === "boot" ? kit.boots
+				: name === "hair" ? lk.hair : name === "hand" && kit.gloves ? kit.gloves : lk.skin;
+			mesh.setColorAt(k, C.set(c));
+			if (name === "torso") {
+				const g = mesh.geometry, pat = g.attributes.aPat, c2 = g.attributes.aCol2;
+				pat.setX(k, kit.pattern); C.set(kit.second); c2.setXYZ(k, C.r, C.g, C.b);
+			}
+		}
+		const V = F.V.setFromMatrixPosition(rig.root.matrixWorld), x = V.x, z = V.z, air = Math.max(0, V.y);
+		F.blobs.setMatrixAt(F.blobs.count++, M.compose(V.set(x + 2, 0.2, z + 1.5), F.Q.identity(), F.S.set(11 + air * 0.15, 1, 7 + air * 0.1)));
+		if (kit.ring) {
+			const r = F.rings.count++;
+			F.rings.setMatrixAt(r, M.compose(V.set(x, 0.25, z), F.Q.identity(), F.S.set(16, 1, 16)));
+			F.rings.setColorAt(r, C.set(kit.ring));
+		}
+		if (num !== null && num !== undefined) {
+			const n = F.nums.count++;
+			F.nums.setMatrixAt(n, rig.spine.matrixWorld);
+			F.nums.setColorAt(n, C.set(kit.ink));
+			F.nums.geometry.attributes.aCell.setX(n, clamp(Math.round(num), 0, 99));
+		}
+	}
+	/* ---------- the officials ----------
+	   Not part of the simulation: the referee keeps a diagonal to the ball, the assistants run the
+	   far touchline level with the second-last defender. */
+	const REF_KIT3 = { shirt: "#17191c", shorts: "#17191c", socks: "#17191c", second: "#17191c", pattern: 0, ink: "#f2b52e", gloves: null, sleeves: false, boots: "#15181a", ring: null };
+	const officials3 = [ 0, 1, 2 ].map(i => ({ x: 0, y: 0, vx: 0, vy: 0, dir: -Math.PI / 2, stride: 0, runAmt: 0, idlePh: i * 2, role: "ref", team: -1,
+		look: { skin: [ "#e0ac86", "#9c6a44", "#f1c9a5" ][i], hair: "#1b1410", style: [ "buzz", "short", "shaved" ][i] } }));
+	let officialsFor3 = null;
+	function stepOfficial3 (o, tx, ty, maxSpd, dt) {
+		const dx = tx - o.x, dy = ty - o.y, d = Math.hypot(dx, dy);
+		const want = d < 6 ? 0 : Math.min(maxSpd, d / 20);
+		const wx = d ? dx / d * want : 0, wy = d ? dy / d * want : 0;
+		o.vx += (wx - o.vx) * Math.min(1, 0.08 * dt); o.vy += (wy - o.vy) * Math.min(1, 0.08 * dt);
+		o.x += o.vx * dt; o.y += o.vy * dt;
+		const spd = Math.hypot(o.vx, o.vy);
+		if (spd > 0.25) { const a = Math.atan2(o.vy, o.vx); o.dir += Math.atan2(Math.sin(a - o.dir), Math.cos(a - o.dir)) * Math.min(1, 0.12 * dt); }
+		o.stride += Math.PI * 2 * (0.95 + 0.5 * spd) / 60 * clamp(spd / 0.4, 0, 1) * dt;
+		o.runAmt += (Math.min(1, spd / 2.6) - o.runAmt) * Math.min(1, 0.1 * dt);
+		o.idlePh += 0.028 * dt;
+	}
+	function updateOfficials3 (dt) {
+		if (!ball) { return; }
+		if (officialsFor3 !== players) {   // a new match: back to their marks
+			officialsFor3 = players;
+			officials3[0].x = FW / 2 - 120; officials3[0].y = FH / 2 + 160;
+			officials3[1].x = FW * 0.25; officials3[1].y = -14; officials3[2].x = FW * 0.75; officials3[2].y = -14;
+		}
+		const live = state === "play" || state === "goal";
+		{
+			const o = officials3[0];
+			let tx = ball.x - (ball.x > FW / 2 ? 140 : -140) * (live ? 1 : 0.4), ty = ball.y + 150 * S;
+			if (freeze > 0 && freezeKind === "kickoff") { tx = FW / 2 - 60; ty = FH / 2 + 90; }
+			tx = clamp(tx, 40, FW - 40); ty = clamp(ty, 30, FH - 30);
+			for (const p of players) { const dx = o.x - p.x, dy = o.y - p.y, d = Math.hypot(dx, dy); if (d < 26 && d > 0.01) { tx += dx / d * 30; ty += dy / d * 30; } }
+			stepOfficial3(o, tx, ty, live ? 2.1 : 0.9, dt);
+		}
+		// The assistant on the left half watches team 0's defence, the other team 1's.
+		for (let k = 1; k <= 2; k++) {
+			const o = officials3[k], defTeam = k === 1 ? 0 : 1;
+			const defs = players.filter(p => p.team === defTeam).map(p => (defTeam === 0 ? p.x : FW - p.x)).sort((a, b) => a - b);
+			const second = defs.length > 1 ? defs[1] : 0;
+			let lineX = defTeam === 0 ? second : FW - second;
+			lineX = defTeam === 0 ? Math.min(lineX, ball.x, FW / 2) : Math.max(lineX, ball.x, FW / 2);
+			stepOfficial3(o, clamp(lineX, k === 1 ? 10 : FW / 2, k === 1 ? FW / 2 : FW - 10), -16, live ? 2.6 : 1, dt);
+			o.dir = Math.PI / 2;   // facing the pitch, running sideways
+		}
+	}
+	// Every figure this frame: the players, then the officials.
+	function drawFigures3D (WX, WD) {
+		const F = G3.fig;
+		for (const k in F.parts) { F.cnt[k] = 0; }
+		F.n = 0; F.nums.count = 0; F.rings.count = 0; F.blobs.count = 0;
+		const dt = frameDt / 16.7;
+		for (const p of players) {
+			if (F.n >= MAXF3) { break; }
+			const rig = F.rigs[F.n], pd = F.prevDir.get(p);
+			const turn = pd === undefined ? 0 : Math.atan2(Math.sin(p.dir - pd), Math.cos(p.dir - pd)) / dt;
+			F.prevDir.set(p, p.dir);
+			const near = p.role === "gk" ? clamp(1 - Math.hypot(ball.x - p.x, ball.y - p.y) / (260 * S), 0, 1) : 0;
+			pose3D(rig, p, WX(p.x), p.y, WD(p.dir), WX(1) < WX(0) ? -turn : turn, near);
+			rig.root.scale.setScalar(0.95 + 0.1 * build(p).seed);   // tall and short
+			commitFigure3D(rig, look(p), kit3D(p), p.num);
+		}
+		if (state === "play" || state === "goal" || state === "half" || state === "paused") { updateOfficials3(state === "play" || state === "goal" ? dt : 0); }
+		for (const o of officials3) {
+			if (F.n >= MAXF3) { break; }
+			const rig = F.rigs[F.n];
+			pose3D(rig, o, WX(o.x), o.y, WD(o.dir), 0, 0);
+			if (o !== officials3[0]) { rig.sh[1].rotation.z = -0.2; rig.sh[1].rotation.x = 0.35; rig.el[1].rotation.z = 0.25; }   // the flag hand
+			commitFigure3D(rig, o.look, REF_KIT3, null);
+		}
+		for (const k in F.parts) {
+			const m = F.parts[k];
+			m.count = F.cnt[k]; m.instanceMatrix.needsUpdate = true;
+			if (m.instanceColor) { m.instanceColor.needsUpdate = true; }
+		}
+		const tg = F.parts.torso.geometry;
+		tg.attributes.aPat.needsUpdate = true; tg.attributes.aCol2.needsUpdate = true;
+		for (const m of [ F.nums, F.rings, F.blobs ]) { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) { m.instanceColor.needsUpdate = true; } }
+		F.nums.geometry.attributes.aCell.needsUpdate = true;
+	}
+	/* ---------- the crowd in 3D ----------
+	   Every seat a fan: a body, a head, two arms and (for a few) a flag, as instances of one shape
+	   whose vertices are tagged by part. The vertex shader does all the moving (the sway, standing,
+	   jumping, arms up, a flag waved), driven by a handful of uniforms, so the crowd costs the CPU
+	   nothing per frame. The back rows of the far stand and the ends use a lighter shape (body and
+	   head only): at that distance arms are a pixel. The near stand is only drawn when the camera
+	   looks back at it. */
+	const crowdMood = { excite: 0, home: 0, away: 0, ooh: 0, wave: 0 };
+	const CROWD_U = { uTime: { value: 0 }, uExcite: { value: 0 }, uHome: { value: 0 }, uAway: { value: 0 }, uOoh: { value: 0 }, uWave: { value: 0 } };
+	// A fan's shape, facing +z (the pitch). Every camera looks at the stands from the pitch side, so
+	// the faces turned away from it (backs and bottoms) are left out.
+	function fanGeometry3D (lite) {
+		const pos = [], nor = [], part = [], idx = [];
+		const quad = (q, n, pt) => {
+			const b = pos.length / 3;
+			for (const [ x, y, z ] of q) { pos.push(x, y, z); nor.push(...n); part.push(pt); }
+			idx.push(b, b + 1, b + 2, b, b + 2, b + 3);
+		};
+		// A box narrower at the bottom than the top (wt, wb), its top face tagged topPt.
+		const box = (cx, cy, cz, wt, wb, sy, sz, pt, topPt = pt) => {
+			const ht = wt / 2, hb = wb / 2, hy = sy / 2, hz = sz / 2, y0 = cy - hy, y1 = cy + hy;
+			const sl = (ht - hb) / sy, ln = Math.hypot(1, sl);
+			quad([ [ cx - ht, y1, cz - hz ], [ cx - ht, y1, cz + hz ], [ cx + ht, y1, cz + hz ], [ cx + ht, y1, cz - hz ] ], [ 0, 1, 0 ], topPt);
+			quad([ [ cx - hb, y0, cz + hz ], [ cx + hb, y0, cz + hz ], [ cx + ht, y1, cz + hz ], [ cx - ht, y1, cz + hz ] ], [ 0, 0, 1 ], pt);
+			quad([ [ cx + hb, y0, cz + hz ], [ cx + hb, y0, cz - hz ], [ cx + ht, y1, cz - hz ], [ cx + ht, y1, cz + hz ] ], [ 1 / ln, -sl / ln, 0 ], pt);
+			quad([ [ cx - hb, y0, cz - hz ], [ cx - hb, y0, cz + hz ], [ cx - ht, y1, cz + hz ], [ cx - ht, y1, cz - hz ] ], [ -1 / ln, -sl / ln, 0 ], pt);
+		};
+		// A head: an eight-sided prism (its front half and sides) with hair on top.
+		const head = (cx, cy, r, hh) => {
+			const y0 = cy - hh / 2, y1 = cy + hh / 2, ring = [];
+			for (let k = 0; k < 8; k++) { const a = (k + 0.5) / 8 * Math.PI * 2; ring.push([ cx + Math.cos(a) * r, Math.sin(a) * r * 0.95 ]); }
+			for (let k = 0; k < 8; k++) {
+				const [ ax, az ] = ring[k], [ bx, bz ] = ring[(k + 1) % 8], mx = (ax + bx) / 2 - cx, mz = (az + bz) / 2, ml = Math.hypot(mx, mz);
+				if (mz / ml < -0.3) { continue; }
+				quad([ [ bx, y0, bz ], [ ax, y0, az ], [ ax, y1, az ], [ bx, y1, bz ] ], [ mx / ml, 0, mz / ml ], 1);
+			}
+			const b = pos.length / 3;
+			for (const [ x, z ] of ring) { pos.push(x, y1 + 0.5, z); nor.push(0, 1, 0); part.push(4); }
+			for (let k = 1; k < 7; k++) { idx.push(b, b + k + 1, b + k); }
+		};
+		box(0, 4.2, 0, 5.0, 3.9, 7.2, 3.0, 0);    // body, sitting (the shader stands him up)
+		if (lite) { box(0, 9.7, 0, 2.9, 2.9, 3.2, 2.8, 1, 4); } else { head(0, 9.7, 1.55, 3.2); }
+		if (!lite) {
+			box(-3.3, 9.5, 0, 1.1, 1.1, 6.5, 1.1, 2);   // arms, modelled raised; the shader lowers them
+			box(3.3, 9.5, 0, 1.1, 1.1, 6.5, 1.1, 2);
+			box(0, 14.5, 0, 6, 6, 4, 0.2, 3);           // a flag or scarf held up (folded away unless he has one)
+		}
+		const g = new THREE.BufferGeometry();
+		g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+		g.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3));
+		g.setAttribute("aPart", new THREE.Float32BufferAttribute(part, 1));
+		g.setIndex(idx);
+		return g;
+	}
+	let crowdMat3 = null;
+	function crowdMaterial3D () {
+		if (crowdMat3) { return crowdMat3; }
+		const m = crowdMat3 = new THREE.MeshLambertMaterial({ color: 0xffffff });
+		m.onBeforeCompile = sh => {
+			Object.assign(sh.uniforms, CROWD_U);
+			sh.vertexShader = sh.vertexShader
+				.replace("#include <common>", `#include <common>
+					attribute float aPart; attribute vec4 aFan; attribute vec3 aSkin;
+					uniform float uTime, uExcite, uHome, uAway, uOoh, uWave;`)
+				.replace("#include <color_vertex>", `#include <color_vertex>
+					if (aPart > 0.5 && aPart < 1.5) { vColor.rgb = aSkin; }
+					if (aPart > 3.5) { float hq = fract(aFan.x * 7.31); vColor.rgb = hq > 0.9 ? vec3(0.62, 0.5, 0.3) : hq > 0.8 ? vec3(0.45, 0.45, 0.45) : aSkin * 0.22 + vec3(0.02); }`)
+				.replace("#include <begin_vertex>", `
+					vec3 transformed = vec3(position);
+					float phase = aFan.x, side = aFan.y, standy = aFan.z, hasFlag = aFan.w;
+					float mood = side > 0.75 ? uHome : side < 0.25 ? uAway : 0.5 * uHome;
+					float up = max(mood, 0.0), down = max(-mood, 0.0);
+					float excite = clamp(uExcite + up * 0.7, 0.0, 1.0);
+					float stand = smoothstep(0.3, 0.7, excite * 0.85 + standy * 0.35 - 0.1 + uOoh * 0.4 * step(0.4, phase));
+					float t = uTime;
+					float sway = sin(t * (1.1 + phase * 0.8) + phase * 6.2832) * (0.35 + 1.4 * excite);
+					float bounce = up * abs(sin(t * (5.5 + phase * 2.5) + phase * 6.2832)) * (3.0 + 3.0 * phase) * step(0.35, standy + up * 0.5);
+					float ooh = uOoh * step(0.3, phase);
+					float armsUp = clamp(up * 1.3 * step(0.25, phase) + ooh * 1.2 + (excite - 0.75) * 2.0 * step(0.6, phase), 0.0, 1.0);
+					if (aPart < 0.5) { transformed.y *= 1.0 + 0.45 * stand; }
+					if ((aPart > 0.5 && aPart < 1.5) || aPart > 3.5) { transformed.y += 3.3 * stand - down * 1.2; transformed.z += down * 0.8; }
+					if (aPart > 1.5 && aPart < 2.5) {
+						transformed.y += 3.3 * stand;
+						float lift = armsUp;
+						transformed.y -= (1.0 - lift) * 7.0;
+						transformed.x = mix(transformed.x * 1.25, transformed.x * (0.45 + 0.55 * (1.0 - ooh)), lift);
+						transformed.y += lift * abs(sin(t * 6.0 + phase * 6.2832)) * 1.4 * up;
+						transformed.z += ooh * 0.9 * (1.0 - up);
+					}
+					if (aPart > 2.5 && aPart < 3.5) {
+						float show = hasFlag * clamp(uWave + up * 1.5 + (excite - 0.55) * 2.0, 0.0, 1.0) * stand;
+						transformed = vec3(0.0, 11.0, 0.0) + (transformed - vec3(0.0, 11.0, 0.0)) * show;
+						transformed.y += 3.3 * stand;
+						transformed.z += sin(t * 7.0 + phase * 6.2832 + transformed.x * 0.9) * 1.1 * show;
+					}
+					transformed.y += bounce;
+					transformed.x += sway * (0.4 + 0.6 * stand);
+				`);
+		};
+		m.customProgramCacheKey = () => "ff-crowd";
+		return m;
+	}
+	// Fill the four stands. f0, D, H: the stands' front gap, depth and height; xl..xr, zl..zr their ends.
+	function buildCrowd3D (st, f0, D, H, xl, xr, zl, zr) {
+		const T = THREE, ROWS = 12, SEAT = coarse ? 13 : 10, LITE_ROW = 6;
+		const gs = gstyle || { fill: 0.8 };
+		const hk = KITS[homeSide] || KITS[0], ak = KITS[1 - homeSide] || KITS[1];
+		const homeC = hk.outfield, homeC2 = hk.second || "#1f2a36", awayC = ak.outfield;
+		const neutrals = [ "#2c3135", "#4a5057", "#8a8f94", "#d9dcdf", "#1e2a38", "#5c4a3a", "#7a2f2f", "#2f4a6a" ];
+		const skins = [ "#f1c9a5", "#e0ac86", "#c68a5e", "#9c6a44", "#6e4a30", "#4a3222" ];
+		let h = 7919;
+		const rnd = () => (h = (h * 48271) % 2147483647) / 2147483647;
+		const cb = 55 * Z3 + 14, gHalf = (GOAL_B - GOAL_T) / 2 + 24;
+		const lists = { full: [], lite: [], near: [] };
+		// Each stand in its own frame: u along it, t from the front (0) to the back (1).
+		const sides = [
+			{ u: [ xl + 12, xr - 12 ], at: (u, t) => [ u, t * H, -f0 - t * D ], ry: 0, list: "far", away: [ 0.82, 1 ] },
+			{ u: [ xl + 12, xr - 12 ], at: (u, t) => [ u, t * H, FH + f0 + t * D ], ry: Math.PI, list: "near" },
+			{ u: [ zl + 12, zr - 12 ], at: (u, t) => [ -f0 - t * D, t * H, u ], ry: Math.PI / 2, list: "end" },
+			{ u: [ zl + 12, zr - 12 ], at: (u, t) => [ FW + f0 + t * D, t * H, u ], ry: -Math.PI / 2, list: "end" }
+		];
+		for (const sd of sides) {
+			const [ u0, u1 ] = sd.u, cols = Math.floor((u1 - u0) / SEAT);
+			for (let i = 0; i < ROWS; i++) {
+				const t = (i + 0.35) / ROWS;
+				for (let c = 0; c < cols; c++) {
+					const u = u0 + SEAT / 2 + c * SEAT + (i % 2 ? SEAT / 2 : 0), frac = (u - u0) / (u1 - u0);
+					if (u > u1) { continue; }
+					const away = sd.away && frac > sd.away[0] && frac < sd.away[1];
+					if (sd.list === "end" && t * H < cb && Math.abs(u - FH / 2) < gHalf) { continue; }   // the goal sits here
+					if (!(away ? rnd() < 0.9 : rnd() < gs.fill)) { continue; }   // an empty seat
+					const [ x, y, z ] = sd.at(u, t), q = rnd();
+					const color = away ? (q < 0.75 ? awayC : neutrals[Math.floor(rnd() * neutrals.length)])
+						: q < 0.55 ? homeC : q < 0.65 ? homeC2 : neutrals[Math.floor(rnd() * neutrals.length)];
+					const side = away ? 0 : color === homeC || color === homeC2 ? 1 : 0.5;
+					const fan = { x, y: y + 0.4, z, ry: sd.ry + (rnd() - 0.5) * 0.3, side, phase: rnd(), stand: rnd(), flag: rnd() < 0.07 ? 1 : 0, skin: skins[Math.floor(rnd() * skins.length)], color, scale: 1.5 + rnd() * 0.2, wide: 0.88 + rnd() * 0.26, tall: 0.9 + rnd() * 0.2 };
+					lists[sd.list === "near" ? "near" : i >= LITE_ROW ? "lite" : "full"].push(fan);
+				}
+			}
+		}
+		const mat = crowdMaterial3D(), M = new T.Matrix4(), P = new T.Vector3(), Sc = new T.Vector3(), Q = new T.Quaternion(), E = new T.Euler(), C = new T.Color();
+		const make = (fans, lite) => {
+			if (!fans.length) { return null; }
+			const geo = fanGeometry3D(lite), n = fans.length;
+			const mesh = new T.InstancedMesh(geo, mat, n);
+			const fa = new Float32Array(n * 4), sk = new Float32Array(n * 3);
+			fans.forEach((f, i) => {
+				M.compose(P.set(f.x, f.y, f.z), Q.setFromEuler(E.set(0, f.ry, 0)), Sc.set(f.scale * f.wide, f.scale * f.tall, f.scale));
+				mesh.setMatrixAt(i, M); mesh.setColorAt(i, C.set(f.color));
+				fa.set([ f.phase, f.side, f.stand, f.flag ], i * 4);
+				C.set(f.skin); sk.set([ C.r, C.g, C.b ], i * 3);
+			});
+			geo.setAttribute("aFan", new T.InstancedBufferAttribute(fa, 4));
+			geo.setAttribute("aSkin", new T.InstancedBufferAttribute(sk, 3));
+			mesh.frustumCulled = false;
+			mesh.userData.ownGeo = true;
+			st.add(mesh);
+			return mesh;
+		};
+		G3.crowd = { full: make(lists.full, false), lite: make(lists.lite, true), near: make(lists.near, false) };
+		G3.crowd.count = lists.full.length + lists.lite.length + lists.near.length;
+	}
+	// The stands' moods: excitement follows the match's heat; goals, chances and fouls give jolts that fade.
+	function animateCrowd3D () {
+		const k = frameDt / 1000, m = crowdMood;
+		m.excite += ((state === "play" || state === "goal" ? crowdHeat : 0.15) - m.excite) * Math.min(1, k * 2.5);
+		m.home *= Math.pow(0.5, k / 2.2); m.away *= Math.pow(0.5, k / 2.2);
+		m.ooh *= Math.pow(0.5, k / 0.6); m.wave *= Math.pow(0.5, k / 3);
+		CROWD_U.uTime.value = reduceMotion ? 0 : performance.now() / 1000;
+		CROWD_U.uExcite.value = reduceMotion ? 0.2 : m.excite;
+		CROWD_U.uHome.value = m.home; CROWD_U.uAway.value = m.away; CROWD_U.uOoh.value = m.ooh; CROWD_U.uWave.value = m.wave;
+	}
+	// Match events, for the stands. home/away here are the home club's fans and the visitors'.
+	function ev3d (kind, data) {
+		const m = crowdMood, homeFans = homeSide;
+		if (kind === "goal") {
+			if (data && data.scorer === homeFans) { m.home = 1; m.away = -1; m.wave = 1; } else { m.away = 1; m.home = -1; }
+			m.ooh = 0;
+		} else if (kind === "near" || kind === "ooh") { m.ooh = 1; m.excite = Math.min(1, m.excite + 0.35); }
+		else if (kind === "roar") { if (!(data > 0.8)) { m.home = Math.max(m.home, 0.5 * (data || 0.5)); } }
+		else if (kind === "groan") { m.home = Math.min(m.home, -0.5); }
+		else if (kind === "foul") { m.ooh = Math.max(m.ooh, 0.6); }
+		else if (kind === "save") { m.ooh = 1; if (data === homeFans) { m.home = Math.max(m.home, 0.5); } else { m.away = Math.max(m.away, 0.5); } }
+		else if (kind === "final") { const won = score[homeFans] > score[1 - homeFans], lost = score[homeFans] < score[1 - homeFans]; m.home = won ? 0.8 : lost ? -0.5 : 0; m.away = lost ? 0.8 : won ? -0.5 : 0; }
+		else if (kind === "chant") { m.wave = Math.max(m.wave, 0.7); }
+	}
+	// How far a spot on the pitch is from the 3D camera (sounds fade with it); 0 when not in 3D.
+	function listenerDist3D (x, y) {
+		if (camMode !== "3d" || !G3.cam) { return 0; }
+		const sw = endsSwapped(), p = G3.cam.position;
+		return Math.hypot((sw ? FW - x : x) - p.x, y - p.z, p.y);
 	}
 	// Which shot the broadcast is on: wide from the gantry between the action, tight behind a
 	// set piece, otherwise following the ball along the near stand.
@@ -7421,20 +8021,10 @@
 		// The camera sits in the near stand, so the stand and its roof are only drawn when a shot looks back at them.
 		if (G3.nearRoof) { for (const o of G3.nearRoof) { o.visible = G3.shot === "celeb"; } }
 		if (G3.nearStand) { G3.nearStand.visible = G3.shot === "celeb"; }
-		// Players: one figure each, made the first time he appears, dropped when he goes off.
-		const seen = new Set();
-		for (const p of players) {
-			let f = G3.figs.get(p);
-			if (!f) { f = figure3D(p); G3.figs.set(p, f); }
-			seen.add(p);
-			syncFigure3D(p, f, WX, WD);
-		}
-		for (const [ p, f ] of G3.figs) {
-			if (seen.has(p)) { continue; }
-			G3.scene.remove(f.root, f.disc, f.shadow);
-			f.disc.material.dispose(); f.shadow.material.dispose();
-			G3.figs.delete(p);
-		}
+		if (G3.crowd && G3.crowd.near) { G3.crowd.near.visible = G3.shot === "celeb"; }
+		// The players and the officials, posed and drawn as instances; the stands breathe with the match.
+		drawFigures3D(WX, WD);
+		animateCrowd3D();
 		// The ball, at its true height, rolling; its shadow stays on the grass.
 		const h = Math.max(0, ball.z || 0), bx = WX(ball.x), bz = ball.y;
 		G3.ball.position.set(bx, h * Z3 + 5, bz);
@@ -8236,6 +8826,7 @@
 			get charging () { return charging; }, get meterRect () { return meterRect; }, get drawMs () { return drawMs; }, get scale () { return scale; }, get kits () { return KITS; }, get stats () { return stats; }, get oppStats () { return oppStats; }, get steerAt () { return steerAt; }, set steerAt (v) { steerAt = v; }, set possTeam (v) { possTeam = v; },
 			set steerSwitchDone (v) { steerSwitchDone = !!v; },
 			get lastSwitchKind () { return lastSwitchKind; }, set lastSwitchKind (v) { lastSwitchKind = v; }, get setPiece () { return setPiece; },
+			get G3 () { return G3; }, get camMode () { return camMode; }, get crowdMood () { return crowdMood; }, get frameDt () { return frameDt; }, get crowdBed () { return crowd; }, get soundOn () { return soundOn; },
 			human, switchScore, outfield, dist,
 			step (n = 1) { for (let i = 0; i < n; i++) { snapshotPrev(); update(); } },
 			key (code, on) { if (on) { keys.add(code); } else { keys.delete(code); } },
