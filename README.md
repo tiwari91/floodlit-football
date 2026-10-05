@@ -26,6 +26,8 @@ Any key or tap skips the replay, and the match clock is stopped throughout.
 
 Graphics (Low, Medium or High, under the pitch and on the pause card) sets how much the 3D view draws: crowd density and detail, the floodlight towers' lattice, the players' floodlight shadows, pixel ratio and antialiasing. Phones start on Low (big tablets on Medium) and computers on High; your choice is remembered.
 
+Two more team instructions sit with Style and Defending: Line (high, normal or deep: a high line squeezes the pitch and plays offside, a deep one guards the space behind) and Tackling (stay on your feet, normal, or get stuck in for more tackles, more slides and more fouls and cards). The computer's line follows its press, and each club has its own way of tackling. Both are on the pause card too.
+
 Settings sit under the pitch in four groups (your team, the match, controls and view, sound and rules); the pause and half-time cards carry the mid-match ones (tactic, camera, auto switch, sound, music, hints, kit contrast, Graphics). Auto switch picks how control moves when you defend: Assisted, Manual only or Aggressive. Kit contrast dresses the other side in white or black with a dashed ring for colour vision that struggles with red on green. Half time and full time show both sides' possession, shots, passes, pass accuracy, tackles, corners, fouls and cards.
 
 On a phone, landscape fills the screen with the pitch and floats the joystick and pads over it; portrait keeps a tall pitch with the controls below. Xbox and PlayStation controllers work too.
