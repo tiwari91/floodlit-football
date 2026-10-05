@@ -434,6 +434,7 @@
 	}
 
 	.banner small { display: block; font-size: 0.2em; letter-spacing: 0.14em; font-weight: 700; opacity: 0.9; }
+	.banner.note { font-size: clamp(17px, 3.2vw, 32px); letter-spacing: 0.04em; width: min(86%, 760px); text-align: center; line-height: 1.15; }
 	.banner.home { color: var(--amber); }
 	.banner.away { color: var(--opp-text); }
 
@@ -1844,6 +1845,79 @@
 	let oppStats = { passes: 0, completed: 0, shots: 0, tackles: 0, corners: 0, fouls: 0, cards: 0 }, oppPending = false;   // the other side's, for the half-time and full-time comparison
 	const notePass = p => { if (p.team === 1) { oppStats.passes++; oppPending = true; } };
 	let matchInjuries = [];   // squad slots of your players hurt this match (they miss games after it)
+	let matchInjInfo = {};    // name -> { type, games, serious } for each of them
+	/* ---------- injuries ----------
+	   A knock: he limps on (slower, weaker shot) and misses a game or two. A serious one: play stops,
+	   the stretcher comes on and he's carried off; he misses weeks (matchdays). Heavy tackles cause
+	   most of them, "get stuck in" more than anyone; a player running on empty can pull something. */
+	const INJURIES = {
+		knock: [ [ "dead leg", 1, 1 ], [ "ankle knock", 1, 2 ], [ "bruised shin", 1, 1 ], [ "tight calf", 1, 2 ] ],
+		serious: [ [ "hamstring strain", 2, 4 ], [ "ankle ligaments", 3, 6 ], [ "groin strain", 2, 4 ], [ "knee ligaments", 5, 9 ], [ "broken toe", 3, 5 ] ]
+	};
+	function rollInjury (serious) {
+		const list = INJURIES[serious ? "serious" : "knock"], [ type, lo, hi ] = list[Math.floor(Math.random() * list.length)];
+		return { type, games: lo + Math.floor(Math.random() * (hi - lo + 1)), serious: !!serious };
+	}
+	const injLabel = pl => (pl.injType ? `${pl.injType} · ` : "");
+	function noteInjury (p, info) {
+		p.injured = true; p.injInfo = info;
+		if (p.team === 0 && p.name && league && league.club && leagueMatch) { if (!matchInjuries.includes(p.name)) { matchInjuries.push(p.name); } matchInjInfo[p.name] = info; }
+		if (p.attr) { p.attr = { ...p.attr, pac: Math.round(p.attr.pac * 0.85), sho: Math.round(p.attr.sho * 0.92) }; }
+		logEvent(p.team, "injury", `${p.name || "Player"} (${info.type}${info.serious ? ", stretchered off" : ""})`);
+	}
+	// The stretcher: two medics jog on from the near touchline, lift him and carry him off.
+	let stretcher = null;
+	function startStretcher (p, after) {
+		const side = p.y < FH / 2 ? -26 : FH + 26;
+		stretcher = { p, n: 0, from: { x: clamp(p.x, 40, FW - 40), y: side }, after, at: { x: p.x, y: p.y } };
+		freeze = 1; freezeKind = "stretcher";
+		charging = false;
+		caption("Injury", "red", p.name || (p.team === 0 ? "Your player" : opp.short), `${p.injInfo ? cap(p.injInfo.type) : "Injured"} · stretchered off`, p.team);
+		$("announce").textContent = `${p.name || "A player"} is hurt. The stretcher is coming on.`;
+		if (typeof crowdReact === "function") { crowdReact("near", 1 - p.team); }
+	}
+	const STRETCH_T = [ 70, 40, 90 ];   // jog on, lift, carry off
+	function stretcherPos () {
+		const s = stretcher;
+		if (!s) { return null; }
+		const n = s.n, [ a, b, c ] = STRETCH_T;
+		const lerp = (u, v, k) => ({ x: u.x + (v.x - u.x) * k, y: u.y + (v.y - u.y) * k });
+		if (n < a) { return { ...lerp(s.from, s.at, n / a), carry: false }; }
+		if (n < a + b) { return { ...s.at, carry: n > a + b * 0.5 }; }
+		return { ...lerp(s.at, s.from, Math.min(1, (n - a - b) / c)), carry: true };
+	}
+	function stepStretcher () {
+		const s = stretcher;
+		if (!s) { freeze = 0; return; }
+		s.n++;
+		if (players.includes(s.p)) { s.p.fall = Math.max(s.p.fall || 0, 20); s.p.vx = s.p.vy = 0; const q = stretcherPos(); if (q && q.carry) { s.p.x = q.x; s.p.y = clamp(q.y, -20, FH + 20); } }
+		if (s.n < STRETCH_T[0] + STRETCH_T[1] + STRETCH_T[2]) { return; }
+		stretcher = null;
+		const p = s.p;
+		p.x = s.at.x; p.y = s.at.y; p.fall = 0;
+		injuredOff(p);
+		freeze = 40; freezeKind = "free";
+		if (s.after) { s.after(); }
+	}
+	// Off he goes: a substitute comes on if there's one left, otherwise his side plays a man short.
+	function injuredOff (p) {
+		if (!players.includes(p)) { return; }
+		if (p.team === 1) {
+			if (cpuSubs > 0) { cpuSub(p, p.role, "injured"); p.x = clamp(p.x, 12, FW - 12); p.y = clamp(p.y, 12, FH - 12); return; }
+		} else if (subsLeft > 0 && !tut) {
+			const pool = subPool(), pick = pool.filter(pl => pl.pos === p.role).sort((a, b) => ovrNow(b) - ovrNow(a))[0] || pool.sort((a, b) => ovrNow(b) - ovrNow(a))[0];
+			if (pick) { makeSub(p, pick); p.x = clamp(p.x, 12, FW - 12); p.y = clamp(p.y, 12, FH - 12); toast("Change made for the injury", "#7fd49b"); return; }
+		}
+		// Nobody left to bring on: down to ten (or fewer).
+		const i = players.indexOf(p), cur = players[ctrl];
+		if (ball.owner === p) { ball.owner = null; }
+		if (receiver === p) { receiver = null; }
+		players.splice(i, 1);
+		dismissed.push([ p.team, p.idx ]);
+		ctrl = players.indexOf(cur);
+		if (ctrl < 0) { const mates = outfield(0); ctrl = players.indexOf(mates[0]); }
+		toast(`${p.team === 0 ? "You're" : `${opp.short} are`} down to ${team(p.team).length}`, "#de4f5a");
+	}
 	let matchCards = [];      // { sqi, kind: "y" | "r2" | "r" } for your players this match
 	let dismissed = [];       // [ team, idx ] of everyone sent off this match
 	// Substitutions: five changes a match. Who has come on and gone off (by name), and
@@ -2139,7 +2213,11 @@
 		const byName = n => [ ...league.club.squad, ...league.club.bench ].find(pl => pl.name === n);
 		for (const n of matchGoals) { const pl = byName(n); if (pl) { pl.goals = (pl.goals || 0) + 1; } }
 		for (const n of new Set([ ...team(0).map(p => p.name), ...wentOff ])) { const pl = byName(n); if (pl) { pl.apps = (pl.apps || 0) + 1; } }
-		for (const n of matchInjuries) { const pl = byName(n); if (pl) { pl.inj = 1 + Math.floor(Math.random() * 3); pl.wasStarter = true; } }
+		for (const n of matchInjuries) {
+			const pl = byName(n), info = matchInjInfo[n] || rollInjury(Math.random() < 0.3);
+			if (pl) { pl.inj = Math.max(pl.inj || 0, info.games); pl.injType = info.type; pl.wasStarter = true; }
+		}
+		matchInjInfo = {};
 		// Suspensions: a red is a ban (two games for a straight red), and five yellows in a season is one.
 		league.banned = [];
 		for (const c of matchCards) {
@@ -2151,7 +2229,7 @@
 			if (ban) { pl.ban = Math.max(pl.ban || 0, ban); pl.wasStarter = true; league.banned.push(`${pl.name} (${ban} game${ban === 1 ? "" : "s"}, ${c.kind === "y" ? "five yellows" : "red card"})`); }
 		}
 		matchCards = [];
-		league.injured = matchInjuries.map(byName).filter(Boolean).map(pl => `${pl.name} (${pl.inj} game${pl.inj === 1 ? "" : "s"})`);
+		league.injured = matchInjuries.map(byName).filter(Boolean).map(pl => `${pl.name} (${pl.injType ? pl.injType + ", " : ""}${pl.inj} game${pl.inj === 1 ? "" : "s"})`);
 		matchInjuries = [];
 		// Hurt starters come off the team sheet; ones back from a knock go straight back on it.
 		if (injuredStarters().length || league.recovered.length) { autoPick(!!league.club.autoRotate, true); }
@@ -2388,7 +2466,7 @@
 			btn.addEventListener("click", () => pickPlayer(list, i));
 			nameTd.append(btn);
 			if (slotPos && slotPos !== pl.pos) { nameTd.append(el("span", "oop", `as ${POS_LABEL[slotPos]}`)); }
-			if (pl.inj > 0) { nameTd.append(el("span", "inj", `injured · ${pl.inj} game${pl.inj === 1 ? "" : "s"}`)); }
+			if (pl.inj > 0) { nameTd.append(el("span", "inj", `✚ ${injLabel(pl)}out ${pl.inj} game${pl.inj === 1 ? "" : "s"}`)); }
 			else if (fitOf(pl) < TIRED) { nameTd.append(el("span", "oop", "▽ tired")); }
 			if (pl.ban > 0) { nameTd.append(el("span", "inj", `suspended · ${pl.ban} game${pl.ban === 1 ? "" : "s"}`)); }
 			else if (pl.ycount > 0) { nameTd.append(el("span", "oop", `${pl.ycount} yellow${pl.ycount === 1 ? "" : "s"}`)); }
@@ -2720,10 +2798,14 @@
 	// After a league match: whoever started loses fitness; everyone else recovers.
 	function updateFitness () {
 		const c = league.club, used = new Set(slotsFor(league.fmt));
-		league.recovered = [];
+		league.recovered = []; league.physio = [];
 		for (const pl of [ ...c.squad, ...c.bench ]) {
 			const was = pl.inj > 0 || pl.ban > 0;
-			if (pl.inj > 0) { pl.inj--; }
+			if (pl.inj > 0) {
+				pl.inj--;
+				if (pl.inj > 0 && Math.random() < staffLvl(c, "fitness") * 0.12) { pl.inj--; league.physio = [ ...(league.physio || []), pl.name ]; }
+				if (!(pl.inj > 0)) { pl.injType = ""; }
+			}
 			if (pl.ban > 0) { pl.ban--; }
 			if (was && !(pl.inj > 0) && !(pl.ban > 0) && pl.wasStarter) { league.recovered.push(pl.name); pl.wasStarter = false; }
 		}
@@ -2999,10 +3081,10 @@
 		const injury = (t, m) => {
 			const list = outfielders(t);
 			if (!list.length) { return; }
-			const p = list[Math.floor(Math.random() * list.length)];
-			logEvent(t, "injury", `${p.name || "Player"} hurt`, m);
+			const p = list[Math.floor(Math.random() * list.length)], info = rollInjury(Math.random() < 0.35);
+			logEvent(t, "injury", `${p.name || "Player"} (${info.type})`, m);
 			if (t === 0) {
-				if (leagueMatch && p.name) { matchInjuries.push(p.name); }
+				if (leagueMatch && p.name) { matchInjuries.push(p.name); matchInjInfo[p.name] = info; }
 				const pool = subPool().filter(pl => pl.pos === p.role).concat(subPool());
 				if (subsLeft > 0 && pool.length) { const saved = timeLeft; timeLeft = matchLen * (1 - m / 90); makeSub(p, pool[0], true); timeLeft = saved; } else { p.injured = true; }
 			} else if (cpuSubs > 0) {
@@ -3331,7 +3413,7 @@
 		fx = [];
 		freeze = KICKOFF_FREEZE;
 		freezeKind = "kickoff";
-		setPiece = null; deadBall = null; restartWalk = null; review = null;
+		setPiece = null; deadBall = null; restartWalk = null; review = null; stretcher = null;
 		lastTouch = -1;
 		for (const p of players) { p.tx = undefined; }
 		snapshotPrev();
@@ -4630,6 +4712,11 @@
 			if (--freeze <= 0) { finishReview(); }
 			return;
 		}
+		if (freeze > 0 && freezeKind === "stretcher") {
+			stepStretcher();
+			stepLimbs();
+			return;
+		}
 		if (freeze > 0 && freezeKind === "walk") {
 			stepWalk();
 			stepLimbs();
@@ -5392,12 +5479,12 @@
 		}
 		// A side can't be reduced below the minimum the laws allow (seven in the full game).
 		if (red && team(off.team).length - 1 < (N === 11 ? 7 : 3)) { red = false; card = "Yellow card, last warning"; matchCards = matchCards.filter(c => !(c.name === off.name && c.kind !== "y")); }
-		let hurt = false;
-		if (!vic.injured && Math.random() < (behind ? 0.22 : 0.06)) {
-			vic.injured = true;
+		let hurt = false, serious = false;
+		const rough = { hard: 1.6, normal: 1, careful: 0.6 }[tackling[off.team]] || 1;
+		if (!vic.injured && Math.random() < (behind ? 0.2 : 0.05) * rough) {
 			hurt = true;
-			if (t === 0 && vic.name && league && league.club && leagueMatch) { matchInjuries.push(vic.name); }
-			if (vic.attr) { vic.attr = { ...vic.attr, pac: Math.round(vic.attr.pac * 0.85), sho: Math.round(vic.attr.sho * 0.92) }; }
+			serious = Math.random() < (behind ? 0.42 : 0.22) * (rough > 1 ? 1.25 : 1) && !tut && !shoot;
+			noteInjury(vic, rollInjury(serious));
 		}
 		burst(off.x, off.y, card ? card.split(":")[0] : "Foul");
 		vic.fall = FALL_T; vic.vx = vic.vy = 0;
@@ -5406,8 +5493,8 @@
 		sfx("foul");
 		const inBox = inAttackBox(vic) && Math.abs(vic.x - attackX(t)) < FMT.box + 20;
 		const who = off.name ? ` by ${off.name}` : "";
-		let hurtText = hurt ? `${vic.name || "He"} is hurt and limping.${t === 0 && subsLeft > 0 ? " Press Subs to bring someone on." : ""}` : "";
-		if (hurt && t === 1 && cpuSubs > 0) {
+		let hurtText = hurt ? (serious ? `${vic.name || "He"} is badly hurt (${vic.injInfo.type}).` : `${vic.name || "He"} is hurt and limping (${vic.injInfo.type}).${t === 0 && subsLeft > 0 ? " Press Subs to bring someone on." : ""}`) : "";
+		if (hurt && !serious && t === 1 && cpuSubs > 0) {
 			const was = vic.name, np = genPlayer(vic.role, cpuOvr(clamp(Math.round(oppStrength), 1, 5)) - 3);
 			vic.name = np.name; vic.attr = { pac: np.pac, sho: np.sho, pas: np.pas, def: np.def }; vic.injured = false; vic.yellow = 0;
 			cpuSubs--;
@@ -5418,11 +5505,15 @@
 		const extra = [ card ? `${card}${who}.` : `Foul${who}.`, red ? `${off.team === 0 ? "You're" : `${opp.short} are`} down to ${team(off.team).length - 1} men.` : "", hurtText ].filter(Boolean).join(" ");
 		if (card) { logEvent(off.team, red ? "red" : "yellow", `${off.name || "Player"}${red ? ` (${card.toLowerCase()})` : ""}`); }
 		if (card) { caption(red ? (card.startsWith("Second") ? "Second yellow" : "Red card") : "Yellow card", red ? "red" : "yellow", off.name || (off.team === 0 ? "You" : opp.short), `${off.team === 0 ? "You" : opp.short} · ${minuteNow()}'`, off.team); }
-		if (hurt) { logEvent(t, "injury", `${vic.name || "Player"} hurt`); }
 		if (inBox) { logEvent(t, "pen", `Penalty won by ${vic.name || "Player"}`); }
 		// A soft one (obstruction rather than a kick) is an indirect free kick.
 		if (inBox) { awardPenalty(t, vic); } else { awardFreeKick(t, vic, { indirect: !card && !behind && Math.random() < 0.15 }); }
 		if (red) { sendOff(off); }
+		if (serious && players.includes(vic)) {
+			// The kick waits for the stretcher.
+			const sp = setPiece, w = freeze;
+			startStretcher(vic, () => { if (sp && players.includes(sp.taker)) { freeze = Math.max(freeze, Math.min(w, 45)); } });
+		}
 		$("announce").textContent = `${inBox ? "Penalty" : "Free kick"} to ${t === 0 ? "you" : opp.name}. ${extra}`;
 		if (card || hurt) { showFoulNote(extra, t); }
 		updateSubsBtn();
@@ -5511,6 +5602,9 @@
 	// When one of yours is running on empty (or limping), say so once and point at the pause card.
 	function tiredNudge () {
 		if (tut || shoot || mode === "tutorial" || subsLeft <= 0 || state !== "play" || autoPilot) { return; }
+		for (const q of players) {
+			if (q.role !== "gk" && !q.injured && staOf(q) < 0.4 && Math.random() < 0.0012) { noteInjury(q, rollInjury(false)); burst(q.x, q.y, "Pulled up"); if (q.team === 0) { toast(`${q.name || `No. ${q.num}`} has pulled up: sub him from Pause`, "#de4f5a"); } updateSubsBtn(); }
+		}
 		const p = team(0).find(q => q.role !== "gk" && !q.nudged && staOf(q) < TIRED_STA - 0.05);
 		if (p) { p.nudged = true; toast(`${p.name || `No. ${p.num}`} is tiring: sub from Pause`, "#f2b52e"); updateSubsBtn(); }
 	}
@@ -5587,7 +5681,7 @@
 
 	function showFoulNote (text, forTeam) {
 		banner.textContent = text;
-		banner.className = "banner " + (forTeam === 0 ? "home" : "away");
+		banner.className = "banner note " + (forTeam === 0 ? "home" : "away");
 		banner.hidden = false;
 		setTimeout(() => { if (banner.textContent === text) { banner.hidden = true; } }, 2200);
 	}
@@ -5637,7 +5731,7 @@
 	function awardPenalty (t, vic) {
 		const gx = attackX(t), inward = gx === FW ? -1 : 1;
 		// The best finisher on the pitch takes it.
-		const taker = outfield(t).filter(q => !q.injured || q === vic).reduce((a, b) => (A(a, "sho") >= A(b, "sho") ? a : b));
+		const taker = outfield(t).filter(q => !q.injured || (q === vic && !(q.injInfo && q.injInfo.serious))).reduce((a, b) => (A(a, "sho") >= A(b, "sho") ? a : b));
 		taker.x = gx + inward * FMT.spot; taker.y = FH / 2;
 		taker.dir = inward === -1 ? 0 : Math.PI;
 		const gk = team(1 - t).find(q => q.role === "gk");
@@ -6203,7 +6297,7 @@
 		score = [ 0, 0 ];
 		stats = { passes: 0, completed: 0, shots: 0, tackles: 0, aiTackles: 0, corners: 0, fouls: 0, cards: 0 };
 		oppStats = { passes: 0, completed: 0, shots: 0, tackles: 0, corners: 0, fouls: 0, cards: 0 }; oppPending = false;
-		matchInjuries = [];
+		matchInjuries = []; matchInjInfo = {};
 		matchCards = []; dismissed = [];
 		matchLog = []; matchGoals = [];
 		subsLeft = SUBS_MAX; cpuSubs = SUBS_MAX; subLog = []; cameOn = []; wentOff = []; subPick = {}; genericBench = null; cpuSubWin = 0; matchSta = {};
@@ -6473,7 +6567,7 @@
 		if (tut || shoot || mode === "tutorial" || mode === "corners" || !(state === "play" || state === "paused" || state === "goal" || state === "half") || !(timeLeft > 0)) { return; }
 		store.set("ff-live", JSON.stringify({
 			v: 1, key: liveKey(), score, timeLeft, momentum, possFrames, stats, ostats: oppStats, best: bestStreak, ment: mentality[0], lastConceded, half: halfDone, at: Date.now(),
-			off: dismissed, cards: matchCards, hurt: matchInjuries, subs: subLog, log: matchLog, goals: matchGoals,
+			off: dismissed, cards: matchCards, hurt: matchInjuries, hurtInfo: matchInjInfo, subs: subLog, log: matchLog, goals: matchGoals,
 			marks: players.filter(p => p.yellow || p.injured).map(p => [ p.team, p.idx, p.yellow || 0, p.injured ? 1 : 0 ]),
 			sta: players.map(p => [ p.team, p.idx, Math.round(staOf(p) * 100) ]), cpuWin: cpuSubWin
 		}));
@@ -6500,6 +6594,7 @@
 		cpuSubWin = clamp(Number(v.cpuWin) || 0, 0, 3);
 		if (Array.isArray(v.cards)) { matchCards = v.cards.filter(c => c && typeof c.name === "string"); }
 		if (Array.isArray(v.hurt)) { matchInjuries = v.hurt.filter(n => typeof n === "string"); }
+		if (v.hurtInfo && typeof v.hurtInfo === "object") { for (const [ n, i ] of Object.entries(v.hurtInfo)) { if (i && typeof i.type === "string" && Number.isFinite(i.games)) { matchInjInfo[n] = { type: i.type, games: clamp(i.games, 1, 12), serious: !!i.serious }; } } }
 		if (Array.isArray(v.log)) { matchLog = v.log.filter(e => e && typeof e.text === "string").slice(0, 200); }
 		if (Array.isArray(v.goals)) { matchGoals = v.goals.filter(n => typeof n === "string"); }
 		if (Array.isArray(v.subs)) { for (const [ i, n ] of v.subs) { const p = find(0, i), pl = subPool().find(q => q.name === n); if (p && pl) { makeSub(p, pl, true); } } }
@@ -6571,6 +6666,7 @@
 				if (league.recovered && league.recovered.length) { nudge += ` Available again: ${league.recovered.join(", ")}.`; }
 				if (league.banned && league.banned.length) { nudge += ` Suspended: ${league.banned.join(", ")}.`; }
 				if (league.injured && league.injured.length) { nudge += ` Injured and out: ${league.injured.join(", ")}; they've been taken off the team sheet.`; }
+				if (league.physio && league.physio.length) { nudge += ` Your fitness coach has ${league.physio.join(", ")} back a week early.`; }
 				if (tired.length) { nudge += ` ⚠ Before the next match: ${tiredText(tired)} Press "Rotate now", or turn on Auto-rotate in the squad panel.`; }
 				const rep2 = league.club.report;
 				if (rep2 && rep2.round === league.round && rep2.gains.length) { nudge += ` Training: ${rep2.gains.slice(0, 4).join(", ")}${rep2.gains.length > 4 ? ` and ${rep2.gains.length - 4 + (rep2.more || 0)} more` : ""}.`; }
@@ -7270,6 +7366,25 @@
 		ctx.restore();
 	}
 
+	// The stretcher and the two medics carrying it.
+	function drawStretcher (three) {
+		const q = stretcherPos();
+		if (!q) { return; }
+		const P = (x, y) => (three ? proj3D(x, clamp(y, -40, FH + 40), 0) : { x: MX + x, y: MY + y, k: 1 });
+		const a = P(q.x - 15, q.y), b = P(q.x + 15, q.y), m1 = P(q.x - 22, q.y), m2 = P(q.x + 22, q.y);
+		if (!a || !b || !m1 || !m2) { return; }
+		const k = three ? a.k : 1;
+		ctx.save();
+		ctx.strokeStyle = "#d9dee0"; ctx.lineWidth = Math.max(3, 8 * k);
+		ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+		for (const m of [ m1, m2 ]) {
+			const r = Math.max(4, 7 * k), y = three ? m.y - 14 * k : m.y;
+			ctx.fillStyle = "#f4f4f4"; ctx.strokeStyle = "rgba(0, 0, 0, 0.5)"; ctx.lineWidth = 1;
+			ctx.beginPath(); ctx.arc(m.x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+			ctx.fillStyle = "#d8343f"; ctx.fillRect(m.x - r * 0.18, y - r * 0.62, r * 0.36, r * 1.24); ctx.fillRect(m.x - r * 0.62, y - r * 0.18, r * 1.24, r * 0.36);
+		}
+		ctx.restore();
+	}
 	// Running on empty: a battery with a sliver of red left.
 	function drawTired (x, y) {
 		ctx.save();
@@ -8196,6 +8311,7 @@
 		if (benchCam()) { return [ clamp(MX + FW / 2 - VW / 2, 0, Math.max(0, WW - VW)), Math.max(0, WH - VH) ]; }
 		// After a goal the camera stays on the scorer.
 		if (celebTracking()) { const h = celeb.hero; return [ clamp(MX + h.x - VW / 2, 0, Math.max(0, WW - VW)), clamp(MY + h.y - VH / 2, 0, Math.max(0, WH - VH)) ]; }
+		if (stretcher) { const q = stretcherPos() || stretcher.at; return [ clamp(MX + q.x - VW / 2, 0, Math.max(0, WW - VW)), clamp(MY + q.y - VH / 2, 0, Math.max(0, WH - VH)) ]; }
 		// Follow whoever has the ball (or the ball itself when loose), looking a little ahead.
 		const o = ball.owner, fx0 = o ? o.x : ball.x, fy0 = o ? o.y : ball.y, vx = o ? o.vx : ball.vx, vy = o ? o.vy : ball.vy;
 		const lx = fx0 + vx * 14, ly = fy0 + vy * 14;
@@ -8266,6 +8382,7 @@
 		drawAim();
 		drawPenAim(false);
 		drawReview(false);
+		drawStretcher(false);
 		if (tut && tut.marker) {
 			const mx = MX + tut.marker.x, my = MY + tut.marker.y, pulse = reduceMotion ? 0 : Math.sin(frame * 0.12) * 4;
 			ctx.save();
@@ -8374,7 +8491,7 @@
 			const bz = Math.max(0, ball.z);
 			ctx.fillStyle = `rgba(0, 0, 0, ${0.4 / (1 + bz / 40)})`;
 			ctx.beginPath(); ctx.ellipse(MX + ball.x + bz * 0.15, MY + ball.y + bz * 0.1, 5 + bz * 0.04, 3 + bz * 0.03, 0, 0, Math.PI * 2); ctx.fill();
-			drawFreeKickSpray(); drawPassTarget(); drawStrikerMarker(); drawSwitchPreview(); drawOffsideLine(); drawAim(); drawPenAim(false); drawReview(false);
+			drawFreeKickSpray(); drawPassTarget(); drawStrikerMarker(); drawSwitchPreview(); drawOffsideLine(); drawAim(); drawPenAim(false); drawReview(false); drawStretcher(false);
 			if (tut && tut.marker) {
 				ctx.strokeStyle = "#f2b52e"; ctx.lineWidth = 3;
 				ctx.beginPath(); ctx.arc(MX + tut.marker.x, MY + tut.marker.y, 24, 0, Math.PI * 2); ctx.stroke();
@@ -9945,6 +10062,14 @@
 			out.look.set(WX(h.x), 16, h.y + (nearSide ? 30 : -30));
 			return out;
 		}
+		if (stretcher && state === "play") {
+			// The stretcher: the camera goes to the injured man.
+			const q = stretcherPos() || stretcher.at;
+			out.kind = "stretcher";
+			out.eye.set(WX(q.x), 150, clamp(q.y + 320, 120, FH + MY * 0.8));
+			out.look.set(WX(q.x), 4, q.y);
+			return out;
+		}
 		if (setPiece && setPiece.taker && o === setPiece.taker && state === "play" && (setPiece.kind === "free" || setPiece.kind === "pen")) {
 			const gx = attackX(setPiece.team), dx0 = gx - ball.x, dy0 = FH / 2 - ball.y, L = Math.hypot(dx0, dy0) || 1, dx = dx0 / L, dy = dy0 / L;
 			out.kind = "set" + setPiece.kind + setPiece.team;
@@ -10186,6 +10311,7 @@
 		drawMinimap();
 		drawPenAim(true);
 		drawReview(true);
+		drawStretcher(true);
 		drawHints();
 		drawPowerMeter();
 		drawToasts();
@@ -10971,7 +11097,7 @@
 				passTo(c, f);
 				return f;
 			},
-			get restartWalk () { return restartWalk; }, get review () { return review; }, get cpuSubs () { return cpuSubs; }, staOf, get offside () { return offside; }, get deadBall () { return deadBall; }, get tally () { return tally; }, get freezeKind () { return freezeKind; }, fkDist () { return fkDist(); }, simExtra () { return { tally, poss: possFrames.slice() }; }, get setPieceKind () { return setPiece ? setPiece.kind : null; }, get gfxLevel () { return gfxLevel; }, setGfx, get musicBar () { return music ? music.bar : -1; }, get audioState () { return audio ? audio.state : "none"; }, get replayOn () { return replayOn(); }, get replay () { return replay; }, get recFrames () { return rec.n; }, REPLAY_AT, REPLAY_FR, GOAL_CELEB, get lastCaption () { return lastCaption; }, caption, get camMode () { return camMode; }, get crowdMood () { return crowdMood; }, get frameDt () { return frameDt; }, get crowdBed () { return crowd; }, get soundOn () { return soundOn; },
+			get restartWalk () { return restartWalk; }, get review () { return review; }, get cpuSubs () { return cpuSubs; }, get stretcher () { return stretcher; }, injureTest (t, serious) { const v = outfield(t).find(p => !p.injured); const o = outfield(1 - t)[0]; if (v && o) { tackling[1 - t] = "hard"; const r = Math.random; Math.random = () => 0.01; try { commitFoul(o, v, true); } finally { Math.random = r; } } return v; }, staOf, get offside () { return offside; }, get deadBall () { return deadBall; }, get tally () { return tally; }, get freezeKind () { return freezeKind; }, fkDist () { return fkDist(); }, simExtra () { return { tally, poss: possFrames.slice() }; }, get setPieceKind () { return setPiece ? setPiece.kind : null; }, get gfxLevel () { return gfxLevel; }, setGfx, get musicBar () { return music ? music.bar : -1; }, get audioState () { return audio ? audio.state : "none"; }, get replayOn () { return replayOn(); }, get replay () { return replay; }, get recFrames () { return rec.n; }, REPLAY_AT, REPLAY_FR, GOAL_CELEB, get lastCaption () { return lastCaption; }, caption, get camMode () { return camMode; }, get crowdMood () { return crowdMood; }, get frameDt () { return frameDt; }, get crowdBed () { return crowd; }, get soundOn () { return soundOn; },
 			human, switchScore, outfield, dist,
 			get officials () { return officials3; }, get flagCall () { return flagCall; }, refKit, deltaE,
 			proj (x, y, z) { return G3.cam ? proj3D(x, y, z) : null; }, get viewScale () { return scale; },
