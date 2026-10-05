@@ -578,6 +578,7 @@
 
 	.forecast li b { font-family: var(--display); font-size: 16px; color: var(--text); }
 	.forecast li.wet-season { border-color: #33506a; }
+	.forecast li .fc-ko { font-size: 12px; line-height: 1; color: var(--text); letter-spacing: 0.02em; }
 	.forecast li.fc-rain { background: #1a2a36; color: #9fc2e3; }
 	.forecast li.fc-heavy { background: #20344a; color: #c4dcf3; }
 	.forecast li.now { outline: 2px solid var(--amber); outline-offset: -1px; }
@@ -1165,6 +1166,7 @@
 					<option value="clear" selected>Clear</option>
 					<option value="rain">Rain</option>
 					<option value="heavy">Heavy rain</option>
+					<option value="windy">Windy</option>
 				</select>
 			</label>
 			<label class="field" for="ground" id="groundField">Ground
@@ -1232,7 +1234,7 @@
 			<div class="lg-side">
 				<div class="lg-next" id="lgNext"></div>
 				<div class="lg-up"><h4 id="lgRecord">Upcoming</h4><ol class="upcoming" id="lgUpcoming"></ol></div>
-				<div class="lg-fc"><h4>Forecast <span class="rainy">Rainy season: matchdays 10 to 26</span></h4><ol class="forecast" id="lgForecast"></ol></div>
+				<div class="lg-fc"><h4>Forecast <span class="rainy">Rainy season: matchdays 10 to 26 · ☾ night · ☀ afternoon · ≈ windy</span></h4><ol class="forecast" id="lgForecast"></ol></div>
 				<div class="lg-round"><h4 id="lgRoundTitle">Latest results</h4><ul id="lgRound"></ul></div>
 			</div>
 			<div class="lg-tablewrap">
@@ -1328,7 +1330,7 @@
 		<p class="fine"><b>Pass and they wilt.</b> String passes together and your side grows in confidence: sharper passing and touches, and the momentum bar swings your way (5 in a row gets a mention, 10 gets an Olé). The side chasing the ball gets tense: stray passes, heavy first touches, late and rash challenges, shakier keeping. It works both ways, so if the computer keeps it off you, your players get nervy too. Win the ball back, keep it for a few passes or score, and the nerves settle; a goal against the run of play flips the game.</p>
 		<p class="fine"><b>Crowd and music.</b> The crowd swells as the ball nears a goal, the home end sings with a drum beating under it, goals get a roar (or a groan from the home fans), and hard saves get an "ooh". After a long quiet spell, or with the home side cruising, the 3D crowd starts a Mexican wave that runs round the bowl. The menus play a stadium anthem in the Mexican style (two trumpets, guitarrón bass, strummed vihuela, güiro and drums); turn it off with Music.</p>
 		<p class="fine"><b>Goals.</b> The scorer wheels away to the corner, slides on his knees in front of the fans and is mobbed by his teammates while the other side trudges back and their keeper fetches the ball out of the net, which bulges and swings where the ball hit it. A caption names the scorer and the minute, and the score bug flashes. In the 3D view the celebration then gives way to an instant replay of the build-up in slow motion, from high behind the goal or low beside it, before the camera goes back to the scorer and cuts wide for the restart. The match clock is stopped throughout. Any key, button or tap skips the celebration and the replay. Cards and substitutions get captions too.</p>
-		<p class="fine"><b>Weather and grounds.</b> Every club has a home ground: grass, muddy or artificial turf. Mud slows the ball and the players and kills the bounce. Turf is quick and true. Rain makes grass and turf skid, makes mud heavier, costs players grip on the turn, sends passes a little astray and makes shots harder for keepers to hold. In the league, matchdays 10 to 26 are the rainy season, and the forecast is shown in advance. In a friendly, pick the weather and ground yourself.</p>
+		<p class="fine"><b>Weather and grounds.</b> Every club has a home ground: grass, muddy or artificial turf. Mud slows the ball and the players and kills the bounce. Turf is quick and true. Rain holds the ball up (heavy rain and mud most of all), costs players grip on the turn, sends passes a little astray and makes shots harder for keepers to hold, so they spill more. Wind pushes the ball while it is in the air: long balls, crosses, corners and lofted shots carry with it and hang against it; the arrow and speed at the top left of the pitch show which way it blows. League fixtures kick off in the afternoon or at night under the floodlights, with the stands dark around a lit pitch. In the league, matchdays 10 to 26 are the rainy season, windier and mostly at night, and the forecast is shown in advance (☾ night, ☀ afternoon, ≈ windy); the kick-off card gives the time, the rain and which way the wind blows for you. In a friendly, pick the weather (including Windy) and ground yourself.</p>
 		<p class="fine"><b>Your season, backed up.</b> Your league saves in this browser. Export league saves it to a file; Import league loads a file back (press twice to confirm, since it replaces the season you have). Use it to keep a backup or carry your season to another browser or device.</p>
 		<p class="fine"><b>Big pitch.</b> The ground fills the screen with just a small score bug for the score and the clock. "Show menu" at the top right of the pitch (or F) brings back the title, the mode tabs and the full scoreboard; "Hide menu" puts it away again.</p>
 		<p class="fine"><b>Pause card.</b> Pause (P or Esc) stops the clock and puts the match settings in reach: tactic, camera, auto switch, sound, music, hints, kit contrast and Graphics, plus substitutions, Simulate the rest and How to play. The half-time card has the same switches.</p>
@@ -1575,25 +1577,54 @@
 	const WEATHER = {
 		clear: { label: "Clear", wet: 0, speed: 1, grip: 1, handling: 1 },
 		rain: { label: "Rain", wet: 1, speed: 0.98, grip: 0.86, handling: 0.88 },
-		heavy: { label: "Heavy rain", wet: 2, speed: 0.96, grip: 0.76, handling: 0.78 }
+		heavy: { label: "Heavy rain", wet: 2, speed: 0.96, grip: 0.76, handling: 0.78 },
+		windy: { label: "Windy", wet: 0, speed: 1, grip: 1, handling: 1, gust: 34 }
 	};
+	// Wind: km/h and the way it blows, as an angle in pitch coordinates (0 blows towards the goal
+	// on the right, the one you attack first). It pushes the ball only while it is in the air.
+	const windWord = s => (s >= 30 ? "a gale" : s >= 20 ? "a strong wind" : s >= 10 ? "a breeze" : "a light breeze");
 	let cond = null;   // this match's combined surface + weather
-	function makeConditions (surfaceKey, weatherKey) {
+	function makeConditions (surfaceKey, weatherKey, wind, ko) {
 		const sf = SURFACES[surfaceKey] || SURFACES.grass, w = WEATHER[weatherKey] || WEATHER.clear;
-		const roll = Math.min(0.992, Math.max(0.968, sf.roll + (surfaceKey === "mud" ? -0.003 : 0.0025) * w.wet));   // runs at load, before clamp exists
+		// Standing water holds the ball up on every surface, and mud most of all.
+		const roll = Math.min(0.992, Math.max(0.968, sf.roll - (surfaceKey === "mud" ? 0.003 : 0.0016) * w.wet));   // runs at load, before clamp exists
+		const wd = wind && Number.isFinite(wind.s) ? wind : { s: w.gust || 0, a: w.gust ? (Math.random() < 0.5 ? 0 : Math.PI) + (Math.random() - 0.5) * 0.8 : 0 };
+		const ws = Math.round(Math.min(50, Math.max(0, wd.s))), wa = Number.isFinite(wd.a) ? wd.a : 0, wk = 0.0006 * ws * (S || 1.7);
 		return {
+			wind: { s: ws, a: wa, ax: Math.cos(wa) * wk, ay: Math.sin(wa) * wk }, ko: ko === "day" ? "day" : "night",
 			surfaceKey: SURFACES[surfaceKey] ? surfaceKey : "grass", weatherKey: WEATHER[weatherKey] ? weatherKey : "clear",
 			roll, speed: sf.speed * w.speed, grip: sf.grip * w.grip, bounce: sf.bounce * (1 - 0.15 * w.wet),
-			land: sf.land, handling: w.handling, wet: w.wet,
+			land: sf.land * (1 - 0.06 * w.wet), handling: w.handling, wet: w.wet,
 			// Passes are hit harder on a slow pitch and softer on a quick one, but not all the way.
 			passComp: Math.pow((1 - roll) / 0.015, 0.8),
-			label: `${w.label} · ${sf.label}`
+			label: `${w.wet || ws < 20 ? (weatherKey === "windy" ? "Clear" : w.label) : "Windy"} · ${sf.label}`
 		};
+	}
+	// The kick-off card's line on the conditions: the time, the rain, the wind and which way it blows for you.
+	function conditionsText () {
+		const w = cond.wind, rain = cond.wet === 2 ? "heavy rain (the ball holds up in the puddles and keepers spill more)" : cond.wet ? "rain (a slower, skiddy ball and keepers who spill more)" : "dry";
+		let wind = "";
+		if (w.s >= 6) {
+			const along = Math.cos(w.a);
+			const how = Math.abs(along) > 0.5 ? (along > 0 ? "at your backs in the first half and in your faces after the break" : "in your faces in the first half and at your backs after the break") : "across the pitch";
+			wind = `; ${windWord(w.s)} (${w.s} km/h) ${how}${w.s >= 15 ? ", carrying long balls and crosses" : ""}`;
+		}
+		return `${cond.ko === "day" ? "an afternoon kick-off" : "a night kick-off under the floodlights"}; ${rain}${wind}; ${SURFACES[cond.surfaceKey].label.toLowerCase()}`;
 	}
 	cond = makeConditions("grass", "clear");
 
 	// League forecast. Matchdays 10 to 26 are the rainy season (autumn into winter).
 	const isRainy = r => r >= 9 && r <= 25;
+	// Wind and kick-off time for each matchday: winter is windier and more of it is played at night.
+	function genWind (n) {
+		return Array.from({ length: n }, (_, r) => {
+			const x = Math.random(), wet = isRainy(r);
+			const s = x < (wet ? 0.35 : 0.55) ? Math.random() * 9 : x < (wet ? 0.8 : 0.9) ? 10 + Math.random() * 14 : 24 + Math.random() * 18;
+			return { s: Math.round(s), a: Math.round(Math.random() * 628) / 100 };
+		});
+	}
+	const genKickoff = n => Array.from({ length: n }, (_, r) => (Math.random() < (isRainy(r) ? 0.65 : 0.35) ? "night" : "day"));
+	const koLabel = k => (k === "day" ? "3pm" : "7.45pm");
 	function genForecast (n) {
 		return Array.from({ length: n }, (_, r) => {
 			const x = Math.random();
@@ -1780,6 +1811,8 @@
 		ensureCoaching(lg.club, lg);
 		if (!Array.isArray(lg.clubStr) || lg.clubStr.length !== TEAMS.length) { lg.clubStr = TEAMS.map(t => t.str); }
 		if (!Array.isArray(lg.weather) || lg.weather.length !== lg.fixtures.length) { lg.weather = genForecast(lg.fixtures.length); }
+		if (!Array.isArray(lg.wind) || lg.wind.length !== lg.fixtures.length || !lg.wind.every(w => w && Number.isFinite(w.s) && Number.isFinite(w.a))) { lg.wind = genWind(lg.fixtures.length); }
+		if (!Array.isArray(lg.ko) || lg.ko.length !== lg.fixtures.length) { lg.ko = genKickoff(lg.fixtures.length); }
 		return lg;
 	}
 
@@ -2181,6 +2214,8 @@
 			clubStr,
 			paid: false,
 			weather: genForecast(fixtures.length),
+			wind: genWind(fixtures.length),
+			ko: genKickoff(fixtures.length),
 			news: [
 				youDown ? "You finished in the relegation zone. The board kept you up but halved the budget." : "",
 				promoted.length ? `Promoted: ${promoted.map(i => TEAMS[i].name).join(", ")}.` : "",
@@ -2384,7 +2419,8 @@
 			det.append(el("span", "stars", stars(getStr(f.opp))), document.createTextNode(` rating. You are ${ordinal(myPos)} on ${me.pts} point${me.pts === 1 ? "" : "s"}.`));
 			next.append(det);
 			const host = f.home ? YOU : o;
-			next.append(el("span", "detail", `${host.ground} · ${SURFACES[host.surface].label} · Forecast: ${WEATHER[league.weather[f.round]].label.toLowerCase()}`));
+			const wn = league.wind[f.round];
+			next.append(el("span", "detail", `${host.ground} · ${SURFACES[host.surface].label} · ${league.ko[f.round] === "day" ? "Afternoon" : "Night"} kick-off, ${koLabel(league.ko[f.round])} · Forecast: ${WEATHER[league.weather[f.round]].label.toLowerCase()}, ${wn.s >= 6 ? `${windWord(wn.s)} of ${wn.s} km/h` : "still air"}`));
 			const tired = tiredStarters();
 			if (tired.length) { next.append(el("span", "detail tiredwarn", `⚠ ${tiredText(tired)}`)); }
 		}
@@ -2492,8 +2528,9 @@
 		league.weather.forEach((w, r) => {
 			if (r < league.round || r >= league.round + 10) { return; }
 			const li = el("li", `fc-${w}${r === league.round ? " now" : ""}${r < league.round ? " past" : ""}${isRainy(r) ? " wet-season" : ""}`);
-			li.append(el("b", "", String(r + 1)), el("span", "", w === "clear" ? "Dry" : w === "rain" ? "Rain" : "Heavy"));
-			li.title = `Matchday ${r + 1}: ${WEATHER[w].label}`;
+			const wn = league.wind[r], ko = league.ko[r];
+			li.append(el("b", "", String(r + 1)), el("span", "", w === "clear" ? "Dry" : w === "rain" ? "Rain" : "Heavy"), el("span", "fc-ko", `${ko === "day" ? "☀" : "☾"}${wn.s >= 20 ? "≈" : ""}`));
+			li.title = `Matchday ${r + 1}: ${WEATHER[w].label}, wind ${wn.s} km/h, ${ko === "day" ? "afternoon" : "night"} kick-off`;
 			ol.append(li);
 		});
 	}
@@ -3239,7 +3276,7 @@
 		if (leagueMatch) {
 			const o = TEAMS[leagueMatch.opp];
 			showOverlay(`Matchday ${leagueMatch.round + 1}`,
-				`${o.name}, ${leagueMatch.home ? "at home" : "away"} at ${(leagueMatch.home ? YOU : o).ground}. Rated ${stars(Math.round(getStr(leagueMatch.opp)))}. ${keyMen()}${coachBrief()}Conditions: ${cond.label.toLowerCase()}. You kick off, attacking the goal on the right.`, "Kick off");
+				`${o.name}, ${leagueMatch.home ? "at home" : "away"} at ${(leagueMatch.home ? YOU : o).ground}. Rated ${stars(Math.round(getStr(leagueMatch.opp)))}. ${keyMen()}${coachBrief()}Conditions: ${conditionsText()}. You kick off, attacking the goal on the right.`, "Kick off");
 			$("ovSim").textContent = "Simulate match";
 			$("ovSim").hidden = false;
 			offerSeasonSim();
@@ -3264,7 +3301,7 @@
 			return;
 		}
 		const newHere = store.get("ff-tut-done") ? "" : "New here? Try the Tutorial button at the top first. ";
-		showOverlay("Friendly · practice match", `${newHere}A practice match: the result doesn't count toward your season. ${keyMen()}Conditions: ${cond.label.toLowerCase()}. You kick off, attacking the goal on the right. Move with the arrows. S passes, W plays a through ball, D shoots, Q hits a long ball to the striker, A tackles, E sprints.`, "Kick off");
+		showOverlay("Friendly · practice match", `${newHere}A practice match: the result doesn't count toward your season. ${keyMen()}Conditions: ${conditionsText()}. You kick off, attacking the goal on the right. Move with the arrows. S passes, W plays a through ball, D shoots, Q hits a long ball to the striker, A tackles, E sprints.`, "Kick off");
 			$("ovSim").textContent = "Simulate match";
 			$("ovSim").hidden = false;
 		}
@@ -3799,6 +3836,7 @@
 		while (k < 160 && (z > 0 || vz > 0)) {
 			x += vx; y += vy; z += vz; vz -= GRAV + (ball.dipG || 0);
 			if (ct > 0) { vx += ball.cax; vy += ball.cay; ct--; }
+			if (cond.wind.s) { const h = Math.min(1, Math.max(0, z) / 30); vx += cond.wind.ax * h; vy += cond.wind.ay * h; }
 			vx *= AIR_DRAG; vy *= AIR_DRAG; k++;
 		}
 		ball.landX = clamp(x, 12, FW - 12); ball.landY = clamp(y, 12, FH - 12); ball.landT = k;
@@ -5345,6 +5383,7 @@
 			ball.z += ball.vz;
 			ball.vz -= GRAV + (ball.dipG || 0);
 			if (ball.curlT > 0) { ball.vx += ball.cax; ball.vy += ball.cay; ball.curlT--; }
+			if (cond.wind.s) { const h = Math.min(1, ball.z / 30); ball.vx += cond.wind.ax * h; ball.vy += cond.wind.ay * h; }
 			ball.vx *= AIR_DRAG;
 			ball.vy *= AIR_DRAG;
 			if (ball.z <= 0) {
@@ -6365,8 +6404,8 @@
 		setOpponent(leagueMatch ? TEAMS[leagueMatch.opp] : FRIENDLY, !leagueMatch || leagueMatch.home);
 		homeSide = !leagueMatch || leagueMatch.home ? 0 : 1;
 		cond = leagueMatch
-			? makeConditions((leagueMatch.home ? YOU : TEAMS[leagueMatch.opp]).surface, league.weather[leagueMatch.round])
-			: makeConditions(groundSel.value, weatherSel.value);
+			? makeConditions((leagueMatch.home ? YOU : TEAMS[leagueMatch.opp]).surface, league.weather[leagueMatch.round], league.wind[leagueMatch.round], league.ko[leagueMatch.round])
+			: makeConditions(groundSel.value, weatherSel.value, null, "night");
 		// Home advantage: the visitors play a little below their rating.
 		// Home advantage: the visitors play a little below their rating.
 		oppStrength = leagueMatch ? getStr(leagueMatch.opp) + (leagueMatch.home ? -0.3 : 0.3) : { easy: 2, normal: 3, hard: 4.5 }[diffSel.value] || 3;
@@ -7089,6 +7128,8 @@
 		ctx.fillStyle = forTex ? (cond.surfaceKey === "turf" ? "#1d6a3d" : "#1a5631") : "#0f1d16";   // in 3D the grass runs on to the boards
 		ctx.fillRect(0, 0, WW, WH);
 		drawStands(forTex);
+		// Night: the stands sink into the dark round the floodlit pitch. Afternoon: daylight on the terraces.
+		if (!forTex) { ctx.fillStyle = cond.ko === "day" ? "rgba(214, 226, 238, 0.12)" : "rgba(1, 3, 7, 0.34)"; ctx.fillRect(0, 0, WW, WH); }
 
 		const gc = grassCanvas();
 		if (gc) { ctx.drawImage(gc, MX, MY); } else { paintGrass(ctx, MX, MY, false); }
@@ -7096,7 +7137,7 @@
 		// Floodlight pools from the four corner masts.
 		for (const [ cx, cy ] of [ [ MX, MY ], [ MX + FW, MY ], [ MX, MY + FH ], [ MX + FW, MY + FH ] ]) {
 			const g = ctx.createRadialGradient(cx, cy, 10, cx, cy, 560 * S);
-			g.addColorStop(0, `rgba(255, 222, 160, ${0.16 + 0.06 * cond.wet})`);   // wet grass throws the light back
+			g.addColorStop(0, `rgba(255, 222, 160, ${(cond.ko === "day" ? 0.04 : 0.2) + 0.06 * cond.wet})`);   // wet grass throws the light back
 			g.addColorStop(1, "rgba(255, 222, 160, 0)");
 			ctx.fillStyle = g;
 			ctx.fillRect(MX, MY, FW, FH);
@@ -7872,13 +7913,26 @@
 		ctx.font = "700 12px Barlow, Arial, sans-serif";
 		ctx.textAlign = "left";
 		ctx.textBaseline = "middle";
-		const text = cond.label.toUpperCase(), w = ctx.measureText(text).width;
+		const text = `${cond.label} · ${cond.ko === "day" ? "Afternoon" : "Night"}`.toUpperCase(), w = ctx.measureText(text).width;
 		// On a narrow screen the score bug sits top left too, so the tags drop below it.
 		const top = canvas.clientWidth < 640 && document.body.classList.contains("big") && overlay.hidden ? 78 : 10;
 		ctx.fillStyle = "rgba(7, 12, 10, 0.6)";
 		ctx.fillRect(10, top, w + 16, 22);
 		ctx.fillStyle = "rgba(238, 246, 234, 0.9)";
 		ctx.fillText(text, 18, top + 11.5);
+		// The wind: an arrow the way it blows on screen (flipped with the picture after half time) and its speed.
+		if (cond.wind.s >= 6) {
+			const wtx = `${cond.wind.s} KM/H`, ww = ctx.measureText(wtx).width, x0 = 10 + w + 22;
+			const sx = Math.cos(cond.wind.a) * (endsSwapped() ? -1 : 1), sy = Math.sin(cond.wind.a) * (camMode === "top" ? 1 : 0.55), sl = Math.hypot(sx, sy) || 1;
+			ctx.fillStyle = cond.wind.s >= 20 ? "rgba(30, 60, 92, 0.78)" : "rgba(7, 12, 10, 0.6)";
+			ctx.fillRect(x0, top, ww + 36, 22);
+			const ax = x0 + 12, ay = top + 11, ux = sx / sl * 7, uy = sy / sl * 7;
+			ctx.strokeStyle = "#cfe6ff"; ctx.fillStyle = "#cfe6ff"; ctx.lineWidth = 2;
+			ctx.beginPath(); ctx.moveTo(ax - ux, ay - uy); ctx.lineTo(ax + ux, ay + uy); ctx.stroke();
+			ctx.beginPath(); ctx.moveTo(ax + ux * 1.25, ay + uy * 1.25); ctx.lineTo(ax + ux * 0.3 - uy * 0.6, ay + uy * 0.3 + ux * 0.6); ctx.lineTo(ax + ux * 0.3 + uy * 0.6, ay + uy * 0.3 - ux * 0.6); ctx.closePath(); ctx.fill();
+			ctx.fillStyle = "rgba(238, 246, 234, 0.92)";
+			ctx.fillText(wtx, x0 + 24, top + 11.5);
+		}
 		if (state === "play" || state === "goal" || state === "paused") {
 			const m = mentality[0], tag = `TACTIC: ${MENTALITY[m + 1].toUpperCase()}${coarse ? "" : "  (1-4 / T)"}`, tw = ctx.measureText(tag).width;
 			ctx.fillStyle = m > 0 ? "rgba(120, 70, 10, 0.75)" : m < 0 ? "rgba(20, 45, 80, 0.75)" : "rgba(7, 12, 10, 0.6)";
@@ -8560,14 +8614,14 @@
 	}
 	let tvTex = null;
 	function tvGroundTex () {
-		if (tvTex && tvTex.stands === stands && tvTex.w === WW && tvTex.h === WH && tvTex.cond === cond.label && tvTex.st === gstyle) { return; }
+		if (tvTex && tvTex.stands === stands && tvTex.w === WW && tvTex.h === WH && tvTex.cond === cond.label + cond.ko && tvTex.st === gstyle) { return; }
 		const mk = () => { const c = document.createElement("canvas"); c.width = Math.ceil(WW); c.height = Math.ceil(WH); return c; };
 		const c = mk(), d = mk(), g = c.getContext && c.getContext("2d"), dg = d.getContext && d.getContext("2d");
 		if (!g || !dg) { tvTex = null; return; }
 		const keep = ctx;
 		ctx = g;
 		try { drawPitch(true); } finally { ctx = keep; }
-		tvTex = { c, d, dg, stands, w: WW, h: WH, cond: cond.label, st: gstyle };
+		tvTex = { c, d, dg, stands, w: WW, h: WH, cond: cond.label + cond.ko, st: gstyle };
 	}
 	function drawSceneTV () {
 		fitView();
@@ -8611,7 +8665,7 @@
 		const onTier = u => [ -14 - u * standD, u * standH ];   // u: 0 at the front, 1 at the back
 		const back = tvProj(xl, ...onTier(1)), front = tvProj(xl, ...onTier(0));
 		const sky = ctx.createLinearGradient(0, 0, 0, back ? back.y : VH * 0.3);
-		sky.addColorStop(0, "#050a10"); sky.addColorStop(1, "#16232b");
+		if (cond.ko === "day") { sky.addColorStop(0, cond.wet ? "#59636d" : "#4f7aa6"); sky.addColorStop(1, cond.wet ? "#9aa3aa" : "#b9cddd"); } else { sky.addColorStop(0, "#020408"); sky.addColorStop(1, "#0f1920"); }
 		ctx.fillStyle = sky; ctx.fillRect(0, 0, VW, VH);
 		if (stands && back && front) {
 			const img = standTop(), rows = 40, rh = img.height / rows;
@@ -9113,7 +9167,7 @@
 	const gfx3 = () => GFX3[gfxLevel] || GFX3.high;
 	function buildStadium3D () {
 		const gs = gstyle || { mow: "stripes", roof: true, lights: "roof", fill: 0.8, seat: "#3b4a58", concrete: "#1b2520", steps: "#262f21", arch: "azteca" };
-		const key = `${WW}x${WH}|${cond.label}|${cond.surfaceKey}|${gs.mow}${gs.roof}${gs.lights}${gs.fill}${gs.arch}${gs.mountains}|${KITS[0].outfield}${KITS[1].outfield}${homeSide}|${gfxLevel}`;
+		const key = `${WW}x${WH}|${cond.label}|${cond.ko}|${cond.surfaceKey}|${gs.mow}${gs.roof}${gs.lights}${gs.fill}${gs.arch}${gs.mountains}|${KITS[0].outfield}${KITS[1].outfield}${homeSide}|${gfxLevel}`;
 		if (G3.stadium && G3.stadiumKey === key && G3.standsRef === stands) { return; }
 		if (G3.stadium) {
 			G3.nearStand = null;
@@ -9389,7 +9443,9 @@
 		const sg = sc.getContext && sc.getContext("2d");
 		if (sg) {
 			const grad = sg.createLinearGradient(0, 0, 0, 128);
-			grad.addColorStop(0, "#03060b"); grad.addColorStop(0.55, "#0b131b"); grad.addColorStop(1, "#1d2d38");
+			const day = cond.ko === "day";
+			const stops = day ? (cond.wet ? [ "#454f58", "#6b7680", "#a2abb2" ] : [ "#2f639a", "#6e9cc6", "#c3d6e4" ]) : [ "#010206", "#060b11", "#121d26" ];
+			grad.addColorStop(0, stops[0]); grad.addColorStop(0.55, stops[1]); grad.addColorStop(1, stops[2]);
 			sg.fillStyle = grad; sg.fillRect(0, 0, 2, 128);
 			const sky = new THREE.Mesh(new THREE.SphereGeometry(FH * 9, 24, 12, 0, Math.PI * 2, 0, Math.PI * 0.52), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(sc), side: THREE.BackSide, fog: false }));
 			sky.position.set(FW / 2, -FH * 0.2, FH / 2); st.add(own(sky, true));
@@ -9402,13 +9458,14 @@
 			starPts.push(FW / 2 + Math.cos(a) * Math.cos(e) * r, Math.sin(e) * r, FH / 2 + Math.sin(a) * Math.cos(e) * r);
 		}
 		const stg = new THREE.BufferGeometry(); stg.setAttribute("position", new THREE.Float32BufferAttribute(starPts, 3));
-		st.add(own(new THREE.Points(stg, new THREE.PointsMaterial({ color: 0xdde6ff, size: 1.8, sizeAttenuation: false, fog: false })), true));
-		st.add(new THREE.AmbientLight(0x66727c, 0.55));
-		st.add(new THREE.HemisphereLight(0x46586c, 0x1e3a2a, 0.5));
-		const key1 = new THREE.DirectionalLight(0xfff1d6, 0.75); key1.position.set(-FW * 0.2, FH * 1.6, FH * 1.6); key1.target.position.set(FW / 2, 0, FH / 2);
+		const dayLit = cond.ko === "day";
+		if (!dayLit) { st.add(own(new THREE.Points(stg, new THREE.PointsMaterial({ color: 0xdde6ff, size: 1.8, sizeAttenuation: false, fog: false })), true)); }
+		st.add(new THREE.AmbientLight(dayLit ? 0x9aa7b2 : 0x5e6a74, dayLit ? 0.85 : 0.5));
+		st.add(new THREE.HemisphereLight(dayLit ? 0x9cb9d6 : 0x46586c, dayLit ? 0x2e4a34 : 0x1e3a2a, dayLit ? 0.7 : 0.45));
+		const key1 = new THREE.DirectionalLight(0xfff1d6, dayLit ? 0.9 : 0.75); key1.position.set(-FW * 0.2, FH * 1.6, FH * 1.6); key1.target.position.set(FW / 2, 0, FH / 2);
 		const key2 = new THREE.DirectionalLight(0xfff1d6, 0.45); key2.position.set(FW * 1.2, FH * 1.6, -FH * 0.5); key2.target.position.set(FW / 2, 0, FH / 2);
 		st.add(key1, key1.target, key2, key2.target);
-		G3.scene.fog = new THREE.Fog(0x0a121a, FH * 2.6, FH * 7);
+		G3.scene.fog = new THREE.Fog(dayLit ? (cond.wet ? 0x8d979e : 0xa9bfd0) : 0x070d13, FH * 2.6, FH * 7);
 		G3.stadium = st;
 		G3.scene.add(st);
 	}
@@ -11201,7 +11258,7 @@
 				return f;
 			},
 			get restartWalk () { return restartWalk; }, get review () { return review; }, get cpuSubs () { return cpuSubs; }, get surge () { return surge; }, get pressI () { return press; }, formBonus, get lastRatings () { return lastRatings; }, get stretcher () { return stretcher; }, injureTest (t, serious) { const v = outfield(t).find(p => !p.injured); const o = outfield(1 - t)[0]; if (v && o) { tackling[1 - t] = "hard"; const r = Math.random; Math.random = () => 0.01; try { commitFoul(o, v, true); } finally { Math.random = r; } } return v; }, staOf, get offside () { return offside; }, get deadBall () { return deadBall; }, get tally () { return tally; }, get freezeKind () { return freezeKind; }, fkDist () { return fkDist(); }, simExtra () { return { tally, poss: possFrames.slice() }; }, get setPieceKind () { return setPiece ? setPiece.kind : null; }, get gfxLevel () { return gfxLevel; }, setGfx, get musicBar () { return music ? music.bar : -1; }, get audioState () { return audio ? audio.state : "none"; }, get replayOn () { return replayOn(); }, get replay () { return replay; }, get recFrames () { return rec.n; }, REPLAY_AT, REPLAY_FR, GOAL_CELEB, get lastCaption () { return lastCaption; }, caption, get camMode () { return camMode; }, get crowdMood () { return crowdMood; }, get frameDt () { return frameDt; }, get crowdBed () { return crowd; }, get soundOn () { return soundOn; },
-			human, switchScore, outfield, dist,
+			human, switchScore, outfield, dist, get cond () { return cond; }, stepBallTest () { stepBall(); }, rematchTest () { clearLive(); state = "intro"; newMatch(); showIntro(); renderLeague(); },
 			get officials () { return officials3; }, get flagCall () { return flagCall; }, refKit, deltaE,
 			proj (x, y, z) { return G3.cam ? proj3D(x, y, z) : null; }, get viewScale () { return scale; },
 			groundTest (o) { if (gstyle) { Object.assign(gstyle, o); } },

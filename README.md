@@ -36,6 +36,8 @@ The grounds are Mexican-style stadiums, each in one of three shapes: a two-tier 
 
 Defending is a team job. The nearest man closes the carrier down goal-side rather than charging at the ball, a second defender covers behind him on the line to goal, and markers track their runners goal-side, reading where they are going. Keepers come off their line to narrow the angle as an attacker closes in and rush out to smother a one-on-one, which is when a chip (Q) is on.
 
+Every league fixture has its weather. Rain holds the ball up, makes passes skid astray and keepers spill more, and you can see it falling and shining on the pitch. Wind blows long balls, crosses, corners and lofted shots off line in the air and holds up or carries anything kicked into or with it; an arrow with its speed sits at the top left of the pitch, flipping with the picture at half time. Fixtures kick off in the afternoon, or at night under the floodlights with the stands dark around the lit pitch. The forecast panel shows each matchday's rain, wind and kick-off time, and the kick-off card says which way the wind blows for you in each half. Friendlies have a Windy option.
+
 Like a TV broadcast:
 - a score bug in each side's colours that flashes for a goal;
 - captions for goals, cards and substitutions;
