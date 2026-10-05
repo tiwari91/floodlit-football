@@ -5494,47 +5494,126 @@
 		scale = canvas.width / VW;
 	}
 
+	// The playing surface. Turf is a brighter, even green; mud and grass are mown, each ground in its
+	// own pattern. On top: patches of lighter and darker grass, a fine grain, the stripes catching the
+	// light along one edge, wear in the goalmouths and on the spots (bare and churned on a mud pitch)
+	// and, in the rain, a wet sheen under the floodlights. Painted once per ground and weather into
+	// its own picture (grassCanvas) and laid down every frame; painted plain if that fails.
+	function paintGrass (g, ox, oy, rich) {
+		const [ c1, c2 ] = cond.surfaceKey === "turf" ? [ "#23804a", "#26894f" ] : [ "#1f6a3b", "#24774a" ];
+		const mow = gstyle && cond.surfaceKey !== "turf" ? gstyle.mow : "stripes";
+		g.save();
+		g.beginPath(); g.rect(ox, oy, FW, FH); g.clip();
+		g.fillStyle = c1; g.fillRect(ox, oy, FW, FH);
+		g.fillStyle = c2;
+		const bands = Math.round(FW / (mow === "wide" ? 200 : 100));
+		if (mow === "checks") {
+			const cx = FW / 12, cy = FH / 8;
+			for (let i = 0; i < 12; i++) { for (let j = 0; j < 8; j++) { if ((i + j) % 2) { g.fillRect(ox + i * cx, oy + j * cy, cx + 0.5, cy + 0.5); } } }
+		} else if (mow === "diag") {
+			const w = FW / 14;
+			g.save(); g.translate(ox + FW / 2, oy + FH / 2); g.rotate(Math.PI / 4);
+			for (let k = -20; k < 20; k += 2) { g.fillRect(k * w, -FW, w, FW * 2); }
+			g.restore();
+		} else if (mow === "rings") {
+			for (let r = Math.hypot(FW, FH) / 2, k = 0; r > 0; r -= 60, k++) {
+				g.fillStyle = k % 2 ? c1 : c2;
+				g.beginPath(); g.arc(ox + FW / 2, oy + FH / 2, r, 0, Math.PI * 2); g.fill();
+			}
+		} else {
+			for (let k = 1; k < bands; k += 2) { g.fillRect(ox + k * FW / bands, oy, FW / bands + 0.5, FH); }
+		}
+		if (rich && g.createLinearGradient) {
+			let h = [ ...`${gstyle ? gstyle.mow + gstyle.concrete : ""}${FW}` ].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) % 2147483647, 11) || 11;
+			const r = () => (h = (h * 48271) % 2147483647) / 2147483647;
+			// Each stripe a touch lighter along the edge the mower finished on.
+			if (mow === "stripes" || mow === "wide") {
+				for (let k = 0; k < bands; k++) {
+					const x0 = ox + k * FW / bands, w = FW / bands, gr = g.createLinearGradient(x0, 0, x0 + w, 0);
+					gr.addColorStop(0, "rgba(255, 255, 220, 0)"); gr.addColorStop(1, `rgba(255, 255, 220, ${k % 2 ? 0.035 : 0.02})`);
+					g.fillStyle = gr; g.fillRect(x0, oy, w, FH);
+				}
+			}
+			// Patches: the grass is never one even colour.
+			for (let i = 0; i < 70; i++) {
+				const x = ox + r() * FW, y = oy + r() * FH, rad = 50 + r() * 170, light = r() < 0.5;
+				const gr = g.createRadialGradient(x, y, 0, x, y, rad);
+				gr.addColorStop(0, light ? "rgba(214, 230, 140, 0.05)" : "rgba(0, 28, 6, 0.07)"); gr.addColorStop(1, "rgba(0, 0, 0, 0)");
+				g.fillStyle = gr; g.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+			}
+			// The grain: thousands of blades lit or in shadow.
+			g.lineWidth = 1;
+			for (let i = 0; i < 4200; i++) {
+				const x = ox + r() * FW, y = oy + r() * FH, l = 2 + r() * 4;
+				g.strokeStyle = r() < 0.5 ? "rgba(190, 230, 160, 0.07)" : "rgba(0, 20, 0, 0.09)";
+				g.beginPath(); g.moveTo(x, y); g.lineTo(x + (r() - 0.5) * 1.5, y + l); g.stroke();
+			}
+			// Wear: the goalmouths, the penalty spots and the centre spot take a beating.
+			const mud = cond.surfaceKey === "mud", turf = cond.surfaceKey === "turf";
+			if (!turf) {
+				const a = mud ? 0.42 + 0.14 * cond.wet : 0.16;
+				const tone = mud ? "92, 68, 40" : "128, 118, 64";
+				const spots = [ [ ox + 34 * S, oy + FH / 2, 110 * GH, 1 ], [ ox + FW - 34 * S, oy + FH / 2, 110 * GH, 1 ], [ ox + FMT.spot, oy + FH / 2, 34 * S, 0.7 ], [ ox + FW - FMT.spot, oy + FH / 2, 34 * S, 0.7 ], [ ox + FW / 2, oy + FH / 2, (mud ? 120 : 40) * S, mud ? 1 : 0.6 ] ];
+				for (const [ px, py, rad, k ] of spots) {
+					const gr = g.createRadialGradient(px, py, 4, px, py, rad);
+					gr.addColorStop(0, `rgba(${tone}, ${a * k})`); gr.addColorStop(0.65, `rgba(${tone}, ${a * k * 0.45})`); gr.addColorStop(1, `rgba(${tone}, 0)`);
+					g.fillStyle = gr; g.fillRect(px - rad, py - rad, rad * 2, rad * 2);
+				}
+				if (mud) {
+					// Churned: stud marks and slide scars round the goalmouths, standing water when it rains.
+					for (const gx of [ ox + 40 * S, ox + FW - 40 * S ]) {
+						for (let i = 0; i < 90; i++) {
+							const x = gx + (r() - 0.5) * 150 * S, y = oy + FH / 2 + (r() - 0.5) * 220 * GH, l = 4 + r() * 16, a2 = r() * Math.PI;
+							g.strokeStyle = `rgba(60, 42, 24, ${0.25 + r() * 0.25})`; g.lineWidth = 1 + r() * 2.5;
+							g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a2) * l, y + Math.sin(a2) * l); g.stroke();
+						}
+						if (cond.wet) {
+							for (let i = 0; i < 6; i++) {
+								const x = gx + (r() - 0.5) * 90 * S, y = oy + FH / 2 + (r() - 0.5) * 140 * GH, rx = 8 + r() * 18;
+								g.fillStyle = "rgba(150, 165, 175, 0.22)"; g.beginPath(); g.ellipse(x, y, rx, rx * 0.5, r() * Math.PI, 0, Math.PI * 2); g.fill();
+							}
+						}
+					}
+				}
+			}
+			// Wet: darker, richer grass, and a sheen under the lights.
+			if (cond.wet) {
+				g.fillStyle = `rgba(0, 24, 12, ${0.08 * cond.wet})`; g.fillRect(ox, oy, FW, FH);
+				for (const [ cx, cy ] of [ [ ox, oy ], [ ox + FW, oy ], [ ox, oy + FH ], [ ox + FW, oy + FH ] ]) {
+					const gr = g.createRadialGradient(cx, cy, 10, cx, cy, 420 * S);
+					gr.addColorStop(0, `rgba(225, 240, 255, ${0.1 * cond.wet})`); gr.addColorStop(1, "rgba(225, 240, 255, 0)");
+					g.fillStyle = gr; g.fillRect(ox, oy, FW, FH);
+				}
+			}
+		} else if (cond.surfaceKey === "mud") {
+			const a = 0.42 + 0.14 * cond.wet;
+			for (const [ px, py, rad ] of [ [ ox + 70 * S, oy + FH / 2, 150 * GH ], [ ox + FW - 70 * S, oy + FH / 2, 150 * GH ], [ ox + FW / 2, oy + FH / 2, 120 * S ] ]) {
+				const gr = g.createRadialGradient(px, py, 8, px, py, rad);
+				gr.addColorStop(0, `rgba(92, 68, 40, ${a})`); gr.addColorStop(0.7, `rgba(92, 68, 40, ${a * 0.45})`); gr.addColorStop(1, "rgba(92, 68, 40, 0)");
+				g.fillStyle = gr; g.fillRect(px - rad, py - rad, rad * 2, rad * 2);
+			}
+		}
+		g.restore();
+	}
+	let grassC = null, grassKey = "";
+	function grassCanvas () {
+		const key = `${FW}x${FH}|${cond.surfaceKey}|${cond.wet}|${gstyle ? gstyle.mow + gstyle.concrete : ""}`;
+		if (grassKey === key) { return grassC; }
+		grassKey = key; grassC = null;
+		try {
+			const c = document.createElement("canvas"); c.width = Math.ceil(FW); c.height = Math.ceil(FH);
+			const g = c.getContext && c.getContext("2d");
+			if (g && g.fillRect && g.createRadialGradient) { paintGrass(g, 0, 0, true); grassC = c; }
+		} catch (e) { grassC = null; }
+		return grassC;
+	}
 	function drawPitch (forTex = false) {
-		ctx.fillStyle = "#0f1d16";
+		ctx.fillStyle = forTex ? (cond.surfaceKey === "turf" ? "#1d6a3d" : "#1a5631") : "#0f1d16";   // in 3D the grass runs on to the boards
 		ctx.fillRect(0, 0, WW, WH);
 		drawStands(forTex);
 
-		// Turf is a brighter, even green; mud and grass are mown, each ground in its own pattern.
-		const [ c1, c2 ] = cond.surfaceKey === "turf" ? [ "#23804a", "#26894f" ] : [ "#1f6a3b", "#237442" ];
-		const mow = gstyle && cond.surfaceKey !== "turf" ? gstyle.mow : "stripes";
-		ctx.save();
-		ctx.beginPath(); ctx.rect(MX, MY, FW, FH); ctx.clip();
-		ctx.fillStyle = c1; ctx.fillRect(MX, MY, FW, FH);
-		ctx.fillStyle = c2;
-		if (mow === "checks") {
-			const cx = FW / 12, cy = FH / 8;
-			for (let i = 0; i < 12; i++) { for (let j = 0; j < 8; j++) { if ((i + j) % 2) { ctx.fillRect(MX + i * cx, MY + j * cy, cx + 0.5, cy + 0.5); } } }
-		} else if (mow === "diag") {
-			const w = FW / 14;
-			ctx.translate(MX + FW / 2, MY + FH / 2); ctx.rotate(Math.PI / 4);
-			for (let k = -20; k < 20; k += 2) { ctx.fillRect(k * w, -FW, w, FW * 2); }
-		} else if (mow === "rings") {
-			for (let r = Math.hypot(FW, FH) / 2, k = 0; r > 0; r -= 60, k++) {
-				ctx.fillStyle = k % 2 ? c1 : c2;
-				ctx.beginPath(); ctx.arc(MX + FW / 2, MY + FH / 2, r, 0, Math.PI * 2); ctx.fill();
-			}
-		} else {
-			const bands = Math.round(FW / (mow === "wide" ? 200 : 100));
-			for (let k = 1; k < bands; k += 2) { ctx.fillRect(MX + k * FW / bands, MY, FW / bands + 0.5, FH); }
-		}
-		ctx.restore();
-		if (cond.surfaceKey === "mud") {
-			// Worn patches in both goalmouths and the centre circle, worse in the wet.
-			const a = 0.42 + 0.14 * cond.wet;
-			for (const [ px, py, r ] of [ [ MX + 70 * S, MY + FH / 2, 150 * GH ], [ MX + FW - 70 * S, MY + FH / 2, 150 * GH ], [ MX + FW / 2, MY + FH / 2, 120 * S ] ]) {
-				const g = ctx.createRadialGradient(px, py, 8, px, py, r);
-				g.addColorStop(0, `rgba(92, 68, 40, ${a})`);
-				g.addColorStop(0.7, `rgba(92, 68, 40, ${a * 0.45})`);
-				g.addColorStop(1, "rgba(92, 68, 40, 0)");
-				ctx.fillStyle = g;
-				ctx.fillRect(px - r, py - r, r * 2, r * 2);
-			}
-		}
+		const gc = grassCanvas();
+		if (gc) { ctx.drawImage(gc, MX, MY); } else { paintGrass(ctx, MX, MY, false); }
 
 		// Floodlight pools from the four corner masts.
 		for (const [ cx, cy ] of [ [ MX, MY ], [ MX + FW, MY ], [ MX, MY + FH ], [ MX + FW, MY + FH ] ]) {
@@ -5604,7 +5683,9 @@
 			fill: clamp(0.42 + (club.str || 3) * 0.11 + (r() - 0.5) * 0.1, 0.45, 1),
 			roof: r() < 0.65,
 			lights: r() < 0.5 ? "pylons" : "roof",
-			boards: [ club.color || "#f2b52e", "#eef2ec", club.color2 || "#1f2a36", "#1f2a36" ]
+			boards: [ club.color || "#f2b52e", "#eef2ec", club.color2 || "#1f2a36", "#1f2a36" ],
+			arch: pick([ "azteca", "akron", "monterrey" ]),   // the 3D stadium's shape
+			mountains: r() < 0.4
 		};
 	}
 	function buildCrowd () {
@@ -7115,6 +7196,22 @@
 		stadium: null, stadiumKey: "", standsRef: null, fig: null, crowd: null, ball: null, ballShadow: null, marks: null,
 		eye: null, look: null, shot: "", v: null, glowTex: null
 	};
+	// Graphics: how much the 3D view draws. Crowd density and the rows that get the detailed fan
+	// shape, the floodlight towers' lattice, the players' floodlight shadows, the pixel ratio and
+	// antialiasing. Phones start on Low (Medium on a big tablet), computers on High (Medium on a
+	// four-core machine); the choice is remembered.
+	const GFX3 = {
+		low: { seat: 15, fill: 0.62, hiRows: 0, nearHiRows: 2, liteRow: 3, lattice: false, shadows: 1, ratio: 1, aa: false },
+		medium: { seat: 12, fill: 0.82, hiRows: 0, nearHiRows: 4, liteRow: 6, lattice: true, shadows: 2, ratio: 1.5, aa: !coarse },
+		high: { seat: 10, fill: 1, hiRows: 2, nearHiRows: 5, liteRow: 8, lattice: true, shadows: 4, ratio: 2, aa: true }
+	};
+	const GFX_NAME = { low: "Low", medium: "Medium", high: "High" };
+	const defaultGfx = () => {
+		const cores = navigator.hardwareConcurrency || 4;
+		if (coarse) { let big = false; try { big = Math.min(screen.width, screen.height) >= 700; } catch (e) { /* none */ } return big && cores >= 6 ? "medium" : "low"; }
+		return cores <= 4 ? "medium" : "high";
+	};
+	let gfxLevel = defaultGfx();
 	const threeState = () => {
 		if (threeFailed) { return "failed"; }
 		if (window.THREE) { return "ready"; }
@@ -7271,153 +7368,291 @@
 		m.userData.ownGeo = true;
 		return m;
 	}
-	// The ground: built once per match (it changes with the club, the format, the weather and the
-	// surface) from the same painting the 2D cameras use, then the stands stand up around it.
+	// The ground: built once per match (it changes with the club, the format, the weather, the
+	// surface and the Graphics setting). The pitch is the 2D cameras' painting laid flat; round it
+	// stands a stadium in the Mexican manner, one of three shapes the ground picks: a two-tier bowl
+	// with a ring of private boxes between the tiers under a ring roof (like the Azteca), one tall
+	// oval tier under a ring roof (like the Akron), or a tight rectangle of two tiers with roofs on
+	// the long sides and mountains behind (like Monterrey). Everything that stands still is merged
+	// into a handful of meshes, so the whole ground is a few draw calls.
+	const ARCH3 = {
+		azteca: { rc: 150, tiers: [ [ 9, 10, 5.6 ], [ 9, 9.2, 8.8 ] ], roofIn: 0.5, ring: true },
+		akron: { rc: 320, tiers: [ [ 15, 10, 7.6 ] ], roofIn: 0.32, ring: true },
+		monterrey: { rc: 40, tiers: [ [ 8, 10, 6.6 ], [ 8, 9.4, 9.6 ] ], roofIn: 0.4, ring: false }
+	};
+	const F_SIDE3 = 24, F_END3 = NET + 28;   // the stands' front: back from the touchlines, and from the goal lines
+	// The bowl's plan d out from its front: a rounded rectangle round the pitch, as points with their
+	// outward normals. Every distance gives the same number of points, so the rows line up.
+	function bowlRing3 (d, rc) {
+		const ax = FW / 2 + F_END3, az = FH / 2 + F_SIDE3, r0 = Math.min(rc, az - 20, ax - 20), R = r0 + d, cx = FW / 2, cz = FH / 2, K = 8, pts = [];
+		const C = [ [ cx + ax - r0, cz - az + r0 ], [ cx + ax - r0, cz + az - r0 ], [ cx - ax + r0, cz + az - r0 ], [ cx - ax + r0, cz - az + r0 ] ];
+		for (let c = 0; c < 4; c++) {
+			for (let k = 0; k <= K; k++) {
+				const a = (c - 1) * Math.PI / 2 + k / K * Math.PI / 2, nx = Math.cos(a), nz = Math.sin(a);
+				pts.push({ x: C[c][0] + nx * R, z: C[c][1] + nz * R, nx, nz });
+			}
+		}
+		return pts;   // closed: the last point joins the first along the far touchline
+	}
+	// The rows, front to back: [ distance out, tread height, tread depth, rise ], with the boxes and
+	// the upper tier's front between two tiers.
+	function bowlProfile3 (A) {
+		const rows = [];
+		let d = 0, h = 3, band = null, upper = null;
+		A.tiers.forEach(([ n, rd, rh ], ti) => {
+			if (ti > 0) { band = { d, h0: h, h1: h + 17 }; d -= 10; h += 22; upper = { d, h }; }
+			for (let i = 0; i < n; i++) { rows.push({ d, h, rd, rh, tier: ti, last: i === n - 1 }); d += rd; h += rh; }
+		});
+		return { rows, band, upper, back: d, top: h };
+	}
+	const gfx3 = () => GFX3[gfxLevel] || GFX3.high;
 	function buildStadium3D () {
-		const key = `${WW}x${WH}|${cond.label}|${cond.surfaceKey}|${gstyle ? gstyle.mow + gstyle.roof + gstyle.lights + gstyle.fill : ""}|${KITS[0].outfield}${KITS[1].outfield}${homeSide}`;
+		const gs = gstyle || { mow: "stripes", roof: true, lights: "roof", fill: 0.8, seat: "#3b4a58", concrete: "#1b2520", steps: "#262f21", arch: "azteca" };
+		const key = `${WW}x${WH}|${cond.label}|${cond.surfaceKey}|${gs.mow}${gs.roof}${gs.lights}${gs.fill}${gs.arch}${gs.mountains}|${KITS[0].outfield}${KITS[1].outfield}${homeSide}|${gfxLevel}`;
 		if (G3.stadium && G3.stadiumKey === key && G3.standsRef === stands) { return; }
 		if (G3.stadium) {
 			G3.nearStand = null;
 			G3.scene.remove(G3.stadium);
 			G3.stadium.traverse(o => {
 				if (o.geometry && o.userData.ownGeo) { o.geometry.dispose(); if (o.isInstancedMesh) { o.dispose(); } }
-				if (o.material && o.userData.ownMat) { if (o.material.map) { o.material.map.dispose(); } o.material.dispose(); }
+				if (o.material && o.userData.ownMat) { if (o.material.map) { o.material.map.dispose(); } if (o.material.emissiveMap) { o.material.emissiveMap.dispose(); } o.material.dispose(); }
 			});
 		}
 		G3.stadiumKey = key; G3.standsRef = stands;
-		const st = new THREE.Group();
-		G3.nearRoof = [];   // the near stand's roof and its lights: hidden when the camera sits behind them
-		// own: this mesh's geometry is its own; ownMat: so is its material (and picture). Shared ones stay.
+		const st = new THREE.Group(), Q = gfx3();
+		G3.nearRoof = [];   // the near side of the ground: hidden while the camera sits in it
 		const own = (o, mat = false) => { o.userData.ownGeo = true; o.userData.ownMat = mat; return o; };
 		const ownMat = o => { o.userData.ownMat = true; return o; };
-		// 1. The pitch: painted flat (no stands), laid on the ground.
+		// 1. The pitch: painted flat (no stands), laid on the ground. Unlit, so it reads exactly like the
+		// 2D painting; in the rain the floodlights glance off it (a specular sheen).
 		const pc = document.createElement("canvas"); pc.width = Math.ceil(WW); pc.height = Math.ceil(WH);
 		const pg = pc.getContext && pc.getContext("2d");
 		if (pg) {
 			const keep = ctx, keepStands = stands;
 			ctx = pg; stands = null;
 			try { drawPitch(true); } finally { ctx = keep; stands = keepStands; }
-			const ground = own(new THREE.Mesh(new THREE.PlaneGeometry(WW, WH), new THREE.MeshBasicMaterial({ map: canvasTex3D(pc) })), true);
+			const tex = canvasTex3D(pc);
+			const mat = cond.wet > 0
+				? new THREE.MeshPhongMaterial({ color: 0x000000, emissive: 0xffffff, emissiveMap: tex, specular: new THREE.Color(0.08 + 0.1 * cond.wet, 0.09 + 0.11 * cond.wet, 0.1 + 0.11 * cond.wet), shininess: 34 })
+				: new THREE.MeshBasicMaterial({ map: tex });
+			const ground = own(new THREE.Mesh(new THREE.PlaneGeometry(WW, WH), mat), true);
 			ground.rotation.x = -Math.PI / 2;
 			ground.position.set(WW / 2 - MX, 0, WH / 2 - MY);
 			st.add(ground);
 		}
-		const apron = new THREE.Mesh(new THREE.PlaneGeometry(WW * 4, WH * 4), mat3D("#0b1410", false));
+		const apron = new THREE.Mesh(new THREE.PlaneGeometry(WW * 4, WH * 4), mat3D(cond.surfaceKey === "turf" ? "#13311f" : "#0f2416", false));
 		apron.rotation.x = -Math.PI / 2; apron.position.set(FW / 2, -0.6, FH / 2);
 		st.add(own(apron));
-		// 2. The stands: each side's crowd picture on a tier rising back from the touchline.
-		const gs = gstyle || { roof: true, lights: "pylons" };
-		const f0 = 14, D = MY * 1.7, H = MY * 1.9, xl = -MX - 40, xr = FW + MX + 40, zl = -40, zr = FH + 40;
-		// The terraces: twelve steps of concrete with a row of seats on each (the fans sit on them below).
-		const terrace = across => {
-			const c = document.createElement("canvas"); c.width = c.height = 192;
-			const tg = c.getContext && c.getContext("2d");
-			if (tg && tg.fillRect) {
-				tg.fillStyle = gs.concrete || "#1b2520"; tg.fillRect(0, 0, 192, 192);
-				for (let i = 0; i < 12; i++) {
-					const a = i * 16;
-					const band = (o, w, col) => { tg.fillStyle = col; if (across) { tg.fillRect(a + o, 0, w, 192); } else { tg.fillRect(0, a + o, 192, w); } };
-					band(0, 5, gs.steps || "#262f21"); band(9, 5, gs.seat || "#3b4a58"); band(14, 2, "rgba(0, 0, 0, 0.35)");
+		// 2. The stadium.
+		const A = ARCH3[gs.arch] || ARCH3.azteca, P = bowlProfile3(A), rings = {}, ring = d => rings[d] || (rings[d] = bowlRing3(d, A.rc));
+		const N = ring(0).length, nxt = j => (j + 1) % N;
+		const isNear = j => { const a = ring(0)[j], b = ring(0)[nxt(j)]; return (a.nz + b.nz) / 2 > 0.45; };
+		const longSide = j => { const a = ring(0)[j], b = ring(0)[nxt(j)]; return Math.abs(a.nz + b.nz) / 2 > 0.92; };
+		const main = acc3(), near = acc3(), lamp = acc3(), nearLamp = acc3(), hills = acc3(), glow = [], nearGlow = [];
+		const shade = (c, k) => { const v = col3(c); return [ v[0] * k, v[1] * k, v[2] * k ]; };
+		const conc = col3(gs.concrete), step = shade(gs.steps, 1.35), riser = shade(gs.concrete, 0.8), seat = col3(gs.seat), seatTop = shade(gs.seat, 1.18);
+		const club = col3(KITS[homeSide].outfield);
+		// Along segment j at distance d: the point a fraction u of the way.
+		const at = (j, d, u, y) => { const a = ring(d)[j], b = ring(d)[nxt(j)]; return [ a.x + (b.x - a.x) * u, y, a.z + (b.z - a.z) * u ]; };
+		const inward = j => { const a = ring(0)[j], b = ring(0)[nxt(j)]; return [ -(a.nx + b.nx) / 2, 0, -(a.nz + b.nz) / 2 ]; };
+		const segLen = (j, d) => { const a = ring(d)[j], b = ring(d)[nxt(j)]; return Math.hypot(b.x - a.x, b.z - a.z); };
+		// A strip between distances d0 and d1 (at heights y0, y1) along segment j, from u0 to u1.
+		const strip = (T, j, d0, y0, d1, y1, col, u0 = 0, u1 = 1) => {
+			const want = d0 === d1 ? inward(j) : y1 >= y0 - 0.01 && Math.abs(y1 - y0) < Math.abs(d1 - d0) ? [ 0, 1, 0 ] : inward(j);
+			accQuad3(T, at(j, d0, u0, y0), at(j, d0, u1, y0), at(j, d1, u1, y1), at(j, d1, u0, y1), col, want);
+		};
+		// Aisles: stairs up through the seats every so often (none in the corners' first rows).
+		const aisles = [];
+		for (let j = 0; j < N; j++) {
+			const L = segLen(j, 0);
+			if (L > 200) { const n = Math.round(L / 150); for (let k = 1; k < n; k++) { aisles.push([ j, k / n ]); } } else if (j % 2 === 0) { aisles.push([ j, 0.5 ]); }
+		}
+		const aislesOf = j => aisles.filter(a => a[0] === j).map(a => a[1]);
+		const lastRow = P.rows[P.rows.length - 1];
+		for (let j = 0; j < N; j++) {
+			const T = isNear(j) ? near : main, TL = isNear(j) ? nearLamp : lamp, ai = aislesOf(j);
+			// The front wall, with a painted band in the club's colour.
+			strip(T, j, 0, 0, 0, P.rows[0].h, shade(conc, 0.7));
+			strip(T, j, 0, P.rows[0].h - 1.6, 0, P.rows[0].h - 0.4, shade(club, 0.75));
+			for (const r of P.rows) {
+				strip(T, j, r.d, r.h, r.d + r.rd, r.h, step);                                   // the tread
+				strip(T, j, r.d + r.rd * 0.48, r.h, r.d + r.rd * 0.48, r.h + 2.4, seat);           // the seats
+				strip(T, j, r.d + r.rd * 0.48, r.h + 2.4, r.d + r.rd * 0.86, r.h + 2.4, seatTop);
+				if (!r.last) { strip(T, j, r.d + r.rd, r.h, r.d + r.rd, r.h + r.rh, riser); }  // the riser up to the next row
+				const L = segLen(j, r.d + r.rd * 0.5);
+				for (const u of ai) {   // the aisle's steps, lighter, over the seats
+					const w = 3.2 / Math.max(1, L);
+					strip(T, j, r.d, r.h + 2.5, r.d + r.rd, r.h + 2.5, shade(conc, 1.9), u - w, u + w);
 				}
 			}
-			return new THREE.MeshLambertMaterial({ map: canvasTex3D(c), side: THREE.DoubleSide });
+			// The private boxes between the tiers: dark glass with the lights on in most of them,
+			// and the upper tier's front above them with an LED ribbon in the club's colour.
+			if (P.band) {
+				const b = P.band, u = P.upper;
+				strip(T, j, b.d, b.h0, b.d, b.h1, [ 0.05, 0.07, 0.09 ]);
+				strip(T, j, b.d, b.h1, u.d, b.h1, shade(conc, 0.5));
+				strip(T, j, u.d, b.h1, u.d, u.h, shade(conc, 0.85));
+				const L = segLen(j, b.d), n = Math.max(1, Math.floor(L / 15));
+				for (let k = 0; k < n; k++) {
+					const hsh = Math.sin((j * 31 + k) * 12.9898) * 43758.5453, lit = hsh - Math.floor(hsh);
+					if (lit < 0.25) { continue; }
+					const u0 = (k + 0.12) / n, u1 = (k + 0.88) / n;
+					strip(TL, j, b.d - 0.4, b.h0 + 4, b.d - 0.4, b.h1 - 3.5, lit > 0.8 ? [ 0.75, 0.86, 1 ] : [ 1, 0.82, 0.55 ], u0, u1);
+				}
+				strip(TL, j, u.d - 0.4, u.h - 7, u.d - 0.4, u.h - 2.5, shade(club, 0.9));
+			}
+			// The back wall and its parapet.
+			strip(T, j, P.back, lastRow.h, P.back, P.top + 12, conc);
+			strip(T, j, P.back - 3, P.top + 12, P.back, P.top + 12, shade(conc, 1.2));
+		}
+		// The roof: a ring round the whole bowl, or over the two long sides, on masts with stays; the
+		// floodlights in a line along its front edge at grounds lit that way.
+		const roofLights = gs.roof && gs.lights === "roof";
+		const lines = [], nearLines = [];
+		if (gs.roof) {
+			const rIn = P.back * A.roofIn, rOut = P.back + 8, hIn = P.top + 36, hOut = P.top + 24;
+			const roofC = [ 0.11, 0.12, 0.14 ], under = [ 0.2, 0.21, 0.23 ];
+			for (let j = 0; j < N; j++) {
+				if (!A.ring && !longSide(j)) { continue; }
+				const T = isNear(j) ? near : main, TL = isNear(j) ? nearLamp : lamp, G = isNear(j) ? nearGlow : glow, Ln = isNear(j) ? nearLines : lines;
+				strip(T, j, rIn, hIn, rOut, hOut, under);
+				strip(T, j, rIn, hIn - 10, rIn, hIn + 1.5, roofC);
+				if (roofLights) {
+					strip(TL, j, rIn + 1, hIn - 10.4, rIn + 4.5, hIn - 10.4, [ 1.25, 1.18, 1.0 ]);
+					const L = segLen(j, rIn), n = Math.max(1, Math.round(L / 120));
+					for (let k = 0; k < n; k++) { glow.length < 400 && G.push(...at(j, rIn + 2, (k + 0.5) / n, hIn - 13)); }
+				}
+				// A mast at the back of every other segment end, with a stay to the roof's front edge.
+				if (j % 2 === 0) {
+					const base = at(j, rOut + 3, 0, 0), top = at(j, rOut + 3, 0, hOut + 46), tip = at(j, rIn + 6, 0, hIn + 2);
+					accBeam3(T, base, top, 3.2, [ 0.24, 0.26, 0.29 ]);
+					Ln.push(...top, ...tip, ...top, ...at(j, (rIn + rOut) / 2, 0, (hIn + hOut) / 2 + 1));
+				}
+			}
+			// The ground's name along the far roof's front edge.
+			G3.signAt = { y: hIn - 4.5, z: -F_SIDE3 - rIn - 0.6 };
+		} else {
+			G3.signAt = { y: P.top + 20, z: -F_SIDE3 - P.back + 2 };
+		}
+		// Floodlight pylons at the four corners, lattice towers with a bank of lamps on top.
+		if (!roofLights) {
+			const PH = P.top + 175, steel = [ 0.3, 0.32, 0.35 ];
+			for (const [ sx, sz ] of [ [ -1, -1 ], [ 1, -1 ], [ 1, 1 ], [ -1, 1 ] ]) {
+				const T = sz > 0 ? near : main, TL = sz > 0 ? nearLamp : lamp, G = sz > 0 ? nearGlow : glow;
+				const ax = FW / 2 + F_END3, az = FH / 2 + F_SIDE3, r0 = Math.min(A.rc, az - 20, ax - 20), R = r0 + P.back + 46;
+				const cx = FW / 2 + sx * (ax - r0) + sx * R * 0.7071, cz = FH / 2 + sz * (az - r0) + sz * R * 0.7071;
+				const leg = (h, i) => { const w = 15 - 10 * h / PH; return [ cx + (i & 1 ? w : -w), h, cz + (i & 2 ? w : -w) ]; };
+				const order = [ 0, 1, 3, 2 ];
+				for (let i = 0; i < 4; i++) { accBeam3(T, leg(0, i), leg(PH, i), 2.2, steel); }
+				if (Q.lattice) {
+					for (let h = 26; h < PH - 4; h += 26) {
+						for (let k = 0; k < 4; k++) {
+							const a = order[k], b = order[(k + 1) % 4];
+							accBeam3(T, leg(h, a), leg(h, b), 0.9, steel);
+							accBeam3(T, leg(h - 26, a), leg(h, b), 0.7, steel);
+						}
+					}
+				}
+				// The lamp bank, turned to the centre spot and tipped down at it.
+				const ry = Math.atan2(FW / 2 - cx, FH / 2 - cz), fx = Math.sin(ry), fz = Math.cos(ry);
+				accBox3(T, cx, PH + 14, cz, 74, 40, 5, [ 0.16, 0.17, 0.19 ], ry, 0.42);
+				for (let a = 0; a < 3; a++) {
+					for (let b = 0; b < 6; b++) {
+						const lx = (b - 2.5) * 11.5, ly = (a - 1) * 11.5, tilt = 0.42, cy = PH + 14 + ly * Math.cos(tilt), off = 3 - ly * Math.sin(tilt);
+						const px = cx + Math.cos(ry) * lx + fx * off, pz = cz - Math.sin(ry) * lx + fz * off;
+						const rx = Math.cos(ry) * 4.4, rz = -Math.sin(ry) * 4.4, up = 4.4 * Math.cos(tilt), back = -4.4 * Math.sin(tilt);
+						accQuad3(TL, [ px - rx, cy - up, pz - rz - fz * back ], [ px + rx, cy - up, pz + rz - fz * back ], [ px + rx, cy + up, pz + rz + fz * back ], [ px - rx, cy + up, pz - rz + fz * back ], [ 1.3, 1.22, 1.02 ], [ fx, 0, fz ]);
+					}
+				}
+				G.push(cx + fx * 9, PH + 14, cz + fz * 9);
+			}
+		}
+		// Mountains behind the far stand at some grounds, black against the night sky.
+		if (gs.mountains || gs.arch === "monterrey") {
+			let mh = 4242;
+			const mr = () => (mh = (mh * 48271) % 2147483647) / 2147483647;
+			for (const [ z, k, col ] of [ [ -FH * 3.6, 1, [ 0.05, 0.07, 0.1 ] ], [ -FH * 2.7, 0.62, [ 0.035, 0.05, 0.07 ] ] ]) {
+				const x0 = -FW * 2, x1 = FW * 3, n = 48;
+				let prev = null;
+				for (let i = 0; i <= n; i++) {
+					const x = x0 + (x1 - x0) * i / n, f = i / n;
+					// A saddle: two peaks with a dip between them, and smaller ridges either side.
+					const saddle = Math.exp(-Math.pow((f - 0.42) / 0.07, 2)) + 0.85 * Math.exp(-Math.pow((f - 0.58) / 0.06, 2));
+					const y = FH * k * (0.28 + 0.55 * saddle + 0.16 * Math.sin(f * 23 + k) + 0.1 * mr());
+					if (prev) { accQuad3(hills, [ prev[0], -10, z ], [ x, -10, z ], [ x, y, z ], [ prev[0], prev[1], z ], col, [ 0, 0, 1 ]); }
+					prev = [ x, y ];
+				}
+			}
+		}
+		// The four merged meshes: the stands and roof (lit), the lamps and lit windows (unlit), each
+		// in a far and a near part, plus the stays and the floodlights' glow.
+		const solid = ownMat(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }));
+		const bright = ownMat(new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide, toneMapped: false }));
+		const mMain = meshAcc3(main, solid), mNear = meshAcc3(near, solid), mLamp = meshAcc3(lamp, bright), mNearLamp = meshAcc3(nearLamp, bright);
+		const mHills = meshAcc3(hills, ownMat(new THREE.MeshBasicMaterial({ vertexColors: true, fog: false })));
+		for (const m of [ mMain, mNear, mLamp, mNearLamp, mHills ]) { if (m) { st.add(m); } }
+		if (mNear) { G3.nearRoof.push(mNear); }
+		if (mNearLamp) { G3.nearRoof.push(mNearLamp); }
+		G3.nearStand = mNear;
+		const stays = (pts, isNearSide) => {
+			if (!pts.length) { return; }
+			const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
+			const l = own(new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0x59626b })), true);
+			st.add(l); if (isNearSide) { G3.nearRoof.push(l); }
 		};
+		stays(lines, false); stays(nearLines, true);
+		const glowPts = (pts, isNearSide) => {
+			if (!pts.length || !G3.glowTex) { return; }
+			const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
+			const p = own(new THREE.Points(g, new THREE.PointsMaterial({ map: G3.glowTex, size: roofLights ? 110 : 260, sizeAttenuation: true, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.75, fog: false })), true);
+			st.add(p); if (isNearSide) { G3.nearRoof.push(p); }
+		};
+		glowPts(glow, false); glowPts(nearGlow, true);
 		if (stands) {
-			const rows = terrace(false), cols = terrace(true);
-			st.add(own(quad3D([ xl, 0, -f0 ], [ xr, 0, -f0 ], [ xr, H, -f0 - D ], [ xl, H, -f0 - D ], [ 0, 0, 1, 0, 1, 1, 0, 1 ], rows), true));
-			// The near stand is the one the broadcast camera sits in, so it is only drawn when the
-			// camera is out on the pitch looking back at it (the goal celebration).
-			G3.nearStand = own(quad3D([ xl, 0, FH + f0 ], [ xr, 0, FH + f0 ], [ xr, H, FH + f0 + D ], [ xl, H, FH + f0 + D ], [ 0, 1, 1, 1, 1, 0, 0, 0 ], rows));
-			st.add(G3.nearStand);
-			st.add(own(quad3D([ -f0, 0, zl ], [ -f0, 0, zr ], [ -f0 - D, H, zr ], [ -f0 - D, H, zl ], [ 1, 1, 1, 0, 0, 0, 0, 1 ], cols), true));
-			st.add(own(quad3D([ FW + f0, 0, zl ], [ FW + f0, 0, zr ], [ FW + f0 + D, H, zr ], [ FW + f0 + D, H, zl ], [ 0, 1, 0, 0, 1, 0, 1, 1 ], cols)));
-			// The ground's name along the back of the main stand.
+			// The ground's name, white on black, across the far side.
 			const nc = document.createElement("canvas"); nc.width = 1024; nc.height = 64;
 			const ng = nc.getContext && nc.getContext("2d");
 			if (ng && ng.fillText) {
 				const name = (leagueMatch ? (leagueMatch.home ? YOU : TEAMS[leagueMatch.opp]).ground : YOU.ground).toUpperCase();
-				ng.fillStyle = "#0d1612"; ng.fillRect(0, 0, 1024, 64);
+				ng.fillStyle = "#0d1216"; ng.fillRect(0, 0, 1024, 64);
 				ng.font = "900 46px 'Big Shoulders Display', 'Arial Narrow', Arial, sans-serif"; ng.textAlign = "center"; ng.textBaseline = "middle";
 				ng.fillStyle = "#eef2ec"; ng.fillText(name, 512, 34);
-				const sign = new THREE.Mesh(new THREE.PlaneGeometry(512, 32), new THREE.MeshBasicMaterial({ map: canvasTex3D(nc) }));
-				sign.position.set(FW / 2, gs.roof ? H * 1.14 + 19 : H + 17, -f0 - D - 3);
+				const sign = new THREE.Mesh(new THREE.PlaneGeometry(400, 25), new THREE.MeshBasicMaterial({ map: canvasTex3D(nc) }));
+				sign.position.set(FW / 2, G3.signAt.y, G3.signAt.z);
 				st.add(own(sign, true));
 			}
-			buildCrowd3D(st, f0, D, H, xl, xr, zl, zr);
+			buildCrowd3D(st, { ring, N, nxt, isNear, aisles: aislesOf, rows: P.rows, segLen });
 		}
-		// A roof over the two long stands, with the lights along its edge at some grounds.
-		const glow = (x, y, z, s) => {
-			if (!G3.glowTex) { return; }
-			const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: G3.glowTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.6 }));
-			sp.position.set(x, y, z); sp.scale.set(s, s, 1); st.add(ownMat(sp));
-		};
-		if (gs.roof) {
-			for (const z of [ -f0 - D * 0.55, FH + f0 + D * 0.55 ]) {
-				const roof = new THREE.Mesh(G3.geo.box, mat3D("#0a0d10", false));
-				roof.scale.set(xr - xl, 4, D * 0.95); roof.position.set((xl + xr) / 2, H * 1.14, z);
-				st.add(roof);
-				if (z > FH) { G3.nearRoof.push(roof); }
-			}
-			if (gs.lights === "roof") {
-				for (const [ z, side ] of [ [ -f0 - D * 0.1, -1 ], [ FH + f0 + D * 0.1, 1 ] ]) {
-					const strip = new THREE.Mesh(G3.geo.box, mat3D("#fff6d8", false));
-					strip.scale.set(xr - xl - 60, 2.5, 3); strip.position.set((xl + xr) / 2, H * 1.11, z);
-					st.add(strip);
-					const before = st.children.length;
-					for (let x = xl + 120; x < xr - 60; x += (xr - xl) / 6) { glow(x, H * 1.11, z - side * 2, 140); }
-					if (z > FH) { G3.nearRoof.push(strip, ...st.children.slice(before)); }
-				}
-			}
-		}
-		if (gs.lights === "pylons") {
-			const PH = H * 2.3;
-			for (const [ px, pz ] of [ [ -MX * 0.6, -40 ], [ FW + MX * 0.6, -40 ], [ -MX * 0.6, FH + 40 ], [ FW + MX * 0.6, FH + 40 ] ]) {
-				const pole = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 3.6, PH, 6), mat3D("#39434a", false));
-				pole.position.set(px, PH / 2, pz); st.add(own(pole));
-				const head = new THREE.Mesh(G3.geo.box, mat3D("#fff6d8", false));
-				head.scale.set(44, 14, 7); head.position.set(px, PH, pz); st.add(head);
-				glow(px, PH, pz + (pz < FH / 2 ? 6 : -6), 230);
-			}
-		}
-		// 3. The goals: posts and bar in white, the net a mesh back to the rear bar.
+		// 3. The goals: frames merged into one white mesh, and the nets (both in one mesh) with give.
 		const cb = 55 * Z3, bb = cb * 0.72, gmid = (GOAL_T + GOAL_B) / 2, gw = GOAL_B - GOAL_T;
+		const frame = acc3(), M = new THREE.Matrix4(), Qn = new THREE.Quaternion(), V = new THREE.Vector3(), Sc = new THREE.Vector3(1, 1, 1), E = new THREE.Euler();
+		const post = new THREE.CylinderGeometry(1.7, 1.7, 1, 10), thin = new THREE.CylinderGeometry(1, 1, 1, 6);
+		const put = (geo, x, y, z, len, rx) => { M.compose(V.set(x, y, z), Qn.setFromEuler(E.set(rx, 0, 0)), Sc.set(1, len, 1)); accGeo3(frame, geo, "#f7faf5", M); };
 		for (const left of [ true, false ]) {
-			const x0 = left ? 0 : FW, xb = left ? -NET : FW + NET, white = mat3D("#f7faf5", false);
-			for (const y of [ GOAL_T, GOAL_B ]) {
-				const post = new THREE.Mesh(new THREE.CylinderGeometry(1.7, 1.7, cb, 8), white);
-				post.position.set(x0, cb / 2, y); st.add(own(post));
-			}
-			const bar = new THREE.Mesh(new THREE.CylinderGeometry(1.7, 1.7, gw + 3.4, 8), white);
-			bar.rotation.x = Math.PI / 2; bar.position.set(x0, cb, gmid); st.add(own(bar));
-			const pts = [];
-			const seg = (a, b) => pts.push(...a, ...b);
-			for (let y = GOAL_T; y <= GOAL_B + 0.1; y += gw / 12) { seg([ x0, cb, y ], [ xb, bb, y ]); seg([ xb, bb, y ], [ xb, 0, y ]); }
-			for (let z = 0; z <= bb + 0.1; z += bb / 5) { seg([ xb, z, GOAL_T ], [ xb, z, GOAL_B ]); }
-			for (let t = 0; t <= 1.001; t += 0.2) { for (const y of [ GOAL_T, GOAL_B ]) { seg([ x0 + (xb - x0) * t, 0, y ], [ x0 + (xb - x0) * t, cb + (bb - cb) * t, y ]); } }
-			for (let t = 0.25; t < 1; t += 0.25) { seg([ x0 + (xb - x0) * t, cb + (bb - cb) * t, GOAL_T ], [ x0 + (xb - x0) * t, cb + (bb - cb) * t, GOAL_B ]); }
-			const ng = new THREE.BufferGeometry();
-			ng.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
-			st.add(own(new THREE.LineSegments(ng, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35 })), true));
-			for (const y of [ GOAL_T, GOAL_B ]) {
-				const rp = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, bb, 6), white);
-				rp.position.set(xb, bb / 2, y); st.add(own(rp));
-			}
-			const rb = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, gw, 6), white);
-			rb.rotation.x = Math.PI / 2; rb.position.set(xb, bb, gmid); st.add(own(rb));
+			const x0 = left ? 0 : FW, xb = left ? -NET : FW + NET;
+			for (const y of [ GOAL_T, GOAL_B ]) { put(post, x0, cb / 2, y, cb, 0); put(thin, xb, bb / 2, y, bb, 0); }
+			put(post, x0, cb, gmid, gw + 3.4, Math.PI / 2);
+			put(thin, xb, bb, gmid, gw, Math.PI / 2);
+			// The stanchions along the ground to the back of the net.
+			for (const y of [ GOAL_T, GOAL_B ]) { M.compose(V.set((x0 + xb) / 2, 0.8, y), Qn.setFromEuler(E.set(0, 0, Math.PI / 2)), Sc.set(1, NET, 1)); accGeo3(frame, thin, "#d9ded8", M); }
 		}
-		// 4. The dugouts on the near touchline.
+		post.dispose(); thin.dispose();
+		st.add(meshAcc3(frame, ownMat(new THREE.MeshBasicMaterial({ vertexColors: true }))));
+		buildNets3D(st, cb, bb, gw);
+		// 4. The dugouts, sunk in front of the near stand.
 		const dw = 190 * Math.sqrt(S);
 		for (const cx of [ FW / 2 - dw * 0.62 - 20, FW / 2 + dw * 0.62 + 20 ]) {
 			const dug = new THREE.Mesh(G3.geo.box, mat3D("#0c1214", false));
-			dug.scale.set(dw, 14, 34); dug.position.set(cx, 7, FH + 33); st.add(dug);
+			dug.scale.set(dw, 13, 18); dug.position.set(cx, 6.5, FH + F_SIDE3 + 8); st.add(dug);
 			const roof = new THREE.Mesh(G3.geo.box, new THREE.MeshBasicMaterial({ color: 0x8cb4c8, transparent: true, opacity: 0.35 }));
-			roof.scale.set(dw + 6, 1.2, 40); roof.position.set(cx, 15, FH + 32); st.add(ownMat(roof));
+			roof.scale.set(dw + 6, 1.2, 22); roof.position.set(cx, 14, FH + F_SIDE3 + 7); st.add(ownMat(roof));
+			G3.nearRoof.push(dug, roof); dug.userData.dugout = cx;
 		}
-		// 4b. Advertising boards along both touchlines, lit like LED hoardings, with gaps for the dugouts.
+		// 4b. Advertising boards all round the pitch, lit like LED hoardings, with gaps for the dugouts.
 		const ac = document.createElement("canvas"); ac.width = 1024; ac.height = 48;
 		const ag = ac.getContext && ac.getContext("2d");
 		if (ag) {
-			const words = [ "FLOODLIT", "MATCHDAY", "LEAGUE", "KICK OFF", "PREMIER", "NIGHT GAME", "90 MINUTES", "FULL TIME" ];
+			const words = [ "FLOODLIT", "MATCHDAY", "LIGA", "KICK OFF", "PREMIER", "NIGHT GAME", "90 MINUTOS", "GOL" ];
 			const cols = [ [ "#102a4a", "#ffffff" ], [ "#ffffff", "#0d1b2a" ], [ KITS[homeSide].outfield, lum(KITS[homeSide].outfield) < 0.3 ? "#ffffff" : "#0b0f12" ], [ "#1d1d1d", "#f2b52e" ] ];
 			for (let i = 0; i < 8; i++) {
 				const [ bgc, fg ] = cols[i % cols.length];
@@ -7428,27 +7663,28 @@
 			const tex = canvasTex3D(ac); tex.wrapS = THREE.RepeatWrapping;
 			const boardMat = new THREE.MeshBasicMaterial({ map: tex });
 			let first = true;
-			const board = (x0, x1, z, near) => {
-				const w = x1 - x0;
+			const board = (a0, a1, fixed, ry, alongX) => {
+				const w = a1 - a0;
 				if (w < 24) { return; }
 				const geo = new THREE.PlaneGeometry(w, 16), uv = geo.attributes.uv;
-				for (let i = 0; i < uv.count; i++) { uv.setX(i, (x0 + uv.getX(i) * w) / 300); }
+				for (let i = 0; i < uv.count; i++) { uv.setX(i, (a0 + uv.getX(i) * w) / 300); }
 				const m = new THREE.Mesh(geo, boardMat);
-				m.position.set(x0 + w / 2, 8, z);
-				if (near) { m.rotation.y = Math.PI; }
+				if (alongX) { m.position.set(a0 + w / 2, 8, fixed); } else { m.position.set(fixed, 8, a0 + w / 2); }
+				m.rotation.y = ry;
 				m.userData.ownGeo = true; m.userData.ownMat = first; first = false;
 				st.add(m);
 			};
-			board(xl + 20, xr - 20, -9, false);
+			board(-F_END3 + 16, FW + F_END3 - 16, -12, 0, true);
 			const gaps = [ FW / 2 - dw * 0.62 - 20, FW / 2 + dw * 0.62 + 20 ].map(cx => [ cx - dw / 2 - 6, cx + dw / 2 + 6 ]);
-			board(xl + 20, gaps[0][0], FH + 9, true); board(gaps[0][1], gaps[1][0], FH + 9, true); board(gaps[1][1], xr - 20, FH + 9, true);
+			board(-F_END3 + 16, gaps[0][0], FH + 12, Math.PI, true); board(gaps[0][1], gaps[1][0], FH + 12, Math.PI, true); board(gaps[1][1], FW + F_END3 - 16, FH + 12, Math.PI, true);
+			board(-6, FH + 6, -NET - 12, Math.PI / 2, false); board(-6, FH + 6, FW + NET + 12, -Math.PI / 2, false);
 		}
 		// 5. The night: a sky that darkens overhead, a few stars, and the floodlights lighting the players.
 		const sc = document.createElement("canvas"); sc.width = 2; sc.height = 128;
 		const sg = sc.getContext && sc.getContext("2d");
 		if (sg) {
 			const grad = sg.createLinearGradient(0, 0, 0, 128);
-			grad.addColorStop(0, "#03060b"); grad.addColorStop(0.55, "#0b131b"); grad.addColorStop(1, "#1a2a33");
+			grad.addColorStop(0, "#03060b"); grad.addColorStop(0.55, "#0b131b"); grad.addColorStop(1, "#1d2d38");
 			sg.fillStyle = grad; sg.fillRect(0, 0, 2, 128);
 			const sky = new THREE.Mesh(new THREE.SphereGeometry(FH * 9, 24, 12, 0, Math.PI * 2, 0, Math.PI * 0.52), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(sc), side: THREE.BackSide, fog: false }));
 			sky.position.set(FW / 2, -FH * 0.2, FH / 2); st.add(own(sky, true));
@@ -7470,6 +7706,77 @@
 		G3.scene.fog = new THREE.Fog(0x0a121a, FH * 2.6, FH * 7);
 		G3.stadium = st;
 		G3.scene.add(st);
+	}
+	// The nets: a mesh of lines over the roof, the back and the sides of each goal, every knot a
+	// vertex that can move. The frame and the ground hold the edges; a ball in the net pushes the
+	// knots near it back and sets the net swinging, which dies away.
+	function buildNets3D (st, cb, bb, gw) {
+		const pos = [], rest = [], nrm = [], wgt = [], idx = [], goalOf = [];
+		const panel = (g, nu, nv, P, n) => {   // P(u, v) -> [ x, y, z ]; n: the way the panel gives
+			const b = pos.length / 3;
+			for (let j = 0; j <= nv; j++) {
+				for (let i = 0; i <= nu; i++) {
+					const p = P(i / nu, j / nv);
+					pos.push(...p); rest.push(...p); nrm.push(...n); goalOf.push(g);
+					wgt.push(Math.sin(Math.PI * i / nu) * Math.sin(Math.PI * j / nv));
+				}
+			}
+			for (let j = 0; j <= nv; j++) { for (let i = 0; i <= nu; i++) {
+				const k = b + j * (nu + 1) + i;
+				if (i < nu) { idx.push(k, k + 1); }
+				if (j < nv) { idx.push(k, k + nu + 1); }
+			} }
+		};
+		const cols = Math.max(8, Math.round(gw / 14));
+		[ true, false ].forEach((left, g) => {
+			const x0 = left ? 0 : FW, xb = left ? -NET : FW + NET, out = left ? -1 : 1;
+			const lerp = (a, b, t) => a + (b - a) * t;
+			// The roof of the net: from the crossbar back to the rear bar, sagging a little in the middle.
+			panel(g, cols, 4, (u, v) => [ lerp(x0, xb, v), lerp(cb, bb, v) - Math.sin(Math.PI * u) * Math.sin(Math.PI * v) * 2.5, lerp(GOAL_T, GOAL_B, u) ], [ out * 0.4, 0.9, 0 ]);
+			// The back: hanging from the rear bar to the ground.
+			panel(g, cols, 6, (u, v) => [ xb + out * Math.sin(Math.PI * v) * Math.sin(Math.PI * u) * 2, lerp(bb, 0, v), lerp(GOAL_T, GOAL_B, u) ], [ out, 0, 0 ]);
+			// The sides.
+			for (const [ y, s ] of [ [ GOAL_T, -1 ], [ GOAL_B, 1 ] ]) {
+				panel(g, 4, 6, (u, v) => [ lerp(x0, xb, u), lerp(lerp(cb, bb, u), 0, v), y ], [ 0, 0, s ]);
+			}
+		});
+		const geo = new THREE.BufferGeometry();
+		geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage));
+		geo.setIndex(idx);
+		const net = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.42 }));
+		net.userData.ownGeo = true; net.userData.ownMat = true;
+		st.add(net);
+		G3.nets = { net, rest: Float32Array.from(rest), nrm: Float32Array.from(nrm), wgt: Float32Array.from(wgt), goalOf, amp: [ 0, 0 ], ph: [ 0, 0 ], hit: [ null, null ], inside: [ false, false ], moving: false };
+	}
+	// Every frame: is the ball in a net? Push it back where the ball is and let it swing.
+	function animateNets3D (bx, by, bh, dt) {
+		const NT = G3.nets;
+		if (!NT) { return; }
+		const cb = 55 * Z3;
+		let any = false;
+		for (let g = 0; g < 2; g++) {
+			const inside = (g === 0 ? bx < -1 : bx > FW + 1) && by > GOAL_T - 2 && by < GOAL_B + 2 && bh < cb + 4;
+			if (inside && !NT.inside[g]) { NT.amp[g] = Math.min(9, 3 + Math.hypot(ball.vx || 0, ball.vy || 0) * 0.9); NT.ph[g] = 0; NT.hit[g] = [ bx, bh, by ]; }
+			NT.inside[g] = inside;
+			if (inside) { NT.hit[g] = [ bx, bh, by ]; }
+			NT.ph[g] += dt * 0.32;
+			NT.amp[g] *= Math.pow(0.955, dt);
+			if (NT.amp[g] > 0.05 || inside) { any = true; }
+		}
+		if (!any && !NT.moving) { return; }
+		NT.moving = any;
+		const arr = NT.net.geometry.attributes.position.array, R = NT.rest, n = NT.nrm, w = NT.wgt;
+		for (let k = 0, v = 0; v < w.length; v++, k += 3) {
+			const g = NT.goalOf[v], h = NT.hit[g];
+			let d = 0;
+			if (h && w[v] > 0) {
+				const dx = R[k] - h[0], dy = R[k + 1] - h[1], dz = R[k + 2] - h[2], dd = dx * dx + dy * dy + dz * dz;
+				const fall = Math.exp(-dd / (2 * 34 * 34));
+				d = w[v] * fall * (NT.amp[g] * Math.sin(NT.ph[g]) + (NT.inside[g] ? 3.5 : 0));
+			}
+			arr[k] = R[k] + n[k] * d; arr[k + 1] = R[k + 1] + n[k + 1] * d; arr[k + 2] = R[k + 2] + n[k + 2] * d;
+		}
+		NT.net.geometry.attributes.position.needsUpdate = true;
 	}
 	/* ---------- the footballers in 3D ----------
 	   One articulated rig per figure (hips, spine, chest, neck, head, shoulders, elbows, hands,
@@ -7863,7 +8170,7 @@
 	   head only): at that distance arms are a pixel. The near stand is only drawn when the camera
 	   looks back at it. */
 	const crowdMood = { excite: 0, home: 0, away: 0, ooh: 0, wave: 0 };
-	const CROWD_U = { uTime: { value: 0 }, uExcite: { value: 0 }, uHome: { value: 0 }, uAway: { value: 0 }, uOoh: { value: 0 }, uWave: { value: 0 } };
+	const CROWD_U = { uTime: { value: 0 }, uExcite: { value: 0 }, uHome: { value: 0 }, uAway: { value: 0 }, uOoh: { value: 0 }, uWave: { value: 0 }, uOla: { value: 0 }, uOlaA: { value: 0 }, uMid: { value: [ 0, 0, 1, 1 ] } };
 	// A fan's shape, facing +z (the pitch). Every camera looks at the stands from the pitch side, so
 	// the faces turned away from it (backs and bottoms) are left out.
 	function fanGeometry3D (kind) {   // "lite", "full" or "hi" (the rounded shape for the front rows)
@@ -7893,9 +8200,9 @@
 			// Legs (seen when he stands), a torso with sloping shoulders, a neck, a rounded head with
 			// hair, arms with hands modelled raised (the shader swings them down), and the flag.
 			for (const sx of [ -0.95, 0.95 ]) { lathe(sx, 0.3, [ [ -2.8, 0.72 ], [ 0.9, 0.92 ] ], 6, 1, 6); }
-			lathe(0, 0, [ [ 0.4, 1.8 ], [ 3.2, 2.05 ], [ 6.0, 2.55 ], [ 7.25, 2.45 ], [ 7.95, 1.65 ], [ 8.35, 0.85 ] ], 9, 0.62, 7);
+			lathe(0, 0, [ [ 0.4, 1.8 ], [ 3.2, 2.05 ], [ 6.0, 2.55 ], [ 7.25, 2.45 ], [ 7.95, 1.65 ], [ 8.35, 0.85 ] ], 8, 0.62, 7);
 			lathe(0, 0, [ [ 8.0, 0.68 ], [ 9.3, 0.72 ] ], 6, 1, 1);
-			lathe(0.05, 0, [ [ 8.95, 0.55 ], [ 9.3, 1.22 ], [ 9.95, 1.52 ], [ 10.65, 1.6 ], [ 11.2, 1.46 ], [ 11.7, 1.02 ], [ 11.98, 0.3 ] ], 10, 0.94, 1, 11.2);
+			lathe(0.05, 0, [ [ 8.95, 0.55 ], [ 9.3, 1.22 ], [ 9.95, 1.52 ], [ 10.65, 1.6 ], [ 11.2, 1.46 ], [ 11.7, 1.02 ], [ 11.98, 0.3 ] ], 8, 0.94, 1, 11.2);
 			for (const sx of [ -2.6, 2.6 ]) {
 				lathe(sx * 1.04, 0, [ [ 7.2, 0.78 ], [ 10.4, 0.7 ], [ 13.5, 0.6 ] ], 6, 1, 8);
 				lathe(sx * 1.04, 0, [ [ 13.4, 0.62 ], [ 14.4, 0.58 ], [ 15.1, 0.2 ] ], 5, 0.8, 5);
@@ -7918,21 +8225,14 @@
 			return g;
 		};
 		if (kind === "hi") { box(0, 14.5, 0, 6, 6, 4, 0.2, 3); return finish(); }
-		// A head: an eight-sided prism (its front half and sides) with hair on top.
-		const head = (cx, cy, r, hh) => {
-			const y0 = cy - hh / 2, y1 = cy + hh / 2, ring = [];
-			for (let k = 0; k < 8; k++) { const a = (k + 0.5) / 8 * Math.PI * 2; ring.push([ cx + Math.cos(a) * r, Math.sin(a) * r * 0.95 ]); }
-			for (let k = 0; k < 8; k++) {
-				const [ ax, az ] = ring[k], [ bx, bz ] = ring[(k + 1) % 8], mx = (ax + bx) / 2 - cx, mz = (az + bz) / 2, ml = Math.hypot(mx, mz);
-				if (mz / ml < -0.3) { continue; }
-				quad([ [ bx, y0, bz ], [ ax, y0, az ], [ ax, y1, az ], [ bx, y1, bz ] ], [ mx / ml, 0, mz / ml ], 1);
-			}
-			const b = pos.length / 3;
-			for (const [ x, z ] of ring) { pos.push(x, y1 + 0.5, z); nor.push(0, 1, 0); part.push(4); }
-			for (let k = 1; k < 7; k++) { idx.push(b, b + k + 1, b + k); }
-		};
-		box(0, 4.2, 0, 5.0, 3.9, 7.2, 3.0, 0);    // body, sitting (the shader stands him up)
-		if (lite) { box(0, 9.7, 0, 2.9, 2.9, 3.2, 2.8, 1, 4); } else { head(0, 9.7, 1.55, 3.2); }
+		if (lite) {
+			box(0, 4.2, 0, 5.0, 3.9, 7.2, 3.0, 0);    // body, sitting (the shader stands him up)
+			box(0, 9.7, 0, 2.9, 2.9, 3.2, 2.8, 1, 4);
+		} else {
+			// Rounded but light: a torso with shoulders and a round head, the front halves only.
+			lathe(0, 0, [ [ 0.6, 1.9 ], [ 4.0, 2.2 ], [ 6.6, 2.6 ], [ 7.8, 1.75 ], [ 8.35, 0.8 ] ], 6, 0.62, 0);
+			lathe(0.05, 0, [ [ 8.7, 0.7 ], [ 9.3, 1.35 ], [ 10.3, 1.6 ], [ 11.2, 1.38 ], [ 11.95, 0.45 ] ], 6, 0.94, 1, 11.2);
+		}
 		if (!lite) {
 			box(-3.3, 9.5, 0, 1.1, 1.1, 6.5, 1.1, 2);   // arms, modelled raised; the shader lowers them
 			box(3.3, 9.5, 0, 1.1, 1.1, 6.5, 1.1, 2);
@@ -7949,7 +8249,7 @@
 			sh.vertexShader = sh.vertexShader
 				.replace("#include <common>", `#include <common>
 					attribute float aPart; attribute vec4 aFan; attribute vec3 aSkin;
-					uniform float uTime, uExcite, uHome, uAway, uOoh, uWave;`)
+					uniform float uTime, uExcite, uHome, uAway, uOoh, uWave, uOla, uOlaA; uniform vec4 uMid;`)
 				.replace("#include <color_vertex>", `#include <color_vertex>
 					int pt = int(aPart + 0.5);
 					if (pt == 1 || pt == 5) { vColor.rgb = aSkin; }
@@ -7967,6 +8267,15 @@
 					float bounce = up * abs(sin(t * (5.5 + phase * 2.5) + phase * 6.2832)) * (3.0 + 3.0 * phase) * step(0.35, standy + up * 0.5);
 					float ooh = uOoh * step(0.3, phase);
 					float armsUp = clamp(up * 1.3 * step(0.25, phase) + ooh * 1.2 + (excite - 0.75) * 2.0 * step(0.6, phase), 0.0, 1.0);
+					// La Ola: the Mexican wave, a band of fans standing with their arms up that runs round the bowl.
+					#ifdef USE_INSTANCING
+					if (uOla > 0.001) {
+						vec2 ip = (vec2(instanceMatrix[3].x, instanceMatrix[3].z) - uMid.xy) / uMid.zw;
+						float da = mod(atan(ip.y, ip.x) - uOlaA + 3.14159, 6.28318) - 3.14159;
+						float ola = uOla * exp(-da * da * 22.0) * (0.75 + 0.25 * phase);
+						stand = max(stand, ola); armsUp = max(armsUp, ola);
+					}
+					#endif
 					int ptv = int(aPart + 0.5);
 					if (ptv == 0) { transformed.y *= 1.0 + 0.45 * stand; }
 					if (ptv == 1 || ptv == 4 || ptv == 7) { transformed.y += 3.3 * stand - down * 1.2; transformed.z += down * 0.8; }
@@ -8001,9 +8310,11 @@
 		m.customProgramCacheKey = () => "ff-crowd";
 		return m;
 	}
-	// Fill the four stands. f0, D, H: the stands' front gap, depth and height; xl..xr, zl..zr their ends.
-	function buildCrowd3D (st, f0, D, H, xl, xr, zl, zr) {
-		const T = THREE, ROWS = 12, SEAT = coarse ? 13 : 10, LITE_ROW = 6;
+	// Fill the bowl: a fan in most seats of every row, in the home colours, with the visitors in the
+	// far corner of the main stand and gaps for the aisles. B: the bowl's plan and rows. The front
+	// rows get the rounded shape, the high rows the light one, as the Graphics setting allows.
+	function buildCrowd3D (st, B) {
+		const T = THREE, GQ = gfx3(), SEAT = GQ.seat;
 		const gs = gstyle || { fill: 0.8 };
 		const hk = KITS[homeSide] || KITS[0], ak = KITS[1 - homeSide] || KITS[1];
 		const homeC = hk.outfield, homeC2 = hk.second || "#1f2a36", awayC = ak.outfield;
@@ -8011,34 +8322,28 @@
 		const skins = [ "#f1c9a5", "#e0ac86", "#c68a5e", "#9c6a44", "#6e4a30", "#4a3222" ];
 		let h = 7919;
 		const rnd = () => (h = (h * 48271) % 2147483647) / 2147483647;
-		const cb = 55 * Z3 + 14, gHalf = (GOAL_B - GOAL_T) / 2 + 24;
 		const lists = { full: [], lite: [], near: [], hi: [], nearHi: [] };
-		// Each stand in its own frame: u along it, t from the front (0) to the back (1).
-		const sides = [
-			{ u: [ xl + 12, xr - 12 ], at: (u, t) => [ u, t * H, -f0 - t * D ], ry: 0, list: "far", away: [ 0.82, 1 ] },
-			{ u: [ xl + 12, xr - 12 ], at: (u, t) => [ u, t * H, FH + f0 + t * D ], ry: Math.PI, list: "near" },
-			{ u: [ zl + 12, zr - 12 ], at: (u, t) => [ -f0 - t * D, t * H, u ], ry: Math.PI / 2, list: "end" },
-			{ u: [ zl + 12, zr - 12 ], at: (u, t) => [ FW + f0 + t * D, t * H, u ], ry: -Math.PI / 2, list: "end" }
-		];
-		for (const sd of sides) {
-			const [ u0, u1 ] = sd.u, cols = Math.floor((u1 - u0) / SEAT);
-			for (let i = 0; i < ROWS; i++) {
-				const t = (i + 0.35) / ROWS;
-				for (let c = 0; c < cols; c++) {
-					const u = u0 + SEAT / 2 + c * SEAT + (i % 2 ? SEAT / 2 : 0), frac = (u - u0) / (u1 - u0);
-					if (u > u1) { continue; }
-					const away = sd.away && frac > sd.away[0] && frac < sd.away[1];
-					if (sd.list === "end" && t * H < cb && Math.abs(u - FH / 2) < gHalf) { continue; }   // the goal sits here
-					if (!(away ? rnd() < 0.9 : rnd() < gs.fill)) { continue; }   // an empty seat
-					const [ x, y, z ] = sd.at(u, t), q = rnd();
+		const fill = clamp(gs.fill * GQ.fill, 0.2, 1);
+		B.rows.forEach((row, i) => {
+			const dS = row.d + row.rd * 0.66, ring = B.ring(dS), y = row.h + 1.5;
+			for (let j = 0; j < B.N; j++) {
+				const a = ring[j], b = ring[B.nxt(j)], L = Math.hypot(b.x - a.x, b.z - a.z), nearSide = B.isNear(j), ai = B.aisles(j);
+				for (let s = (i % 2 ? SEAT : SEAT / 2); s < L - SEAT * 0.3; s += SEAT) {
+					const u = s / L;
+					if (ai.some(v => Math.abs(v - u) * L < 5.5)) { continue; }   // the aisle
+					const x = a.x + (b.x - a.x) * u, z = a.z + (b.z - a.z) * u;
+					if (nearSide && row.h < 20 && Math.abs(x - FW / 2) < 190 * Math.sqrt(S) * 1.24 + 26 && Math.abs(x - FW / 2) > 14) { continue; }   // the dugouts
+					const away = x > FW * 0.8 && z < FH * 0.22 && !nearSide;
+					if (!(away ? rnd() < 0.9 : rnd() < fill)) { continue; }   // an empty seat
+					const nx = a.nx + (b.nx - a.nx) * u, nz = a.nz + (b.nz - a.nz) * u, q = rnd();
 					const color = away ? (q < 0.75 ? awayC : neutrals[Math.floor(rnd() * neutrals.length)])
 						: q < 0.55 ? homeC : q < 0.65 ? homeC2 : neutrals[Math.floor(rnd() * neutrals.length)];
 					const side = away ? 0 : color === homeC || color === homeC2 ? 1 : 0.5;
-					const fan = { x, y: y + 0.4, z, ry: sd.ry + (rnd() - 0.5) * 0.3, side, phase: rnd(), stand: rnd(), flag: rnd() < 0.07 ? 1 : 0, skin: skins[Math.floor(rnd() * skins.length)], color, scale: 1.5 + rnd() * 0.2, wide: 0.88 + rnd() * 0.26, tall: 0.9 + rnd() * 0.2 };
-					lists[sd.list === "near" ? (i < 4 ? "nearHi" : "near") : sd.list === "far" && i < 2 && !away ? "hi" : i >= LITE_ROW ? "lite" : "full"].push(fan);
+					const fan = { x, y, z, ry: Math.atan2(-nx, -nz) + (rnd() - 0.5) * 0.3, side, phase: rnd(), stand: rnd(), flag: rnd() < 0.07 ? 1 : 0, skin: skins[Math.floor(rnd() * skins.length)], color, scale: 1.5 + rnd() * 0.2, wide: 0.88 + rnd() * 0.26, tall: 0.9 + rnd() * 0.2 };
+					lists[nearSide ? (i < GQ.nearHiRows ? "nearHi" : "near") : i < GQ.hiRows && !away ? "hi" : i >= GQ.liteRow ? "lite" : "full"].push(fan);
 				}
 			}
-		}
+		});
 		const mat = crowdMaterial3D(), M = new T.Matrix4(), P = new T.Vector3(), Sc = new T.Vector3(), Q = new T.Quaternion(), E = new T.Euler(), C = new T.Color();
 		const make = (fans, kind) => {
 			if (!fans.length) { return null; }
@@ -8070,6 +8375,18 @@
 		CROWD_U.uTime.value = reduceMotion ? 0 : performance.now() / 1000;
 		CROWD_U.uExcite.value = reduceMotion ? 0.2 : m.excite;
 		CROWD_U.uHome.value = m.home; CROWD_U.uAway.value = m.away; CROWD_U.uOoh.value = m.ooh; CROWD_U.uWave.value = m.wave;
+		// La Ola: after a long quiet spell (or with the home side two up) the stands start a Mexican
+		// wave that runs round the bowl a couple of times. Not with reduced motion.
+		const live = state === "play" && freeze <= 0, now = performance.now();
+		m.lull = live && crowdHeat < 0.3 ? (m.lull || 0) + k : 0;
+		const cruising = live && score[homeSide] - score[1 - homeSide] >= 2 && m.lull > 6;
+		if (!reduceMotion && !(m.olaT > 0) && (m.lull > 20 || cruising) && now - (m.olaLast || -1e9) > 70000) { m.olaT = 15; m.olaLast = now; }
+		if (state !== "play" && state !== "goal") { m.olaT = 0; }
+		if (m.olaT > 0) { m.olaT -= k; m.olaA = (m.olaA || 0) + k * 0.95; }
+		m.ola = (m.ola || 0) + ((m.olaT > 1.2 ? 1 : 0) - (m.ola || 0)) * Math.min(1, k * 1.6);
+		CROWD_U.uOla.value = reduceMotion ? 0 : m.ola;
+		CROWD_U.uOlaA.value = m.olaA || 0;
+		const mid = CROWD_U.uMid.value; mid[0] = FW / 2; mid[1] = FH / 2; mid[2] = FW / 2 + 160; mid[3] = FH / 2 + 160;
 	}
 	// Match events, for the stands. home/away here are the home club's fans and the visitors'.
 	function ev3d (kind, data) {
@@ -8156,10 +8473,12 @@
 		buildStadium3D();
 		const sw = endsSwapped(), WX = x => (sw ? FW - x : x), WD = d => (sw ? Math.PI - d : d);
 		camera3D();
-		// The camera sits in the near stand, so the stand and its roof are only drawn when a shot looks back at them.
-		if (G3.nearRoof) { for (const o of G3.nearRoof) { o.visible = G3.shot === "celeb"; } }
-		if (G3.nearStand) { G3.nearStand.visible = G3.shot === "celeb"; }
-		if (G3.crowd) { for (const m of [ G3.crowd.near, G3.crowd.nearHi ]) { if (m) { m.visible = G3.shot === "celeb"; } } }
+		// The broadcast camera sits in the near stand, so that side of the ground (its seats, fans, roof
+		// and lights) is only drawn when the camera is out in front of it, looking back.
+		const showNear = G3.eye.z < FH + F_SIDE3 - 2;
+		if (G3.nearRoof) { for (const o of G3.nearRoof) { o.visible = showNear; } }
+		if (G3.nearStand) { G3.nearStand.visible = showNear; }
+		if (G3.crowd) { for (const m of [ G3.crowd.near, G3.crowd.nearHi ]) { if (m) { m.visible = showNear; } } }
 		// The players and the officials, posed and drawn as instances; the stands breathe with the match.
 		drawFigures3D(WX, WD);
 		animateCrowd3D();
@@ -8171,6 +8490,7 @@
 			G3.v.set(ball.vy, 0, -(sw ? -ball.vx : ball.vx)).normalize();
 			G3.ball.rotateOnWorldAxis(G3.v, spd / 5 * frameDt / 16.7);
 		}
+		animateNets3D(bx, bz, h * Z3 + 5, frameDt / 16.7);
 		const sh = 1 / (1 + h / 90);
 		G3.ballShadow.position.set(bx + 2 + h * 0.06, 0.3, bz + 1.5 + h * 0.04);
 		G3.ballShadow.scale.set(4.5 * sh + 2, 1, 4.5 * sh + 2);
@@ -8968,6 +9288,8 @@
 			human, switchScore, outfield, dist,
 			get officials () { return officials3; }, get flagCall () { return flagCall; }, refKit, deltaE,
 			proj (x, y, z) { return G3.cam ? proj3D(x, y, z) : null; }, get viewScale () { return scale; },
+			groundTest (o) { if (gstyle) { Object.assign(gstyle, o); } },
+			olaTest () { crowdMood.olaT = 15; crowdMood.olaLast = performance.now(); },
 			raiseFlagTest (kind) { raiseFlag(ball.x, kind === "offside" ? "off" : "out"); flagCall.t = 600; },
 			step (n = 1) { for (let i = 0; i < n; i++) { snapshotPrev(); update(); } },
 			key (code, on) { if (on) { keys.add(code); } else { keys.delete(code); } },
