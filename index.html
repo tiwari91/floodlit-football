@@ -6492,6 +6492,13 @@
 		for (let k = 0; k < 3; k++) {
 			for (const b of [ 0, 0.28, 0.56 ]) { noiseBurst("white", t + k * 1.1 + b, 0.09, g * 1.6, "bandpass", 1800, 1600, 0.9, pan); }
 		}
+		// The bombo: the terrace drum beats the rhythm under the clapping and on through the song.
+		for (let k = 0; k < 8; k++) {
+			const at = t + k * 0.55, o = audio.createOscillator(), dg = audio.createGain();
+			o.type = "sine"; o.frequency.setValueAtTime(95, at); o.frequency.exponentialRampToValueAtTime(48, at + 0.25);
+			dg.gain.setValueAtTime(g * (k % 4 === 3 ? 3.2 : 2.2), at); dg.gain.exponentialRampToValueAtTime(0.0001, at + 0.3);
+			o.connect(dg); connectPan(dg, pan); o.start(at); o.stop(at + 0.32);
+		}
 		const tune = CHANTS[Math.floor(Math.random() * CHANTS.length)], dur = 0.34, t0 = t + 3.4;
 		const outG = audio.createGain(), lp = audio.createBiquadFilter();
 		lp.type = "lowpass"; lp.frequency.value = 1100;
@@ -6540,34 +6547,89 @@
 		}
 	}
 
-	// A stadium anthem on the menus: a four-chord loop with a brass-like pad and a tune.
-	const PROG = [ [ 261.6, 329.6, 392 ], [ 196, 246.9, 293.7 ], [ 220, 261.6, 329.6 ], [ 174.6, 220, 261.6 ] ];
-	const MEL = [ [ 523.3, 587.3 ], [ 493.9, 392 ], [ 523.3, 659.3 ], [ 587.3, 523.3 ] ];
-	function scheduleBar (t, i) {
-		const chord = PROG[i % 4], bar = 2;
-		const pad = audio.createGain(), lp = audio.createBiquadFilter();
-		lp.type = "lowpass"; lp.frequency.value = 1500;
-		pad.gain.setValueAtTime(0.0001, t);
-		pad.gain.linearRampToValueAtTime(0.5, t + 0.25);
-		pad.gain.setValueAtTime(0.5, t + bar - 0.3);
-		pad.gain.linearRampToValueAtTime(0.0001, t + bar);
-		pad.connect(lp).connect(music.g);
-		for (const f of chord) {
+	// The stadium anthem on the menus, in the Mexican manner: two trumpets a third apart (mariachi
+	// style) over a guitarrón bass, vihuela strums on the off-beats, a güiro, kick and clap, and a
+	// timbal fill every eighth bar. Sixteen bars in G at 116 beats a minute, all synthesised.
+	const BPM = 116, BEAT = 60 / BPM, BAR = BEAT * 4;
+	const midiHz = n => 440 * Math.pow(2, (n - 69) / 12);
+	const CHORDS = { G: [ 55, 59, 62 ], C: [ 48, 52, 55 ], D: [ 50, 54, 57 ], Em: [ 52, 55, 59 ], D7: [ 50, 54, 60 ] };
+	const SONG = [   // [ chord, chord for the second half of the bar or null, eight melody notes (eighths) ]
+		[ "G", null, [ 74, 0, 71, 74, 79, 0, 0, 0 ] ], [ "G", null, [ 78, 79, 81, 0, 79, 0, 74, 0 ] ],
+		[ "C", null, [ 76, 0, 76, 79, 76, 0, 72, 0 ] ], [ "D", null, [ 74, 0, 78, 81, 78, 0, 74, 0 ] ],
+		[ "G", null, [ 71, 74, 79, 0, 83, 0, 81, 79 ] ], [ "Em", null, [ 79, 0, 76, 0, 71, 0, 76, 0 ] ],
+		[ "C", "D", [ 72, 76, 79, 0, 74, 78, 81, 0 ] ], [ "G", null, [ 79, 0, 0, 74, 79, 0, 0, 0 ] ],
+		[ "Em", null, [ 83, 0, 81, 79, 76, 0, 0, 0 ] ], [ "C", null, [ 76, 79, 84, 0, 83, 0, 81, 0 ] ],
+		[ "G", null, [ 74, 0, 79, 0, 83, 0, 79, 0 ] ], [ "D", null, [ 81, 0, 78, 0, 74, 0, 0, 0 ] ],
+		[ "Em", null, [ 79, 81, 83, 0, 88, 0, 83, 0 ] ], [ "C", null, [ 84, 0, 83, 81, 79, 0, 76, 0 ] ],
+		[ "D", null, [ 78, 0, 81, 0, 86, 0, 84, 0 ] ], [ "D7", null, [ 83, 0, 81, 0, 78, 0, 74, 0 ] ]
+	];
+	// A third below in G major: two steps down the scale.
+	const SCALE_G = [ 7, 9, 11, 0, 2, 4, 6 ];
+	const thirdBelow = n => { const pc = n % 12, i = SCALE_G.indexOf(pc); if (i < 0) { return n - 4; } const pc2 = SCALE_G[(i + 5) % 7]; let m = n - ((pc - pc2 + 12) % 12); if (m === n) { m -= 12; } return m; };
+	function trumpet (t, n, dur, gain) {
+		const g = audio.createGain(), f = audio.createBiquadFilter();
+		f.type = "lowpass"; f.Q.value = 2;
+		f.frequency.setValueAtTime(700, t); f.frequency.linearRampToValueAtTime(2600, t + 0.05); f.frequency.exponentialRampToValueAtTime(1500, t + Math.max(0.1, dur));
+		g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(gain, t + 0.025);
+		g.gain.setValueAtTime(gain * 0.8, t + Math.max(0.04, dur - 0.06)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.05);
+		f.connect(g).connect(music.g);
+		for (const d of [ -7, 6 ]) {
 			const o = audio.createOscillator();
-			o.type = "sawtooth"; o.frequency.value = f; o.detune.value = (Math.random() * 2 - 1) * 8;
-			o.connect(pad); o.start(t); o.stop(t + bar + 0.05);
+			o.type = "sawtooth"; o.frequency.value = midiHz(n); o.detune.value = d;
+			if (dur > 0.4) {   // a held note gets a little vibrato
+				const lfo = audio.createOscillator(), lg = audio.createGain();
+				lfo.frequency.value = 5.6; lg.gain.setValueAtTime(0, t); lg.gain.linearRampToValueAtTime(9, t + dur);
+				lfo.connect(lg).connect(o.detune); lfo.start(t); lfo.stop(t + dur + 0.1);
+			}
+			o.connect(f); o.start(t); o.stop(t + dur + 0.1);
 		}
-		const bass = audio.createOscillator(), bg = audio.createGain();
-		bass.type = "triangle"; bass.frequency.value = chord[0] / 2;
-		bg.gain.setValueAtTime(0.9, t); bg.gain.exponentialRampToValueAtTime(0.05, t + bar);
-		bass.connect(bg).connect(music.g); bass.start(t); bass.stop(t + bar);
-		MEL[i % 4].forEach((f, k) => {
-			const o = audio.createOscillator(), g = audio.createGain(), s0 = t + k * (bar / 2);
-			o.type = "square"; o.frequency.value = f;
-			g.gain.setValueAtTime(0.0001, s0);
-			g.gain.linearRampToValueAtTime(0.18, s0 + 0.04);
-			g.gain.exponentialRampToValueAtTime(0.001, s0 + bar / 2 - 0.05);
-			o.connect(g).connect(lp); o.start(s0); o.stop(s0 + bar / 2);
+	}
+	function pluck (t, n, dur, gain, type = "triangle") {
+		const o = audio.createOscillator(), g = audio.createGain();
+		o.type = type; o.frequency.value = midiHz(n);
+		g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(gain, t + 0.006); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+		o.connect(g).connect(music.g); o.start(t); o.stop(t + dur + 0.02);
+	}
+	function hit (t, dur, gain, type, f0, f1, q = 1) {   // filtered noise: claps, güiro, shakers
+		const src = audio.createBufferSource(), f = audio.createBiquadFilter(), g = audio.createGain();
+		src.buffer = noise("white"); f.type = type; f.Q.value = q;
+		f.frequency.setValueAtTime(f0, t); f.frequency.linearRampToValueAtTime(f1, t + dur);
+		g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(gain, t + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+		src.connect(f).connect(g).connect(music.g); src.start(t, Math.random()); src.stop(t + dur + 0.02);
+	}
+	function drum (t, f0, f1, dur, gain) {
+		const o = audio.createOscillator(), g = audio.createGain();
+		o.type = "sine"; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+		g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+		o.connect(g).connect(music.g); o.start(t); o.stop(t + dur + 0.02);
+	}
+	function scheduleBar (t, i) {
+		const [ c1, c2, mel ] = SONG[i % SONG.length], E = BEAT / 2;
+		// Drums: kick on one and three, a clap on two and four, the güiro scraping each beat.
+		for (let b = 0; b < 4; b++) {
+			const s = t + b * BEAT;
+			if (b % 2 === 0) { drum(s, 130, 48, 0.22, 0.9); } else { hit(s, 0.13, 0.35, "bandpass", 1600, 1200, 0.9); }
+			hit(s + E * 0.5, 0.16, 0.12, "bandpass", 3200, 4200, 2.5); hit(s + E * 1.2, 0.05, 0.1, "bandpass", 4000, 4000, 3);
+		}
+		if (i % 8 === 7) { for (let k = 0; k < 4; k++) { drum(t + 3 * BEAT + k * E / 2, 330 - k * 25, 220 - k * 20, 0.12, 0.45); } }   // a timbal fill into the next phrase
+		// Guitarrón: the root on one, the fifth on three, a walk into the next bar.
+		for (let half = 0; half < 2; half++) {
+			const ch = CHORDS[half && c2 ? c2 : c1], root = ch[0] - 12, s = t + half * 2 * BEAT;
+			pluck(s, root, 0.42, 0.55); pluck(s, root + 12, 0.3, 0.12, "sine");
+			pluck(s + BEAT, root + 7, 0.36, 0.42);
+		}
+		// Vihuela: a bright chord on each off-beat.
+		for (let b = 0; b < 4; b++) {
+			const ch = CHORDS[b >= 2 && c2 ? c2 : c1], s = t + b * BEAT + E;
+			for (const n of ch) { pluck(s, n + 12, 0.11, 0.07, "square"); }
+		}
+		// The trumpets, in thirds.
+		mel.forEach((n, k) => {
+			if (!n) { return; }
+			let len = 1;
+			while (k + len < mel.length && !mel[k + len] && len < 3) { len++; }
+			const s = t + k * E, dur = len * E * 0.92;
+			trumpet(s, n - 12, dur, 0.2); trumpet(s, thirdBelow(n) - 12, dur, 0.12);
 		});
 	}
 	function updateMusic () {
@@ -6577,7 +6639,7 @@
 		if (want && !music) {
 			music = { g: audio.createGain(), next: t + 0.1, bar: 0 };
 			music.g.gain.value = 0;
-			music.g.gain.setTargetAtTime(0.045, t, 0.6);
+			music.g.gain.setTargetAtTime(0.05, t, 0.6);
 			music.g.connect(audio.destination);
 		}
 		if (!want && music) {
@@ -6587,7 +6649,7 @@
 			music = null;
 			return;
 		}
-		if (music) { while (music.next < t + 0.6) { scheduleBar(music.next, music.bar++); music.next += 2; } }
+		if (music) { while (music.next < t + 0.6) { scheduleBar(music.next, music.bar++); music.next += BAR; } }
 	}
 
 	// Rain you can hear: filtered noise, while a match is on and sound is on.
@@ -9242,7 +9304,7 @@
 			try { G3.renderer.dispose(); if (G3.renderer.forceContextLoss) { G3.renderer.forceContextLoss(); } } catch (e) { /* gone already */ }
 			const fresh = canvas3d.cloneNode(false);
 			canvas3d.replaceWith(fresh); canvas3d = fresh; watchCanvas3D(fresh);
-			G3.renderer = null; G3.scene = null; G3.stadium = null; G3.stadiumKey = ""; G3.mats.clear(); G3.fig = null; G3.crowd = null; G3.nets = null; G3.w = 0; G3.shot = "";
+			G3.renderer = null; G3.scene = null; G3.stadium = null; G3.stadiumKey = ""; G3.mats.clear(); G3.fig = null; G3.crowd = null; G3.nets = null; G3.w = 0; G3.shot = ""; G3.lost = false;
 			crowdMat3 = null;
 			show3D(camMode === "3d");
 		} else {
@@ -9523,7 +9585,7 @@
 			get charging () { return charging; }, get meterRect () { return meterRect; }, get drawMs () { return drawMs; }, get scale () { return scale; }, get kits () { return KITS; }, get stats () { return stats; }, get oppStats () { return oppStats; }, get steerAt () { return steerAt; }, set steerAt (v) { steerAt = v; }, set possTeam (v) { possTeam = v; },
 			set steerSwitchDone (v) { steerSwitchDone = !!v; },
 			get lastSwitchKind () { return lastSwitchKind; }, set lastSwitchKind (v) { lastSwitchKind = v; }, get setPiece () { return setPiece; },
-			get G3 () { return G3; }, get gfxLevel () { return gfxLevel; }, setGfx, get replayOn () { return replayOn(); }, get replay () { return replay; }, get recFrames () { return rec.n; }, REPLAY_AT, REPLAY_FR, GOAL_CELEB, get lastCaption () { return lastCaption; }, caption, get camMode () { return camMode; }, get crowdMood () { return crowdMood; }, get frameDt () { return frameDt; }, get crowdBed () { return crowd; }, get soundOn () { return soundOn; },
+			get G3 () { return G3; }, get gfxLevel () { return gfxLevel; }, setGfx, get musicBar () { return music ? music.bar : -1; }, get audioState () { return audio ? audio.state : "none"; }, get replayOn () { return replayOn(); }, get replay () { return replay; }, get recFrames () { return rec.n; }, REPLAY_AT, REPLAY_FR, GOAL_CELEB, get lastCaption () { return lastCaption; }, caption, get camMode () { return camMode; }, get crowdMood () { return crowdMood; }, get frameDt () { return frameDt; }, get crowdBed () { return crowd; }, get soundOn () { return soundOn; },
 			human, switchScore, outfield, dist,
 			get officials () { return officials3; }, get flagCall () { return flagCall; }, refKit, deltaE,
 			proj (x, y, z) { return G3.cam ? proj3D(x, y, z) : null; }, get viewScale () { return scale; },
