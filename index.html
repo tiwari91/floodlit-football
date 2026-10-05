@@ -6890,6 +6890,17 @@
 				ctx.fillStyle = [ "#f1c9a5", "#c68a5e", "#9c6a44", "#e0ac86" ][(i + d.team) % 4];
 				ctx.beginPath(); ctx.arc(bx, by - 7, 4, 0, Math.PI * 2); ctx.fill();
 			}
+			// The coaching staff, in club tracksuits, standing at the end of the dugout: yours are the
+			// ones you've hired; theirs grow with the club.
+			const nStaff = d.team === 0 ? (mode === "league" && league && league.club && league.club.staff ? Object.values(league.club.staff).filter(Boolean).length : 2) : clamp(Math.round(oppStrength), 1, 5);
+			for (let i = 0; i < nStaff; i++) {
+				const sx = x0 - 10 - (i % 3) * 13 * (d.team === 0 ? 1 : -1) + (d.team === 0 ? 0 : w + 20), sy = y0 + 12 + Math.floor(i / 3) * 16;
+				ctx.fillStyle = "#2a2f38";
+				ctx.beginPath(); ctx.ellipse(sx, sy, 6.5, 5, 0, 0, Math.PI * 2); ctx.fill();
+				ctx.strokeStyle = kit.outfield; ctx.lineWidth = 1.2; ctx.stroke();
+				ctx.fillStyle = [ "#e0ac86", "#9c6a44", "#f1c9a5" ][(i + d.team) % 3];
+				ctx.beginPath(); ctx.arc(sx, sy - 5.5, 3.2, 0, Math.PI * 2); ctx.fill();
+			}
 			ctx.font = "700 11px Barlow, Arial, sans-serif";
 			ctx.textAlign = "center"; ctx.textBaseline = "middle";
 			const lw = ctx.measureText(d.label).width + 12;
