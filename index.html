@@ -129,6 +129,7 @@
 	.lower .lt-tag.red { background: #d8343f; color: #ffffff; }
 	.lower .lt-tag.sub { background: #1d7a46; color: #ffffff; }
 	.lower .lt-tag.replay { background: #f2b52e; color: #10140f; }
+	.lower .lt-tag.review { background: #eef2f0; color: #10140f; }
 	.lower .lt-main { display: flex; flex-direction: column; justify-content: center; padding: 4px 14px 5px 12px; background: #f4f6f2; color: #0d1612; border-left: 6px solid var(--lt-kit, #f2b52e); border-radius: 0 3px 3px 0; overflow: hidden; }
 	.lower .lt-main b { font-size: 21px; font-weight: 800; letter-spacing: 0.04em; line-height: 1.05; overflow: hidden; text-overflow: ellipsis; }
 	.lower .lt-main small { font-family: var(--body, inherit); font-size: 12px; font-weight: 700; letter-spacing: 0.08em; color: #44514b; }
@@ -1855,7 +1856,7 @@
 	let subsLeft = SUBS_MAX, cpuSubs = SUBS_MAX, cameOn = [], wentOff = [], subPick = {}, genericBench = null;
 	let possFrames = [ 0, 0 ];
 	// Counts for the test harness and the match report: both sides, counted where they happen.
-	const newTally = () => ({ shots: [ 0, 0 ], heads: [ 0, 0 ], headGoals: [ 0, 0 ], corners: [ 0, 0 ], cornerGoals: [ 0, 0 ], claims: [ 0, 0 ], punches: [ 0, 0 ], crosses: [ 0, 0 ], clears: [ 0, 0 ], goals: [ 0, 0 ], offsides: [ 0, 0 ], fks: [ 0, 0 ], fkGoals: [ 0, 0 ], pens: [ 0, 0 ], penGoals: [ 0, 0 ], spills: [ 0, 0 ], indirect: 0, walks: 0, carry: [ [], [] ], dribbleShots: [ 0, 0 ], air: { none: 0, attWin: 0, defWin: 0, noAct: 0 } });
+	const newTally = () => ({ shots: [ 0, 0 ], heads: [ 0, 0 ], headGoals: [ 0, 0 ], corners: [ 0, 0 ], cornerGoals: [ 0, 0 ], claims: [ 0, 0 ], punches: [ 0, 0 ], crosses: [ 0, 0 ], clears: [ 0, 0 ], goals: [ 0, 0 ], offsides: [ 0, 0 ], fks: [ 0, 0 ], fkGoals: [ 0, 0 ], pens: [ 0, 0 ], penGoals: [ 0, 0 ], spills: [ 0, 0 ], indirect: 0, walks: 0, tight: 0, carry: [ [], [] ], dribbleShots: [ 0, 0 ], air: { none: 0, attWin: 0, defWin: 0, noAct: 0 } });
 	let tally = newTally(), cornerAt = [ -9999, -9999 ];
 
 	/* ---------- momentum ----------
@@ -3302,7 +3303,7 @@
 		fx = [];
 		freeze = KICKOFF_FREEZE;
 		freezeKind = "kickoff";
-		setPiece = null; deadBall = null; restartWalk = null;
+		setPiece = null; deadBall = null; restartWalk = null; review = null;
 		lastTouch = -1;
 		for (const p of players) { p.tx = undefined; }
 		snapshotPrev();
@@ -3399,11 +3400,43 @@
 	const isOffside = (p, line) => rel(p.team, p.x) > line + 2;
 
 	function markOffside (kicker) {
-		offside = { team: kicker.team, set: new Set() };
+		offside = { team: kicker.team, set: new Set(), margin: new Map(), line: 0 };
 		if (!offsideOn() || (setPiece && setPiece.taker === kicker)) { return; }   // no offside from a corner or a throw-in
 		const line = offsideLine(kicker.team);
+		offside.line = line;
 		for (const m of players) {
-			if (m.team === kicker.team && m !== kicker && m.role !== "gk" && isOffside(m, line)) { offside.set.add(m); }
+			if (m.team !== kicker.team || m === kicker || m.role === "gk") { continue; }
+			if (isOffside(m, line)) { offside.set.add(m); }
+			// Anyone within a stride of the line, either side of it, is a tight call if he gets the ball.
+			const d = rel(m.team, m.x) - line;
+			if (d > -9 && d < 13) { offside.margin.set(m, { d, x: m.x, y: m.y }); }
+		}
+	}
+	// A tight call: the picture freezes on the moment, the line goes across the pitch and the
+	// officials check it before the decision (offside, with a flag and a whistle, or play on).
+	let review = null;
+	const cm = d => `${Math.max(2, Math.round(Math.abs(d) * 6.2))} cm`;
+	function startReview (p, off, mg) {
+		review = { p, off, d: mg.d, team: p.team, lineX: p.team === 0 ? offside.line : FW - offside.line, n: 0 };
+		freeze = 84; freezeKind = "review";
+		charging = false;
+		tally.tight++;
+		caption("Tight call", "review", "Checking offside", `${p.name || teamName(p.team)} · ${minuteNow()}'`, p.team);
+		banner.textContent = "Checking…"; banner.className = "banner " + (p.team === 0 ? "home" : "away"); banner.hidden = false;
+		$("announce").textContent = "A tight call: the officials are checking offside.";
+		if (typeof crowdReact === "function") { crowdReact("near", p.team); }
+	}
+	function finishReview () {
+		const r = review;
+		review = null;
+		banner.hidden = true;
+		if (!r) { return; }
+		if (r.off && players.includes(r.p)) {
+			callOffside(r.p);
+			caption("Offside", "review", `By ${cm(r.d)}`, `${r.p.name || teamName(r.p.team)} was beyond the line`, r.p.team);
+		} else {
+			caption("Onside", "review", "Play on", `Level by ${cm(r.d)}`, r.team);
+			showFoulNote("Onside: play on", r.team);
 		}
 	}
 
@@ -4564,6 +4597,11 @@
 		}
 		if (state !== "play") { return; }
 		if (shoot && shoot.next && frame >= shoot.next) { nextShootCorner(); }
+		if (freeze > 0 && freezeKind === "review") {
+			if (review) { review.n++; }
+			if (--freeze <= 0) { finishReview(); }
+			return;
+		}
 		if (freeze > 0 && freezeKind === "walk") {
 			stepWalk();
 			stepLimbs();
@@ -6026,7 +6064,14 @@
 
 	function gainBall (p) {
 		const lostBy = p.team !== possTeam ? possTeam : -1;
-		// First touch by a teammate who was offside when the ball was played.
+		// First touch by a teammate who was offside when the ball was played (or a tight one either way).
+		if (offside.team === p.team && offside.margin && offside.margin.has(p) && !bulkSim && !shoot && !tut && state === "play" && (offside.set.has(p) || p.team === 0 || p.role === "fwd") && Math.random() < 0.5) {
+			const mg = offside.margin.get(p), off = offside.set.has(p);
+			offside.margin.delete(p);
+			startReview(p, off, mg);
+			if (off) { return; }
+			offside.set.delete(p);
+		}
 		if (offside.team === p.team && offside.set.has(p)) { callOffside(p); return; }
 		lastTouch = p.team;
 		offside = { team: -1, set: new Set() };
@@ -7155,6 +7200,29 @@
 		ctx.restore();
 	}
 
+	// A tight call frozen: the line across the pitch and the man it is about.
+	function drawReview (three) {
+		if (!review || state !== "play") { return; }
+		const x = review.lineX, p = review.p, pulse = reduceMotion ? 0 : Math.sin(review.n * 0.25) * 0.15;
+		ctx.save();
+		ctx.strokeStyle = `rgba(236, 72, 86, ${0.82 + pulse})`; ctx.lineWidth = 4; ctx.shadowColor = "rgba(255, 255, 255, 0.7)"; ctx.shadowBlur = 6;
+		if (three) {
+			let a = null;
+			ctx.beginPath();
+			for (let k = 0; k <= 16; k++) {
+				const b = proj3D(x, FH * k / 16, 1);
+				if (a && b) { ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); }
+				a = b;
+			}
+			ctx.stroke();
+			const q = players.includes(p) ? proj3D(p.x, p.y, 0) : null;
+			if (q) { ctx.strokeStyle = "#f2b52e"; ctx.beginPath(); ctx.ellipse(q.x, q.y, 22 * q.k, 9 * q.k, 0, 0, Math.PI * 2); ctx.stroke(); }
+		} else {
+			ctx.beginPath(); ctx.moveTo(MX + x, MY); ctx.lineTo(MX + x, MY + FH); ctx.stroke();
+			if (players.includes(p)) { ctx.strokeStyle = "#f2b52e"; ctx.beginPath(); ctx.arc(MX + p.x, MY + p.y, 22, 0, Math.PI * 2); ctx.stroke(); }
+		}
+		ctx.restore();
+	}
 	// Your penalty: a crosshair on the side of the goal you're leaning to (the middle if you're square).
 	function drawPenAim (three) {
 		if (!setPiece || setPiece.kind !== "pen" || state !== "play" || setPiece.team !== 0 || ball.owner !== setPiece.taker || setPiece.taker !== human()) { return; }
@@ -8119,6 +8187,7 @@
 		drawOffsideLine();
 		drawAim();
 		drawPenAim(false);
+		drawReview(false);
 		if (tut && tut.marker) {
 			const mx = MX + tut.marker.x, my = MY + tut.marker.y, pulse = reduceMotion ? 0 : Math.sin(frame * 0.12) * 4;
 			ctx.save();
@@ -8227,7 +8296,7 @@
 			const bz = Math.max(0, ball.z);
 			ctx.fillStyle = `rgba(0, 0, 0, ${0.4 / (1 + bz / 40)})`;
 			ctx.beginPath(); ctx.ellipse(MX + ball.x + bz * 0.15, MY + ball.y + bz * 0.1, 5 + bz * 0.04, 3 + bz * 0.03, 0, 0, Math.PI * 2); ctx.fill();
-			drawFreeKickSpray(); drawPassTarget(); drawStrikerMarker(); drawSwitchPreview(); drawOffsideLine(); drawAim(); drawPenAim(false);
+			drawFreeKickSpray(); drawPassTarget(); drawStrikerMarker(); drawSwitchPreview(); drawOffsideLine(); drawAim(); drawPenAim(false); drawReview(false);
 			if (tut && tut.marker) {
 				ctx.strokeStyle = "#f2b52e"; ctx.lineWidth = 3;
 				ctx.beginPath(); ctx.arc(MX + tut.marker.x, MY + tut.marker.y, 24, 0, Math.PI * 2); ctx.stroke();
@@ -10035,6 +10104,7 @@
 		}
 		drawMinimap();
 		drawPenAim(true);
+		drawReview(true);
 		drawHints();
 		drawPowerMeter();
 		drawToasts();
@@ -10808,7 +10878,19 @@
 			throwTest (t, x, top) { if (state !== "play") { return; } freeze = 0; awardThrow(t, x, top); },
 			goalKickTest (def) { if (state !== "play") { return; } freeze = 0; awardGoalKick(def, def === 0); },
 			liftTest () { const p = ball.owner; if (p) { liftShot(p); } },
-			get restartWalk () { return restartWalk; }, get deadBall () { return deadBall; }, get tally () { return tally; }, get freezeKind () { return freezeKind; }, fkDist () { return fkDist(); }, simExtra () { return { tally, poss: possFrames.slice() }; }, get setPieceKind () { return setPiece ? setPiece.kind : null; }, get gfxLevel () { return gfxLevel; }, setGfx, get musicBar () { return music ? music.bar : -1; }, get audioState () { return audio ? audio.state : "none"; }, get replayOn () { return replayOn(); }, get replay () { return replay; }, get recFrames () { return rec.n; }, REPLAY_AT, REPLAY_FR, GOAL_CELEB, get lastCaption () { return lastCaption; }, caption, get camMode () { return camMode; }, get crowdMood () { return crowdMood; }, get frameDt () { return frameDt; }, get crowdBed () { return crowd; }, get soundOn () { return soundOn; },
+			offsideTest (d, t = 1) {
+				if (state !== "play") { return; }
+				freeze = 0; setPiece = null;
+				const c = outfield(t).find(p => p.role === "mid"), f = outfield(t).find(p => p.role === "fwd");
+				c.x = t === 1 ? FW * 0.62 : FW * 0.38; c.y = FH / 2; c.vx = c.vy = 0; c.kickCd = 0; ball.owner = c; syncOwnedBall();
+				for (const q of outfield(1 - t)) { q.vx = q.vy = 0; }
+				const line = offsideLine(t);
+				f.x = t === 0 ? line + d : FW - (line + d); f.y = clamp(FH / 2 + 90, 20, FH - 20); f.vx = f.vy = 0;
+				for (const q of outfield(1 - t)) { if (Math.hypot(q.x - f.x, q.y - f.y) < 60 || Math.hypot(q.x - c.x, q.y - c.y) < 60) { q.y = clamp(q.y + (q.y < FH / 2 ? -140 : 140), 20, FH - 20); } }
+				passTo(c, f);
+				return f;
+			},
+			get restartWalk () { return restartWalk; }, get review () { return review; }, get offside () { return offside; }, get deadBall () { return deadBall; }, get tally () { return tally; }, get freezeKind () { return freezeKind; }, fkDist () { return fkDist(); }, simExtra () { return { tally, poss: possFrames.slice() }; }, get setPieceKind () { return setPiece ? setPiece.kind : null; }, get gfxLevel () { return gfxLevel; }, setGfx, get musicBar () { return music ? music.bar : -1; }, get audioState () { return audio ? audio.state : "none"; }, get replayOn () { return replayOn(); }, get replay () { return replay; }, get recFrames () { return rec.n; }, REPLAY_AT, REPLAY_FR, GOAL_CELEB, get lastCaption () { return lastCaption; }, caption, get camMode () { return camMode; }, get crowdMood () { return crowdMood; }, get frameDt () { return frameDt; }, get crowdBed () { return crowd; }, get soundOn () { return soundOn; },
 			human, switchScore, outfield, dist,
 			get officials () { return officials3; }, get flagCall () { return flagCall; }, refKit, deltaE,
 			proj (x, y, z) { return G3.cam ? proj3D(x, y, z) : null; }, get viewScale () { return scale; },
