@@ -77,34 +77,73 @@
 	/* Big pitch: no title or scoreboard, the ground takes the screen, a score bug on the pitch. */
 	body.big .top, body.big .scoreboard { display: none; }
 	body.big .pitchwrap { height: max(220px, min(calc(100svh - 96px), calc(var(--pw) * 648 / 1072), 1400px)); }
+	/* The score bug: a broadcast graphic. Each side's name on a bar in its kit colour, the score in
+	   a white box, the clock in amber; the score box flashes when a goal goes in. */
 	.scorebug {
 		position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 3;
-		display: none; align-items: center; gap: 10px; padding: 4px 12px 5px;
-		background: rgba(7, 12, 10, 0.88); border: 1px solid var(--rule); border-radius: 4px;
-		font-family: var(--display); font-weight: 800; font-size: 20px; letter-spacing: 0.05em; text-transform: uppercase;
+		display: none; align-items: stretch; gap: 0; padding: 0;
+		background: linear-gradient(180deg, rgba(24, 31, 37, 0.96), rgba(8, 12, 15, 0.96)); border-radius: 3px;
+		box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+		font-family: var(--display); font-weight: 800; font-size: 19px; letter-spacing: 0.06em; text-transform: uppercase;
 		color: var(--chalk, #eef6ea); pointer-events: none; white-space: nowrap;
 	}
+	.scorebug > span:not(.bugbar):not(.bugmood), .scorebug > b { display: inline-flex; align-items: center; padding: 4px 11px 5px; }
+	.scorebug #bugHome { border-left: 6px solid var(--left-kit, #f2b52e); border-radius: 3px 0 0 3px; }
+	.scorebug #bugAway { border-right: 6px solid var(--right-kit, #de4f5a); }
 	body.big .scorebug { display: inline-flex; }
 	.pitchwrap:has(.overlay:not([hidden])) .scorebug { display: none; }   /* the card over the pitch has the details */
 	.menutoggle {
 		position: absolute; top: 10px; right: 10px; z-index: 4; padding: 5px 10px; font-size: 13px;
 		background: rgba(7, 12, 10, 0.82); border: 1px solid var(--rule); border-radius: 4px; color: var(--chalk, #eef6ea);
 	}
-	.scorebug b { font-size: 24px; font-variant-numeric: tabular-nums; }
-	.scorebug .t { color: #f2b52e; font-size: 18px; font-variant-numeric: tabular-nums; }
+	.scorebug b { font-size: 22px; font-variant-numeric: tabular-nums; background: #f4f6f2; color: #0d1612; letter-spacing: 0.04em; min-width: 3.3em; justify-content: center; }
+	.scorebug b.flash { animation: bugflash 1.6s ease-out; }
+	@keyframes bugflash { 0%, 30% { background: var(--amber); } 100% { background: #f4f6f2; } }
+	.scorebug .t { color: #f2b52e; font-size: 17px; font-variant-numeric: tabular-nums; background: rgba(255, 255, 255, 0.07); border-radius: 0 3px 3px 0; }
 	@media (max-width: 640px) {
-		.scorebug { left: 10px; transform: none; gap: 7px; padding: 3px 9px 4px; font-size: 15px; max-width: calc(100% - 118px); }
-		.scorebug > span:not(.t):not(.bugbar):not(.bugmood) { overflow: hidden; text-overflow: ellipsis; max-width: 9ch; }
-		.scorebug b { font-size: 19px; }
-		.scorebug .t { font-size: 15px; }
+		.scorebug { left: 10px; transform: none; font-size: 14px; max-width: calc(100% - 118px); }
+		.scorebug > span:not(.bugbar):not(.bugmood), .scorebug > b { padding: 3px 7px 4px; }
+		.scorebug > span:not(.t):not(.bugbar):not(.bugmood) { overflow: hidden; text-overflow: ellipsis; max-width: 6ch; }
+		.scorebug b { font-size: 17px; min-width: 2.9em; }
+		.scorebug .t { font-size: 13px; }
 		.scorebug .bugmood { left: 0; transform: none; }
 		.menutoggle { padding: 4px 8px; font-size: 12px; }
 	}
 	/* Big pitch keeps the momentum: a strip along the bottom of the bug and a word under it. */
-	.scorebug .bugbar { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; overflow: hidden; border-radius: 0 0 4px 4px; background: rgba(255, 255, 255, 0.08); }
+	.scorebug .bugbar { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; overflow: hidden; border-radius: 0 0 3px 3px; background: rgba(255, 255, 255, 0.08); }
 	.scorebug .bugmood { position: absolute; top: calc(100% + 4px); left: 50%; transform: translateX(-50%); font-size: 12px; font-weight: 700; letter-spacing: 0.08em; padding: 2px 8px; border-radius: 3px; background: rgba(7, 12, 10, 0.78); color: var(--chalk, #eef6ea); }
 	.scorebug .bugmood.home { color: var(--amber); }
 	.scorebug .bugmood.away { color: var(--opp-text); }
+	/* Lower-third captions: goals, cards and substitutions, like a broadcast. A tag (GOAL, YELLOW
+	   CARD...), then the name on a white plate with the side's kit colour down its edge. */
+	.lower {
+		position: absolute; left: 14px; bottom: 44px; z-index: 3; display: flex; align-items: stretch;
+		pointer-events: none; font-family: var(--display); text-transform: uppercase; white-space: nowrap;
+		filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.5)); max-width: calc(100% - 28px);
+	}
+	.lower[hidden] { display: none; }
+	.lower.in { animation: ltIn 0.45s cubic-bezier(0.2, 0.8, 0.2, 1); }
+	@keyframes ltIn { from { transform: translateX(-24px); opacity: 0; } to { transform: none; opacity: 1; } }
+	.lower .lt-tag { display: flex; align-items: center; padding: 0 12px; font-weight: 900; font-size: 15px; letter-spacing: 0.12em; background: #0d1216; color: var(--amber); border-radius: 3px 0 0 3px; }
+	.lower .lt-tag.yellow { background: #ffd21f; color: #1b1606; }
+	.lower .lt-tag.red { background: #d8343f; color: #ffffff; }
+	.lower .lt-tag.sub { background: #1d7a46; color: #ffffff; }
+	.lower .lt-tag.replay { background: #f2b52e; color: #10140f; }
+	.lower .lt-main { display: flex; flex-direction: column; justify-content: center; padding: 4px 14px 5px 12px; background: #f4f6f2; color: #0d1612; border-left: 6px solid var(--lt-kit, #f2b52e); border-radius: 0 3px 3px 0; overflow: hidden; }
+	.lower .lt-main b { font-size: 21px; font-weight: 800; letter-spacing: 0.04em; line-height: 1.05; overflow: hidden; text-overflow: ellipsis; }
+	.lower .lt-main small { font-family: var(--body, inherit); font-size: 12px; font-weight: 700; letter-spacing: 0.08em; color: #44514b; }
+	.pitchwrap:has(.overlay:not([hidden])) .lower { display: none; }
+	@media (pointer: coarse), (max-width: 640px) {
+		.lower { top: 50px; bottom: auto; left: 10px; }
+		.lower .lt-tag { font-size: 12px; padding: 0 9px; }
+		.lower .lt-main b { font-size: 16px; }
+		.lower .lt-main small { font-size: 11px; }
+	}
+	/* The replay's tag, top right under the menu button. */
+	.replaytag { position: absolute; top: 46px; right: 10px; z-index: 3; padding: 3px 10px 4px; font-family: var(--display); font-weight: 900; font-size: 15px; letter-spacing: 0.14em; text-transform: uppercase; background: #f2b52e; color: #10140f; border-radius: 3px; pointer-events: none; }
+	.replaytag[hidden] { display: none; }
+	.replaytag small { font-weight: 700; font-size: 11px; letter-spacing: 0.1em; margin-left: 8px; opacity: 0.75; }
+	@media (prefers-reduced-motion: reduce) { .lower.in, .scorebug b.flash { animation: none; } }
 	.scoreboard {
 		display: grid;
 		grid-template-columns: 1fr auto 1fr;
@@ -991,6 +1030,8 @@
 		<canvas id="pitch" aria-label="Football pitch"></canvas>
 		<button class="menutoggle" id="menuToggle" type="button" aria-pressed="true">Show menu</button>
 		<div class="scorebug" id="scoreBug" aria-hidden="true"><span id="bugHome">You</span><b id="bugScore">0 – 0</b><span id="bugAway">CPU</span><span class="t" id="bugClock">03:00</span><span class="bugbar"><span class="mfill" id="bugFill"></span></span><span class="bugmood" id="bugMood" hidden></span></div>
+		<div class="lower" id="lowerThird" aria-hidden="true" hidden><span class="lt-tag" id="ltTag">Goal</span><span class="lt-main"><b id="ltName"></b><small id="ltSub"></small></span></div>
+		<div class="replaytag" id="replayTag" aria-hidden="true" hidden>Replay<small>any key skips</small></div>
 		<div class="banner" id="banner" hidden></div>
 		<div class="coach" id="coach" hidden>
 			<div class="coach-step" id="coachStep"></div>
@@ -4306,7 +4347,8 @@
 			celeb = { t: 0, hero, target: [ hero.x + dx / L * run, hero.y + dy / L * run ], kneelAt: -1, fetched: false };
 			for (const p of players) { p.kneel = 0; p.sulk = 0; }
 			banner.textContent = ball.headed && ball.lastBy && ball.lastBy.team === scorer ? (scorer === 0 ? "Header! Goal" : `Header! ${opp.short} score`) : scorer === 0 ? "Goal" : `${opp.short} score`;
-			if (hero && hero.name) { const s = document.createElement("small"); s.textContent = `${hero.name} ${minuteNow()}'`; banner.append(s); }
+			const by = ball.lastBy, own = by && by.team !== scorer, who = own ? by : hero;
+			caption(own ? "Own goal" : "Goal", "goal", (who && who.name) || (scorer === 0 ? "You" : opp.short), `${own ? "Own goal" : ball.headed ? "Header" : scorer === 0 ? "You" : opp.short} · ${minuteNow()}'`, own ? by.team : scorer);
 		}
 		banner.className = "banner " + (scorer === 0 ? "home" : "away");
 		banner.hidden = false;
@@ -4495,10 +4537,12 @@
 			vic.name = np.name; vic.attr = { pac: np.pac, sho: np.sho, pas: np.pas, def: np.def }; vic.injured = false; vic.yellow = 0;
 			cpuSubs--;
 			hurtText = `${was || "Their man"} is hurt: ${opp.short} bring on ${np.name}.`;
+			setTimeout(() => caption("Substitution", "sub", np.name, `${opp.short} · off: ${was || "injured"}`, 1), 2600);
 			logEvent(1, "sub", `${np.name} on for ${was || "the injured man"}`);
 		}
 		const extra = [ card ? `${card}${who}.` : `Foul${who}.`, red ? `${off.team === 0 ? "You're" : `${opp.short} are`} down to ${team(off.team).length - 1} men.` : "", hurtText ].filter(Boolean).join(" ");
 		if (card) { logEvent(off.team, red ? "red" : "yellow", `${off.name || "Player"}${red ? ` (${card.toLowerCase()})` : ""}`); }
+		if (card) { caption(red ? (card.startsWith("Second") ? "Second yellow" : "Red card") : "Yellow card", red ? "red" : "yellow", off.name || (off.team === 0 ? "You" : opp.short), `${off.team === 0 ? "You" : opp.short} · ${minuteNow()}'`, off.team); }
 		if (hurt) { logEvent(t, "injury", `${vic.name || "Player"} hurt`); }
 		if (inBox) { logEvent(t, "pen", `Penalty won by ${vic.name || "Player"}`); }
 		if (inBox) { awardPenalty(t, vic); } else { awardFreeKick(t, vic); }
@@ -4556,6 +4600,7 @@
 		subsLeft--;
 		if (!quiet) {
 			burst(p.x, p.y, "Sub on");
+			caption("Substitution", "sub", pl.name, `On for ${out} · ${minuteNow()}'`, 0);
 			$("announce").textContent = `Substitution: ${pl.name} on for ${out}.`;
 		}
 		updateSubsBtn();
@@ -5275,6 +5320,7 @@
 			if (mode !== "tutorial") { store.set("ff-played", String(playedCount() + 1)); }
 		}
 		if (state === "half") { toast("Second half: teams change ends", "#eef6ea"); }
+		if ((state === "intro" || state === "full" || state === "half") && mode !== "tutorial") { introSweep = { on: true }; }
 		state = "play";
 		pauseBtn.textContent = "Pause";
 		if (mode === "tutorial" && !tut) { tut = { step: 0 }; freeze = 0; setupTutStep(); }
@@ -5450,6 +5496,21 @@
 		if (show) { b.textContent = label; }
 	}
 
+	// Lower-third captions, like a broadcast: a goal, a card or a substitution, for four and a half seconds.
+	let ltTimer = 0, lastCaption = null;
+	function caption (tag, kind, name, sub, t) {
+		if (bulkSim || mode === "tutorial") { return; }
+		const el = $("lowerThird");
+		if (!el) { return; }
+		$("ltTag").textContent = tag; $("ltTag").className = "lt-tag " + kind;
+		$("ltName").textContent = name; $("ltSub").textContent = sub;
+		el.style.setProperty("--lt-kit", (KITS[t] || KITS[0]).outfield);
+		el.hidden = false;
+		el.classList.remove("in"); void el.offsetWidth; el.classList.add("in");
+		lastCaption = { tag, kind, name, sub, at: performance.now() };
+		clearTimeout(ltTimer);
+		ltTimer = setTimeout(() => { el.hidden = true; }, 4500);
+	}
 	function renderHud () {
 		renderMomentum();
 		renderSimBtn();
@@ -5459,15 +5520,20 @@
 
 		const t = Math.ceil(timeLeft);
 		const clock = `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
-		const key = `${score[0]}|${score[1]}|${clock}`;
+		const narrow = window.innerWidth <= 640;
+		const key = `${score[0]}|${score[1]}|${clock}|${narrow}`;
 		if (key === lastHud) { return; }
 		lastHud = key;
 		scoreHomeEl.textContent = leftIsYou ? score[0] : score[1];
 		scoreAwayEl.textContent = leftIsYou ? score[1] : score[0];
 		clockEl.textContent = clock;
-		$("bugHome").textContent = $("homeName").textContent;
-		$("bugAway").textContent = $("awayName").textContent;
-		$("bugScore").textContent = `${scoreHomeEl.textContent} – ${scoreAwayEl.textContent}`;
+		// Broadcast codes on a narrow screen: the first three letters of each side.
+		const code = n => (narrow ? (n.replace(/[^A-Za-z]/g, "").slice(0, 3) || n) : n);
+		$("bugHome").textContent = code($("homeName").textContent);
+		$("bugAway").textContent = code($("awayName").textContent);
+		const bugScore = `${scoreHomeEl.textContent} – ${scoreAwayEl.textContent}`, bs = $("bugScore");
+		if (bs.textContent !== bugScore && state === "goal") { bs.classList.remove("flash"); void bs.offsetWidth; bs.classList.add("flash"); }
+		bs.textContent = bugScore;
 		$("bugClock").textContent = clock;
 		const tot = possFrames[0] + possFrames[1];
 		const mine = tot ? Math.round(100 * possFrames[0] / tot) : 50;
@@ -8411,6 +8477,10 @@
 	// Which shot the broadcast is on: wide from the gantry between the action, tight behind a
 	// set piece, otherwise following the ball along the near stand.
 	const FOLLOW_FOV = 40;
+	// The kick-off sweep: at the start of each half the camera swings in from high over a corner of
+	// the ground and comes down to the broadcast position while the 3-2-1 runs, arriving with the
+	// whistle. Not with reduced motion.
+	let introSweep = null;
 	function shot3D (out) {
 		const wideDrift = reduceMotion ? 0 : Math.sin(performance.now() / 9000) * FW * 0.1;
 		if (benchCam()) {
@@ -8418,6 +8488,17 @@
 			out.eye.set(FW / 2 + wideDrift, FH * 0.92, FH + FH * 1.02);
 			out.look.set(FW / 2, 10, FH * 0.4);
 			return out;
+		}
+		if (introSweep && state === "play" && !reduceMotion) {
+			const T = 1 - freeze / KICKOFF_FREEZE;
+			if (freeze > 0 && freezeKind === "kickoff" && T >= 0 && T < 1) {
+				const e = smooth3(T), a = -1.05 * (1 - e), R = FH * (1.95 - 1.13 * e);
+				out.kind = "intro";
+				out.eye.set(FW / 2 + Math.sin(a) * R * 1.25, FH * (1.2 - 0.7 * e), FH / 2 + Math.cos(a) * R);
+				out.look.set(FW / 2, 0, FH / 2);
+				return out;
+			}
+			introSweep = null;
 		}
 		const sw = endsSwapped(), WX = x => (sw ? FW - x : x);
 		const o = ball.owner;
@@ -8475,7 +8556,7 @@
 		camera3D();
 		// The broadcast camera sits in the near stand, so that side of the ground (its seats, fans, roof
 		// and lights) is only drawn when the camera is out in front of it, looking back.
-		const showNear = G3.eye.z < FH + F_SIDE3 - 2;
+		const showNear = G3.eye.z < FH + F_SIDE3 - 2 || G3.shot === "intro" || G3.shot.startsWith("replay");
 		if (G3.nearRoof) { for (const o of G3.nearRoof) { o.visible = showNear; } }
 		if (G3.nearStand) { G3.nearStand.visible = showNear; }
 		if (G3.crowd) { for (const m of [ G3.crowd.near, G3.crowd.nearHi ]) { if (m) { m.visible = showNear; } } }
@@ -9284,7 +9365,7 @@
 			get charging () { return charging; }, get meterRect () { return meterRect; }, get drawMs () { return drawMs; }, get scale () { return scale; }, get kits () { return KITS; }, get stats () { return stats; }, get oppStats () { return oppStats; }, get steerAt () { return steerAt; }, set steerAt (v) { steerAt = v; }, set possTeam (v) { possTeam = v; },
 			set steerSwitchDone (v) { steerSwitchDone = !!v; },
 			get lastSwitchKind () { return lastSwitchKind; }, set lastSwitchKind (v) { lastSwitchKind = v; }, get setPiece () { return setPiece; },
-			get G3 () { return G3; }, get camMode () { return camMode; }, get crowdMood () { return crowdMood; }, get frameDt () { return frameDt; }, get crowdBed () { return crowd; }, get soundOn () { return soundOn; },
+			get G3 () { return G3; }, get lastCaption () { return lastCaption; }, caption, get camMode () { return camMode; }, get crowdMood () { return crowdMood; }, get frameDt () { return frameDt; }, get crowdBed () { return crowd; }, get soundOn () { return soundOn; },
 			human, switchScore, outfield, dist,
 			get officials () { return officials3; }, get flagCall () { return flagCall; }, refKit, deltaE,
 			proj (x, y, z) { return G3.cam ? proj3D(x, y, z) : null; }, get viewScale () { return scale; },
