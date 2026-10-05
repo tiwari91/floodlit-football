@@ -1157,6 +1157,13 @@
 				</select>
 			</label>
 			<button id="camBtn" type="button" aria-pressed="false" title="Switch camera (C): overhead, TV or 3D">Camera: overhead</button>
+			<label class="field" for="gfx" title="How much the 3D view draws: crowd density and detail, floodlight shadows, sharpness and smoothing">Graphics
+				<select id="gfx">
+					<option value="low">Low</option>
+					<option value="medium">Medium</option>
+					<option value="high">High</option>
+				</select>
+			</label>
 			<button id="hintsBtn" type="button" aria-pressed="true">Hints on</button>
 			<button id="mapBtn" type="button" aria-pressed="false">Minimap off</button>
 			<button id="bigBtn" type="button" aria-pressed="false">Big pitch: off</button>
@@ -7254,13 +7261,16 @@
 	   transparent, and carries the HUD: hints, toasts, the countdown, the minimap, names and
 	   markers. three.js comes from cdnjs; if WebGL or the script is unavailable, the view
 	   falls back to the 2D cameras. */
-	const canvas3d = $("pitch3d"), threeEl = $("threeLib");
+	let canvas3d = $("pitch3d");
+	const threeEl = $("threeLib");
 	let threeFailed = !threeEl || !canvas3d, threeWaitStart = 0, threeToldLoading = false;
 	if (threeEl) { threeEl.addEventListener("error", () => { threeFailed = true; }); }
-	if (canvas3d) {
-		canvas3d.addEventListener("webglcontextlost", e => { e.preventDefault(); G3.lost = true; });
-		canvas3d.addEventListener("webglcontextrestored", () => { G3.lost = false; });
-	}
+	const watchCanvas3D = c => {
+		// (Only the canvas in use counts: a retired one, dropped for a Graphics change, also reports a loss.)
+		c.addEventListener("webglcontextlost", e => { e.preventDefault(); if (c === canvas3d) { G3.lost = true; } });
+		c.addEventListener("webglcontextrestored", () => { if (c === canvas3d) { G3.lost = false; } });
+	};
+	if (canvas3d) { watchCanvas3D(canvas3d); }
 	const Z3 = Z_W;   // ball and crossbar heights, in pitch pixels
 	const G3 = {   // everything the WebGL view owns
 		renderer: null, scene: null, cam: null, lost: false, geo: null, mats: new Map(),
@@ -7273,8 +7283,8 @@
 	// four-core machine); the choice is remembered.
 	const GFX3 = {
 		low: { seat: 15, fill: 0.62, hiRows: 0, nearHiRows: 2, liteRow: 3, lattice: false, shadows: 1, ratio: 1, aa: false },
-		medium: { seat: 12, fill: 0.82, hiRows: 0, nearHiRows: 4, liteRow: 6, lattice: true, shadows: 2, ratio: 1.5, aa: !coarse },
-		high: { seat: 10, fill: 1, hiRows: 2, nearHiRows: 5, liteRow: 8, lattice: true, shadows: 4, ratio: 2, aa: true }
+		medium: { seat: 12, fill: 0.82, hiRows: 0, nearHiRows: 4, liteRow: 6, lattice: true, shadows: 3, ratio: 1.5, aa: !coarse },
+		high: { seat: 10, fill: 1, hiRows: 2, nearHiRows: 5, liteRow: 8, lattice: true, shadows: 5, ratio: 2, aa: true }
 	};
 	const GFX_NAME = { low: "Low", medium: "Medium", high: "High" };
 	const defaultGfx = () => {
@@ -7298,7 +7308,7 @@
 	function resize3D () {
 		if (!G3.renderer || !canvas3d || canvas3d.hidden) { return; }
 		const rect = canvas3d.getBoundingClientRect();
-		G3.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, coarse ? 1.5 : 2));
+		G3.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, gfx3().ratio));
 		G3.renderer.setSize(Math.max(1, Math.round(rect.width)), Math.max(1, Math.round(rect.height)), false);
 	}
 	// One material per colour, shared by every mesh that wears it.
@@ -7314,7 +7324,8 @@
 	const flat3D = (geo, color, opacity) => new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false }));
 	function init3D () {
 		try {
-			const renderer = new THREE.WebGLRenderer({ canvas: canvas3d, antialias: !coarse, powerPreference: "high-performance", alpha: false });
+			const renderer = new THREE.WebGLRenderer({ canvas: canvas3d, antialias: gfx3().aa, powerPreference: "high-performance", alpha: false });
+			G3.aa = gfx3().aa;
 			renderer.setClearColor(0x070c12, 1);
 			G3.renderer = renderer;
 			G3.scene = new THREE.Scene();
@@ -7938,7 +7949,9 @@
 		// A kit-coloured ring at each player's feet (it keeps the sides readable from the gantry) and a soft shadow.
 		const rings = new T.InstancedMesh(G3.geo.ring, new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7, depthWrite: false }), MAXF3);
 		const blobs = new T.InstancedMesh(G3.geo.shadow, new T.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.32, depthWrite: false }), MAXF3);
-		for (const m of [ rings, blobs ]) { m.instanceMatrix.setUsage(T.DynamicDrawUsage); m.frustumCulled = false; m.count = 0; G3.scene.add(m); }
+		// Under four floodlights a player throws four faint shadows, one away from each (as many as the Graphics setting draws).
+		const longs = new T.InstancedMesh(G3.geo.shadow, new T.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.12, depthWrite: false }), MAXF3 * 4);
+		for (const m of [ rings, blobs, longs ]) { m.instanceMatrix.setUsage(T.DynamicDrawUsage); m.frustumCulled = false; m.count = 0; G3.scene.add(m); }
 		rings.setColorAt(0, white);
 		// The assistants' flags, held in the hand: a pole and a red-and-yellow chequered cloth.
 		const FA = acc3();
@@ -7962,7 +7975,7 @@
 			const hip = [ node(hips, 0, -1.0, -2.7), node(hips, 0, -1.0, 2.7) ], kn = hip.map(h => node(h, 0, -7.3, 0)), an = kn.map(k => node(k, 0, -6.5, 0));
 			rigs.push({ root, hips, spine, chest, neck, head, sh, el, ha, hip, kn, an });
 		}
-		G3.fig = { parts, nums, rings, blobs, flags, rigs, cnt: {}, n: 0, M: new T.Matrix4(), M2: new T.Matrix4(), C: new T.Color(), V: new T.Vector3(), S: new T.Vector3(), Q: new T.Quaternion(), prevDir: new WeakMap() };
+		G3.fig = { parts, nums, rings, blobs, longs, flags, rigs, cnt: {}, n: 0, M: new T.Matrix4(), M2: new T.Matrix4(), C: new T.Color(), V: new T.Vector3(), S: new T.Vector3(), Q: new T.Quaternion(), prevDir: new WeakMap() };
 	}
 	// Reset a rig to standing.
 	function resetRig3D (r) {
@@ -8114,6 +8127,15 @@
 		}
 		const V = F.V.setFromMatrixPosition(rig.root.matrixWorld), x = V.x, z = V.z, air = Math.max(0, V.y);
 		F.blobs.setMatrixAt(F.blobs.count++, M.compose(V.set(x + 2, 0.2, z + 1.5), F.Q.identity(), F.S.set(11 + air * 0.15, 1, 7 + air * 0.1)));
+		const ns = gfx3().shadows - 1;
+		if (ns > 0 && air < 20) {
+			for (let k = 0; k < 4; k++) {
+				if (ns < 4 && k % 2) { continue; }   // Medium: the two lights on one diagonal
+				const lx = k === 0 || k === 3 ? -160 : FW + 160, lz = k < 2 ? -160 : FH + 160;
+				const dx = x - lx, dz = z - lz, d = Math.hypot(dx, dz) || 1, len = clamp(32 * d / 950, 10, 52);
+				F.longs.setMatrixAt(F.longs.count++, M.compose(V.set(x + dx / d * len * 0.5, 0.15, z + dz / d * len * 0.5), F.Q.setFromAxisAngle(F.Y || (F.Y = new THREE.Vector3(0, 1, 0)), -Math.atan2(dz, dx)), F.S.set(len * 0.5, 1, 3.4)));
+			}
+		}
 		if (kit.ring) {
 			const r = F.rings.count++;
 			F.rings.setMatrixAt(r, M.compose(V.set(x, 0.25, z), F.Q.identity(), F.S.set(16, 1, 16)));
@@ -8193,7 +8215,7 @@
 	function drawFigures3D (WX, WD) {
 		const F = G3.fig;
 		for (const k in F.parts) { F.cnt[k] = 0; }
-		F.n = 0; F.nums.count = 0; F.rings.count = 0; F.blobs.count = 0;
+		F.n = 0; F.nums.count = 0; F.rings.count = 0; F.blobs.count = 0; F.longs.count = 0;
 		const dt = frameDt / 16.7;
 		for (const p of players) {
 			if (F.n >= MAXF3) { break; }
@@ -8230,7 +8252,7 @@
 		}
 		const tg = F.parts.torso.geometry;
 		tg.attributes.aPat.needsUpdate = true; tg.attributes.aCol2.needsUpdate = true;
-		for (const m of [ F.nums, F.rings, F.blobs ]) { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) { m.instanceColor.needsUpdate = true; } }
+		for (const m of [ F.nums, F.rings, F.blobs, F.longs ]) { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) { m.instanceColor.needsUpdate = true; } }
 		F.nums.geometry.attributes.aCell.needsUpdate = true;
 	}
 	/* ---------- the crowd in 3D ----------
@@ -9205,6 +9227,37 @@
 		if (state === "play" || state === "goal" || state === "paused") { toast(highContrast ? "Kit contrast on" : "Kit contrast off", "#f2b52e"); }
 	});
 
+	// Graphics: Low, Medium or High. The stadium and crowd are rebuilt at the new level on the next
+	// frame; a change of antialiasing needs a new WebGL context, so the 3D view starts afresh on a new
+	// canvas. Saved only once chosen, like the camera.
+	const gfxSel = $("gfx");
+	function setGfx (level, chosen = false) {
+		if (!GFX3[level]) { return; }
+		const was = gfxLevel;
+		gfxLevel = level;
+		if (gfxSel) { gfxSel.value = level; }
+		if (chosen) { store.set("ff-gfx", level); }
+		if (level === was || !G3.renderer) { return; }
+		if (G3.aa !== gfx3().aa && canvas3d) {
+			try { G3.renderer.dispose(); if (G3.renderer.forceContextLoss) { G3.renderer.forceContextLoss(); } } catch (e) { /* gone already */ }
+			const fresh = canvas3d.cloneNode(false);
+			canvas3d.replaceWith(fresh); canvas3d = fresh; watchCanvas3D(fresh);
+			G3.renderer = null; G3.scene = null; G3.stadium = null; G3.stadiumKey = ""; G3.mats.clear(); G3.fig = null; G3.crowd = null; G3.nets = null; G3.w = 0; G3.shot = "";
+			crowdMat3 = null;
+			show3D(camMode === "3d");
+		} else {
+			resize3D();
+		}
+	}
+	if (gfxSel) {
+		gfxSel.value = gfxLevel;
+		gfxSel.addEventListener("change", () => {
+			setGfx(gfxSel.value, true);
+			if (state === "play" || state === "goal" || state === "paused") { toast(`Graphics: ${GFX_NAME[gfxLevel]}`, "#f2b52e"); }
+			gfxSel.blur();
+		});
+	}
+
 	/* ---------- how to play ----------
 	   One screen with every control, for the keyboard, touch or a controller, and what the
 	   markers on the pitch mean. H opens it any time (and pauses the match). */
@@ -9302,7 +9355,8 @@
 			[ soundOn ? "Sound on" : "Sound off", soundOn, () => soundBtn.click() ],
 			[ musicOn ? "Music on" : "Music off", musicOn, () => $("musicBtn").click() ],
 			[ hintsOn ? "Hints on" : "Hints off", hintsOn, () => $("hintsBtn").click() ],
-			[ highContrast ? "Kit contrast on" : "Kit contrast off", highContrast, () => $("contrastBtn").click() ]
+			[ highContrast ? "Kit contrast on" : "Kit contrast off", highContrast, () => $("contrastBtn").click() ],
+			[ `Graphics: ${GFX_NAME[gfxLevel]}`, false, () => { const ks = Object.keys(GFX3); setGfx(ks[(ks.indexOf(gfxLevel) + 1) % ks.length], true); } ]
 		];
 		q.replaceChildren(...items.map(([ label, on, act ]) => {
 			const b = document.createElement("button");
@@ -9420,6 +9474,7 @@
 		if (store.get("ff-map") === "1") { minimapOn = true; $("mapBtn").textContent = "Minimap on"; $("mapBtn").setAttribute("aria-pressed", "true"); }
 		if (store.get("ff-hints") === "0") { hintsOn = false; $("hintsBtn").textContent = "Hints off"; $("hintsBtn").setAttribute("aria-pressed", "false"); }
 		if (store.get("ff-music") === "0") { musicOn = false; $("musicBtn").textContent = "Music off"; $("musicBtn").setAttribute("aria-pressed", "false"); }
+		{ const g = store.get("ff-gfx"); if (g && GFX3[g]) { setGfx(g); } }
 		if (store.get("ff-contrast") === "1") { highContrast = true; $("contrastBtn").textContent = "Kit contrast on"; $("contrastBtn").setAttribute("aria-pressed", "true"); }
 
 		try {
@@ -9468,7 +9523,7 @@
 			get charging () { return charging; }, get meterRect () { return meterRect; }, get drawMs () { return drawMs; }, get scale () { return scale; }, get kits () { return KITS; }, get stats () { return stats; }, get oppStats () { return oppStats; }, get steerAt () { return steerAt; }, set steerAt (v) { steerAt = v; }, set possTeam (v) { possTeam = v; },
 			set steerSwitchDone (v) { steerSwitchDone = !!v; },
 			get lastSwitchKind () { return lastSwitchKind; }, set lastSwitchKind (v) { lastSwitchKind = v; }, get setPiece () { return setPiece; },
-			get G3 () { return G3; }, get replayOn () { return replayOn(); }, get replay () { return replay; }, get recFrames () { return rec.n; }, REPLAY_AT, REPLAY_FR, GOAL_CELEB, get lastCaption () { return lastCaption; }, caption, get camMode () { return camMode; }, get crowdMood () { return crowdMood; }, get frameDt () { return frameDt; }, get crowdBed () { return crowd; }, get soundOn () { return soundOn; },
+			get G3 () { return G3; }, get gfxLevel () { return gfxLevel; }, setGfx, get replayOn () { return replayOn(); }, get replay () { return replay; }, get recFrames () { return rec.n; }, REPLAY_AT, REPLAY_FR, GOAL_CELEB, get lastCaption () { return lastCaption; }, caption, get camMode () { return camMode; }, get crowdMood () { return crowdMood; }, get frameDt () { return frameDt; }, get crowdBed () { return crowd; }, get soundOn () { return soundOn; },
 			human, switchScore, outfield, dist,
 			get officials () { return officials3; }, get flagCall () { return flagCall; }, refKit, deltaE,
 			proj (x, y, z) { return G3.cam ? proj3D(x, y, z) : null; }, get viewScale () { return scale; },
