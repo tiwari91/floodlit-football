@@ -354,6 +354,16 @@
 		.card button.primary { font-size: 17px; padding: 6px 18px; }
 	}
 	.card.wide { max-width: min(680px, 100%); }
+	/* The trophy lift: the captain's arms raise the cup over the card, again and again, under fireworks. */
+	.fireworks { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+	.fireworks[hidden] { display: none; }
+	.trophy { display: grid; justify-items: center; gap: 2px; margin-top: -4px; }
+	.trophy[hidden] { display: none; }
+	.trophy svg { width: 96px; height: auto; animation: lift 1.1s ease-in-out infinite alternate; transform-origin: 50% 100%; filter: drop-shadow(0 0 14px rgba(255, 214, 110, 0.55)); }
+	.trophy span { font-family: var(--display); font-weight: 800; font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--amber); }
+	@keyframes lift { from { transform: translateY(10px); } to { transform: translateY(-8px); } }
+	@media (max-height: 460px) { .trophy svg { width: 58px; } .trophy span { font-size: 11px; } }
+	@media (prefers-reduced-motion: reduce) { .trophy svg { animation: none; } }
 	/* While picking a change, the panel has the card to itself. */
 	.card.wide > .card-body, .card.wide > .actions, .card.wide > .quick { display: none; }
 	.subs { display: grid; gap: 10px; width: 100%; min-height: 0; overflow-y: auto; }
@@ -1064,8 +1074,10 @@
 			<div class="coach-text" id="coachText"></div>
 			<div class="coach-actions"><button type="button" id="coachSkip">Skip step</button><button type="button" id="coachExit">Exit tutorial</button></div>
 		</div>
+		<canvas class="fireworks" id="fireworks" hidden aria-hidden="true"></canvas>
 		<div class="overlay" id="overlay">
 			<div class="card">
+				<div class="trophy" id="ovTrophy" hidden aria-hidden="true"><svg viewBox="0 0 120 112" width="120" height="112"><defs><linearGradient id="gold" x1="0" x2="1"><stop offset="0" stop-color="#b8862b"/><stop offset="0.45" stop-color="#ffe08a"/><stop offset="1" stop-color="#c9952f"/></linearGradient></defs><g class="arms"><path d="M14 112 L30 44" stroke="var(--tr-kit, #f2b52e)" stroke-width="11" stroke-linecap="round" fill="none"/><path d="M106 112 L90 44" stroke="var(--tr-kit, #f2b52e)" stroke-width="11" stroke-linecap="round" fill="none"/><circle cx="30" cy="42" r="6" fill="#c98f6b"/><circle cx="90" cy="42" r="6" fill="#c98f6b"/></g><g class="cup"><path d="M36 14 H84 C84 44 74 58 60 60 C46 58 36 44 36 14 Z" fill="url(#gold)" stroke="#8a6420" stroke-width="2"/><path d="M36 20 C22 20 22 42 40 46" stroke="url(#gold)" stroke-width="5" fill="none"/><path d="M84 20 C98 20 98 42 80 46" stroke="url(#gold)" stroke-width="5" fill="none"/><rect x="55" y="59" width="10" height="13" fill="url(#gold)"/><rect x="44" y="71" width="32" height="9" rx="2" fill="url(#gold)" stroke="#8a6420" stroke-width="1.5"/><path d="M46 20 H58" stroke="#fff6cf" stroke-width="3" stroke-linecap="round" opacity="0.8"/></g></svg><span id="ovTrophyText"></span></div>
 				<h2 id="ovTitle">Kick off</h2>
 				<div class="card-body" id="ovBody">
 					<p id="ovText">You kick off, attacking the goal on the right. Move with the arrows. S passes, W plays a through ball, D shoots, Q hits a long ball to the striker, A tackles, E sprints.</p>
@@ -1522,6 +1534,10 @@
 		[ "Kestrel Park", "Kestrel", "#d9d9d9", "#7a1f3d", 1, "Kestrel Ground", "grass" ],
 		[ "Lowfield Rovers", "Lowfield", "#8b4db8", "#eeeeee", 2, "Low Field", "grass" ]
 	];
+	// Local rivals, by league id (0 is you): these games are derbies, with the loudest crowds of the season.
+	const RIVALS = [ [ 0, 1 ], [ 4, 8 ], [ 5, 11 ], [ 2, 7 ], [ 3, 9 ], [ 12, 14 ], [ 10, 17 ], [ 13, 16 ], [ 6, 19 ], [ 15, 18 ], [ 20, 22 ], [ 21, 24 ], [ 23, 27 ], [ 25, 28 ] ];
+	const derbyOf = (a, b) => RIVALS.some(([ x, y ]) => (x === a && y === b) || (x === b && y === a));
+	const rivalOf = id => { const r = RIVALS.find(([ x, y ]) => x === id || y === id); return r ? (r[0] === id ? r[1] : r[0]) : -1; };
 	const DIVISION = 20, SEASON_ROUNDS = 38, JANUARY = 19;   // January window before matchday 20
 	const GK_KITS = [ "#7ee3c0", "#f0e27a", "#f2a0c8", "#8fd0f5", "#f29a5e", "#9be87a", "#e8736e" ];
 	// Perceptual colour difference (CIE76 ΔE in Lab): under ~72 two shirts are easy to confuse at a glance on small figures.
@@ -2413,7 +2429,7 @@
 				: `You finished ${ordinal(myPos)} with ${me.pts} point${me.pts === 1 ? "" : "s"}. Start a new season from the pitch.`));
 		} else {
 			const f = currentFixture(), o = TEAMS[f.opp];
-			next.append(el("span", "eyebrow", `Next · Matchday ${f.round + 1} · ${f.home ? "Home" : "Away"}`));
+			next.append(el("span", "eyebrow", `Next · Matchday ${f.round + 1} · ${f.home ? "Home" : "Away"}${derbyOf(0, f.opp) ? " · Derby" : ""}`));
 			const name = el("div", "opp"); name.append(dotFor(o), el("span", "", o.name)); next.append(name);
 			const det = el("span", "detail");
 			det.append(el("span", "stars", stars(getStr(f.opp))), document.createTextNode(` rating. You are ${ordinal(myPos)} on ${me.pts} point${me.pts === 1 ? "" : "s"}.`));
@@ -2516,7 +2532,7 @@
 		for (let r = league.round; r < Math.min(league.fixtures.length, league.round + 5); r++) {
 			const pair = league.fixtures[r].find(([ a, b ]) => a === 0 || b === 0), home = pair[0] === 0, o = TEAMS[home ? pair[1] : pair[0]];
 			const li = el("li", r === league.round ? "now" : "");
-			li.append(el("b", "", String(r + 1)), el("span", home ? "ha h" : "ha a", home ? "H" : "A"), dotFor(o), el("span", "who", o.name), el("span", "stars", stars(Math.round(getStr(home ? pair[1] : pair[0])))));
+			li.append(el("b", "", String(r + 1)), el("span", home ? "ha h" : "ha a", home ? "H" : "A"), dotFor(o), el("span", "who", o.name + (derbyOf(0, home ? pair[1] : pair[0]) ? " (derby)" : "")), el("span", "stars", stars(Math.round(getStr(home ? pair[1] : pair[0])))));
 			ol.append(li);
 		}
 	}
@@ -3141,6 +3157,7 @@
 		if (seasonDone()) {
 			const champ = rows[0].id === 0 ? `You are champions with ${pts} points!` : `${TEAMS[rows[0].id].name} are champions. You finished ${ordinal(pos)} on ${pts} points.`;
 			showOverlay(`Season ${league.season} simulated`, `${line} ${champ}${scorers}${disc} Prize money: ${money(league.prize || 0)}. The transfer window is open below the pitch.`, `Start season ${league.season + 1}`);
+			if (rows[0].id === 0) { celebrateTrophy("league trophy"); }
 		} else {
 			showOverlay(stoppedJan ? "January window" : "Simulated", `${line} You're ${ordinal(pos)} on ${pts} points.${scorers}${disc}${stoppedJan ? " The January transfer window is open: sign players below the pitch, then carry on." : ""}`, "Kick off");
 			$("ovSim").textContent = "Simulate match";
@@ -3274,9 +3291,9 @@
 	function showIntroCard () {
 		pauseBtn.textContent = "Pause";
 		if (leagueMatch) {
-			const o = TEAMS[leagueMatch.opp];
-			showOverlay(`Matchday ${leagueMatch.round + 1}`,
-				`${o.name}, ${leagueMatch.home ? "at home" : "away"} at ${(leagueMatch.home ? YOU : o).ground}. Rated ${stars(Math.round(getStr(leagueMatch.opp)))}. ${keyMen()}${coachBrief()}Conditions: ${conditionsText()}. You kick off, attacking the goal on the right.`, "Kick off");
+			const o = TEAMS[leagueMatch.opp], derby = isDerby();
+			showOverlay(`Matchday ${leagueMatch.round + 1}${derby ? " · Derby" : ""}`,
+				`${derby ? `Derby day: the local rivals, and the loudest crowd of the season. Both ends will sing all night. ` : ""}${o.name}, ${leagueMatch.home ? "at home" : "away"} at ${(leagueMatch.home ? YOU : o).ground}. Rated ${stars(Math.round(getStr(leagueMatch.opp)))}. ${keyMen()}${coachBrief()}Conditions: ${conditionsText()}. You kick off, attacking the goal on the right.`, "Kick off");
 			$("ovSim").textContent = "Simulate match";
 			$("ovSim").hidden = false;
 			offerSeasonSim();
@@ -6822,6 +6839,7 @@
 		showOverlay(wasSim ? (leagueMatch ? "Simulated result" : "Simulated friendly") : "Full time", `${line} ${nudge}`, btn,
 			wasSim ? null : matchStats(Math.round(100 * possFrames[0] / Math.max(1, possFrames[0] + possFrames[1]))));
 		if (leagueMatch && !seasonDone() && tiredStarters().length) { $("ovFix").textContent = "Rotate now"; $("ovFix").hidden = false; }
+		if (leagueMatch && seasonDone() && standings()[0].id === 0) { celebrateTrophy("league trophy"); }
 		$("ovHelp").hidden = false;
 		renderReport();
 		if (leagueMatch) { offerSeasonSim(); }
@@ -6855,6 +6873,7 @@
 		$("ovSubs").hidden = true;
 		$("ovSeason").hidden = true;
 		$("ovReport").hidden = true;
+		$("ovTrophy").hidden = true;
 		$("subPanel").hidden = true;
 		$("ovKeys").hidden = true;
 		$("ovQuick").hidden = true;
@@ -6888,6 +6907,72 @@
 			ovStats.append(cell);
 		}
 		overlay.hidden = false;
+	}
+
+	// Silverware: the captain lifts the trophy on the card while fireworks go up over the ground.
+	let fireworks = null;
+	function captainName () {
+		if (!league || !league.club) { return "Your captain"; }
+		const c = league.club, xi = slotsFor(league.fmt).map(i => c.squad[i]).filter(Boolean);
+		const k = xi.find(pl => pl.role === "key") || xi.slice().sort((a, b) => (b.age || 0) - (a.age || 0) + (ovrOf(b) - ovrOf(a)) * 0.2)[0];
+		return k ? k.name : "Your captain";
+	}
+	function celebrateTrophy (what) {
+		const tr = $("ovTrophy");
+		tr.style.setProperty("--tr-kit", KITS[0].outfield || "#f2b52e");
+		$("ovTrophyText").textContent = `${captainName()} lifts the ${what}`;
+		tr.hidden = false;
+		startFireworks();
+	}
+	function startFireworks () {
+		const cv = $("fireworks"), wrap = $("pitchwrap");
+		if (!cv || !cv.getContext || reduceMotion) { return; }
+		const dpr = Math.min(1.5, window.devicePixelRatio || 1), W = wrap.clientWidth, H = wrap.clientHeight;
+		cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); cv.hidden = false;
+		const g = cv.getContext("2d");
+		g.setTransform(dpr, 0, 0, dpr, 0, 0);
+		const cols = [ KITS[0].outfield || "#f2b52e", KITS[0].trim || "#ffffff", "#ffd36a", "#ffffff", "#ff6b5a", "#7fd3ff" ];
+		const fw = { rockets: [], sparks: [], t0: performance.now(), next: 0, W, H, g, cv };
+		if (fireworks) { cancelAnimationFrame(fireworks.raf); }
+		fireworks = fw;
+		const bang = (x, loud) => {
+			if (!soundOn || !audio) { return; }
+			const at = audio.currentTime + 0.02, pan = clamp(x / W * 2 - 1, -0.9, 0.9) * 0.7;
+			noiseBurst("brown", at, 0.5, 0.18 * loud, "lowpass", 900, 120, 0.7, pan);
+			for (let k = 0; k < 9; k++) { noiseBurst("white", at + 0.25 + Math.random() * 0.7, 0.05, 0.03 * loud, "highpass", 3500, 5000, 0.7, pan); }
+		};
+		const tick = now => {
+			const el2 = now - fw.t0;
+			if (el2 < 9000 && now > fw.next) {
+				fw.next = now + (el2 < 400 ? 60 : 240 + Math.random() * 340);
+				const x = W * (0.1 + Math.random() * 0.8);
+				fw.rockets.push({ x, y: H, vx: (Math.random() - 0.5) * 1.2, vy: -(H * 0.012 + Math.random() * H * 0.006), top: H * (0.12 + Math.random() * 0.32), c: cols[Math.floor(Math.random() * cols.length)] });
+				if (soundOn && audio) { const at = audio.currentTime, o = audio.createOscillator(), gg = audio.createGain(); o.type = "sine"; o.frequency.setValueAtTime(900, at); o.frequency.exponentialRampToValueAtTime(2400, at + 0.6); gg.gain.setValueAtTime(0.012, at); gg.gain.exponentialRampToValueAtTime(0.0001, at + 0.65); o.connect(gg); connectPan(gg, 0); o.start(at); o.stop(at + 0.7); }
+			}
+			g.globalCompositeOperation = "source-over";
+			g.clearRect(0, 0, W, H);
+			g.globalCompositeOperation = "lighter";
+			for (const r of fw.rockets) {
+				r.x += r.vx; r.y += r.vy; r.vy *= 0.985;
+				g.fillStyle = "#fff3c4"; g.fillRect(r.x - 1, r.y - 1, 2.5, 6);
+				if (r.y <= r.top) {
+					r.dead = true;
+					const n = 46 + Math.floor(Math.random() * 30), sp = 1.6 + Math.random() * 1.8;
+					for (let k = 0; k < n; k++) { const a = k / n * Math.PI * 2, v = sp * (0.6 + Math.random() * 0.5); fw.sparks.push({ x: r.x, y: r.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 1, c: Math.random() < 0.2 ? "#ffffff" : r.c }); }
+					bang(r.x, 1);
+				}
+			}
+			fw.rockets = fw.rockets.filter(r => !r.dead);
+			for (const p of fw.sparks) {
+				p.x += p.vx; p.y += p.vy; p.vy += 0.03; p.vx *= 0.986; p.vy *= 0.986; p.life -= 0.009;
+				g.globalAlpha = Math.max(0, p.life);
+				g.fillStyle = p.c; g.beginPath(); g.arc(p.x, p.y, 2.2, 0, Math.PI * 2); g.fill();
+			}
+			g.globalAlpha = 1;
+			fw.sparks = fw.sparks.filter(p => p.life > 0);
+			if (el2 < 9000 || fw.sparks.length || fw.rockets.length) { fw.raf = requestAnimationFrame(tick); } else { cv.hidden = true; fireworks = null; }
+		};
+		fw.raf = requestAnimationFrame(tick);
 	}
 
 	let lastHud = "", lastCooling = false, lastMood = "";
@@ -8037,39 +8122,80 @@
 
 	// Terrace chants: claps, then a few hundred voices on a simple tune (one of three), from the
 	// home end, or from the away corner when the visitors are on top.
-	const CHANTS = [
-		[ 392, 392, 440, 392, 330, 392, 440, 494 ],
-		[ 330, 330, 392, 330, 294, 262, 294, 330 ],
-		[ 440, 494, 523, 494, 440, 392, 440, 440 ]
-	];
+	// Every club has its own song, worked out from its name: a key (major or minor), a tempo, a
+	// rhythm, a clap and a drum, a tune, and whether a few voices lead a call that the whole end answers.
+	const SONG_RHYTHMS = [ [ 1, 1, 1, 1, 1, 1, 2 ], [ 1, 1, 2, 1, 1, 2 ], [ 0.5, 0.5, 1, 0.5, 0.5, 1, 1, 1, 2 ], [ 1.5, 0.5, 1, 1, 1.5, 0.5, 2 ], [ 1, 0.5, 0.5, 1, 1, 0.5, 0.5, 1, 2 ], [ 2, 1, 1, 2, 1, 1, 2 ] ];
+	const SONG_CLAPS = [ [ 0, 0.28, 0.56 ], [ 0, 0.5, 1, 1.25, 1.5 ], [ 0, 0.25, 0.5, 1 ], [ 0, 0.33, 0.66, 1, 1.17, 1.33 ], [ 0, 1 ] ];
+	const songCache = new Map();
+	function clubSong (id) {
+		if (songCache.has(id)) { return songCache.get(id); }
+		const club = typeof teamOf === "function" ? teamOf(id) : (TEAMS[id] || FRIENDLY);
+		let h = hashStr(`${club.name}|song`) || 1;
+		const r = n => { h = (h + 0x6D2B79F5) >>> 0; let z = Math.imul(h ^ (h >>> 15), 1 | h); z = (z + Math.imul(z ^ (z >>> 7), 61 | z)) ^ z; return (((z ^ (z >>> 14)) >>> 0) % n); };
+		const minor = r(2) === 1, scale = minor ? [ 0, 2, 3, 5, 7, 8, 10, 12 ] : [ 0, 2, 4, 5, 7, 9, 11, 12 ];
+		const rhythm = SONG_RHYTHMS[r(SONG_RHYTHMS.length)], notes = [];
+		let deg = r(5), step = 0;
+		for (let i = 0; i < rhythm.length; i++) {
+			step = [ -2, -1, -1, 1, 1, 2, 0, 3 ][r(8)];
+			if (deg + step < 0 || deg + step > 7) { step = -step; }
+			deg = Math.max(0, Math.min(7, deg + step));
+			if (i === rhythm.length - 1) { deg = [ 0, 4, 7 ][r(3)]; }
+			notes.push(scale[deg]);
+		}
+		const song = { root: 62 + r(9), minor, notes, rhythm, beat: 0.24 + r(7) * 0.03, claps: SONG_CLAPS[r(SONG_CLAPS.length)], drum: 0.42 + r(5) * 0.05, call: r(3) > 0, wave: [ "sawtooth", "square", "sawtooth" ][r(3)] };
+		songCache.set(id, song);
+		return song;
+	}
+	// A line of the song, by a few voices (a call) or the whole end (the answer).
+	function sing (t0, song, from, to, voices, g, pan) {
+		const outG = audio.createGain(), lp = audio.createBiquadFilter();
+		let len = 0;
+		for (let i = from; i < to; i++) { len += song.rhythm[i] * song.beat; }
+		lp.type = "lowpass"; lp.frequency.value = voices > 3 ? 1150 : 1500;
+		outG.gain.setValueAtTime(0.0001, t0);
+		outG.gain.linearRampToValueAtTime(g, t0 + 0.12);
+		outG.gain.setValueAtTime(g, t0 + Math.max(0.15, len - 0.15));
+		outG.gain.linearRampToValueAtTime(0.0001, t0 + len + 0.25);
+		outG.connect(lp); connectPan(lp, pan);
+		for (let v = 0; v < voices; v++) {
+			const o = audio.createOscillator();
+			o.type = song.wave;
+			o.detune.value = (Math.random() * 2 - 1) * (voices > 3 ? 32 : 14);
+			let at = t0;
+			for (let i = from; i < to; i++) { o.frequency.setTargetAtTime(midiHz(song.root + song.notes[i] - (v >= voices - 2 && voices > 3 ? 12 : 0)), at, 0.03); at += song.rhythm[i] * song.beat; }
+			o.connect(outG);
+			o.start(t0); o.stop(t0 + len + 0.35);
+		}
+		return len;
+	}
+	// The team a set of fans follows: home or away end.
+	const clubIdOfTeam = t => (t === 0 ? 0 : leagueMatch ? leagueMatch.opp : 99);
+	const isDerby = () => !!leagueMatch && derbyOf(0, leagueMatch.opp);
 	function chant (loud, away = false) {
 		ev3d("chant");
-		const t = audio.currentTime + 0.05, g = 0.035 * loud, pan = away ? 0.5 : -0.3;
+		const id = clubIdOfTeam(away ? 1 - homeSide : homeSide), song = clubSong(id);
+		const t = audio.currentTime + 0.05, g = 0.035 * loud * (isDerby() ? 1.3 : 1), pan = away ? 0.5 : -0.3;
+		const bar = song.beat * 4;
 		for (let k = 0; k < 3; k++) {
-			for (const b of [ 0, 0.28, 0.56 ]) { noiseBurst("white", t + k * 1.1 + b, 0.09, g * 1.6, "bandpass", 1800, 1600, 0.9, pan); }
+			for (const b of song.claps) { noiseBurst("white", t + k * bar + b * song.beat * 2, 0.09, g * 1.6, "bandpass", 1800, 1600, 0.9, pan); }
 		}
-		// The bombo: the terrace drum beats the rhythm under the clapping and on through the song.
-		for (let k = 0; k < 8; k++) {
-			const at = t + k * 0.55, o = audio.createOscillator(), dg = audio.createGain();
-			o.type = "sine"; o.frequency.setValueAtTime(95, at); o.frequency.exponentialRampToValueAtTime(48, at + 0.25);
+		// The bombo: the terrace drum beats the club's rhythm under the clapping and on through the song.
+		const n = Math.round((3 * bar + 8 * song.beat * 2) / song.drum);
+		for (let k = 0; k < n; k++) {
+			const at = t + k * song.drum, o = audio.createOscillator(), dg = audio.createGain();
+			o.type = "sine"; o.frequency.setValueAtTime(song.minor ? 88 : 98, at); o.frequency.exponentialRampToValueAtTime(48, at + 0.25);
 			dg.gain.setValueAtTime(g * (k % 4 === 3 ? 3.2 : 2.2), at); dg.gain.exponentialRampToValueAtTime(0.0001, at + 0.3);
 			o.connect(dg); connectPan(dg, pan); o.start(at); o.stop(at + 0.32);
 		}
-		const tune = CHANTS[Math.floor(Math.random() * CHANTS.length)], dur = 0.34, t0 = t + 3.4;
-		const outG = audio.createGain(), lp = audio.createBiquadFilter();
-		lp.type = "lowpass"; lp.frequency.value = 1100;
-		outG.gain.setValueAtTime(0.0001, t0);
-		outG.gain.linearRampToValueAtTime(g, t0 + 0.2);
-		outG.gain.setValueAtTime(g, t0 + tune.length * dur - 0.2);
-		outG.gain.linearRampToValueAtTime(0.0001, t0 + tune.length * dur + 0.3);
-		outG.connect(lp); connectPan(lp, pan);
-		for (let v = 0; v < 6; v++) {
-			const o = audio.createOscillator();
-			o.type = "sawtooth";
-			o.detune.value = (Math.random() * 2 - 1) * 30;
-			tune.forEach((f, i) => o.frequency.setTargetAtTime(f * (v >= 4 ? 0.5 : 1), t0 + i * dur, 0.03));
-			o.connect(outG);
-			o.start(t0); o.stop(t0 + tune.length * dur + 0.4);
+		const t0 = t + 3 * bar + 0.15, half = Math.ceil(song.notes.length / 2);
+		if (song.call) {
+			// A few voices lead off, the whole end answers, and then they all sing it through.
+			const a = sing(t0, song, 0, half, 2, g * 0.75, pan - 0.15);
+			const b = sing(t0 + a + 0.1, song, half, song.notes.length, 6, g, pan);
+			sing(t0 + a + b + 0.35, song, 0, song.notes.length, 6, g * 1.1, pan);
+		} else {
+			const a = sing(t0, song, 0, song.notes.length, 6, g, pan);
+			sing(t0 + a + 0.3, song, 0, song.notes.length, 6, g * 1.1, pan);
 		}
 	}
 
@@ -8136,9 +8262,9 @@
 			crowd = { rumble, vox, air, pan, nextChant: audio.currentTime + 6 };
 		}
 		if (!crowd) { return; }
-		const t = audio.currentTime, heat = live ? crowdHeat : 0;
+		const t = audio.currentTime, heat = live ? Math.max(crowdHeat, isDerby() ? 0.35 : 0) : 0;
 		const breathe = 1 + 0.12 * Math.sin(t * 0.63) + 0.08 * Math.sin(t * 1.71 + 1);
-		const quiet = state === "half" ? 0.5 : 1;
+		const quiet = (state === "half" ? 0.5 : 1) * (isDerby() ? 1.35 : 1);   // a derby is the loudest night of the season
 		crowd.rumble.g.gain.setTargetAtTime(live ? (0.045 + 0.08 * heat) * breathe * quiet : 0, t, 0.4);
 		crowd.vox.g.gain.setTargetAtTime(live ? (0.022 + 0.085 * heat) * breathe * quiet : 0, t, 0.35);
 		crowd.air.g.gain.setTargetAtTime(live ? (0.004 + 0.01 * heat) * quiet : 0, t, 0.5);
@@ -8146,9 +8272,10 @@
 		if (crowd.pan) { crowd.pan.pan.setTargetAtTime(0.22 * Math.sin(t * 0.21), t, 0.5); }
 		if (live && state === "play" && freeze <= 0 && t > crowd.nextChant) {
 			// The home end sings, louder when the home side is on top; the away corner answers when theirs is.
-			const awayUp = edge(1 - homeSide) > 0.35 && Math.random() < 0.5;
-			chant(awayUp ? 0.5 : 0.7 + 0.6 * edge(homeSide), awayUp);
-			crowd.nextChant = t + 12 + Math.random() * 10 - 5 * edge(homeSide);
+			// In a derby both ends sing all night, trading songs.
+			const awayUp = (isDerby() || edge(1 - homeSide) > 0.35) && Math.random() < 0.5;
+			chant(awayUp ? (isDerby() ? 0.8 : 0.5) : 0.7 + 0.6 * edge(homeSide), awayUp);
+			crowd.nextChant = t + (12 + Math.random() * 10 - 5 * edge(homeSide)) * (isDerby() ? 0.6 : 1);
 		}
 	}
 
@@ -11258,7 +11385,7 @@
 				return f;
 			},
 			get restartWalk () { return restartWalk; }, get review () { return review; }, get cpuSubs () { return cpuSubs; }, get surge () { return surge; }, get pressI () { return press; }, formBonus, get lastRatings () { return lastRatings; }, get stretcher () { return stretcher; }, injureTest (t, serious) { const v = outfield(t).find(p => !p.injured); const o = outfield(1 - t)[0]; if (v && o) { tackling[1 - t] = "hard"; const r = Math.random; Math.random = () => 0.01; try { commitFoul(o, v, true); } finally { Math.random = r; } } return v; }, staOf, get offside () { return offside; }, get deadBall () { return deadBall; }, get tally () { return tally; }, get freezeKind () { return freezeKind; }, fkDist () { return fkDist(); }, simExtra () { return { tally, poss: possFrames.slice() }; }, get setPieceKind () { return setPiece ? setPiece.kind : null; }, get gfxLevel () { return gfxLevel; }, setGfx, get musicBar () { return music ? music.bar : -1; }, get audioState () { return audio ? audio.state : "none"; }, get replayOn () { return replayOn(); }, get replay () { return replay; }, get recFrames () { return rec.n; }, REPLAY_AT, REPLAY_FR, GOAL_CELEB, get lastCaption () { return lastCaption; }, caption, get camMode () { return camMode; }, get crowdMood () { return crowdMood; }, get frameDt () { return frameDt; }, get crowdBed () { return crowd; }, get soundOn () { return soundOn; },
-			human, switchScore, outfield, dist, get cond () { return cond; }, stepBallTest () { stepBall(); }, rematchTest () { clearLive(); state = "intro"; newMatch(); showIntro(); renderLeague(); },
+			human, switchScore, outfield, dist, get cond () { return cond; }, clubSong, isDerby, celebrateTrophy, get fireworks () { return fireworks; }, chantTest (away) { ensureAudio(); chant(1, !!away); }, stepBallTest () { stepBall(); }, rematchTest () { clearLive(); state = "intro"; newMatch(); showIntro(); renderLeague(); },
 			get officials () { return officials3; }, get flagCall () { return flagCall; }, refKit, deltaE,
 			proj (x, y, z) { return G3.cam ? proj3D(x, y, z) : null; }, get viewScale () { return scale; },
 			groundTest (o) { if (gstyle) { Object.assign(gstyle, o); } },
