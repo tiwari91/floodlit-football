@@ -463,6 +463,8 @@
 	}
 
 	.modes button[aria-pressed="true"] { background: var(--amber); color: var(--amber-ink); }
+	.modes { flex-wrap: wrap; max-width: 100%; }
+	@media (max-width: 560px) { .modes button { padding: 5px 10px; font-size: 15px; letter-spacing: 0.05em; } }
 
 	/* League */
 	.league {
@@ -1008,6 +1010,7 @@
 			<button type="button" id="modeLeague" aria-pressed="true">League</button>
 			<button type="button" id="modeFriendly" aria-pressed="false">Friendly</button>
 			<button type="button" id="modeTutorial" aria-pressed="false">Tutorial</button>
+			<button type="button" id="modeCorners" aria-pressed="false">Corner shootout</button>
 		</div>
 	</header>
 
@@ -1268,7 +1271,7 @@
 		<p class="fine"><b>Free kicks.</b> The other side stands 9.15 m back, and near your goal they build a wall. From shooting range, press W to curl it over the wall (up or down picks the corner, the far post if you don't choose), or D to drive it low and hard. S plays it short. Hold E (or Shift) to sprint at any time: you'll see speed streaks behind your player.</p>
 		<p class="fine"><b>Fouls and cards.</b> A slide that misses the ball and takes the man, above all from behind, is a foul: a free kick where it happened, or a penalty in the box (pick a side with ↑ ↓ and press D; the keeper guesses). Reckless tackles get a yellow card, a second yellow is a red, and a bad one from behind can be a straight red: the player walks off and his side plays a man down. In the league a red card is a ban (two games for a straight red), five yellows in a season is one, and a player hurt in a foul limps on and then misses one to three games. Banned and injured players come off the team sheet by themselves and go back on it when they're available.</p>
 		<p class="fine"><b>Throw-ins.</b> When the ball goes over a touchline, the other side throws it back in from that spot. On yours, aim with the arrows and press S for a short throw to feet or Q for a long throw. Opponents stand off the thrower, and there is no offside from a throw-in.</p>
-		<p class="fine"><b>Corners and goal kicks.</b> If a defender puts the ball over their own goal line it's a corner; if an attacker does, it's a goal kick. On your corners, aim with the arrows (the dashed ring shows who you'll find) and press S or Q to whip in a lofted cross. Runners head for the box and defenders mark them. There is no offside from a corner.</p>
+		<p class="fine"><b>Corners and goal kicks.</b> If a defender puts the ball over their own goal line it's a corner; if an attacker does, it's a goal kick. On your corners, S whips an in-swinger at the near post, Q floats an out-swinger to the far post and W drops one on the penalty spot; the ball bends in the air and comes down where you picked, give or take your taker's passing. Your runners wait in a knot around the spot and attack the near post, far post, spot and six-yard box as it is struck, each with a man goal-side of him, while two defenders hold the near post and the six-yard line and a keeper comes for anything dropping into his area: he catches it, punches it clear or flaps and misses. Whoever gets up highest wins the header, and in the box that can be a goal. The same goes for crosses from out wide (Q from near the byline) and long balls over the top. Central and in range, Q chips the keeper instead. There is no offside from a corner.</p>
 		<p class="fine"><b>Offside</b> (every format; switch it off with the Offside button). A teammate is offside if, when the ball is played, they are in the other half and nearer the goal line than both the ball and the second-last defender, and they are the next to touch it. The defenders get a free kick. While you have the ball, a red dashed line shows the offside line and anyone beyond it is marked OFF. Your pass markers prefer onside teammates.</p>
 		<p class="fine"><b>Keepers.</b> A keeper holding the ball in their own area can't be challenged. Nobody presses them: both teams drop back into shape, opponents must stay outside the faint ring, and the keeper releases it within a second or two.</p>
 		<p class="fine"><b>The stadium and the clubs.</b> Every ground is built in the Mexican manner, in one of three shapes: a two-tier bowl with a ring of lit private boxes between the tiers under a ring roof on masts, one tall oval tier under a ring roof, or a tight rectangle of two tiers with roofs on the long sides and mountains behind. Floodlights run along the roof or stand on lattice towers at the corners; aisles climb through the seats; the grass is mown in the ground's own pattern, worn in the goalmouths (churned and puddled on a muddy pitch) and glistens under the lights in the rain. The stands fill with the home club's fans (with an away corner), the ground's name runs across the far side, and on the near touchline both benches sit in their dugouts with each manager in his technical area. In the league panel, Clubs shows every club in the Premier Division (and the division below): rating, ground, how they play, danger man and best defender; tap one for its squad.</p>
@@ -1705,6 +1708,9 @@
 	const logEvent = (team, kind, text, min = minuteNow()) => { matchLog.push({ min, team, kind, text }); };
 	let subsLeft = SUBS_MAX, cpuSubs = SUBS_MAX, cameOn = [], wentOff = [], subPick = {}, genericBench = null;
 	let possFrames = [ 0, 0 ];
+	// Counts for the test harness and the match report: both sides, counted where they happen.
+	const newTally = () => ({ shots: [ 0, 0 ], heads: [ 0, 0 ], headGoals: [ 0, 0 ], corners: [ 0, 0 ], cornerGoals: [ 0, 0 ], claims: [ 0, 0 ], punches: [ 0, 0 ], crosses: [ 0, 0 ], clears: [ 0, 0 ], goals: [ 0, 0 ], air: { none: 0, attWin: 0, defWin: 0, noAct: 0 } });
+	let tally = newTally(), cornerAt = [ -9999, -9999 ];
 
 	/* ---------- momentum ----------
 	   -1 (CPU on top) .. +1 (you on top). Keeping the ball builds it; tackles,
@@ -2399,13 +2405,14 @@
 	}
 
 	function setMode (m) {
-		mode = m === "friendly" || m === "tutorial" ? m : "league";
-		if (mode !== "tutorial") { store.set("ff-mode", mode); }
-		tut = null;
+		mode = m === "friendly" || m === "tutorial" || m === "corners" ? m : "league";
+		if (mode !== "tutorial" && mode !== "corners") { store.set("ff-mode", mode); }
+		tut = null; shoot = null;
 		$("coach").hidden = true;
 		$("modeLeague").setAttribute("aria-pressed", String(mode === "league"));
 		$("modeFriendly").setAttribute("aria-pressed", String(mode === "friendly"));
 		$("modeTutorial").setAttribute("aria-pressed", String(mode === "tutorial"));
+		$("modeCorners").setAttribute("aria-pressed", String(mode === "corners"));
 		diffSel.disabled = weatherSel.disabled = groundSel.disabled = mode === "league";
 		diffSel.title = mode === "league" ? "In the league, each club plays at its own rating" : "";
 		weatherSel.title = groundSel.title = mode === "league" ? "In the league, the fixture sets the ground and the forecast" : "";
@@ -2425,7 +2432,7 @@
 	// Simulate: the whole match from the kick-off card, or the rest of it from the pause
 	// screen (the score so far stands). Strength against strength, with home advantage.
 	function simulateMine () {
-		if (mode === "tutorial" || !(state === "intro" || state === "paused" || state === "half")) { return; }
+		if (mode === "tutorial" || mode === "corners" || !(state === "intro" || state === "paused" || state === "half")) { return; }
 		const left = state === "intro" ? 1 : clamp(timeLeft / matchLen, 0, 1);
 		if (state === "intro") { score = [ 0, 0 ]; }
 		const mine = league && league.club ? yourStr() : 3;
@@ -2601,6 +2608,10 @@
 				rows[0].id === 0 ? "You won the league." : `${TEAMS[rows[0].id].name} won the league. You finished ${ordinal(pos)}.`,
 				`Start season ${league.season + 1}`);
 		} else {
+			if (mode === "corners") {
+			showOverlay("Corner shootout", `Five corners each, taken in turn, against ${opp.name}. On yours, S whips an in-swinger at the near post, Q floats an out-swinger to the far post and W drops one on the penalty spot; your runners attack the ball and you can head it in (D at goal, S to nod it on, Q to clear). On theirs, defend: pick up a runner, win the header, or leave it to your keeper. A goal is a point; level after ten, it goes to sudden death. Nothing here counts toward your season.`, "Start the shootout");
+			return;
+		}
 			if (mode === "tutorial") {
 			showOverlay("Tutorial", "Learn the controls one step at a time. The coach at the top tells you what to do, and it moves on as soon as you've done it. The other team stands still (except when you practise tackling) and the clock doesn't run. Nothing here counts toward your season.", "Start tutorial");
 			return;
@@ -2800,7 +2811,7 @@
 	let offside = { team: -1, set: new Set() };
 	// Offside is played in every format unless you switch it off with the Offside button.
 	let offsideRule = true;
-	const offsideOn = () => offsideRule;
+	const offsideOn = () => offsideRule && !shoot;
 	// The deepest line an attacker of `t` may stand level with.
 	function offsideLine (t) {
 		const opp = players.filter(q => q.team !== t).map(q => rel(t, q.x)).sort((a, b) => b - a);
@@ -2949,6 +2960,7 @@
 		ball.lift = false;
 		ball.headed = false;
 		ball.shot = false;
+		ball.curlT = 0; ball.landT = 0;
 		ball.lastBy = p;
 		ball.kickedAt = frame;
 		p.kickCd = 20;
@@ -2970,14 +2982,56 @@
 	}
 
 	// Lofted ball that comes down on (tx, ty): over any defender in the lane.
-	function loftTo (p, tx, ty) {
+	// bow: how far it bends off the straight line mid-flight (+ to the left of its path), the bend
+	// solved so that it still comes down on (tx, ty). hang: more or less time in the air.
+	function loftTo (p, tx, ty, bow = 0, hang = 1) {
 		notePass(p);
 		const d = Math.hypot(tx - ball.x, ty - ball.y);
-		const T = clamp(d / 9, 24, 70);                       // frames in the air
+		const T = Math.round(clamp(d / 9, 24, 70) * hang);     // frames in the air
 		kick(p, tx, ty, d * (1 - AIR_DRAG) / (1 - Math.pow(AIR_DRAG, T)));
 		ball.vz = GRAV * T / 2;
+		setCurl(T, bow);
 		ball.landX = clamp(tx, 12, FW - 12);
 		ball.landY = clamp(ty, 12, FH - 12);
+		ball.landT = T;
+		if (Math.abs(p.y - FH / 2) > FH * 0.2 && rel(p.team, p.x) > FW * 0.62) { tally.crosses[p.team]++; }
+	}
+	// Swing: a sideways push off the line at the strike, and a steady pull back that brings the
+	// ball onto its landing spot after T frames (drag included), so the flight bends like a
+	// whipped cross rather than a dart.
+	function setCurl (T, bow) {
+		if (!bow || T < 4) { return; }
+		let s1 = 0, s2 = 0, v1 = 1, v2 = 0;
+		for (let k = 0; k < T; k++) { s1 += v1; v1 *= AIR_DRAG; s2 += v2; v2 = (v2 + 1) * AIR_DRAG; }
+		const c = 4 * bow / T, a = -c * s1 / Math.max(1e-6, s2);
+		const sp = Math.hypot(ball.vx, ball.vy) || 1, nx = -ball.vy / sp, ny = ball.vx / sp;
+		ball.vx += nx * c; ball.vy += ny * c;
+		ball.cax = nx * a; ball.cay = ny * a; ball.curlT = T;
+	}
+	// Where (and in how many frames) a ball in the air comes down, flown forward exactly as stepBall flies it.
+	function predictLanding () {
+		let x = ball.x, y = ball.y, z = ball.z, vx = ball.vx, vy = ball.vy, vz = ball.vz, ct = ball.curlT || 0, k = 0;
+		while (k < 160 && (z > 0 || vz > 0)) {
+			x += vx; y += vy; z += vz; vz -= GRAV;
+			if (ct > 0) { vx += ball.cax; vy += ball.cay; ct--; }
+			vx *= AIR_DRAG; vy *= AIR_DRAG; k++;
+		}
+		ball.landX = clamp(x, 12, FW - 12); ball.landY = clamp(y, 12, FH - 12); ball.landT = k;
+	}
+	// A chip: up and over a keeper off his line, dropping under the bar.
+	function chipShot (p) {
+		const goalX = attackX(p.team), gx = goalX + (goalX === FW ? 20 : -20), sho = A(p, "sho");
+		const ty = FH / 2 + (Math.random() * 2 - 1) * FMT.goal * 0.28 + gauss() * Math.max(8, 80 - sho) * 0.45 * GH;
+		const D = Math.hypot(gx - ball.x, ty - ball.y);
+		const vh = clamp(D / 34, 5.5, 10);
+		const T = Math.log(Math.max(0.05, 1 - D * (1 - AIR_DRAG) / vh)) / Math.log(AIR_DRAG);
+		const zGoal = clamp(30 + gauss() * (10 + Math.max(0, 70 - sho) * 0.35), 4, 95);
+		kick(p, gx, ty, vh);
+		ball.shot = true; ball.lift = true;
+		ball.vz = (zGoal + 0.5 * GRAV * T * T) / T;
+		predictLanding();
+		tally.shots[p.team]++;
+		if (p.team === 0) { stats.shots++; burst(p.x, p.y, "Chip"); } else { oppStats.shots++; crowdReact("chance", 1); }
 	}
 
 	// A point in the space ahead of a runner, toward the goal they attack.
@@ -2989,6 +3043,7 @@
 
 	function shootAt (p, power01, aimY) {
 		if (p.team === 1) { oppStats.shots++; }
+		tally.shots[p.team]++;
 		const gx = p.team === 0 ? FW + 20 : -20;
 		kick(p, gx, aimY, 9.5 + power01 * 8.5);
 		ball.shot = true;
@@ -3096,10 +3151,12 @@
 			return;
 		}
 		if (setPiece && setPiece.taker === p) { takeSetPiece(p, true); return; }
+		// Central and in range of goal, Q chips the keeper.
+		if (shotInRange(p) && !isWide(p.y, 0.2) && Math.hypot(FW - p.x, FH / 2 - p.y) < 480 * Math.sqrt(S)) { charging = false; aimY = null; chipShot(p); return; }
 		// From out wide in the final third, Q whips a cross to the best-placed teammate in the box.
 		if (rel(0, p.x) > FW * 0.68 && isWide(p.y)) {
 			const box = outfield(0).filter(q => q !== p && inAttackBox(q)).sort((a, b) => openness(b) - openness(a));
-			if (box.length) { loftTo(p, box[0].x - 8, box[0].y); handOff(box[0], 170); return; }
+			if (box.length) { loftTo(p, box[0].x - 8, box[0].y, (p.y < FH / 2 ? 1 : -1) * 18 * GH); handOff(box[0], 170); return; }
 		}
 		const m = strikerTarget(p);
 		if (!m) { return; }
@@ -3120,7 +3177,7 @@
 		if (tut) { tut.flags.through = true; }
 		if (setPiece && setPiece.taker === p) {
 			if (setPiece.kind === "free" && shotInRange(p)) { liftShot(p); return; }
-			takeSetPiece(p, false);
+			takeSetPiece(p, false, "through");
 			return;
 		}
 		const m = passTarget(p);
@@ -3586,6 +3643,14 @@
 			}
 			return [ cx, cy ];
 		}
+		// A cross dropping into his area: come and claim it if he can get there first.
+		if (!ball.owner && lastTouch !== p.team && (ball.z > 6 || ball.vz > 0) && !ball.shot && ball.landT > 0) {
+			const lr = rel(p.team, ball.landX), ly = Math.abs(ball.landY - FH / 2);
+			if (lr < FMT.box * (shoot ? 0.38 : 0.6) && ly < FMT.goal / 2 + FMT.box * (shoot ? 0.2 : 0.4)) {
+				const reach = (ball.landT + 10) * BASE_SPD * 1.15;
+				if (Math.hypot(ball.landX - p.x, ball.landY - p.y) < reach) { p.claiming = frame; return [ ball.landX, ball.landY ]; }
+			}
+		}
 		const loose = !ball.owner;
 		const r = rel(p.team, ball.x);
 		if (loose && r < 150 * GH && Math.abs(ball.y - FH / 2) < 170 * GH) {
@@ -3641,9 +3706,8 @@
 		if (setPiece && setPiece.kind === "corner" && setPiece.taker === p) {
 			// The computer's corner: a moment to set, then a cross to one of the runners in the box.
 			if (++p.hold < 30) { return null; }
-			const goalX = attackX(p.team);
-			const box = outfield(p.team).filter(m => m !== p && Math.abs(m.x - goalX) < 200 * GH);
-			cornerCross(p, box.length ? box[Math.floor(Math.random() * box.length)] : null);
+			const r = Math.random();
+			cornerCross(p, null, r < 0.4 ? "near" : r < 0.75 ? "far" : "spot", Math.random() < 0.6 ? "in" : "out");
 			return null;
 		}
 		if (p.role === "gk") {
@@ -3663,7 +3727,8 @@
 				const box = outfield(p.team).filter(m => m !== p && inAttackBox(m));
 				if (box.length) {
 					const m = box.sort((a, b) => openness(b) - openness(a))[0];
-					loftTo(p, m.x + (goalX === FW ? -8 : 8), m.y + (Math.random() * 2 - 1) * (18 + 40 * edge(1 - p.team)));
+					const bend = (Math.random() < 0.5 ? 1 : -1) * (8 + Math.random() * 16) * GH;
+					loftTo(p, m.x + (goalX === FW ? -8 : 8), m.y + (Math.random() * 2 - 1) * (18 + 40 * edge(1 - p.team)), bend);
 					return null;
 				}
 			}
@@ -3671,6 +3736,9 @@
 			// Close in: shoot. Further out and crowded: sometimes try one from distance.
 			const crowded = openness(p) < 70;
 			const longShot = dg < 400 * range && (crowded || edge(p.team) > 0.5) && Math.random() < 0.18 + 0.1 * edge(p.team);   // on top, they fancy one from range
+			// One on one with the keeper off his line: sometimes dink it over him.
+			const keeper = players.find(q => q.team !== p.team && q.role === "gk");
+			if (keeper && dg < 330 * range && dg > 110 * range && rel(keeper.team, keeper.x) > 55 * GH && dist(keeper, p) < dg * 0.75 && Math.random() < 0.3) { chipShot(p); return null; }
 			if (dg < 170 * range || (dg < 270 * range && Math.random() < 0.35) || longShot) {
 				// Better finishers are more accurate and hit it harder.
 				const fin = clamp(1.3 - (A(p, "sho") - 50) / 100, 0.6, 1.4);
@@ -3883,6 +3951,7 @@
 			stepBall();
 			if (--goalTimer <= 0) {
 				banner.hidden = true;
+				if (shoot) { state = "play"; nextShootCorner(); return; }
 				if (timeLeft <= 0) { endMatch(); return; }
 				state = "play";
 				kickoff(lastConceded);
@@ -3890,6 +3959,7 @@
 			return;
 		}
 		if (state !== "play") { return; }
+		if (shoot && shoot.next && frame >= shoot.next) { nextShootCorner(); }
 		if (freeze > 0) {
 			freeze--;
 			if (freezeKind === "kickoff") {
@@ -3900,7 +3970,8 @@
 		}
 		if (goFlash > 0) { goFlash--; }
 
-		if (!tut) {
+		if (shoot) { shootTick(); if (state !== "play") { return; } }
+		if (!tut && !shoot) {
 			timeLeft = Math.max(0, timeLeft - 1 / 60);
 			if (!halfDone && timeLeft <= matchLen / 2) { halfTime(); return; }
 		}
@@ -3921,7 +3992,7 @@
 			if (moodZone === -1) { toast("Nerves settling", "#7fd49b"); } else if (moodZone === 1) { toast(`${opp.short} settling`, "#f2b52e"); }
 			moodZone = 0;
 		}
-		if (timeLeft <= 0) { endMatch(); return; }
+		if (timeLeft <= 0 && !shoot) { endMatch(); return; }
 
 		if (frame % 120 === 0) { saveLive(); }
 		if (frame % 60 === 0 && leagueMatch !== undefined) {
@@ -3979,6 +4050,19 @@
 			supporter[t] = outfield(t).filter(q => q !== c && q !== receiver && !(t === 0 && players.indexOf(q) === ctrl)).reduce((a, b) => (!a || dist(b, c) < dist(a, c) ? b : a), null);
 		}
 		planRuns(0); planRuns(1);
+		stepCornerPlan();
+		// A cross or long ball dropping into a box: the two nearest attackers attack the drop, and
+		// the two nearest defenders go with them, goal-side.
+		const airMen = new Map();
+		if (!cornerPlan && !ball.owner && ball.z > 4 && ball.landT > 4 && !ball.shot && lastTouch >= 0) {
+			const def = 1 - lastTouch, land = { x: ball.landX, y: ball.landY };
+			if (rel(def, land.x) < FMT.box + 60 && Math.abs(land.y - FH / 2) < FMT.goal / 2 + FMT.box) {
+				const near = t => outfield(t).filter(q => !(t === 0 && players.indexOf(q) === ctrl) && q !== receiver).sort((a, b) => dist(a, land) - dist(b, land)).slice(0, 2);
+				for (const q of near(lastTouch)) { airMen.set(q, [ land.x, land.y ]); }
+				const back = def === 0 ? -1 : 1;
+				near(def).forEach((q, i) => airMen.set(q, [ land.x + back * (i ? 14 : 6), land.y + (i ? (land.y < FH / 2 ? 12 : -12) : 0) ]));
+			}
+		}
 		// The computer's defenders mark your attackers goal-side, too.
 		const marks1 = new Map();
 		if (ball.owner && ball.owner.team === 0 && !keeperHolds) {
@@ -4109,12 +4193,16 @@
 				continue;
 			}
 
-			let target;
+			let target, setRole = false;
 			if (ball.owner === p) {
 				target = aiOwnerAct(p);
 				if (!target) { continue; }
 			} else if (p.role === "gk") {
 				target = gkTarget(p);
+			} else if (cornerPlan && cornerPlan.role.has(p)) {
+				target = cornerTarget(p); setRole = true;
+			} else if (airMen.has(p)) {
+				target = airMen.get(p); setRole = true;
 			} else if (p === chaser1 || (autoPilot && players.indexOf(p) === ctrl && !(ball.owner && ball.owner.team === 0))) {
 				// Read a ball in the air: run to where it will come down.
 				target = ball.z > 0 ? [ ball.landX, ball.landY ] : [ ball.x + ball.vx * 6, ball.y + ball.vy * 6 ];
@@ -4170,6 +4258,12 @@
 			if (setPiece && !diving && p !== setPiece.taker && p.role !== "gk") {
 				const off = Math.hypot(target[0] - p.x, target[1] - p.y);
 				sprint = Math.min(sprint, off > 160 ? 0.8 : off > 60 ? 0.5 : 0.34);
+			}
+			// Attacking a ball in the air (or a corner run once it's struck): flat out, straight at it.
+			if (setRole) {
+				const live = !setPiece && (!cornerPlan || cornerPlan.delivered);
+				sprint = live ? 1.05 : Math.min(sprint, 0.5);
+				p.tx = target[0]; p.ty = target[1];
 			}
 			// Smooth where AI players are heading so they don't twitch as the ball moves.
 			if (p.tx === undefined || Math.hypot(target[0] - p.tx, target[1] - p.ty) > 900) { p.tx = target[0]; p.ty = target[1]; }
@@ -4330,7 +4424,11 @@
 	}
 
 	function goalScored (scorer) {
+		if (shoot) { if (shoot.live) { shootResult(scorer === shoot.att ? (ball.headed && ball.lastBy && ball.lastBy.team === scorer ? "Header, goal" : "Goal") : "Own goal", scorer); } else { return; } }
 		score[scorer]++;
+		tally.goals[scorer]++;
+		if (ball.headed && ball.lastBy && ball.lastBy.team === scorer) { tally.headGoals[scorer]++; }
+		if (frame - cornerAt[scorer] < 420) { tally.cornerGoals[scorer]++; }
 		{
 			const by = ball.lastBy;
 			const own = by && by.team !== scorer;
@@ -4378,11 +4476,12 @@
 			const h0 = Math.max(ball.z, 0) + Math.abs(ball.vz) * 8;
 			ball.z += ball.vz;
 			ball.vz -= GRAV;
+			if (ball.curlT > 0) { ball.vx += ball.cax; ball.vy += ball.cay; ball.curlT--; }
 			ball.vx *= AIR_DRAG;
 			ball.vy *= AIR_DRAG;
 			if (ball.z <= 0) {
 				// Landing: a small bounce, and the grass takes some pace off.
-				ball.z = 0;
+				ball.z = 0; ball.curlT = 0;
 				ball.vz = -ball.vz > 2 ? -ball.vz * cond.bounce : 0;
 				ball.vx *= cond.land; ball.vy *= cond.land;
 				if (cond.wet && h0 > 20) { splash(ball.x, ball.y); }
@@ -4391,6 +4490,7 @@
 			ball.vx *= cond.roll;
 			ball.vy *= cond.roll;
 		}
+		if (ball.z > 0) { predictLanding(); }
 		ball.spin += Math.hypot(ball.vx, ball.vy) * 0.25;
 		const inMouth = ball.y > GOAL_T + 4 && ball.y < GOAL_B - 4 && ball.z <= 55;   // higher is over the bar
 		if (state === "play" && (ball.y < -4 || ball.y > FH + 4)) {
@@ -4431,6 +4531,7 @@
 	let lastTouch = -1;     // team that last touched the ball
 	let setPiece = null;    // { kind: "corner", team, taker } until the corner is taken
 	function outOfPlay (leftEnd) {
+		if (shoot) { shootEnd(ball.shot ? "Off target" : "Out of play"); return; }
 		const defTeam = leftEnd ? 0 : 1;   // you defend the left goal
 		raiseFlag(ball.x, "out");
 		if (ball.shot && frame - (ball.kickedAt || -999) < 120 && Math.abs(ball.y - FH / 2) < FMT.goal / 2 + 70 * GH && (ball.z || 0) < 95) { ooh(); ev3d("near"); }
@@ -4471,15 +4572,29 @@
 		if (!rest.length) { awardGoalKick(def, leftEnd); return; }   // nobody left to take it (a side down to the bare few)
 		const taker = rest.reduce((a, b) => (dist(a, corner) < dist(b, corner) ? a : b));
 		taker.x = corner.x; taker.y = corner.y; taker.dir = Math.atan2(FH / 2 - corner.y, gx + inward * 90 - corner.x);
-		const spots = [ [ 70, -55 ], [ 95, 15 ], [ 125, -10 ], [ 80, 70 ] ].map(([ dx, dy ]) => [ gx + inward * dx * GH, FH / 2 + dy * GH ]);
-		const markers = dfs.slice().sort((a, b) => Math.abs(a.x - gx) - Math.abs(b.x - gx)).slice(0, runners.length);
+		// The runners start in a knot around the penalty spot and attack a zone each when the ball
+		// is struck: near post, far post, the spot and the middle of the six-yard box. Each has a man
+		// goal-side of him; two more defenders hold the near post and the six-yard line; one attacker
+		// waits on the edge of the box for the second ball.
+		const sy = top ? -1 : 1, Z = cornerSpots(gx, inward, sy), aims = [ Z.near, Z.far, Z.spot, Z.six ];
+		const starts = [ [ 0.62, 0.12 * sy ], [ 0.7, -0.22 * sy ], [ 0.86, 0.02 ], [ 0.6, -0.05 * sy ] ].map(([ dx, dy ]) => [ gx + inward * dx * FMT.box, FH / 2 + dy * FMT.box ]);
+		const markers = dfs.slice().sort((a, b) => (Math.abs(a.x - gx) - (a.role === "def") * 80) - (Math.abs(b.x - gx) - (b.role === "def") * 80));
+		const plan = { att, def, gx, inward, sy, role: new Map(), delivered: false, at: frame, attacker: null, defender: null };
 		runners.forEach((r, i) => {
-			r.x = spots[i][0]; r.y = spots[i][1];
-			const m = markers[i];
-			if (m) { m.x = spots[i][0] - inward * 16; m.y = spots[i][1] + 6; }   // goal-side of their man
+			r.x = starts[i][0]; r.y = starts[i][1];
+			plan.role.set(r, { kind: "run", start: starts[i], aim: aims[i] });
+			const m = markers.shift();
+			if (m) { m.x = starts[i][0] - inward * 16; m.y = starts[i][1] + 6 * sy; plan.role.set(m, { kind: "mark", man: r }); }   // goal-side of their man
 		});
+		for (const spot of [ [ gx + inward * FMT.box * 0.12, FH / 2 + sy * FMT.goal * 0.45 ], [ gx + inward * FMT.box * 0.32, FH / 2 ] ]) {
+			const z = markers.shift();
+			if (z) { z.x = spot[0]; z.y = spot[1]; plan.role.set(z, { kind: "zone", spot }); }
+		}
+		const edgeMan = rest.filter(q => q !== taker).sort((a, b) => Math.abs(a.x - gx) - Math.abs(b.x - gx))[0];
+		if (edgeMan) { const spot = [ gx + inward * (FMT.box + 45), FH / 2 - sy * 40 ]; edgeMan.x = spot[0]; edgeMan.y = spot[1]; plan.role.set(edgeMan, { kind: "edge", spot }); }
+		cornerPlan = plan;
 		const gk = team(def).find(q => q.role === "gk");
-		if (gk) { gk.x = gx + inward * 20; gk.y = FH / 2; }
+		if (gk) { gk.x = gx + inward * 20; gk.y = FH / 2 + sy * 8; }
 		// Everyone else from the defending side keeps their distance from the taker.
 		for (const q of players) {
 			if (q.team !== def) { continue; }
@@ -4489,6 +4604,7 @@
 		setPieceStart(taker, 70);
 		setPiece = { kind: "corner", team: att, taker };
 		if (att === 0) { stats.corners = (stats.corners || 0) + 1; } else { oppStats.corners++; }
+		tally.corners[att]++; cornerAt[att] = frame + 9999;   // counts from the delivery
 		restartBanner("Corner", att);
 	}
 
@@ -4512,6 +4628,7 @@
 	// From behind it's likely a yellow card and sometimes an injury.
 	function commitFoul (off, vic, behind) {
 		if (state !== "play" || setPiece || tut || inHands(vic)) { return; }
+		if (shoot) { if (shoot.live) { sfx("whistle"); shootEnd(off.team === shoot.att ? "Foul by the attacker" : "Foul in the box: no goal, retaken next round"); } return; }
 		const t = vic.team;
 		// Cards, as the laws have them: reckless (mostly from behind) is a yellow, a second
 		// yellow is a red, and a really bad one from behind is a straight red.
@@ -4758,6 +4875,7 @@
 		kick(p, gx, ty, vh);
 		ball.shot = true;
 		ball.vz = (zGoal + 0.5 * GRAV * T * T) / T;
+		tally.shots[p.team]++;
 		ball.lift = true;   // slower than a driven shot: the keeper has longer to get across
 		// On target, the keeper gets across more often than not; into the corner, less so.
 		const gk = team(1 - p.team).find(q => q.role === "gk"), off = Math.abs(ty - FH / 2) / (FMT.goal / 2);
@@ -4786,6 +4904,7 @@
 	}
 
 	function awardThrow (t, spotX, top) {
+		if (shoot) { shootEnd("Out of play"); return; }
 		const spot = { x: clamp(spotX, 20, FW - 20), y: top ? 12 : FH - 12 };
 		const taker = outfield(t).reduce((a, b) => (dist(a, spot) < dist(b, spot) ? a : b));
 		taker.x = spot.x; taker.y = spot.y;
@@ -4823,7 +4942,7 @@
 	}
 
 	// Taking whatever set piece you are standing over.
-	function takeSetPiece (p, long) {
+	function takeSetPiece (p, long, via) {
 		if (setPiece.kind === "pen") { takePenalty(p); return; }
 		if (setPiece.kind === "free") {
 			// A free kick is open play from a dead ball: S plays it short, Q goes long, D shoots.
@@ -4841,18 +4960,85 @@
 			if (m) { startPass(p, m, false); } else { gkDistribute(p); }
 			return;
 		}
+		// Corners: S whips an in-swinger at the near post, Q floats an out-swinger to the far post,
+		// W drops one on the penalty spot.
+		if (setPiece.kind === "corner") { cornerCross(p, null, long ? "far" : via === "through" ? "spot" : "near", long ? "out" : "in"); return; }
 		const m = passTarget(p);
-		if (setPiece.kind === "corner") { cornerCross(p, m); } else { throwIn(p, m, long); }
+		throwIn(p, m, long);
 		if (m) { handOff(m, 160); }
 	}
 
-	// Taking a corner: a lofted cross into the box.
-	function cornerCross (p, target) {
-		const inward = p.x < FW / 2 ? 1 : -1;
-		const tx = target ? target.x + (Math.random() * 2 - 1) * 14 : p.x + inward * 150;
-		const ty = target ? target.y + (Math.random() * 2 - 1) * 14 : FH / 2;
-		loftTo(p, tx, ty);
+	// The zones a corner is aimed at, for the goal at gx (inward points into the pitch, sy is the
+	// side the corner is taken from: -1 the top touchline, 1 the bottom).
+	function cornerSpots (gx, inward, sy) {
+		const b = FMT.box, g = FMT.goal / 2;
+		return {
+			near: [ gx + inward * b * 0.27, FH / 2 + sy * (g - 8) ],
+			far: [ gx + inward * b * 0.33, FH / 2 - sy * (g + 6) ],
+			spot: [ gx + inward * FMT.spot, FH / 2 + sy * 8 ],
+			six: [ gx + inward * b * 0.42, FH / 2 - sy * 10 ]
+		};
+	}
+	// Taking a corner: a lofted cross into the box. kind: "near" (whipped at the near post), "far"
+	// (floated to the back post) or "spot" (the penalty spot); swing: "in" bends towards goal,
+	// "out" away from it. Worse passers miss their zone by more.
+	function cornerCross (p, target, kind, swing) {
+		const leftEnd = p.x < FW / 2, inward = leftEnd ? 1 : -1, gx = leftEnd ? 0 : FW, sy = p.y < FH / 2 ? -1 : 1;
+		const Z = cornerSpots(gx, inward, sy);
+		kind = Z[kind] ? kind : "spot";
+		let [ tx, ty ] = Z[kind];
+		const acc = (8 + Math.max(0, 78 - A(p, "pas")) * 0.7) * GH;
+		tx += (Math.random() * 2 - 1) * acc; ty += (Math.random() * 2 - 1) * acc;
+		swing = swing === "in" || swing === "out" ? swing : Math.random() < 0.6 ? "in" : "out";
+		// The bow: an in-swinger bends out over the pitch and curls back towards goal, an out-swinger the other way.
+		const dx = tx - ball.x, dy = ty - ball.y, L = Math.hypot(dx, dy) || 1, leftIsPitch = Math.sign(-dy / L) === inward ? 1 : -1;
+		// An out-swinger bows towards the goal line: never so far that it goes out of play in the air.
+		const room = Math.max(0, inward * ((ball.x + tx) / 2 - gx) - 14);
+		const bow = swing === "in" ? leftIsPitch * (kind === "near" ? 22 : 30) * GH : -leftIsPitch * Math.min((kind === "near" ? 16 : 26) * GH, room);
+		loftTo(p, tx, ty, bow, kind === "near" ? 0.7 : kind === "far" ? 0.8 : 0.85);
+		ball.swing = swing;
 		setPiece = null;
+		cornerAt[p.team] = frame;
+		if (cornerPlan) { cornerPlan.delivered = true; cornerPlan.at = frame; cornerPlan.kind = kind; }
+		if (p.team === 0) { burst(p.x, p.y, `${swing === "in" ? "In-swinger" : "Out-swinger"}, ${kind === "near" ? "near post" : kind === "far" ? "far post" : "the spot"}`); }
+		// Control goes to the runner who is attacking that zone.
+		if (p.team === 0 && cornerPlan) {
+			const runners = [ ...cornerPlan.role ].filter(([ q, r ]) => r.kind === "run").map(([ q ]) => q);
+			const m = runners.sort((a, b) => Math.hypot(a.x - tx, a.y - ty) - Math.hypot(b.x - tx, b.y - ty))[0];
+			if (m) { handOff(m, 160); }
+		}
+	}
+	// A corner in progress: who runs where, who marks whom, until the ball is won or dies.
+	let cornerPlan = null;
+	function stepCornerPlan () {
+		const cp = cornerPlan;
+		if (!cp) { return; }
+		const sinceKick = frame - cp.at;
+		if (state !== "play" || (!cp.delivered && (!setPiece || setPiece.kind !== "corner")) ||
+			(cp.delivered && (ball.owner || sinceKick > 200 || (ball.z <= 0 && ball.vz <= 0 && sinceKick > 20)))) { cornerPlan = null; return; }
+		if (!cp.delivered) { return; }
+		// Whoever can get to the drop first on each side attacks it.
+		const land = { x: ball.landX, y: ball.landY };
+		let ba = null, bd = null, da = Infinity, dd = Infinity;
+		for (const [ q, r ] of cp.role) {
+			if (!players.includes(q)) { continue; }
+			const d = dist(q, land);
+			if ((r.kind === "run" || r.kind === "edge") && d < da) { da = d; ba = q; }
+			if ((r.kind === "mark" || r.kind === "zone") && d < dd) { dd = d; bd = q; }
+		}
+		cp.attacker = ba; cp.defender = bd;
+	}
+	function cornerTarget (p) {
+		const cp = cornerPlan, r = cp && cp.role.get(p);
+		if (!r) { return null; }
+		const flying = cp.delivered && !ball.owner;
+		if (flying && (cp.attacker === p || cp.defender === p)) { return [ ball.landX - (cp.defender === p ? cp.inward * 8 : 0), ball.landY ]; }
+		if (r.kind === "run") { return cp.delivered ? r.aim : r.start; }
+		if (r.kind === "mark") {
+			const q = r.man, dx = cp.gx - q.x, dy = FH / 2 - q.y, d = Math.hypot(dx, dy) || 1;
+			return [ q.x + dx / d * 15, q.y + dy / d * 15 ];
+		}
+		return r.spot;
 	}
 
 	function contest () {
@@ -4893,6 +5079,7 @@
 					// One save attempt per shot: beaten once, the keeper stays beaten for that shot.
 					if (isGk) {
 						if (ball.lift) { save = Math.min(0.9, save * 1.9); }
+						if (ball.headed) { save = Math.min(0.9, save * 1.35); }
 						if (ball.pen && ball.pen.gk === p) { if (!ball.pen.saved) { continue; } }
 						else if (ball.beaten === p) { continue; }
 						if (!(ball.pen && ball.pen.gk === p) && Math.random() > save * 1.6) { ball.beaten = p; continue; }
@@ -4950,24 +5137,40 @@
 
 	// A header at goal: better finishers place it; everyone else just gets it on target, maybe.
 	function header (p) {
-		const gx = attackX(p.team) + (p.team === 0 ? 20 : -20), sho = A(p, "sho");
-		// Headers are softer than shots (keepers can reach them) and less accurate (some miss).
-		const aimY = FH / 2 + (Math.random() * 2 - 1) * (FMT.goal / 2) * clamp(1.55 - sho / 100, 0.55, 1.35);
-		kick(p, gx, aimY, 7.5 + sho * 0.035, "header");
-		ball.vz = 1.2;
+		const gx = attackX(p.team) + (p.team === 0 ? 20 : -20), sho = A(p, "sho"), z0 = Math.max(6, ball.z);
+		// Headers are softer than shots and less accurate: aimed for the side the keeper isn't on,
+		// down towards the line, and a poor header of the ball sends it wide or over.
+		const gk = team(1 - p.team).find(q => q.role === "gk"), err = clamp(1.45 - sho / 100, 0.5, 1.1);
+		const side = gk ? (gk.y < FH / 2 ? 1 : -1) * (Math.random() < 0.8 ? 1 : -1) : (Math.random() < 0.5 ? 1 : -1);
+		const aimY = FH / 2 + side * FMT.goal * 0.3 + gauss() * FMT.goal * 0.26 * err;
+		const sp = 8.4 + sho * 0.035 + Math.random() * 1.5;
+		kick(p, gx, aimY, sp, "header");
+		const T = Math.max(3, Math.hypot(gx - ball.x, aimY - ball.y) / sp);
+		const zt = clamp(18 + gauss() * 26 * err, 1, 95);
+		ball.z = z0;
+		ball.vz = (zt - z0 + 0.5 * GRAV * T * T) / T;
 		ball.headed = true;
 		ball.shot = true;
 		p.jump = JUMP;
-		if (p.team === 0) { stats.shots++; burst(p.x, p.y, "Header"); } else { oppStats.shots++; ooh(); }
+		predictLanding();
+		tally.shots[p.team]++; tally.heads[p.team]++;
+		if (p.team === 0) { stats.shots++; burst(p.x, p.y, "Header"); } else { oppStats.shots++; }
+		crowdReact("chance", p.team);
 	}
 	// A defensive header: away from goal, high and far.
 	function clearance (p) {
-		const away = p.team === 0 ? 1 : -1;
-		kick(p, p.x + away * 260 * Math.sqrt(S), clamp(p.y + (Math.random() * 2 - 1) * 200, 40, FH - 40), 12, "header");
-		ball.vz = 4;
+		const away = p.team === 0 ? 1 : -1, z0 = Math.max(6, ball.z);
+		// Away from goal and out towards the flank the ball came from: never back across the six-yard box.
+		const wide = Math.sign(p.y - FH / 2) || (Math.random() < 0.5 ? 1 : -1);
+		kick(p, p.x + away * (200 + Math.random() * 120) * Math.sqrt(S), clamp(p.y + wide * (60 + Math.random() * 160), 40, FH - 40), 10 + Math.random() * 3, "header");
+		ball.z = z0;
+		ball.vz = 3.5 + Math.random() * 1.5;
 		ball.headed = true;
 		p.jump = JUMP;
+		predictLanding();
+		tally.clears[p.team]++;
 		if (p.team === 0) { burst(p.x, p.y, "Cleared"); }
+		crowdReact("clear", p.team);
 	}
 
 	// A headed pass, or a flick-on: nodded down to a teammate ahead of him.
@@ -4984,8 +5187,11 @@
 		}
 		if (!best) { clearance(p); return; }
 		const d = dist(p, best), err = 14 + (100 - A(p, "pas")) * 0.35;
+		const z0 = Math.max(6, ball.z);
 		kick(p, best.x + best.vx * 8 + (Math.random() * 2 - 1) * err, best.y + best.vy * 8 + (Math.random() * 2 - 1) * err, clamp(d / 40 + 2.2, 4, 9.5), "header");
-		ball.vz = 1.8;
+		ball.z = z0;
+		ball.vz = 1.2;
+		predictLanding();
 		ball.headed = true;
 		p.jump = JUMP;
 		if (p.team === 0) { handOff(best, 90); burst(p.x, p.y, "Headed on"); }
@@ -4997,18 +5203,53 @@
 	const JUMP = 22;
 	let headIntent = null;   // what you asked your player to do with a ball coming down to him
 	const jumpAmt = p => p.jump > 0 ? Math.sin(Math.PI * (1 - p.jump / JUMP)) : 0;
+	// A keeper coming for a cross in his area: catch it, punch it clear, or flap at it and miss.
+	// Bodies around him make it harder, and so does a wet ball.
+	function keeperClaim () {
+		if (ball.z > 64 || ball.z < 4 || ball.vz > 1 || ball.shot) { return false; }
+		for (const gk of players) {
+			if (gk.role !== "gk" || gk.kickCd > 0 || gk.team === lastTouch || dist(gk, ball) > 32) { continue; }
+			if (rel(gk.team, gk.x) > FMT.box + 20 || Math.abs(gk.y - FH / 2) > FMT.goal / 2 + FMT.box) { continue; }
+			const crowd = players.filter(q => q.team !== gk.team && dist(q, gk) < 26).length;
+			const r = Math.random(), catchP = clamp((0.6 + (A(gk, "def") - 65) * 0.012 - crowd * 0.14) * cond.handling * (shoot ? 0.7 : 1), 0.15, 0.9);
+			gk.jump = JUMP;
+			if (r < catchP) {
+				tally.claims[gk.team]++;
+				gainBall(gk);
+				burst(gk.x, gk.y, "Claimed");
+				crowdReact("save", gk.team);
+				return true;
+			}
+			if (r < catchP + (1 - catchP) * 0.6) {
+				// A punch: out towards the edge of the box and beyond.
+				const away = gk.team === 0 ? 1 : -1, z0 = ball.z;
+				kick(gk, gk.x + away * (170 + Math.random() * 120) * Math.sqrt(S), clamp(gk.y + (Math.random() * 2 - 1) * 220, 40, FH - 40), 9 + Math.random() * 3, "header");
+				ball.z = z0; ball.vz = 3 + Math.random() * 2; predictLanding();
+				tally.punches[gk.team]++;
+				burst(gk.x, gk.y, "Punched");
+				crowdReact("clear", gk.team);
+				return true;
+			}
+			gk.kickCd = 24;   // he flapped at it and missed: it's anyone's
+			crowdReact("chance", 1 - gk.team);
+			return false;
+		}
+		return false;
+	}
 	function aerial () {
-		if (!(ball.z > 8 && ball.z < 46 && ball.vz < 0) || frame - (ball.kickedAt || -99) < 6) { return false; }
+		if (!ball.owner && keeperClaim()) { return true; }
+		if (!(ball.z > 8 && ball.z < 50 && ball.vz < 0) || frame - (ball.kickedAt || -99) < 6) { return false; }
 		let a = null, b = null, da = Infinity, db = Infinity;
 		for (const p of players) {
 			if (p.kickCd > 0 || p.jump > 0) { continue; }
 			const d = dist(p, ball);
-			if (p.role === "gk") { if (d < 30 && rel(p.team, p.x) < 160 * GH) { return false; } continue; }
-			if (d > 24) { continue; }
+			if (p.role === "gk") { if (d < 30 && rel(p.team, p.x) < FMT.box + 20 && p.team !== lastTouch) { return false; } continue; }
+			if (d > 26) { continue; }
 			if (d < da) { b = a; db = da; a = p; da = d; } else if (d < db) { b = p; db = d; }
 		}
-		if (!a) { return false; }
-		const air = (p, d) => (24 - d) * 0.5 + (Math.max(A(p, "def"), A(p, "sho")) - 65) * 0.08 + Math.random() * 6;
+		if (!a) { if (ball.z < 30 && ball.landT < 3) { tally.air.none++; } return false; }
+		// Attacking a ball is easier than defending it: the runner knows where he's going.
+		const air = (p, d) => (24 - d) * 0.5 + (Math.max(A(p, "def"), A(p, "sho")) - 65) * 0.08 + Math.random() * 6 + (p.team === lastTouch ? (shoot ? 3.5 : 1.5) : 0);
 		let w = a, l = b && b.team !== a.team && db < 28 ? b : null;
 		if (l && air(l, db) > air(a, da)) { w = l; l = a; }
 		const isYou = w.team === 0 && players.indexOf(w) === ctrl;
@@ -5016,11 +5257,14 @@
 		let act = asked;
 		if (!act) {
 			const r = Math.random();
-			if (w.team === lastTouch && inAttackBox(w)) { act = r < 0.6 ? "goal" : r < 0.68 ? "pass" : null; }
-			else if (w.team !== lastTouch && inOwnBox(w)) { act = r < 0.3 * defMul(w) ? "clear" : null; }
-			else { act = r < 0.06 ? "pass" : null; }
+			const facing = Math.cos(Math.atan2(FH / 2 - w.y, attackX(w.team) - w.x) - w.dir) > -0.2;
+			if (w.team === lastTouch && inAttackBox(w) && rel(w.team, w.x) > FW - FMT.box * 0.95) { act = r < (facing ? 0.5 : 0.28) * (shoot ? 1.3 : 1) ? "goal" : r < 0.75 ? "pass" : null; }
+			else if (w.team === lastTouch && inAttackBox(w)) { act = r < 0.18 ? "goal" : r < 0.5 ? "pass" : null; }
+			else if (w.team !== lastTouch && inOwnBox(w)) { act = r < (shoot ? 0.6 : 0.82) * defMul(w) ? "clear" : r < 0.92 ? "pass" : null; }
+			else { act = r < (w.team !== lastTouch ? 0.35 : 0.12) ? "pass" : null; }
 		}
-		if (!act) { return false; }
+		if (!act) { tally.air.noAct++; return false; }
+		if (w.team === lastTouch) { tally.air.attWin++; } else { tally.air.defWin++; }
 		headIntent = null;
 		if (l) {
 			l.jump = JUMP; l.kickCd = 26;   // beaten in the air, he comes down a step behind
@@ -5104,7 +5348,8 @@
 		// Home advantage: the visitors play a little below their rating.
 		// Home advantage: the visitors play a little below their rating.
 		oppStrength = leagueMatch ? getStr(leagueMatch.opp) + (leagueMatch.home ? -0.3 : 0.3) : { easy: 2, normal: 3, hard: 4.5 }[diffSel.value] || 3;
-		const oppStr = leagueMatch ? getStr(leagueMatch.opp) + (leagueMatch.home ? -0.3 : 0.3) : { easy: 2, normal: 3, hard: 4.5 }[diffSel.value] || 3;
+		// The corner shootout is played against a side nearer your own level.
+		const oppStr = leagueMatch ? getStr(leagueMatch.opp) + (leagueMatch.home ? -0.3 : 0.3) : (mode === "corners" ? { easy: 1.5, normal: 2.2, hard: 3.4 } : { easy: 2, normal: 3, hard: 4.5 })[diffSel.value] || 3;
 		diff = strengthCfg(oppStr);
 		oppSquad = cpuSquad(leagueMatch ? leagueMatch.opp : 99, oppStr);
 		$("fmtName").textContent = FMT.label;
@@ -5117,6 +5362,7 @@
 		subsLeft = SUBS_MAX; cpuSubs = SUBS_MAX; subLog = []; cameOn = []; wentOff = []; subPick = {}; genericBench = null;
 		updateSubsBtn();
 		possFrames = [ 0, 0 ];
+		tally = newTally(); cornerAt = [ -9999, -9999 ];
 		momentum = leagueMatch ? (homeSide === 0 ? 0.12 : -0.12) : 0;   // the home crowd gives the home side a start
 		passStreak = [ 0, 0 ]; bestStreak = [ 0, 0 ]; heavyTouches = [ 0, 0 ];
 		mentality = [ 0, 0 ];
@@ -5159,6 +5405,102 @@
 		const condChanged = (mode === "friendly" && cond && (weatherSel.value !== cond.weatherKey || groundSel.value !== cond.surfaceKey)) ||
 			(FMT.shape && shapeOf(fmtKey) !== FMT.shape);
 		nextNote.hidden = !(seasonFmt || (live && (fmtSel.value !== fmtKey || Number(lenSel.value) !== matchLen || condChanged)));
+	}
+
+	/* ---------- corner shootout ----------
+	   A practice game of corners: five each, taken in turn (you first), from alternate sides. A
+	   round ends with a goal, the defending side winning the ball, the ball going dead or the box
+	   being cleared, or six seconds after the delivery. Level after ten, it's sudden death in pairs
+	   (three pairs at most, then honours even). No clock, no offside, nothing saved. */
+	let shoot = null;
+	function startShootout () {
+		shoot = { n: 0, total: 10, att: 0, live: false, next: 0, at: 0, log: [], extra: 0 };
+		freeze = 0;
+		state = "play";
+		pauseBtn.textContent = "Pause";
+		nextShootCorner();
+	}
+	function nextShootCorner () {
+		if (!shoot) { return; }
+		shoot.next = 0;
+		const [ a, b ] = score;
+		const done = shoot.n >= shoot.total;
+		// Settled early: one side can't be caught with the corners left.
+		const rem = shoot.total - shoot.n, leftA = shoot.n % 2 === 0 ? Math.ceil(rem / 2) : Math.floor(rem / 2), leftB = rem - leftA;
+		if (done || (shoot.n < 10 && (a > b + leftB || b > a + leftA))) {
+			if (done && a === b && shoot.extra < 3) { shoot.extra++; shoot.total += 2; }
+			else { finishShootout(); return; }
+		}
+		shoot.att = shoot.n % 2;
+		const top = Math.floor(shoot.n / 2) % 2 === 0;
+		banner.hidden = true;
+		ball.owner = null; ball.z = 0; ball.vz = 0; ball.vx = ball.vy = 0; ball.shot = false; ball.headed = false;
+		for (const p of players) { p.jump = 0; p.dive = 0; p.fall = 0; p.kickCd = 0; p.slideAI = 0; p.lunge = 0; p.run = null; }
+		awardCorner(shoot.att, shoot.att === 1, top);
+		if (!setPiece) { shootResult("No taker", -1); return; }
+		// Defending one of theirs: you start on the marker nearest the goal.
+		if (shoot.att === 1 && cornerPlan) {
+			const mine = [ ...cornerPlan.role ].filter(([ q, r ]) => q.team === 0 && (r.kind === "mark" || r.kind === "zone")).map(([ q ]) => q).sort((x, y) => x.x - y.x);
+			if (mine[0]) { ctrl = players.indexOf(mine[0]); manualLock = 30; }
+		}
+		shoot.live = true;
+		shoot.at = frame;
+		shoot.delivered = 0;
+		restartBanner(`Corner ${shoot.n + 1} of ${shoot.total}${shoot.extra ? " · sudden death" : ""}`, shoot.att);
+		renderModeBadge(); lastHud = ""; renderHud();
+	}
+	// The round is over: note what happened and line up the next one after a breath.
+	function shootResult (what, scorer) {
+		if (!shoot || !shoot.live) { return; }
+		shoot.live = false;
+		shoot.log.push({ att: shoot.att, what, goal: scorer === shoot.att, own: scorer >= 0 && scorer !== shoot.att, by: ball.lastBy ? ball.lastBy.name || "" : "" });
+		shoot.n++;
+		cornerPlan = null;
+	}
+	function shootEnd (what) {
+		if (!shoot || !shoot.live) { return; }
+		shootResult(what, -1);
+		toast(what, shoot.log[shoot.log.length - 1].att === 0 ? "#de4f5a" : "#7fd49b");
+		setPiece = null;
+		ball.owner = null; ball.vx *= 0.2; ball.vy *= 0.2;
+		freeze = 50; freezeKind = "free";
+		shoot.next = frame + 50;
+		renderModeBadge(); lastHud = "";
+	}
+	function shootTick () {
+		if (!shoot || !shoot.live || state !== "play") { return; }
+		if (!shoot.delivered && !setPiece) { shoot.delivered = frame; }
+		if (!shoot.delivered) { return; }
+		const def = 1 - shoot.att, since = frame - shoot.delivered, o = ball.owner;
+		if (o && o.team === def && since > 2) { shootEnd(o.role === "gk" ? "Keeper claims it" : "Defended"); return; }
+		if (rel(def, ball.x) > FMT.box + 170 && ball.z < 30) { shootEnd("Cleared"); return; }
+		if (since > 360) { shootEnd("Time's up"); }
+	}
+	function finishShootout () {
+		const [ a, b ] = score, log = shoot.log;
+		const count = (t, f) => log.filter(e => e.att === t && f(e)).length;
+		const rows = {
+			you: "You", them: opp.short,
+			rows: [
+				[ "Corners", count(0, () => true), count(1, () => true) ],
+				[ "Goals", count(0, e => e.goal), count(1, e => e.goal) ],
+				[ "Headed in", count(0, e => e.goal && /Header/.test(e.what)), count(1, e => e.goal && /Header/.test(e.what)) ],
+				[ "Keeper claimed", count(0, e => /Keeper/.test(e.what)), count(1, e => /Keeper/.test(e.what)) ],
+				[ "Defended or cleared", count(0, e => /Defended|Cleared/.test(e.what)), count(1, e => /Defended|Cleared/.test(e.what)) ]
+			]
+		};
+		const line = a > b ? `You win the corner shootout ${a}–${b}.` : a < b ? `${cap(opp.name)} win the corner shootout ${b}–${a}.` : `Honours even at ${a}–${b}.`;
+		const marks = t => log.filter(e => e.att === t).map(e => (e.goal ? "●" : "○")).join(" ");
+		const scorers = log.filter(e => e.goal).map(e => `${e.by || (e.att === 0 ? "you" : opp.short)}${/Header/.test(e.what) ? " (header)" : ""}`);
+		const seq = `You ${marks(0)}  ·  ${opp.short} ${marks(1)}.${scorers.length ? ` Scored by ${scorers.join(", ")}.` : " Nobody scored."}`;
+		shoot = null;
+		cornerPlan = null; setPiece = null;
+		state = "full";
+		banner.hidden = true;
+		sfx("final");
+		$("announce").textContent = line;
+		showOverlay("Corner shootout", `${line} ${seq}`, "Play again", rows);
+		renderModeBadge(); lastHud = ""; renderHud();
 	}
 
 	/* ---------- tutorial ---------- */
@@ -5277,7 +5619,7 @@
 	   paused where you left it. The season itself is saved separately after every result. */
 	const liveKey = () => (mode === "league" && league ? `L${league.season}-${league.round}-${league.fmt}` : `F-${fmtKey}`);
 	function saveLive () {
-		if (tut || mode === "tutorial" || !(state === "play" || state === "paused" || state === "goal" || state === "half") || !(timeLeft > 0)) { return; }
+		if (tut || shoot || mode === "tutorial" || mode === "corners" || !(state === "play" || state === "paused" || state === "goal" || state === "half") || !(timeLeft > 0)) { return; }
 		store.set("ff-live", JSON.stringify({
 			v: 1, key: liveKey(), score, timeLeft, momentum, possFrames, stats, ostats: oppStats, best: bestStreak, ment: mentality[0], lastConceded, half: halfDone, at: Date.now(),
 			off: dismissed, cards: matchCards, hurt: matchInjuries, subs: subLog, log: matchLog, goals: matchGoals,
@@ -5326,6 +5668,7 @@
 			clearLive();
 			newMatch();
 			freeze = KICKOFF_FREEZE;
+			if (mode === "corners") { startShootout(); return; }
 			if (mode !== "tutorial") { store.set("ff-played", String(playedCount() + 1)); }
 		}
 		if (state === "half") { toast("Second half: teams change ends", "#eef6ea"); }
@@ -5488,6 +5831,7 @@
 	function renderModeBadge () {
 		const b = $("modeBadge");
 		if (mode === "tutorial") { b.textContent = "Tutorial · practice"; b.className = "modebadge tutorial"; }
+		else if (mode === "corners") { b.textContent = shoot ? `Corner shootout · corner ${Math.min(shoot.n + 1, shoot.total)} of ${shoot.total}` : "Corner shootout · practice"; b.className = "modebadge practice"; }
 		else if (mode === "league" && league && leagueMatch) { b.textContent = `Premier Division · Matchday ${leagueMatch.round + 1}`; b.className = "modebadge"; }
 		else if (mode === "league") { b.textContent = "Premier Division"; b.className = "modebadge"; }
 		else { b.textContent = "Friendly · practice (doesn't count)"; b.className = "modebadge practice"; }
@@ -5497,7 +5841,7 @@
 	let lastSimLabel = "";
 	function renderSimBtn () {
 		const b = $("simBtn");
-		const show = mode !== "tutorial" && (state === "intro" || state === "play" || state === "paused" || state === "half");
+		const show = mode !== "tutorial" && mode !== "corners" && (state === "intro" || state === "play" || state === "paused" || state === "half");
 		const label = !show ? "" : state === "intro" ? "Simulate match" : "Simulate rest";
 		if (label === lastSimLabel) { return; }
 		lastSimLabel = label;
@@ -5528,7 +5872,7 @@
 		if (cooling !== lastCooling) { lastCooling = cooling; padTackle.classList.toggle("cooling", cooling); }
 
 		const t = Math.ceil(timeLeft);
-		const clock = `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+		const clock = shoot ? `C ${Math.min(shoot.n + 1, shoot.total)}/${shoot.total}` : `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
 		const narrow = window.innerWidth <= 640;
 		const key = `${score[0]}|${score[1]}|${clock}|${narrow}`;
 		if (key === lastHud) { return; }
@@ -6463,6 +6807,9 @@
 			noiseBurst("white", t + 1.6, 3, 0.1, "bandpass", 800, 1000, 0.5);
 		}
 	};
+	// The crowd reacts to what just happened, and it is not neutral. kind: chance, save, tackle,
+	// clear. Filled out with the crowd's sounds further down.
+	function crowdReact (kind, t) { if (typeof crowdReactImpl === "function") { crowdReactImpl(kind, t); } }
 	const groan = () => {
 		ev3d("groan");
 		if (!soundOn || !audio) { return; }
@@ -6694,11 +7041,13 @@
 				: setPiece.kind === "free" ? (shotInRange(me)
 					? [ [ P ? "Stick" : "↑ ↓", "Pick a corner" ], [ P ? "Y" : "W", "Curl it over the wall" ], [ P ? "B" : "D", "Drive it low" ], [ P ? "A" : "S", "Pass" ] ]
 					: [ [ P ? "Stick" : "Arrows", "Aim" ], [ P ? "A" : "S", "Pass" ], [ P ? "RB" : "Q", "Long ball" ], [ P ? "B" : "D", "Shoot" ] ])
-				: [ [ P ? "Stick" : "Arrows", "Aim" ], [ P ? "A" : "S", "Cross" ] ];
+				: setPiece.kind === "corner" ? [ [ P ? "A" : "S", "Near post (in-swinger)" ], [ P ? "RB" : "Q", "Far post (out-swinger)" ], [ P ? "Y" : "W", "Penalty spot" ] ]
+				: [ [ P ? "Stick" : "Arrows", "Aim" ], [ P ? "A" : "S", "Short" ], [ P ? "RB" : "Q", "Long" ] ];
 		} else if (ball.owner === me && charging && aimY !== null && shotInRange(me)) {
 			items = [ [ P ? "Stick" : "↑ ↓", "Aim in the goal" ], [ P ? "Release B" : "Release D", "Shoot (harder = wider)" ] ];
 		} else if (ball.owner === me) {
-			items = [ [ P ? "A" : "S", "Pass" ], [ P ? "Y" : "W", "Through ball" ], [ P ? "B" : "D", "Shoot, hold for power" ], [ P ? "RB" : "Q", "Long ball" ], [ P ? "RT" : "E", "Sprint" ] ];
+			const chip = shotInRange(me) && !isWide(me.y, 0.2) && Math.hypot(FW - me.x, FH / 2 - me.y) < 480 * Math.sqrt(S);
+			items = [ [ P ? "A" : "S", "Pass" ], [ P ? "Y" : "W", "Through ball" ], [ P ? "B" : "D", "Shoot, hold for power" ], [ P ? "RB" : "Q", chip ? "Chip the keeper" : rel(0, me.x) > FW * 0.68 && isWide(me.y) ? "Cross" : "Long ball" ], [ P ? "RT" : "E", "Sprint" ] ];
 		} else if (ball.owner && ball.owner.team === 0) {
 			items = [ [ P ? "A" : "S", "Switch" ], [ P ? "RT" : "E", "Sprint" ] ];
 		} else {
@@ -9157,6 +9506,7 @@
 	$("modeLeague").addEventListener("click", e => { e.currentTarget.blur(); if (mode !== "league") { setMode("league"); } });
 	$("modeFriendly").addEventListener("click", e => { e.currentTarget.blur(); if (mode !== "friendly") { setMode("friendly"); } });
 	$("modeTutorial").addEventListener("click", e => { e.currentTarget.blur(); setMode("tutorial"); });
+	$("modeCorners").addEventListener("click", e => { e.currentTarget.blur(); setMode("corners"); });
 	$("coachSkip").addEventListener("click", e => { e.currentTarget.blur(); if (tut) { nextTutStep(); } });
 	$("coachExit").addEventListener("click", e => { e.currentTarget.blur(); setMode("friendly"); });
 	// Starting over wipes the season, so it takes a second press.
@@ -9586,7 +9936,7 @@
 			get charging () { return charging; }, get meterRect () { return meterRect; }, get drawMs () { return drawMs; }, get scale () { return scale; }, get kits () { return KITS; }, get stats () { return stats; }, get oppStats () { return oppStats; }, get steerAt () { return steerAt; }, set steerAt (v) { steerAt = v; }, set possTeam (v) { possTeam = v; },
 			set steerSwitchDone (v) { steerSwitchDone = !!v; },
 			get lastSwitchKind () { return lastSwitchKind; }, set lastSwitchKind (v) { lastSwitchKind = v; }, get setPiece () { return setPiece; },
-			get G3 () { return G3; }, get gfxLevel () { return gfxLevel; }, setGfx, get musicBar () { return music ? music.bar : -1; }, get audioState () { return audio ? audio.state : "none"; }, get replayOn () { return replayOn(); }, get replay () { return replay; }, get recFrames () { return rec.n; }, REPLAY_AT, REPLAY_FR, GOAL_CELEB, get lastCaption () { return lastCaption; }, caption, get camMode () { return camMode; }, get crowdMood () { return crowdMood; }, get frameDt () { return frameDt; }, get crowdBed () { return crowd; }, get soundOn () { return soundOn; },
+			get G3 () { return G3; }, get matchLog () { return matchLog; }, get shoot () { return shoot; }, cornerTest (att, top = true) { if (state !== "play") { return; } freeze = 0; awardCorner(att, att === 1, top); }, get cornerPlan () { return cornerPlan; }, simExtra () { return { tally, poss: possFrames.slice() }; }, get setPieceKind () { return setPiece ? setPiece.kind : null; }, get gfxLevel () { return gfxLevel; }, setGfx, get musicBar () { return music ? music.bar : -1; }, get audioState () { return audio ? audio.state : "none"; }, get replayOn () { return replayOn(); }, get replay () { return replay; }, get recFrames () { return rec.n; }, REPLAY_AT, REPLAY_FR, GOAL_CELEB, get lastCaption () { return lastCaption; }, caption, get camMode () { return camMode; }, get crowdMood () { return crowdMood; }, get frameDt () { return frameDt; }, get crowdBed () { return crowd; }, get soundOn () { return soundOn; },
 			human, switchScore, outfield, dist,
 			get officials () { return officials3; }, get flagCall () { return flagCall; }, refKit, deltaE,
 			proj (x, y, z) { return G3.cam ? proj3D(x, y, z) : null; }, get viewScale () { return scale; },
