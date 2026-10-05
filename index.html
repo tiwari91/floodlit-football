@@ -366,6 +366,7 @@
 	.subcol button small { color: var(--muted); white-space: nowrap; }
 	.subcol .hurt { color: #ef5b66; font-weight: 700; }
 	.subcol .tired { color: #f2b52e; font-weight: 700; }
+	.sq-table .trait { display: inline-block; margin-left: 6px; padding: 0 5px; border-radius: 3px; font-size: 10px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; background: rgba(126, 200, 227, 0.16); color: #9fd6ea; vertical-align: 1px; }
 	.subs .sub-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 	.subs .sub-note { font-size: 13px; color: var(--muted); margin: 0; }
 	#subsBtn.alert { outline: 2px solid #ef5b66; outline-offset: 2px; }
@@ -1646,6 +1647,27 @@
 	};
 	const natsOf = region => Object.keys(NATIONS).filter(k => NATIONS[k][1] === region);
 	const ROLES = { key: "Key player", first: "First team", rotation: "Rotation", prospect: "Prospect" };
+	/* ---------- player traits ----------
+	   About a third of players have one, suited to where they play. Traits change what a player does
+	   on the pitch, not just a number: see tr() in the match code. */
+	const TRAITS = {
+		pace: [ "Pace merchant", "quicker, and makes runs in behind" ],
+		target: [ "Target man", "wins headers and holds the ball up; long balls look for him" ],
+		playmaker: [ "Playmaker", "longer, more accurate passing and through balls" ],
+		poacher: [ "Poacher", "lives on the last defender, sharper finishing in the box" ],
+		winner: [ "Ball-winner", "wins tackles and slides in more often" ],
+		sweeper: [ "Sweeper keeper", "plays high and rushes out to through balls" ]
+	};
+	const TRAIT_ODDS = { gk: [ [ "sweeper", 30 ] ], def: [ [ "winner", 24 ], [ "pace", 8 ] ], mid: [ [ "playmaker", 20 ], [ "winner", 14 ], [ "pace", 7 ] ], fwd: [ [ "poacher", 24 ], [ "target", 20 ], [ "pace", 20 ] ] };
+	// From the name, so the same player always has the same trait (old saves, the computer's squads).
+	function traitFor (pl) {
+		const h = hashStr(String(pl.name) + "|trait|" + pl.pos) % 100;
+		let acc = 0;
+		for (const [ k, w ] of TRAIT_ODDS[pl.pos] || []) { acc += w; if (h < acc) { return k; } }
+		return "";
+	}
+	const traitOf = pl => (pl && typeof pl.trait === "string" && (pl.trait === "" || TRAITS[pl.trait]) ? pl.trait : pl ? traitFor(pl) : "");
+	const traitName = k => (TRAITS[k] ? TRAITS[k][0] : "");
 	// Fill in whatever a player is missing (old saves, generated players). Never changes a set field.
 	function ensurePlayer (pl) {
 		if (!pl || typeof pl !== "object") { return pl; }
@@ -1657,6 +1679,7 @@
 		if (!Number.isFinite(pl.pot)) { pl.pot = clamp(ovrOf(pl) + Math.max(0, 27 - pl.age) * 1.5 + ((h >>> 16) % 6), ovrOf(pl), 94); }
 		if (!ROLES[pl.role]) { pl.role = ""; }   // "" = picked for him from his standing in the squad
 		if (!Number.isFinite(pl.adapt)) { pl.adapt = 0; }
+		if (typeof pl.trait !== "string" || (pl.trait && !TRAITS[pl.trait])) { pl.trait = traitFor(pl); }
 		return pl;
 	}
 	const roleOf = (pl, c) => {
@@ -1949,8 +1972,10 @@
 	}
 	let possFrames = [ 0, 0 ];
 	// Counts for the test harness and the match report: both sides, counted where they happen.
-	const newTally = () => ({ shots: [ 0, 0 ], heads: [ 0, 0 ], headGoals: [ 0, 0 ], corners: [ 0, 0 ], cornerGoals: [ 0, 0 ], claims: [ 0, 0 ], punches: [ 0, 0 ], crosses: [ 0, 0 ], clears: [ 0, 0 ], goals: [ 0, 0 ], offsides: [ 0, 0 ], fks: [ 0, 0 ], fkGoals: [ 0, 0 ], pens: [ 0, 0 ], penGoals: [ 0, 0 ], spills: [ 0, 0 ], indirect: 0, walks: 0, tight: 0, carry: [ [], [] ], dribbleShots: [ 0, 0 ], air: { none: 0, attWin: 0, defWin: 0, noAct: 0 } });
+	const newTally = () => ({ shots: [ 0, 0 ], heads: [ 0, 0 ], headGoals: [ 0, 0 ], corners: [ 0, 0 ], cornerGoals: [ 0, 0 ], claims: [ 0, 0 ], punches: [ 0, 0 ], crosses: [ 0, 0 ], clears: [ 0, 0 ], goals: [ 0, 0 ], offsides: [ 0, 0 ], fks: [ 0, 0 ], fkGoals: [ 0, 0 ], pens: [ 0, 0 ], penGoals: [ 0, 0 ], spills: [ 0, 0 ], indirect: 0, walks: 0, tight: 0, by: {}, carry: [ [], [] ], dribbleShots: [ 0, 0 ], air: { none: 0, attWin: 0, defWin: 0, noAct: 0 } });
 	let tally = newTally(), cornerAt = [ -9999, -9999 ];
+	// Per-player counts for the test harness (headers won, runs, tackles), keyed team-index.
+	const tallyBy = (p, k) => { const key = `${p.team}-${p.idx}`, o = tally.by[key] || (tally.by[key] = {}); o[k] = (o[k] || 0) + 1; };
 
 	/* ---------- momentum ----------
 	   -1 (CPU on top) .. +1 (you on top). Keeping the ball builds it; tackles,
@@ -2403,7 +2428,7 @@
 			card.append(el("div", "cc-line", `Danger man ${fw.name} (SHO ${fw.sho}) · Rock ${df.name} (DEF ${df.def})`));
 			if (openClub === id) {
 				const ol = el("ol");
-				sq.forEach(q => { const li = el("li"); li.append(el("span", "pos", POS_LABEL[q.pos]), el("span", "", q.name), el("span", "", String(ovrOf(q)))); ol.append(li); });
+				sq.forEach(q => { const li = el("li"), tk = traitOf(q); li.append(el("span", "pos", POS_LABEL[q.pos]), el("span", "", q.name + (tk ? ` · ${traitName(tk)}` : "")), el("span", "", String(ovrOf(q)))); ol.append(li); });
 				card.append(ol);
 			}
 			const toggle = () => { openClub = openClub === id ? null : id; renderClubs(); };
@@ -2472,6 +2497,7 @@
 			else if (pl.ycount > 0) { nameTd.append(el("span", "oop", `${pl.ycount} yellow${pl.ycount === 1 ? "" : "s"}`)); }
 			if (pl.goals > 0) { nameTd.append(el("span", "gls", `${pl.goals} goal${pl.goals === 1 ? "" : "s"}`)); }
 			ensurePlayer(pl);
+			if (pl.trait) { const tg = el("span", "trait", traitName(pl.trait)); tg.title = TRAITS[pl.trait][1]; nameTd.append(tg); }
 			nameTd.append(el("span", "meta", `${pl.age} · ${pl.nat}`));
 			if (pl.morale < 45) { nameTd.append(el("span", "inj", "unhappy")); }
 			if (pl.adapt > 0) { nameTd.append(el("span", "oop", "settling in")); }
@@ -2551,7 +2577,7 @@
 			ensurePlayer(pl);
 			const ask = askOf(pl), tgt = signingTarget(pl.pos), out = tgt.out, rr = ratingRange(pl), ok = permitOk(pl), talks = pl.bids >= 0 || pl.bids === undefined;
 			const li = el("li");
-			li.append(el("span", "pos", POS_LABEL[pl.pos]), el("span", "who", `${pl.name} · ${pl.age} · ${pl.nat}`));
+			li.append(el("span", "pos", POS_LABEL[pl.pos]), el("span", "who", `${pl.name} · ${pl.age} · ${pl.nat}${pl.trait ? ` · ${traitName(pl.trait)}` : ""}`));
 			const btns = el("span", "bids");
 			const b = el("button", "", `Bid ${money(ask)}`);
 			b.type = "button"; b.disabled = !ok || !talks || c.budget + 1e-9 < ask || c.budget < 0;
@@ -3349,17 +3375,20 @@
 				: cpu ? { pac: cpu.pac, sho: cpu.sho, pas: cpu.pas, def: cpu.def } : null;
 			p.name = p.team === 0 && club ? club.squad[slots[p.idx]].name : cpu ? cpu.name : "";
 			const pl = p.team === 0 && club ? club.squad[slots[p.idx]] : cpu;
+			ensureTraitP(p, pl || (p.team === 0 && !club ? { name: `you${p.idx}`, pos: FMT.roles[p.idx] } : null));
 			p.sta = p.team === 0 && club ? clamp(fitOf(pl) / 100, 0.45, 1) : 0.96 + Math.random() * 0.04;
 			p.endure = pl ? endureOf(pl) : 1; p.nudged = false;
 		});
 	}
 	const A = (p, k) => (p && p.attr ? p.attr[k] : 65);
+	const tr = (p, k) => !!p && p.trait === k;
+	function ensureTraitP (p, pl) { p.trait = pl ? traitOf(pl) : ""; }
 	// Young legs last longer; a good fitness coach helps yours a little more.
 	const endureOf = pl => { const a = Number.isFinite(pl.age) ? pl.age : 26; const fc = league && league.club && [ ...league.club.squad, ...league.club.bench ].includes(pl) ? staffLvl(league.club, "fitness") * 0.025 : 0; return (a <= 23 ? 0.9 : a <= 29 ? 1 : a <= 32 ? 1.1 : 1.2) - fc; };
 	const paceMul = p => 1 + (A(p, "pac") - 65) * 0.0025;
 	const defMul = p => 1 + (A(p, "def") - 65) * 0.012;
 	// Poor passers drift a little off target, and everyone does in the rain.
-	const passErr = p => (Math.max(0, 70 - A(p, "pas")) * 0.6 + cond.wet * 5) * (style[p.team] === "possession" ? 0.6 : 1) * (1 - 0.25 * edge(p.team)) + 22 * edge(1 - p.team) + 26 * Math.max(0, 0.75 - staOf(p));
+	const passErr = p => (Math.max(0, 70 - A(p, "pas")) * 0.6 + cond.wet * 5) * (style[p.team] === "possession" ? 0.6 : 1) * (1 - 0.25 * edge(p.team)) + 22 * edge(1 - p.team) + 26 * Math.max(0, 0.75 - staOf(p)) - (tr(p, "playmaker") ? 9 : 0);
 
 	// A keeper with the ball in hands inside their own area.
 	const KEEPER_CLEAR = 70;
@@ -3691,7 +3720,7 @@
 	function passTo (p, m) {
 		notePass(p);
 		// A rattled side's passes stray (yours a little, the computer-run ones more).
-		const err = p.team === 0 && players.indexOf(p) === ctrl ? passErr(p) : 45 * edge(1 - p.team) + cond.wet * 8 + 30 * Math.max(0, 0.75 - staOf(p));
+		const err = Math.max(0, p.team === 0 && players.indexOf(p) === ctrl ? passErr(p) : (45 * edge(1 - p.team) + cond.wet * 8 + 30 * Math.max(0, 0.75 - staOf(p))) * (tr(p, "playmaker") ? 0.55 : 1));
 		const lx = m.x + m.vx * 10 + (Math.random() * 2 - 1) * err;
 		const ly = m.y + m.vy * 10 + (Math.random() * 2 - 1) * err;
 		const d = Math.hypot(lx - ball.x, ly - ball.y);
@@ -3852,7 +3881,7 @@
 		const fwds = ahead.filter(m => m.role === "fwd");
 		let best = null, bs = -Infinity;
 		for (const m of fwds.length ? fwds : ahead) {
-			const s = m.x / FW + openness(m) / 300 - (offsideOn() && isOffside(m, offsideLine(0)) ? 1 : 0);
+			const s = m.x / FW + openness(m) / 300 - (offsideOn() && isOffside(m, offsideLine(0)) ? 1 : 0) + (tr(m, "target") ? 0.25 : 0);
 			if (s > bs) { bs = s; best = m; }
 		}
 		return best;
@@ -3963,7 +3992,7 @@
 		return ball.x > FW - 650 * Math.sqrt(S) && Math.abs(off) < 1.0;
 	}
 	function shotSpread (p, power) {
-		return (6 + power * 18 + 22 * edge(1) + Math.max(0, 65 - A(p, "sho")) * 0.4 + 30 * Math.max(0, 0.75 - staOf(p))) * GH;
+		return (6 + power * 18 + 22 * edge(1) + Math.max(0, 65 - A(p, "sho")) * 0.4 + 30 * Math.max(0, 0.75 - staOf(p))) * GH * (tr(p, "poacher") && inAttackBox(p) ? 0.75 : 1);
 	}
 
 	function humanShootPress () {
@@ -4261,8 +4290,8 @@
 				if (s > bs) { bs = s; best = { p, run: { kind, x: q.x, y: q.y, until: frame + 90 + Math.floor(Math.random() * 60) } }; }
 			};
 			// In behind: a forward, or an attacking midfielder once the ball is over halfway.
-			if ((p.role === "fwd" || p.cam || (p.role === "mid" && cr > FW * 0.5)) && pr > cr - 80 * S && cr > FW * 0.3) {
-				consider("behind", Math.max(line - 6, pr + 110 * S, cr + 90 * S), p.y + (p.y - c.y) * 0.3, p.role === "fwd" ? 0.5 : 0.2);
+			if ((p.role === "fwd" || p.cam || tr(p, "pace") || (p.role === "mid" && cr > FW * 0.5)) && pr > cr - 80 * S && cr > FW * 0.3) {
+				consider("behind", Math.max(line - 6, pr + 110 * S, cr + 90 * S), p.y + (p.y - c.y) * 0.3, (p.role === "fwd" ? 0.5 : 0.2) + (tr(p, "pace") ? 0.55 : 0) - (tr(p, "target") ? 0.3 : 0));
 			}
 			// Overlap: a wide player on the carrier's flank goes round the outside of him.
 			if (wide && isWide(c.y, 0.18) && Math.sign(c.y - FH / 2) === Math.sign(p.by - FH / 2) && pr < cr + 40 && cr > FW * 0.35 && style[t] !== "counter") {
@@ -4273,7 +4302,7 @@
 				consider("pocket", cr + 120 * S, FH / 2 + (p.by - FH / 2) * 0.5 + (c.y < FH / 2 ? 70 : -70) * root, 0.1);
 			}
 		}
-		if (best) { best.p.run = best.run; }
+		if (best) { best.p.run = best.run; tallyBy(best.p, best.run.kind); }
 	}
 
 	// Where a player without the ball wants to be, and why (the kind). One idea at a time.
@@ -4324,7 +4353,13 @@
 	// rather than snapping the target across the pitch and turning him on the spot.
 	const BLEND = 45;
 	function formationTarget (p) {
-		const [ x, y, kind ] = rawFormationTarget(p);
+		let [ x, y, kind ] = rawFormationTarget(p);
+		// A poacher hangs on the last defender's shoulder in the box whenever his side has it up there.
+		if (tr(p, "poacher") && !p.run && (ball.owner ? ball.owner.team === p.team : possTeam === p.team) && rel(p.team, ball.x) > FW * 0.5) {
+			const line = offsideOn() ? offsideLine(p.team) - 10 : FW - FMT.box * 0.5, rr = Math.min(line, FW - FMT.box * 0.45);
+			const px = p.team === 0 ? rr : FW - rr, py = FH / 2 + clamp(y - FH / 2, -FMT.goal * 0.6, FMT.goal * 0.6);
+			x += (px - x) * 0.85; y += (py - y) * 0.85; kind = "poach";
+		}
 		if (p.tKind !== kind) {
 			const recent = p.tRaw && frame - p.tRawF <= 2;
 			p.tFrom = recent ? p.tRaw : p.tx !== undefined ? [ p.tx, p.ty ] : null;
@@ -4369,14 +4404,15 @@
 		// A cross dropping into his area: come and claim it if he can get there first.
 		if (!ball.owner && lastTouch !== p.team && (ball.z > 6 || ball.vz > 0) && !ball.shot && ball.landT > 0) {
 			const lr = rel(p.team, ball.landX), ly = Math.abs(ball.landY - FH / 2);
-			if (lr < FMT.box * (shoot ? 0.38 : 0.6) && ly < FMT.goal / 2 + FMT.box * (shoot ? 0.2 : 0.4)) {
+			if (lr < FMT.box * (shoot ? 0.38 : tr(p, "sweeper") ? 0.78 : 0.6) && ly < FMT.goal / 2 + FMT.box * (shoot ? 0.2 : 0.4)) {
 				const reach = (ball.landT + 10) * BASE_SPD * 1.15;
 				if (Math.hypot(ball.landX - p.x, ball.landY - p.y) < reach) { p.claiming = frame; return [ ball.landX, ball.landY ]; }
 			}
 		}
 		const loose = !ball.owner;
 		const r = rel(p.team, ball.x);
-		if (loose && r < 150 * GH && Math.abs(ball.y - FH / 2) < 170 * GH) {
+		const sweeperK = tr(p, "sweeper");
+		if (loose && r < (sweeperK ? 270 : 150) * GH && Math.abs(ball.y - FH / 2) < (sweeperK ? 260 : 170) * GH) {
 			const mates = team(p.team);
 			const nearest = mates.reduce((a, b) => (dist(a, ball) < dist(b, ball) ? a : b));
 			if (nearest === p) { return [ ball.x, ball.y ]; }
@@ -4388,12 +4424,13 @@
 			const gxl = p.team === 0 ? 0 : FW, db = Math.hypot(ball.x - gxl, ball.y - FH / 2) || 1, R = 420 * Math.sqrt(S);
 			if (db < R) {
 				const between = players.some(q => q.team === p.team && q.role !== "gk" && rel(p.team, q.x) < rel(p.team, carrier.x) - 8 && Math.abs(q.y - carrier.y) < 70 * Math.sqrt(S));
-				const rush = !between && db < 240 * Math.sqrt(S) && Math.abs(ball.y - FH / 2) < FMT.goal / 2 + FMT.box * 0.6;
-				const out = rush ? Math.min(db * 0.6, 120 * GH) : 22 + clamp((R - db) * 0.1, 0, 40 * GH);
+				const rush = !between && db < (sweeperK ? 310 : 240) * Math.sqrt(S) && Math.abs(ball.y - FH / 2) < FMT.goal / 2 + FMT.box * (sweeperK ? 0.9 : 0.6);
+				const out = rush ? Math.min(db * 0.6, (sweeperK ? 170 : 120) * GH) : 22 + clamp((R - db) * 0.1, 0, 40 * GH);
 				return [ gxl + (ball.x - gxl) / db * out, FH / 2 + (ball.y - FH / 2) / db * out * 0.85 ];
 			}
 		}
-		const sweep = mentality[p.team] >= 2 ? 70 * S : 0;   // all-out attack: the keeper plays as a sweeper
+		// All-out attack, or a sweeper keeper with his side on the ball: he stands well off his line.
+		const sweep = mentality[p.team] >= 2 ? 70 * S : sweeperK && (ball.owner ? ball.owner.team === p.team : possTeam === p.team) ? 85 * S : sweeperK ? 30 * S : 0;
 		const x = p.team === 0 ? ownLine + 22 + sweep : ownLine - 22 - sweep;
 		const y = FH / 2 + clamp((ball.y - FH / 2) * 0.45, -54 * GH, 54 * GH);
 		return [ x, y ];
@@ -4484,15 +4521,15 @@
 			if (keeper && dg < 330 * range && dg > 110 * range && rel(keeper.team, keeper.x) > 55 * GH && dist(keeper, p) < dg * 0.75 && Math.random() < 0.3) { chipShot(p); return null; }
 			if (dg < 170 * range || (dg < 270 * range && Math.random() < 0.35) || longShot) {
 				// Better finishers are more accurate and hit it harder.
-				const fin = clamp(1.3 - (A(p, "sho") - 50) / 100, 0.6, 1.4) + Math.max(0, 0.75 - staOf(p)) * 0.8;
+				const fin = (clamp(1.3 - (A(p, "sho") - 50) / 100, 0.6, 1.4) + Math.max(0, 0.75 - staOf(p)) * 0.8) * (tr(p, "poacher") && inAttackBox(p) ? 0.7 : 1);
 				const aim = FH / 2 + ((Math.random() * 2 - 1) * 42 + (Math.random() * 2 - 1) * (cfg.spread + 45 * edge(1 - p.team)) * fin) * GH;
 				shootAt(p, clamp(0.55 + Math.random() * 0.45 + (A(p, "sho") - 65) * 0.004, 0.4, 1), aim);
 				return null;
 			}
 			// A forward timing a run on the offside line: slide a through ball into the space behind.
-			if (offsideOn() && Math.random() < (style[p.team] === "possession" ? 0.15 : style[p.team] === "balanced" ? 0.3 : 0.45) + 0.12 * edge(p.team) && openness(p) > 45) {
+			if (offsideOn() && Math.random() < (style[p.team] === "possession" ? 0.15 : style[p.team] === "balanced" ? 0.3 : 0.45) + 0.12 * edge(p.team) + (tr(p, "playmaker") ? 0.2 : 0) && openness(p) > 45) {
 				const line = offsideLine(p.team);
-				const runner = outfield(p.team).filter(m => m !== p && m.role === "fwd" && !isOffside(m, line) && line - rel(p.team, m.x) < 90 &&
+				const runner = outfield(p.team).filter(m => m !== p && (m.role === "fwd" || tr(m, "pace")) && !isOffside(m, line) && line - rel(p.team, m.x) < 90 &&
 					rel(p.team, m.x) > rel(p.team, p.x) + 40).sort((a, b) => openness(b) - openness(a))[0];
 				if (runner) {
 					const [ lx, ly ] = leadPoint(p, runner);
@@ -4506,9 +4543,9 @@
 			}
 			// Now and then a defender or midfielder hits one over the top to a forward.
 			const longRate = { possession: 0.015, balanced: 0.05, direct: 0.12, counter: 0.1 }[style[p.team]];
-			if ((p.role === "def" || p.role === "mid") && Math.random() < longRate) {
+			if ((p.role === "def" || p.role === "mid") && Math.random() < longRate * (tr(p, "playmaker") ? 1.6 : 1) * (outfield(p.team).some(m => tr(m, "target")) ? 1.4 : 1)) {
 				const f = outfield(p.team).filter(m => m.role === "fwd" && rel(p.team, m.x) - rel(p.team, p.x) > 300)
-					.sort((a, b) => openness(b) - openness(a))[0];
+					.sort((a, b) => (openness(b) + (tr(b, "target") ? 70 : 0)) - (openness(a) + (tr(a, "target") ? 70 : 0)))[0];
 				if (f) {
 					const [ lx, ly ] = leadPoint(p, f);
 					const err = (30 + 60 * edge(1 - p.team)) * (style[p.team] === "direct" || style[p.team] === "counter" ? 0.6 : 1);
@@ -4523,7 +4560,7 @@
 				for (const m of outfield(p.team)) {
 					if (m === p) { continue; }
 					const d = dist(p, m);
-					if (d < 70 || d > 460 * Math.sqrt(S)) { continue; }
+					if (d < 70 || d > (tr(p, "playmaker") ? 620 : 460) * Math.sqrt(S)) { continue; }
 					const adv = (rel(p.team, m.x) - rel(p.team, p.x)) / 300 * (style[p.team] === "possession" ? 0.5 : style[p.team] === "balanced" ? 1 : 1.6);
 					const s = adv + openness(m) / 120 - d / (style[p.team] === "possession" ? 400 : 800);
 					if (offsideOn() && isOffside(m, offsideLine(p.team))) { continue; }
@@ -4862,7 +4899,7 @@
 				p.sprintAmt = (p.sprintAmt || 0) * 0.88;
 				if (Number.isFinite(p.sprintFuel)) { p.sprintFuel = Math.min(1, p.sprintFuel + SPRINT_FILL); p.sprintOut = p.sprintOut && p.sprintFuel < 0.25; }
 			}
-			const spdMul = (p.team === 1 ? diff.spd : 1) * (ball.owner === p ? 0.88 : 1) * (p.injured ? 0.8 : 1) * mood(p.team, 0.07) * paceMul(p) * cond.speed * (0.8 + 0.2 * staOf(p));
+			const spdMul = (p.team === 1 ? diff.spd : 1) * (ball.owner === p ? 0.88 : 1) * (p.injured ? 0.8 : 1) * mood(p.team, 0.07) * paceMul(p) * cond.speed * (0.8 + 0.2 * staOf(p)) * (tr(p, "pace") ? 1.05 : 1);
 
 			// The receiver runs onto the pass by itself; the arrows take over on the first touch.
 			if (p === receiver && !ball.owner) {
@@ -4960,7 +4997,7 @@
 			}
 			const carrier = ball.owner;
 			if (carrier && carrier.team !== p.team && p.role !== "gk" && !inHands(carrier) && !(p.slideCd > 0) && dist(p, carrier) < 42 &&
-				!(carrier.team === 0 && frame - (carrier.gotAt || 0) < 22) && Math.random() < 0.008 * defMul(p) * (p.role === "def" ? 1.4 : 1) * TACKLE_FX[tackling[p.team]].slide) {
+				!(carrier.team === 0 && frame - (carrier.gotAt || 0) < 22) && Math.random() < 0.008 * defMul(p) * (p.role === "def" ? 1.4 : 1) * TACKLE_FX[tackling[p.team]].slide * (tr(p, "winner") ? 1.6 : 1)) {
 				p.dir = Math.atan2(carrier.y + carrier.vy * 6 - p.y, carrier.x + carrier.vx * 6 - p.x);
 				p.slideAI = 12;
 				p.slideCd = 120;
@@ -5649,7 +5686,7 @@
 			b.setAttribute("aria-pressed", String(subPick.off === p));
 			const tired = p.role !== "gk" && staOf(p) < TIRED_STA;
 			const left = el("span", p.injured ? "hurt" : tired ? "tired" : "", `${p.injured ? "✚ " : tired ? "▽ " : ""}${p.name || "Player"}`);
-			b.append(left, el("small", "", `${POS_LABEL[p.role] || ""} · ${Math.round(staOf(p) * 100)}% legs${p.yellow ? " · booked" : ""}${p.injured ? " · injured" : tired ? " · tired" : ""}`));
+			b.append(left, el("small", "", `${POS_LABEL[p.role] || ""}${p.trait ? ` · ${traitName(p.trait)}` : ""} · ${Math.round(staOf(p) * 100)}% legs${p.yellow ? " · booked" : ""}${p.injured ? " · injured" : tired ? " · tired" : ""}`));
 			b.addEventListener("click", () => { subPick.off = subPick.off === p ? null : p; renderSubs(); });
 			offCol.append(b);
 		}
@@ -5659,7 +5696,7 @@
 			const b = el("button");
 			b.type = "button";
 			b.setAttribute("aria-pressed", String(subPick.on === pl));
-			b.append(el("span", "", pl.name), el("small", "", `${POS_LABEL[pl.pos]} · ${ovrNow(pl)} · ${fitOf(pl)}%`));
+			b.append(el("span", "", pl.name), el("small", "", `${POS_LABEL[pl.pos]} · ${ovrNow(pl)}${traitOf(pl) ? ` · ${traitName(traitOf(pl))}` : ""} · ${fitOf(pl)}%`));
 			b.addEventListener("click", () => { subPick.on = subPick.on === pl ? null : pl; renderSubs(); });
 			onCol.append(b);
 		}
@@ -6026,7 +6063,9 @@
 			if (near > (sliding ? 28 : 23)) { continue; }
 			// Staying tight to the carrier wins the ball back over time; a slide wins it fast.
 			let chance = (q.team === 1 ? diff.tackle : isHuman ? (pressHeld || touchPress || padPressBtn ? 0.045 : 0.035) : 0.022) * mood(q.team, 0.4) * defMul(q) * (isHuman ? 1 : TACKLE_FX[tackling[q.team]].win) * (0.8 + 0.2 * staOf(q));
-			if (sliding) { chance = 0.3 * defMul(q); }
+			if (tr(q, "winner")) { chance *= 1.4; }
+			if (tr(o, "target") && !sliding) { chance *= 0.7; }
+			if (sliding) { chance = 0.3 * defMul(q) * (tr(q, "winner") ? 1.2 : 1); }
 			if (settling && q.team === 1) { chance *= sliding ? 0.5 : 0.15; }
 			const won = Math.random() < chance;
 			// A slide that arrives and misses the ball takes the man instead, from behind most of all.
@@ -6042,6 +6081,7 @@
 			{
 				o.kickCd = 40;
 				gainBall(q);
+				tallyBy(q, "tackle");
 				swing(q.team, 0.08);
 				if (isHuman) { burst(q.x, q.y, "Won it"); sfx("tackle"); stats.tackles++; } else if (q.team === 1) { oppStats.tackles++; } else { stats.aiTackles = (stats.aiTackles || 0) + 1; }
 				crowdReact("tackle", q.team);
@@ -6164,7 +6204,7 @@
 		}
 		if (!a) { if (ball.z < 30 && ball.landT < 3) { tally.air.none++; } return false; }
 		// Attacking a ball is easier than defending it: the runner knows where he's going.
-		const air = (p, d) => (24 - d) * 0.5 + (Math.max(A(p, "def"), A(p, "sho")) - 65) * 0.08 + Math.random() * 6 + (p.team === lastTouch ? (shoot ? 3.5 : 1.5) : 0);
+		const air = (p, d) => (24 - d) * 0.5 + (Math.max(A(p, "def"), A(p, "sho")) - 65) * 0.08 + Math.random() * 6 + (p.team === lastTouch ? (shoot ? 3.5 : 1.5) : 0) + (tr(p, "target") ? 5 : 0);
 		let w = a, l = b && b.team !== a.team && db < 28 ? b : null;
 		if (l && air(l, db) > air(a, da)) { w = l; l = a; }
 		const isYou = w.team === 0 && players.indexOf(w) === ctrl;
@@ -6180,6 +6220,7 @@
 		}
 		if (!act) { tally.air.noAct++; return false; }
 		if (w.team === lastTouch) { tally.air.attWin++; } else { tally.air.defWin++; }
+		tallyBy(w, "air");
 		headIntent = null;
 		if (l) {
 			l.jump = JUMP; l.kickCd = 26;   // beaten in the air, he comes down a step behind
