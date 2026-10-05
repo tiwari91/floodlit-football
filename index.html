@@ -3855,6 +3855,7 @@
 
 	function update () {
 		frame++;
+		stepReplay();
 		for (const p of players) { if (p.fall > 0) { p.fall--; } if (p.dive > 0) { p.dive--; } if (p.diveCd > 0) { p.diveCd--; } if (p.throwA > 0) { p.throwA--; } }
 		if (flagCall && --flagCall.t <= 0) { flagCall = null; }
 		// The crowd gets louder as the ball nears either goal, and goes up for goals.
@@ -4260,7 +4261,7 @@
 	// with their heads down while their keeper fetches the ball out of the net. Then everyone jogs
 	// back for the restart. Seven seconds, or any key or tap to get on with it.
 	let celeb = null;
-	const celebTracking = () => state === "goal" && celeb && goalTimer < GOAL_CELEB - 45;   // the camera is on the scorer
+	const celebTracking = () => state === "goal" && celeb && celeb.t > 45 && !replayOn();   // the camera is on the scorer
 	function celebrate () {
 		const C = celeb;
 		if (!C) { return; }
@@ -4268,7 +4269,7 @@
 		const T = C.t, hero = C.hero, sc = lastScorer;
 		const kneeling = C.kneelAt >= 0 && T - C.kneelAt < 70;
 		if (C.kneelAt >= 0 && T === C.kneelAt + 1 && sc === homeSide) { roar(0.7); }   // the slide brings the fans up again
-		const home = T > 300;   // back for the restart
+		const home = T > 300 + (C.rp || 0);   // back for the restart (later when there is a replay first)
 		for (const p of players) {
 			let tx = p.x, ty = p.y, spd = 0, acc = ACC_AI;
 			const scored = p.team === sc;
@@ -4317,7 +4318,7 @@
 		}
 	}
 	function skipCelebration () {
-		if (state === "goal" && goalTimer > 70 && goalTimer < GOAL_CELEB - 20) { goalTimer = 70; }
+		if (state === "goal" && goalTimer > 70 && celeb && celeb.t > 20) { goalTimer = 70; }   // (the replay too)
 	}
 
 	function goalScored (scorer) {
@@ -4338,13 +4339,13 @@
 		ball.owner = null;
 		charging = false;
 		state = "goal";
-		goalTimer = GOAL_CELEB;
+		goalTimer = GOAL_CELEB + cueReplay(scorer);
 		{
 			const side = outfield(scorer);
 			const hero = ball.lastBy && ball.lastBy.team === scorer ? ball.lastBy : side[side.length - 1] || team(scorer)[0];
 			// He heads for the corner flag, but not a marathon: at most 260 units, so his teammates can catch him.
 			const cx = scorer === 0 ? FW - 70 : 70, cy = hero.y < FH / 2 ? 44 : FH - 44, dx = cx - hero.x, dy = cy - hero.y, L = Math.hypot(dx, dy) || 1, run = Math.min(L, 260);
-			celeb = { t: 0, hero, target: [ hero.x + dx / L * run, hero.y + dy / L * run ], kneelAt: -1, fetched: false };
+			celeb = { t: 0, hero, target: [ hero.x + dx / L * run, hero.y + dy / L * run ], kneelAt: -1, fetched: false, rp: goalTimer - GOAL_CELEB };
 			for (const p of players) { p.kneel = 0; p.sulk = 0; }
 			banner.textContent = ball.headed && ball.lastBy && ball.lastBy.team === scorer ? (scorer === 0 ? "Header! Goal" : `Header! ${opp.short} score`) : scorer === 0 ? "Goal" : `${opp.short} score`;
 			const by = ball.lastBy, own = by && by.team !== scorer, who = own ? by : hero;
@@ -6815,7 +6816,11 @@
 		}
 	}
 
+	const replayTagEl = $("replayTag");
 	function drawScene () {
+		// The REPLAY tag over the picture while one runs (and no GOAL banner over the replay).
+		const rp = camMode === "3d" && replayOn();
+		if (replayTagEl && replayTagEl.hidden === rp) { replayTagEl.hidden = !rp; if (rp) { banner.hidden = true; } }
 		if (camMode === "3d" && drawScene3D()) { return; }   // while three.js loads, the TV camera stands in
 		if ((camMode === "tv" || camMode === "3d") && !benchCam()) { drawSceneTV(); return; }
 		drawSceneTop();
@@ -8500,6 +8505,7 @@
 			}
 			introSweep = null;
 		}
+		if (replayOn()) { return replayShot(out); }
 		const sw = endsSwapped(), WX = x => (sw ? FW - x : x);
 		const o = ball.owner;
 		if (celebTracking()) {
@@ -8576,6 +8582,7 @@
 		G3.ballShadow.position.set(bx + 2 + h * 0.06, 0.3, bz + 1.5 + h * 0.04);
 		G3.ballShadow.scale.set(4.5 * sh + 2, 1, 4.5 * sh + 2);
 		G3.ballShadow.material.opacity = 0.3 * sh + 0.08;
+		if (G3.shot.startsWith("replay")) { for (const m of Object.values(G3.marks)) { m.visible = false; } return; }   // a clean picture for the replay
 		// The markers on the grass.
 		const mk = G3.marks, me = human(), playing = state === "play" && freeze <= 0;
 		const isHuman = me && state !== "intro";
@@ -8637,6 +8644,7 @@
 		ctx.setTransform(1, 0, 0, 1, 0, 0);
 		ctx.clearRect(0, 0, canvas.width, canvas.height);
 		ctx.setTransform(scale, 0, 0, scale, 0, 0);
+		if (replayOn()) { drawRain(); return; }
 		const me = human(), playing = state === "play" && freeze <= 0;
 		ctx.textAlign = "center"; ctx.textBaseline = "middle";
 		for (const p of players) {
@@ -8770,9 +8778,10 @@
 		// Keep the 2D cameras' target moving too, so a switch back is smooth (and the minimap frame is right).
 		const [ tx, ty ] = camTarget(), ease = reduceMotion ? 1 : 1 - Math.exp(-frameDt / 190);
 		camX += (tx - camX) * ease; camY += (ty - camY) * ease;
+		let restore = null;
 		try {
-			sync3D();
-			G3.renderer.render(G3.scene, G3.cam);
+			if (replayOn()) { restore = applyReplay(); }
+			try { sync3D(); G3.renderer.render(G3.scene, G3.cam); } finally { if (restore) { restore(); } }
 			hud3D();
 			if (threeToldLoading) { threeToldLoading = false; fx = fx.filter(f => !(f.toast && f.label === "Loading 3D view")); }
 		} catch (e) {
@@ -8787,6 +8796,100 @@
 	function snapshotPrev () {
 		for (const p of players) { p.px = p.x; p.py = p.y; p.pdir = p.dir; p.pstride = p.stride; }
 		if (ball) { ball.px = ball.x; ball.py = ball.y; ball.pz = ball.z; }
+	}
+
+	/* ---------- the replay ----------
+	   The last few seconds of play are kept: every player's position and pose, the ball and the
+	   officials. After a goal in the 3D view, the celebration gives way to an instant replay of the
+	   build-up, in slow motion, from another angle (high behind the goal, or low at the side of it),
+	   then back to the scorer and the restart. Any key or tap skips it, as it does the celebration.
+	   The match clock is stopped throughout, as it is for any goal. */
+	const REC_F = [ "x", "y", "dir", "stride", "runAmt", "vx", "vy", "kickA", "kickPow", "jump", "slideAI", "fall", "dive", "diveSide", "throwA", "idlePh", "shuf", "celebA", "kneel", "sulk" ];
+	const REC_N = 300, REC_P = 24, REC_W = REC_P * REC_F.length + 5 + 15;   // frames kept, players, floats a frame
+	const REPLAY_AT = 230, REPLAY_BEFORE = 150, REPLAY_AFTER = 28, REPLAY_SPEED = 0.64;
+	const REPLAY_FR = Math.round((REPLAY_BEFORE + REPLAY_AFTER) / REPLAY_SPEED);   // frames on screen
+	const rec = { buf: null, who: new Array(REC_N), head: 0, n: 0 };
+	let replay = null;   // { end, len, left (frames still to record), angle, goalX, shotY }
+	function recordFrame () {
+		if (!rec.buf) { rec.buf = new Float32Array(REC_N * REC_W); }
+		const b = rec.buf, o0 = rec.head * REC_W, NF = REC_F.length;
+		rec.who[rec.head] = players;
+		for (let i = 0; i < players.length && i < REC_P; i++) {
+			const p = players[i], o = o0 + i * NF;
+			for (let k = 0; k < NF; k++) { b[o + k] = +p[REC_F[k]] || 0; }
+			if (p.lunge > 0 && i === ctrl) { b[o + 10] = 1; }   // your slide shows as a slide
+		}
+		const ob = o0 + REC_P * NF;
+		b[ob] = ball.x; b[ob + 1] = ball.y; b[ob + 2] = ball.z || 0; b[ob + 3] = ball.vx; b[ob + 4] = ball.vy;
+		officials3.forEach((f, k) => { const q = ob + 5 + k * 5; b[q] = f.x; b[q + 1] = f.y; b[q + 2] = f.dir; b[q + 3] = f.stride; b[q + 4] = f.runAmt; });
+		rec.head = (rec.head + 1) % REC_N;
+		rec.n = Math.min(REC_N, rec.n + 1);
+	}
+	// Called every simulated frame: keep recording during play, and for a moment after a goal (the
+	// ball into the net), then hold the clip.
+	function stepReplay () {
+		if (state === "play") { recordFrame(); return; }
+		if (state === "goal" && replay && replay.left > 0) {
+			recordFrame();
+			if (--replay.left === 0) { replay.end = (rec.head - 1 + REC_N) % REC_N; replay.len = Math.min(rec.n, REPLAY_BEFORE + REPLAY_AFTER); }
+		}
+	}
+	// A goal: plan a replay if the 3D view is on and there is enough of the build-up to show.
+	function cueReplay (scorer) {
+		replay = null;
+		if (camMode !== "3d" || !G3.renderer || threeFailed || rec.n < 60 || mode === "tutorial") { return 0; }
+		replay = { left: REPLAY_AFTER, end: -1, len: 0, angle: (score[0] + score[1]) % 2, goalX: scorer === 0 ? FW : 0, shotY: ball.y };
+		return REPLAY_FR;
+	}
+	const replayOn = () => !!(replay && replay.len > 0 && state === "goal" && celeb && celeb.t >= REPLAY_AT && celeb.t < REPLAY_AT + REPLAY_FR && goalTimer > 70 && camMode === "3d");
+	// Where the clip is: a fractional frame, 0 at the start.
+	const replayPos = () => clamp((celeb.t - REPLAY_AT) * REPLAY_SPEED, 0, replay.len - 1.001);
+	// Put the recorded moment onto the players, the ball and the officials for drawing; returns
+	// the function that puts everything back.
+	function applyReplay () {
+		const f = replayPos(), i0 = Math.floor(f), t = f - i0, NF = REC_F.length, b = rec.buf;
+		const row = k => (replay.end - (replay.len - 1 - k) + REC_N * 2) % REC_N;
+		const r0 = row(i0), r1 = row(Math.min(replay.len - 1, i0 + 1)), who = rec.who[r0] || players;
+		const keep = [], keepPlayers = players, keepCtrl = ctrl;
+		const lerpA = (a, c) => a + Math.atan2(Math.sin(c - a), Math.cos(c - a)) * t;
+		who.forEach((p, i) => {
+			if (i >= REC_P) { return; }
+			const saved = {};
+			for (const k of REC_F) { saved[k] = p[k]; }
+			saved.lunge = p.lunge; keep.push([ p, saved ]);
+			const a = r0 * REC_W + i * NF, c = r1 * REC_W + i * NF;
+			REC_F.forEach((k, j) => { p[k] = b[a + j]; });
+			p.x = b[a] + (b[c] - b[a]) * t; p.y = b[a + 1] + (b[c + 1] - b[a + 1]) * t;
+			p.dir = lerpA(b[a + 2], b[c + 2]); p.stride = b[a + 3] + (b[c + 3] - b[a + 3]) * t;
+			p.lunge = 0;
+		});
+		const ob0 = r0 * REC_W + REC_P * NF, ob1 = r1 * REC_W + REC_P * NF;
+		const keepBall = [ ball.x, ball.y, ball.z, ball.vx, ball.vy ];
+		ball.x = b[ob0] + (b[ob1] - b[ob0]) * t; ball.y = b[ob0 + 1] + (b[ob1 + 1] - b[ob0 + 1]) * t; ball.z = b[ob0 + 2] + (b[ob1 + 2] - b[ob0 + 2]) * t;
+		ball.vx = b[ob0 + 3] * REPLAY_SPEED; ball.vy = b[ob0 + 4] * REPLAY_SPEED;
+		const keepOff = officials3.map(o => [ o.x, o.y, o.dir, o.stride, o.runAmt ]);
+		officials3.forEach((o, k) => { const q = ob0 + 5 + k * 5, q1 = ob1 + 5 + k * 5; o.x = b[q] + (b[q1] - b[q]) * t; o.y = b[q + 1] + (b[q1 + 1] - b[q + 1]) * t; o.dir = b[q + 2]; o.stride = b[q + 3]; o.runAmt = b[q + 4]; });
+		players = who; ctrl = -1;
+		return () => {
+			for (const [ p, saved ] of keep) { Object.assign(p, saved); }
+			[ ball.x, ball.y, ball.z, ball.vx, ball.vy ] = keepBall;
+			officials3.forEach((o, k) => { [ o.x, o.y, o.dir, o.stride, o.runAmt ] = keepOff[k]; });
+			players = keepPlayers; ctrl = keepCtrl;
+		};
+	}
+	// The replay's camera: high in the stand behind the goal looking back up the pitch, or low at
+	// the side of the goal looking across it. It follows the ball (with reduced motion it holds still).
+	function replayShot (out) {
+		const sw = endsSwapped(), gx = sw ? FW - replay.goalX : replay.goalX, side = gx > FW / 2 ? 1 : -1;
+		const bx = sw ? FW - ball.x : ball.x, by = ball.y, bh = Math.max(0, ball.z || 0) * Z3;
+		out.kind = "replay" + replay.angle;
+		if (replay.angle === 0) {
+			out.eye.set(gx + side * (F_END3 + 70), 96, clamp(FH / 2 - (replay.shotY - FH / 2) * 0.35, FH * 0.25, FH * 0.75));
+		} else {
+			out.eye.set(gx - side * 150, 24, FH + 4);
+		}
+		if (reduceMotion) { out.look.set(gx - side * 140, 8, FH / 2); } else { out.look.set(bx, 6 + bh * 0.5, by); }
+		return out;
 	}
 
 	/* ---------- loop ---------- */
@@ -9365,7 +9468,7 @@
 			get charging () { return charging; }, get meterRect () { return meterRect; }, get drawMs () { return drawMs; }, get scale () { return scale; }, get kits () { return KITS; }, get stats () { return stats; }, get oppStats () { return oppStats; }, get steerAt () { return steerAt; }, set steerAt (v) { steerAt = v; }, set possTeam (v) { possTeam = v; },
 			set steerSwitchDone (v) { steerSwitchDone = !!v; },
 			get lastSwitchKind () { return lastSwitchKind; }, set lastSwitchKind (v) { lastSwitchKind = v; }, get setPiece () { return setPiece; },
-			get G3 () { return G3; }, get lastCaption () { return lastCaption; }, caption, get camMode () { return camMode; }, get crowdMood () { return crowdMood; }, get frameDt () { return frameDt; }, get crowdBed () { return crowd; }, get soundOn () { return soundOn; },
+			get G3 () { return G3; }, get replayOn () { return replayOn(); }, get replay () { return replay; }, get recFrames () { return rec.n; }, REPLAY_AT, REPLAY_FR, GOAL_CELEB, get lastCaption () { return lastCaption; }, caption, get camMode () { return camMode; }, get crowdMood () { return crowdMood; }, get frameDt () { return frameDt; }, get crowdBed () { return crowd; }, get soundOn () { return soundOn; },
 			human, switchScore, outfield, dist,
 			get officials () { return officials3; }, get flagCall () { return flagCall; }, refKit, deltaE,
 			proj (x, y, z) { return G3.cam ? proj3D(x, y, z) : null; }, get viewScale () { return scale; },
