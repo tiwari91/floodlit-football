@@ -697,6 +697,11 @@
 		text-align: center;
 	}
 
+	.side-col { display: grid; gap: 18px; min-width: 0; }
+	.coach-sel { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-bottom: 8px; }
+	.staff .who small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; }
+	.staff .cands { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; }
+	.staff .cands button { grid-row: auto; font-size: 12px; padding: 3px 8px; }
 	.win {
 		padding: 14px 16px;
 		background: var(--panel);
@@ -1239,12 +1244,40 @@
 					</table>
 				</div>
 			</div>
+			<div class="side-col">
 			<div class="win">
 				<div class="sq-head"><h4 id="winTitle">Transfer window</h4><span class="budget" id="winBudget"></span></div>
 				<p class="win-note" id="winNote"></p>
 				<ul class="market" id="winMarket"></ul>
 				<h4 class="up-title">Club upgrades</h4>
 				<ul class="upgrades" id="winUpgrades"></ul>
+			</div>
+			<div class="win coachp" id="coachPanel">
+				<div class="sq-head"><h4>Coaching</h4><span class="lg-meta" id="drillMeta"></span></div>
+				<p class="win-note">Train every week between matches. Focus picks what improves; young players improve fastest and players past 30 slowly lose pace. Hard training improves them quicker but tires them and risks knocks. Your coaches multiply it all.</p>
+				<div class="coach-sel">
+					<label class="field" for="trFocus">Focus
+						<select id="trFocus">
+							<option value="balanced">Balanced</option>
+							<option value="attack">Attacking: shooting, passing</option>
+							<option value="defence">Defending</option>
+							<option value="fitness">Fitness and pace</option>
+							<option value="tactics">Tactics: shape and drills</option>
+							<option value="youth">Youth: the under-22s</option>
+						</select>
+					</label>
+					<label class="field" for="trLoad">Intensity
+						<select id="trLoad">
+							<option value="light">Light</option>
+							<option value="normal" selected>Normal</option>
+							<option value="hard">Hard</option>
+						</select>
+					</label>
+				</div>
+				<p class="win-note" id="trReport"></p>
+				<h4 class="up-title">Staff</h4>
+				<ul class="upgrades staff" id="staffList"></ul>
+			</div>
 			</div>
 		</div>
 		<div class="lg-clubs">
@@ -1569,8 +1602,8 @@
 		"Fenwick", "Tamura", "Petrov", "Nyland", "Osei", "Ruiz", "Walsh", "Kerr", "Barros", "Ekberg", "Marsh", "Toft" ];
 	const UPGRADES = [
 		{ key: "training", name: "Training ground", effect: "+3 pace, whole squad", costs: [ 1, 2, 3.5 ] },
-		{ key: "coaching", name: "Attacking coach", effect: "+3 shooting and passing", costs: [ 1, 2, 3.5 ] },
-		{ key: "defence", name: "Defensive coach", effect: "+3 defending and goalkeeping", costs: [ 1, 2, 3.5 ] }
+		{ key: "coaching", name: "Finishing school", effect: "+3 shooting and passing", costs: [ 1, 2, 3.5 ] },
+		{ key: "defence", name: "Defensive drills pitch", effect: "+3 defending and goalkeeping", costs: [ 1, 2, 3.5 ] }
 	];
 	const money = m => (Math.abs(m) < 0.095 && m !== 0 ? `${m < 0 ? "-" : ""}£${Math.round(Math.abs(m) * 1000)}k` : `${m < 0 ? "-" : ""}£${Math.abs(m).toFixed(1)}m`);
 	const round1 = v => Math.round(v * 10) / 10;
@@ -1628,7 +1661,7 @@
 	// Wages per season (£m), paid a matchday at a time; shown as £k a week.
 	const wageOf = p => (Number.isFinite(p.wage) ? p.wage : Math.round((0.02 + valueOf(p) * 0.05) * 1000) / 1000);
 	const wageWeek = w => `£${(w * 1000 / 52).toFixed(1)}k/wk`;
-	const squadWages = c => [ ...c.squad, ...c.bench ].reduce((t, p) => t + wageOf(p), 0);
+	const squadWages = c => [ ...c.squad, ...c.bench ].reduce((t, p) => t + wageOf(p), 0) + Object.values(c.staff || {}).reduce((t, st) => t + (st ? st.wage : 0), 0);
 
 	function ovrOf (p) {
 		const w = { gk: [ 0, 0, 0, 1 ], def: [ 0.25, 0.05, 0.2, 0.5 ], mid: [ 0.2, 0.2, 0.4, 0.2 ], fwd: [ 0.3, 0.35, 0.2, 0.15 ] }[p.pos];
@@ -1670,6 +1703,7 @@
 		if (!Array.isArray(c.market)) { c.market = fresh.market; }
 		c.market = c.market.filter(pl => pl && POS_LABEL[pl.pos] && typeof pl.name === "string");
 		for (const pl of [ ...c.squad, ...c.bench, ...c.market ]) { ensurePlayer(pl); }
+		ensureCoaching(c, null);
 		if (!Array.isArray(c.log)) { c.log = []; }
 		return c;
 	}
@@ -1677,6 +1711,7 @@
 	// Older saves predate the club; give them one.
 	function ensureClub (lg) {
 		lg.club = sanitizeClub(lg.club);
+		ensureCoaching(lg.club, lg);
 		if (!Array.isArray(lg.clubStr) || lg.clubStr.length !== TEAMS.length) { lg.clubStr = TEAMS.map(t => t.str); }
 		if (!Array.isArray(lg.weather) || lg.weather.length !== lg.fixtures.length) { lg.weather = genForecast(lg.fixtures.length); }
 		return lg;
@@ -1708,6 +1743,9 @@
 		// A happy player gives a little more, an unhappy one a little less; a new signing from abroad
 		// is not at his best until he has settled.
 		const mor = Number.isFinite(p.morale) ? 0.96 + 0.08 * p.morale / 100 : 1, settle = p.adapt > 0 ? 1 - 0.015 * Math.min(p.adapt, 5) : 1;
+		// Drilled sides pass and defend a touch better (up to +2 at full tactical familiarity).
+		const drill = league && league.club && Number.isFinite(league.club.drill) && [ ...league.club.squad, ...league.club.bench ].includes(p) ? Math.floor(league.club.drill / 40) : 0;
+		base.pas = Math.min(99, base.pas + drill); base.def = Math.min(99, base.def + drill);
 		const f = (v, w) => Math.max(20, Math.round(v * w * (p.inj > 0 ? 0.85 : 1) * mor * settle) - oop);
 		return { pac: f(base.pac, 0.75 + 0.25 * fit), sho: f(base.sho, 0.9 + 0.1 * fit), pas: f(base.pas, 0.9 + 0.1 * fit), def: f(base.def, 0.9 + 0.1 * fit) };
 	}
@@ -2372,6 +2410,7 @@
 		});
 		if (open && !c.market.length) { const li = el("li"); li.append(el("span", "swap", "Nobody left on the list this window.")); mk.append(li); }
 
+		renderCoaching();
 		const ups = $("winUpgrades");
 		ups.replaceChildren();
 		for (const u of UPGRADES) {
@@ -2467,6 +2506,133 @@
 		saveLeague(); renderClub();
 	}
 	let openPl = null;   // whose details are open in the squad table
+
+	/* ---------- coaching: staff and training ----------
+	   Six jobs, each held by someone rated one to five stars (or nobody). Coaches multiply what
+	   training does for the attributes they look after; the fitness coach also speeds recovery and
+	   cuts training knocks; the assistant runs the tactical drills; the scout finds and sizes up
+	   players abroad. Staff cost a fee to hire and a wage. */
+	const STAFF = {
+		assistant: [ "Assistant manager", "tactical drills, morale" ], attack: [ "Attacking coach", "shooting and passing" ], defence: [ "Defensive coach", "defending" ],
+		gk: [ "Goalkeeping coach", "keepers" ], fitness: [ "Fitness coach", "pace, recovery, fewer knocks" ], scout: [ "Chief scout", "finds and rates players abroad" ]
+	};
+	const FIRST = [ "Ana", "Bruno", "Carla", "Dario", "Elif", "Femi", "Gus", "Hana", "Ivo", "Jonas", "Kofi", "Lena", "Mateo", "Nina", "Omar", "Pia", "Ravi", "Sven", "Tomo", "Uli", "Vera", "Wim", "Yara", "Zeki" ];
+	const staffLvl = (c, job) => (c.staff && c.staff[job] ? c.staff[job].lvl : 0);
+	const staffWages = c => Object.values(c.staff || {}).reduce((t, st) => t + (st ? st.wage : 0), 0);
+	const staffFee = lvl => round1(0.15 + lvl * lvl * 0.12);
+	function genStaffPool () {
+		const pool = [];
+		for (const job of Object.keys(STAFF)) {
+			for (let k = 0; k < 2; k++) {
+				const lvl = clamp(1 + Math.floor(Math.random() * 5), 1, 5), nat = Object.keys(NATIONS)[Math.floor(Math.random() * Object.keys(NATIONS).length)];
+				pool.push({ job, lvl, nat, name: `${FIRST[Math.floor(Math.random() * FIRST.length)]} ${SURNAMES[Math.floor(Math.random() * SURNAMES.length)]}`, wage: Math.round((0.02 + lvl * 0.025) * 1000) / 1000 });
+			}
+		}
+		return pool;
+	}
+	function ensureCoaching (c, lg) {
+		if (!c.staff || typeof c.staff !== "object") { c.staff = {}; }
+		for (const job of Object.keys(STAFF)) { const st = c.staff[job]; if (st && !(Number.isFinite(st.lvl) && typeof st.name === "string")) { c.staff[job] = null; } }
+		if (!c.training || typeof c.training !== "object") { c.training = { focus: "balanced", load: "normal" }; }
+		if (!Number.isFinite(c.drill)) { c.drill = 30; }
+		if (lg && !Array.isArray(lg.staffPool)) { lg.staffPool = genStaffPool(); }
+	}
+	function hireStaff (i) {
+		const c = league.club, cand = league.staffPool[i];
+		if (!cand) { return; }
+		const fee = staffFee(cand.lvl);
+		if (c.budget + 1e-9 < fee) { lastDeal = `${cand.name} wants a ${money(fee)} fee to join.`; afterClubChange(); return; }
+		c.budget = round1(c.budget - fee);
+		const old = c.staff[cand.job];
+		c.staff[cand.job] = { name: cand.name, lvl: cand.lvl, nat: cand.nat, wage: cand.wage };
+		league.staffPool.splice(i, 1);
+		lastDeal = `${cand.name} (${"★".repeat(cand.lvl)}) is your new ${STAFF[cand.job][0].toLowerCase()}${old ? `, replacing ${old.name}` : ""}.`;
+		afterClubChange();
+	}
+	function fireStaff (job) {
+		const c = league.club, st = c.staff[job];
+		if (!st) { return; }
+		c.staff[job] = null;
+		lastDeal = `${st.name} has left the club.`;
+		afterClubChange();
+	}
+	// A week on the training ground, after each league match.
+	function weeklyCoaching (lm, played) {
+		const c = league.club;
+		ensureCoaching(c, league);
+		const tr = c.training, load = { light: 0.7, normal: 1, hard: 1.35 }[tr.load] || 1, gains = [], knocks = [];
+		const FOCUS = { balanced: {}, attack: { sho: 1.8, pas: 1.5, pac: 0.5, def: 0.5 }, defence: { def: 1.8, pac: 0.7, sho: 0.5, pas: 0.5 }, fitness: { pac: 1.8, sho: 0.6, pas: 0.6, def: 0.6 }, tactics: { pac: 0.4, sho: 0.4, pas: 0.4, def: 0.4 }, youth: {} }[tr.focus] || {};
+		const coachFor = (pl, k) => (k === "pac" ? "fitness" : k === "def" ? (pl.pos === "gk" ? "gk" : "defence") : pl.pos === "gk" ? "gk" : "attack");
+		for (const pl of [ ...c.squad, ...c.bench ]) {
+			ensurePlayer(pl);
+			if (pl.inj > 0) { continue; }
+			if (!pl.xp || typeof pl.xp !== "object") { pl.xp = {}; }
+			const age = pl.age, young = age <= 21 ? 1.6 : age <= 24 ? 1.2 : age <= 28 ? 0.8 : age <= 31 ? 0.4 : 0.15;
+			const room = ovrOf(pl) >= pl.pot ? 0.1 : 1, youth = tr.focus === "youth" ? (age <= 21 ? 1.8 : 0.5) : 1, match = played.has(pl.name) ? 1.3 : 1;
+			const keys = pl.pos === "gk" ? [ "def", "pas" ] : [ "pac", "sho", "pas", "def" ];
+			for (const k of keys) {
+				const g = 0.05 * young * load * (1 + staffLvl(c, coachFor(pl, k)) * 0.22) * (FOCUS[k] || 1) * room * youth * match;
+				pl.xp[k] = (pl.xp[k] || 0) + g;
+				if (pl.xp[k] >= 1) { pl.xp[k] -= 1; if (pl[k] < 99) { pl[k]++; gains.push(`${pl.name} +1 ${k.toUpperCase()}`); } }
+			}
+			// Hard weeks tire legs and now and then cause a knock; a good fitness coach makes both rarer.
+			const fl = staffLvl(c, "fitness");
+			if (tr.load === "hard") { pl.fit = clamp(fitOf(pl) - 4 + fl * 0.6, 40, 100); if (Math.random() < 0.012 * (1 - fl * 0.15)) { pl.inj = 1; knocks.push(pl.name); } }
+			else if (tr.load === "light") { pl.fit = clamp(fitOf(pl) + 4, 40, 100); }
+			if (fl) { pl.fit = clamp(fitOf(pl) + fl, 40, 100); }
+			// The assistant keeps spirits up.
+			const al = staffLvl(c, "assistant");
+			if (al) { pl.morale = clamp(pl.morale + (65 - pl.morale) * 0.02 * al, 5, 100); pl.morale = Math.round(pl.morale); }
+		}
+		// Tactical drills: the side learns its shape, which tightens passing and defending a little.
+		c.drill = clamp(c.drill + (tr.focus === "tactics" ? 5 : 1.2) * (1 + staffLvl(c, "assistant") * 0.2) * load - 0.6, 0, 100);
+		c.report = { round: lm.round + 1, gains: gains.slice(0, 12), more: Math.max(0, gains.length - 12), knocks };
+		if (gains.length || knocks.length) { c.log = [ ...(c.log || []), `MD${lm.round + 1}: ${gains.length} improvement${gains.length === 1 ? "" : "s"}${knocks.length ? `, knocks for ${knocks.join(", ")}` : ""}` ].slice(-10); }
+	}
+	// Between seasons: players past 30 lose a step, and the staff list changes.
+	function seasonCoaching (c) {
+		ensureCoaching(c, league);
+		const dropped = [];
+		for (const pl of [ ...c.squad, ...c.bench ]) {
+			if (pl.age >= 31) {
+				const d = pl.age >= 34 ? 3 : pl.age >= 32 ? 2 : 1;
+				pl.pac = Math.max(30, pl.pac - d - (Math.random() < 0.5 ? 1 : 0));
+				if (pl.age >= 33) { for (const k of [ "sho", "pas", "def" ]) { if (Math.random() < 0.5) { pl[k] = Math.max(30, pl[k] - 1); } } }
+				dropped.push(pl.name);
+			}
+		}
+		league.staffPool = genStaffPool();
+		if (dropped.length) { league.news = `${league.news} Getting older: ${dropped.slice(0, 5).join(", ")}${dropped.length > 5 ? " and others" : ""} have lost a yard of pace.`.trim(); }
+	}
+	function renderCoaching () {
+		const c = league.club;
+		ensureCoaching(c, league);
+		$("trFocus").value = c.training.focus; $("trLoad").value = c.training.load;
+		$("drillMeta").textContent = `Tactical familiarity ${Math.round(c.drill)}%`;
+		const r = c.report;
+		$("trReport").textContent = r ? `After matchday ${r.round}: ${r.gains.length ? r.gains.join(", ") + (r.more ? ` and ${r.more} more` : "") : "no one improved a point this week"}.${r.knocks.length ? ` Knocks in training: ${r.knocks.join(", ")}.` : ""}` : "Your first report comes after the next league match.";
+		const ul = $("staffList");
+		ul.replaceChildren();
+		for (const [ job, [ title, what ] ] of Object.entries(STAFF)) {
+			const st = c.staff[job], li = el("li");
+			li.append(el("span", "pos", st ? "★".repeat(st.lvl) : "–"));
+			const who = el("span", "who", st ? `${st.name} (${st.nat})` : "Vacant");
+			who.append(el("small", "", `${title}: ${what}${st ? ` · ${wageWeek(st.wage)}` : ""}`));
+			li.append(who);
+			if (st) { const b = el("button", "", "Let go"); b.type = "button"; b.addEventListener("click", () => fireStaff(job)); li.append(b); }
+			else { li.append(el("span", "")); }
+			const cands = el("div", "cands");
+			league.staffPool.forEach((cd, i) => {
+				if (cd.job !== job || (st && cd.lvl <= st.lvl)) { return; }
+				const b = el("button", "", `Hire ${cd.name} ${"★".repeat(cd.lvl)} · ${money(staffFee(cd.lvl))}`);
+				b.type = "button"; b.disabled = c.budget + 1e-9 < staffFee(cd.lvl);
+				b.addEventListener("click", () => hireStaff(i));
+				cands.append(b);
+			});
+			if (cands.children.length) { li.append(cands); }
+			ul.append(li);
+		}
+	}
 
 	// After a league match: whoever started loses fitness; everyone else recovers.
 	function updateFitness () {
@@ -5956,6 +6122,8 @@
 				if (league.banned && league.banned.length) { nudge += ` Suspended: ${league.banned.join(", ")}.`; }
 				if (league.injured && league.injured.length) { nudge += ` Injured and out: ${league.injured.join(", ")}; they've been taken off the team sheet.`; }
 				if (tired.length) { nudge += ` ⚠ Before the next match: ${tiredText(tired)} Press "Rotate now", or turn on Auto-rotate in the squad panel.`; }
+				const rep2 = league.club.report;
+				if (rep2 && rep2.round === league.round && rep2.gains.length) { nudge += ` Training: ${rep2.gains.slice(0, 4).join(", ")}${rep2.gains.length > 4 ? ` and ${rep2.gains.length - 4 + (rep2.more || 0)} more` : ""}.`; }
 				btn = `Play matchday ${league.round + 1}`;
 			}
 		}
@@ -9822,6 +9990,9 @@
 	$("modeFriendly").addEventListener("click", e => { e.currentTarget.blur(); if (mode !== "friendly") { setMode("friendly"); } });
 	$("modeTutorial").addEventListener("click", e => { e.currentTarget.blur(); setMode("tutorial"); });
 	$("modeCorners").addEventListener("click", e => { e.currentTarget.blur(); setMode("corners"); });
+	for (const [ id, key ] of [ [ "trFocus", "focus" ], [ "trLoad", "load" ] ]) {
+		$(id).addEventListener("change", () => { if (!league || !league.club) { return; } ensureCoaching(league.club, league); league.club.training[key] = $(id).value; saveLeague(); renderCoaching(); });
+	}
 	$("coachSkip").addEventListener("click", e => { e.currentTarget.blur(); if (tut) { nextTutStep(); } });
 	$("coachExit").addEventListener("click", e => { e.currentTarget.blur(); setMode("friendly"); });
 	// Starting over wipes the season, so it takes a second press.
