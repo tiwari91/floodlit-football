@@ -300,6 +300,7 @@
 		place-items: center;
 		background: rgba(7, 12, 10, 0.3);
 		padding: 16px;
+		grid-template-rows: minmax(0, 100%);   /* so the card's max-height is the pitch's, and its body scrolls */
 	}
 
 	.card {
@@ -9831,18 +9832,24 @@
 				row(K.move, "Move", "Run with the ball. Your player is the one in the amber ring, with his name above him."),
 				row(K.pass, "Pass", "To the teammate in the dashed amber ring. It avoids opponents in the way, and the receiver runs onto it."),
 				row(K.through, "Through ball", "Into the space ahead of a runner, toward goal."),
-				row(K.long, "Long ball", "To the striker marked Q. From out wide it becomes a cross into the box."),
+				row(K.long, "Long ball", "To the striker marked Q, lofted over anyone in the way. From out wide it becomes a bending cross into the box; central and in range of goal it chips the keeper."),
 				row(K.shoot, "Shoot", `Tap for a quick shot; ${hold} for power. While holding, ${howScheme === "keys" ? "↑ ↓ move" : howScheme === "pad" ? "the stick moves" : "the joystick moves"} the crosshair along the goal; the amber band shows how far it could stray.`),
 				row(K.sprint, "Sprint", "Hold while moving. The bar under your player is what is left; run it dry and he jogs until it refills.")
 			]),
 			sec("Without the ball", [
 				row(K.tackle, "Tackle", `Alongside the carrier: a shoulder challenge. From further out: a slide. ${cap(hold)} from further away and your man closes him down and jockeys him for you.`),
 				row(K.switch, "Switch player", "To the teammate under the S marker (the defender best placed to win it). Press again for the next best."),
-				row(K.sprint, "Sprint", "Close the carrier down faster; the same bar drains.")
+				row(K.sprint, "Sprint", "Close the carrier down faster; the same bar drains."),
+				row(`${K.shoot} / ${K.pass} / ${K.long}`, "A ball in the air", "Coming down to your man: head it at goal, nod it on to a teammate, or head it clear.")
+			]),
+			sec("Corners", [
+				row(K.pass, "Near post", "An in-swinger whipped at the near post; your runners attack their zones as it is struck."),
+				row(K.long, "Far post", "An out-swinger floated to the back post."),
+				row(K.through, "Penalty spot", "Dropped on the spot for a runner arriving late. Corner shootout (the fourth mode button) is five corners each, a goal a point.")
 			]),
 			sec("Any time", [
 				row(K.tactic, "Tactic", `${howScheme === "keys" ? "1 Defensive, 2 Balanced, 3 Attacking, 4 All-out attack (T cycles)" : "Cycle Defensive, Balanced, Attacking, All-out attack"}. The tag at the top left of the pitch shows the current one.`),
-				row(K.pause, "Pause", "The clock stops. The pause card has the camera, sound and switching settings, substitutions, and Simulate the rest."),
+				row(K.pause, "Pause", "The clock stops. The pause card has the camera, sound and switching settings, your line and tackling instructions, substitutions, and Simulate the rest."),
 				row(K.cam, "Camera", "Overhead, TV or 3D. The one you pick is remembered. Graphics (Low, Medium, High) under the pitch or on the pause card sets how much the 3D view draws. After a goal in 3D there is a replay; any key or tap skips it."),
 				row(K.big, "Big pitch", "The ground fills the screen with a small score bug; Show menu brings the page back."),
 				row(K.help, "How to play", "This screen.")
