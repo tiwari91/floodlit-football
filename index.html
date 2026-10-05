@@ -1254,7 +1254,10 @@
 				<p class="win-note" id="winNote"></p>
 				<div class="tabs mk-tabs" id="mkTabs" role="group" aria-label="Which market"></div>
 				<p class="win-note" id="mkScout"></p>
+				<h4 class="up-title" id="bidsTitle" hidden>Offers for your players</h4>
+				<ul class="market" id="bidsIn"></ul>
 				<ul class="market" id="winMarket"></ul>
+				<p class="win-note" id="trNews"></p>
 				<h4 class="up-title">Club upgrades</h4>
 				<ul class="upgrades" id="winUpgrades"></ul>
 			</div>
@@ -2041,6 +2044,8 @@
 				down.length ? `Weaker: ${down.join(", ")}.` : ""
 			].filter(Boolean).join(" ")
 		};
+		league.cpuIn = {};
+		windowEvents("Summer");
 		if (prev) {
 			sanitizeClub(club);
 			gone = rolloverClub(club);
@@ -2108,6 +2113,7 @@
 		league.round = lm.round + 1;
 		updateFitness();
 		weeklyClub(lm, h, a);
+		if (!windowOpen()) { league.bidsIn = []; }
 		if (league.round === JANUARY) { league.club.market = genMarket(); league.club.scoutLeft = 2 + staffLvl(league.club, "scout"); if (typeof windowEvents === "function") { windowEvents("January"); } }
 		// Knocks from this match: out for one to three games, and off the team sheet.
 		const byName = n => [ ...league.club.squad, ...league.club.bench ].find(pl => pl.name === n);
@@ -2466,6 +2472,7 @@
 		if (open && !c.market.length) { const li = el("li"); li.append(el("span", "swap", "Nobody left on the list this window.")); mk.append(li); }
 
 		renderCoaching();
+		renderBids();
 		const ups = $("winUpgrades");
 		ups.replaceChildren();
 		for (const u of UPGRADES) {
@@ -2626,7 +2633,7 @@
 			const room = ovrOf(pl) >= pl.pot ? 0.1 : 1, youth = tr.focus === "youth" ? (age <= 21 ? 1.8 : 0.5) : 1, match = played.has(pl.name) ? 1.3 : 1;
 			const keys = pl.pos === "gk" ? [ "def", "pas" ] : [ "pac", "sho", "pas", "def" ];
 			for (const k of keys) {
-				const g = 0.05 * young * load * (1 + staffLvl(c, coachFor(pl, k)) * 0.22) * (FOCUS[k] || 1) * room * youth * match;
+				const g = 0.04 * young * load * (1 + staffLvl(c, coachFor(pl, k)) * 0.22) * (FOCUS[k] || 1) * room * youth * match;
 				pl.xp[k] = (pl.xp[k] || 0) + g;
 				if (pl.xp[k] >= 1) { pl.xp[k] -= 1; if (pl[k] < 99) { pl[k]++; gains.push(`${pl.name} +1 ${k.toUpperCase()}`); } }
 			}
@@ -3093,7 +3100,106 @@
 		let h = (clubId * 7919 + (league ? league.season : 1) * 104729) % 2147483647 || 1;
 		const rnd = () => { h = (h * 48271) % 2147483647; return h / 2147483647; };
 		const base = cpuOvr(str);
-		return POS_OF_SLOT.map((pos, i) => genPlayer(pos, base + Math.round((rnd() * 2 - 1) * 4) + (i === 9 || i === 2 ? 3 : 0), null, rnd));
+		const sq = POS_OF_SLOT.map((pos, i) => genPlayer(pos, base + Math.round((rnd() * 2 - 1) * 4) + (i === 9 || i === 2 ? 3 : 0), null, rnd));
+		// This season's signings, from the transfer windows, take their places.
+		const ins = league && league.cpuIn && league.cpuIn[clubId];
+		if (Array.isArray(ins)) { for (const d of ins) { if (d && d.pl && Number.isInteger(d.slot) && d.slot > 0 && d.slot < sq.length) { sq[d.slot] = { ...d.pl }; } } }
+		return sq;
+	}
+	/* ---------- the other clubs do business too ----------
+	   When a window opens the computer's clubs buy from home and abroad (some of them players on your
+	   own list), the buyers get a little stronger, and a few of them bid for your players. Their
+	   signings show up in their squads in the Clubs panel and play against you. Offers for your
+	   players lapse when the window shuts. */
+	function windowEvents (when) {
+		if (!league || !league.club) { return; }
+		const lg = league, c = lg.club, news = [];
+		if (!lg.cpuIn || typeof lg.cpuIn !== "object") { lg.cpuIn = {}; }
+		const others = lg.members.filter(id => id !== 0);
+		for (const id of others) { lg.clubStr[id] = clamp(lg.clubStr[id] - 0.04, 1, 5); }   // squads age; the deals below put it back
+		const deals = 4 + Math.floor(Math.random() * 4);
+		for (let k = 0; k < deals; k++) {
+			const buyer = others[Math.floor(Math.random() * others.length)], str = getStr(buyer);
+			const slot = 1 + Math.floor(Math.random() * (POS_OF_SLOT.length - 1)), pos = POS_OF_SLOT[slot];
+			// Sometimes they take one off your own shortlist.
+			const mine = c.market.findIndex(pl => pl.pos === pos && ovrOf(pl) >= cpuOvr(str) - 4);
+			let pl, from, fee;
+			if (mine >= 0 && Math.random() < 0.5) { pl = c.market.splice(mine, 1)[0]; from = pl.from || "abroad"; fee = askOf(pl); }
+			else {
+				const regions = Object.keys(MARKETS), region = regions[Math.floor(Math.random() * regions.length)], m = MARKETS[region];
+				pl = genPlayer(pos, clamp(cpuOvr(str) + Math.floor(Math.random() * 7) - 1, 50, 92));
+				const nats = natsOf(region); pl.nat = nats[Math.floor(Math.random() * nats.length)]; pl.age = 19 + Math.floor(Math.random() * 13);
+				from = m.clubs[Math.floor(Math.random() * m.clubs.length)]; fee = round1(valueOf(pl) * m.mult);
+			}
+			const keep = { name: pl.name, pos: pl.pos, pac: pl.pac, sho: pl.sho, pas: pl.pas, def: pl.def, age: pl.age, nat: pl.nat };
+			lg.cpuIn[buyer] = [ ...(lg.cpuIn[buyer] || []).filter(d => d.slot !== slot), { slot, pl: keep } ].slice(-4);
+			lg.clubStr[buyer] = clamp(lg.clubStr[buyer] + 0.12, 1, 5);
+			news.push(`${TEAMS[buyer].short || TEAMS[buyer].name} sign ${pl.name} (${pl.nat}, ${ovrOf(pl)}) from ${from} for ${money(fee)}`);
+		}
+		// Bids for your players: the clubs above you in the market for your best and most valuable.
+		const yours = [ ...c.squad, ...c.bench ].filter(p => p.pos !== "gk" || ovrOf(p) > 70).sort((a, b) => valueOf(b) - valueOf(a));
+		const nb = Math.min(yours.length, 1 + Math.floor(Math.random() * 3));
+		lg.bidsIn = [];
+		for (let k = 0; k < nb; k++) {
+			const pl = yours[Math.floor(Math.random() * Math.min(6, yours.length))];
+			if (!pl || lg.bidsIn.some(b => b.name === pl.name)) { continue; }
+			const club = others[Math.floor(Math.random() * others.length)];
+			lg.bidsIn.push({ name: pl.name, club, fee: round1(Math.max(0.3, valueOf(pl) * (0.85 + Math.random() * 0.45))) });
+		}
+		lg.transferNews = [ ...news.map(n => `${when}: ${n}`), ...(lg.transferNews || []) ].slice(0, 10);
+	}
+	// Sell one of yours: to a bidder, or to whoever the market finds (a little under his value).
+	function sellPlayer (name, fee, club) {
+		const c = league.club, inSq = c.squad.findIndex(p => p.name === name), inB = c.bench.findIndex(p => p.name === name);
+		if ((inSq < 0 && inB < 0) || !windowOpen()) { return; }
+		const pl = inSq >= 0 ? c.squad[inSq] : c.bench[inB];
+		if (inSq >= 0 && pl.pos === "gk" && ![ ...c.squad, ...c.bench ].some(q => q !== pl && q.pos === "gk")) { lastDeal = `Sign another keeper before you sell ${pl.name}.`; afterClubChange(); return; }
+		if (inSq >= 0) { c.squad.splice(inSq, 1); } else { c.bench.splice(inB, 1); }
+		c.budget = round1(c.budget + fee);
+		league.bidsIn = (league.bidsIn || []).filter(b => b.name !== name);
+		if (Number.isInteger(club)) { const slot = POS_OF_SLOT.indexOf(pl.pos) > 0 ? POS_OF_SLOT.indexOf(pl.pos) + Math.floor(Math.random() * 2) : 1; league.cpuIn = league.cpuIn || {}; league.cpuIn[club] = [ ...(league.cpuIn[club] || []), { slot: clamp(slot, 1, 10), pl: { name: pl.name, pos: pl.pos, pac: pl.pac, sho: pl.sho, pas: pl.pas, def: pl.def, age: pl.age, nat: pl.nat } } ].slice(-4); league.clubStr[club] = clamp(league.clubStr[club] + 0.1, 1, 5); }
+		refillSquad(c);
+		openPl = null;
+		lastDeal = `${pl.name} sold${Number.isInteger(club) ? ` to ${TEAMS[club].name}` : ""} for ${money(fee)}.`;
+		c.log = [ ...(c.log || []), lastDeal ].slice(-10);
+		afterClubChange();
+	}
+	function rejectBid (name) {
+		const lg = league, b = (lg.bidsIn || []).find(x => x.name === name);
+		if (!b) { return; }
+		lg.bidsIn = lg.bidsIn.filter(x => x !== b);
+		const pl = [ ...lg.club.squad, ...lg.club.bench ].find(p => p.name === name);
+		// A move to a bigger club turned down: he takes it badly.
+		if (pl && getStr(b.club) > yourStr()) { pl.morale = clamp(pl.morale - 8, 5, 100); lastDeal = `You turned down ${TEAMS[b.club].name} for ${name}; he wanted the move (morale ${pl.morale}).`; }
+		else { lastDeal = `You turned down ${TEAMS[b.club].name}'s bid for ${name}.`; }
+		afterClubChange();
+	}
+	function sellButton (pl) {
+		if (!windowOpen()) { return null; }
+		const lg = league, others = lg.members.filter(id => id !== 0), club = others[hashStr(pl.name + lg.round + lg.season) % others.length];
+		const fee = round1(Math.max(0.1, valueOf(pl) * 0.85));
+		const b = el("button", "", `Sell to ${TEAMS[club].short || TEAMS[club].name} (${money(fee)})`);
+		b.type = "button";
+		b.addEventListener("click", () => sellPlayer(pl.name, fee, club));
+		return b;
+	}
+	function renderBids () {
+		const ul = $("bidsIn"), lg = league, open = windowOpen();
+		ul.replaceChildren();
+		const bids = open ? (lg.bidsIn || []).filter(b => [ ...lg.club.squad, ...lg.club.bench ].some(p => p.name === b.name)) : [];
+		$("bidsTitle").hidden = !bids.length;
+		for (const b of bids) {
+			const li = el("li"), pl = [ ...lg.club.squad, ...lg.club.bench ].find(p => p.name === b.name);
+			li.append(el("span", "pos", POS_LABEL[pl.pos]), el("span", "who", `${TEAMS[b.club].name} bid ${money(b.fee)} for ${b.name}`));
+			const btns = el("span", "bids");
+			const a = el("button", "", "Accept"); a.type = "button"; a.addEventListener("click", () => sellPlayer(b.name, b.fee, b.club));
+			const r = el("button", "", "Reject"); r.type = "button"; r.addEventListener("click", () => rejectBid(b.name));
+			btns.append(a, r); li.append(btns);
+			li.append(el("span", "ratings", `OVR ${ovrOf(pl)} · ${pl.age} · valued at ${money(valueOf(pl))}`));
+			ul.append(li);
+		}
+		const tn = $("trNews");
+		tn.textContent = (lg.transferNews || []).length ? `Around the league: ${lg.transferNews.slice(0, 5).join("; ")}.` : "";
 	}
 	let oppSquad = [];
 
