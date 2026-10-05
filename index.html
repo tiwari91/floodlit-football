@@ -1681,7 +1681,7 @@
 	let state = "intro";  // intro | play | goal | paused | full
 	let ctrl = 3;          // index of the human-controlled player in team 0
 	let frame = 0, freeze = 0, goalTimer = 0, switchCd = 0, manualLock = 0, goFlash = 0;
-	let autoPilot = false;   // test harness: the computer drives your player too (batch sims)
+	let autoPilot = false, dribbleTest = false, lastCarrier = null;   // test harness: the computer drives your player too (batch sims)
 	let pressHeld = false, touchPress = false, padPressBtn = false;   // A / Tackle button / X held: the press assist
 	let possLostAt = -1000;  // frame your side last lost the ball
 	let autoSwitchMode = "assisted";   // assisted | manual | aggressive (the Auto switch setting)
@@ -1709,7 +1709,7 @@
 	let subsLeft = SUBS_MAX, cpuSubs = SUBS_MAX, cameOn = [], wentOff = [], subPick = {}, genericBench = null;
 	let possFrames = [ 0, 0 ];
 	// Counts for the test harness and the match report: both sides, counted where they happen.
-	const newTally = () => ({ shots: [ 0, 0 ], heads: [ 0, 0 ], headGoals: [ 0, 0 ], corners: [ 0, 0 ], cornerGoals: [ 0, 0 ], claims: [ 0, 0 ], punches: [ 0, 0 ], crosses: [ 0, 0 ], clears: [ 0, 0 ], goals: [ 0, 0 ], air: { none: 0, attWin: 0, defWin: 0, noAct: 0 } });
+	const newTally = () => ({ shots: [ 0, 0 ], heads: [ 0, 0 ], headGoals: [ 0, 0 ], corners: [ 0, 0 ], cornerGoals: [ 0, 0 ], claims: [ 0, 0 ], punches: [ 0, 0 ], crosses: [ 0, 0 ], clears: [ 0, 0 ], goals: [ 0, 0 ], carry: [ [], [] ], dribbleShots: [ 0, 0 ], air: { none: 0, attWin: 0, defWin: 0, noAct: 0 } });
 	let tally = newTally(), cornerAt = [ -9999, -9999 ];
 
 	/* ---------- momentum ----------
@@ -3662,6 +3662,18 @@
 			const nearest = mates.reduce((a, b) => (dist(a, ball) < dist(b, ball) ? a : b));
 			if (nearest === p) { return [ ball.x, ball.y ]; }
 		}
+		// An attacker running at goal: come off the line along the line to the ball and narrow the
+		// angle, further the closer he gets; one on one with nobody between, rush out to smother it.
+		const carrier = ball.owner && ball.owner.team !== p.team ? ball.owner : null;
+		if (carrier && !setPiece) {
+			const gxl = p.team === 0 ? 0 : FW, db = Math.hypot(ball.x - gxl, ball.y - FH / 2) || 1, R = 420 * Math.sqrt(S);
+			if (db < R) {
+				const between = players.some(q => q.team === p.team && q.role !== "gk" && rel(p.team, q.x) < rel(p.team, carrier.x) - 8 && Math.abs(q.y - carrier.y) < 70 * Math.sqrt(S));
+				const rush = !between && db < 240 * Math.sqrt(S) && Math.abs(ball.y - FH / 2) < FMT.goal / 2 + FMT.box * 0.6;
+				const out = rush ? Math.min(db * 0.6, 120 * GH) : 22 + clamp((R - db) * 0.1, 0, 40 * GH);
+				return [ gxl + (ball.x - gxl) / db * out, FH / 2 + (ball.y - FH / 2) / db * out * 0.85 ];
+			}
+		}
 		const sweep = mentality[p.team] >= 2 ? 70 * S : 0;   // all-out attack: the keeper plays as a sweeper
 		const x = p.team === 0 ? ownLine + 22 + sweep : ownLine - 22 - sweep;
 		const y = FH / 2 + clamp((ball.y - FH / 2) * 0.45, -54 * GH, 54 * GH);
@@ -3723,6 +3735,12 @@
 		}
 		const goal = { x: attackX(p.team), y: FH / 2 };
 		const dg = dist(p, goal);
+		// Test harness: a carrier who only ever runs at goal and shoots from close in, to measure how
+		// well the other side stops a dribbler.
+		if (dribbleTest && p.team === 0 && p.role !== "gk") {
+			if (dg < 190 * Math.sqrt(S)) { shootAt(p, 0.85, FH / 2 + (Math.random() * 2 - 1) * FMT.goal * 0.35); return null; }
+			return [ goal.x, FH / 2 + (p.y - FH / 2) * 0.7 ];
+		}
 		if (--p.think <= 0) {
 			p.think = Math.max(2, cfg.think + Math.round(6 * edge(1 - p.team) - 2 * edge(p.team)));   // rattled players dither; confident ones play quicker
 			// Wide in the final third: cross it into the box.
@@ -4032,16 +4050,27 @@
 			const c = outfield(1).filter(p => p !== chaser1).sort((a, b) => dist(a, ball) - dist(b, ball));
 			return c[0] || null;
 		})();
+		// Goal-side of a carrier, `gap` towards the goal team t defends, allowing for where he is going.
+		const goalSide = (q, t, gap) => { const gx = t === 0 ? 0 : FW, ax = q.x + q.vx * 6, ay = q.y + q.vy * 6, dx = gx - ax, dy = FH / 2 - ay, d = Math.hypot(dx, dy) || 1, g = Math.min(gap, d * 0.6); return [ ax + dx / d * g, ay + dy / d * g ]; };
+		// The second man: behind the one pressing, on the carrier's line to goal, so beating one
+		// defender isn't a walk in on goal.
+		const second1 = (() => {
+			if (!cover1 || rel(1, ball.x) > FW * 0.7) { return null; }
+			const c = outfield(1).filter(p => p !== chaser1 && p !== cover1 && rel(1, p.x) < rel(1, ball.x) + 40).sort((a, b) => dist(a, ball) - dist(b, ball))[0];
+			return c && dist(c, ball) < 420 * Math.sqrt(S) ? c : null;
+		})();
 
 		// Your teammates defend too. When the CPU has the ball, the nearest one
 		// covers goal-side of it (and presses if you are out of the play), and the
 		// rest pick up the red attackers closest to your goal.
-		let cover0 = null;
+		let cover0 = null, second0 = null;
 		const marks0 = new Map();
 		if (ball.owner && ball.owner.team === 1 && !keeperHolds) {
 			const helpers = outfield(0).filter(p => players.indexOf(p) !== ctrl).sort((a, b) => dist(a, ball) - dist(b, ball));
 			cover0 = helpers[0] || null;
-			const free = helpers.slice(1);
+			const back = helpers.slice(1).filter(p => rel(0, p.x) < rel(0, ball.x) + 40)[0];
+			if (back && dist(back, ball) < 420 * Math.sqrt(S) && rel(0, ball.x) < FW * 0.7) { second0 = back; }
+			const free = helpers.slice(1).filter(p => p !== second0);
 			// Only attackers in your part of the pitch need a man on them.
 			const threats = outfield(1).filter(q => q !== ball.owner && q.x < FW * (0.45 - 0.07 * Math.max(0, mentality[0]))).sort((a, b) => a.x - b.x);
 			for (const q of threats) {
@@ -4074,7 +4103,7 @@
 		// The computer's defenders mark your attackers goal-side, too.
 		const marks1 = new Map();
 		if (ball.owner && ball.owner.team === 0 && !keeperHolds) {
-			const free = outfield(1).filter(p => p !== chaser1 && p !== cover1);
+			const free = outfield(1).filter(p => p !== chaser1 && p !== cover1 && p !== second1);
 			const threats = outfield(0).filter(q => q !== ball.owner && rel(1, q.x) < FW * 0.45).sort((a, b) => b.x - a.x);
 			for (const q of threats) {
 				if (!free.length) { break; }
@@ -4218,7 +4247,9 @@
 				const own = { x: FW, y: FH / 2 };
 				const k = press[1] === "high" ? 0.12 : press[1] === "low" ? 0.45 : 0.3;
 				const in1 = press[1] === "high" ? dist(p, ball) < 220 : press[1] === "low" ? dist(p, ball) < 90 : rel(1, ball.x) < FW * 0.5 && dist(p, ball) < 160;
-				target = in1 ? [ ball.x, ball.y ] : [ ball.x + (own.x - ball.x) * k, ball.y + (own.y - ball.y) * k ];
+				target = in1 ? goalSide(ball.owner || ball, 1, dist(p, ball) > 70 ? 14 : 6) : [ ball.x + (own.x - ball.x) * k, ball.y + (own.y - ball.y) * k ];
+			} else if (p === second1 || p === second0) {
+				target = goalSide(ball.owner || ball, p.team, 80 * Math.sqrt(S));
 			} else if (p === cover0) {
 				const own = { x: 0, y: FH / 2 };
 				const k = press[0] === "high" ? 0.12 : press[0] === "low" ? 0.45 : 0.3;
@@ -4227,16 +4258,16 @@
 				const goes = press[0] === "high" ? dp < 480 || nearer
 					: press[0] === "low" ? dp < 90 || (nearer && rel(0, ball.x) < FW * 0.35 && dp < 200)
 						: (nearer && dp < 380 * Math.sqrt(S)) || (rel(0, ball.x) < FW * 0.5 && dp < 200);
-				target = goes ? [ ball.x, ball.y ] : [ ball.x + (own.x - ball.x) * k, ball.y + (own.y - ball.y) * k ];
+				target = goes ? goalSide(ball.owner || ball, 0, dist(p, ball) > 70 ? 14 : 6) : [ ball.x + (own.x - ball.x) * k, ball.y + (own.y - ball.y) * k ];
 			} else if (marks1.has(p)) {
-				const q = marks1.get(p), gx = FW - q.x, gy = FH / 2 - q.y, gd = Math.hypot(gx, gy) || 1;
+				const q = marks1.get(p), qx = q.x + q.vx * 8, qy = q.y + q.vy * 8, gx = FW - qx, gy = FH / 2 - qy, gd = Math.hypot(gx, gy) || 1;
 				const gap = clamp(40 - (A(p, "def") - 65) * 0.6, 22, 55);   // tight, tighter for good markers
-				target = [ q.x + gx / gd * gap, q.y + gy / gd * gap ];
+				target = [ qx + gx / gd * gap, qy + gy / gd * gap ];
 			} else if (marks0.has(p)) {
 				// Stand goal-side of your man, between him and your goal.
-				const q = marks0.get(p), gx = 0 - q.x, gy = FH / 2 - q.y, gd = Math.hypot(gx, gy) || 1;
+				const q = marks0.get(p), qx = q.x + q.vx * 8, qy = q.y + q.vy * 8, gx = 0 - qx, gy = FH / 2 - qy, gd = Math.hypot(gx, gy) || 1;
 				const gap = clamp(40 - (A(p, "def") - 65) * 0.6, 22, 55);   // tight, tighter for good markers
-				target = [ q.x + gx / gd * gap, q.y + gy / gd * gap ];
+				target = [ qx + gx / gd * gap, qy + gy / gd * gap ];
 			} else {
 				target = spreadTarget(p, formationTarget(p));
 			}
@@ -4244,7 +4275,7 @@
 			// A keeper facing a shot moves at full stretch; how quickly depends on his handling.
 			const diving = p.role === "gk" && shotAt(p) ? 1.3 * (0.85 + 0.15 * defMul(p)) : 0;
 			// Real pace: a chaser at full tilt tops out near 10 m/s, and a man with the ball is a touch slower.
-			let sprint = diving || (p === chaser1 || p === cover0 || (p === cover1 && press[1] === "high") ? 1.05 : ball.owner === p ? 0.96 : 1);
+			let sprint = diving || (p === chaser1 || p === cover0 || (p === cover1 && press[1] === "high") || ((p === second1 || p === second0) && dist(p, { x: target[0], y: target[1] }) > 60) ? 1.05 : ball.owner === p ? 0.96 : 1);
 			// Off the ball, nobody runs flat out all game: they jog back into shape, stride out
 			// when they're well out of position or near the ball, and markers match their runner.
 			if (!diving && sprint === 1 && p.role !== "gk") {
@@ -4278,7 +4309,7 @@
 			// Everyone reads the play at his own speed, so a side never slides across in lockstep.
 			const ours = ball.owner ? ball.owner.team === p.team : possTeam === p.team;
 			// The shape glides after the ball rather than chasing it; getting back is quicker than pushing on.
-			const k = ball.owner === p || p === chaser1 ? 1 : (0.03 + ((p.idx * 7 + p.team * 3) % 5) * 0.012) * (ours ? 1 : 1.8);
+			const k = ball.owner === p || p === chaser1 ? 1 : p === cover1 || p === cover0 || p === second1 || p === second0 ? 0.3 : (0.03 + ((p.idx * 7 + p.team * 3) % 5) * 0.012) * (ours ? 1 : 1.8);
 			p.tx += (target[0] - p.tx) * k;
 			p.ty += (target[1] - p.ty) * k;
 			const [ dvx, dvy ] = steer(p, diving ? target[0] : p.tx, diving ? target[1] : p.ty, BASE_SPD * spdMul * sprint, Math.hypot(target[0] - p.x, target[1] - p.y));
@@ -5300,6 +5331,7 @@
 	}
 
 	function gainBall (p) {
+		const lostBy = p.team !== possTeam ? possTeam : -1;
 		// First touch by a teammate who was offside when the ball was played.
 		if (offside.team === p.team && offside.set.has(p)) { callOffside(p); return; }
 		lastTouch = p.team;
@@ -5308,10 +5340,11 @@
 		ball.headed = false;
 		if (p.role !== "gk") { p.vx *= 0.85; p.vy *= 0.85; }   // the first touch takes a little pace off
 		p.hold = 0;
-		p.gotAt = frame;
+		p.gotAt = frame; p.gotX = p.x;
+		if (lostBy >= 0 && lastCarrier && lastCarrier.team === lostBy && lastCarrier.gotX !== undefined) { tally.carry[lostBy].push(Math.round(rel(lostBy, lastCarrier.x) - rel(lostBy, lastCarrier.gotX))); }
+		lastCarrier = p;
 		p.think = 4;
 		// A change of possession is a new situation, so drop any manual-switch hold.
-		const lostBy = p.team !== possTeam ? possTeam : -1;
 		if (p.team !== possTeam) {
 			manualLock = 0;
 			if (p.team === 1) { possLostAt = frame; switchCd = 0; autoHold = 0; turnoverPending = true; steerSwitchDone = false; }
@@ -10032,7 +10065,7 @@
 			key (code, on) { if (on) { keys.add(code); } else { keys.delete(code); } },
 			press (code) { window.dispatchEvent(new KeyboardEvent("keydown", { code })); },
 			release (code) { window.dispatchEvent(new KeyboardEvent("keyup", { code })); },
-			set autoPilot (v) { autoPilot = !!v; }, get autoPilot () { return autoPilot; },
+			set autoPilot (v) { autoPilot = !!v; }, set dribbleTest (v) { dribbleTest = !!v; }, get autoPilot () { return autoPilot; },
 			set timeLeft (v) { timeLeft = v; }, set freeze (v) { freeze = v; }, set ctrl (v) { ctrl = v; }, set manualLock (v) { manualLock = v; }, set switchCd (v) { switchCd = v; },
 			forceGoal (t) {
 				if (state !== "play" || !ball) { return; }
