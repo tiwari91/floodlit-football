@@ -122,6 +122,7 @@
 		filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.5)); max-width: calc(100% - 28px);
 	}
 	.lower[hidden] { display: none; }
+	.lower:has(~ .bc-ticker:not([hidden])) { bottom: 72px; }   /* clear of the key hints, which lift above the ticker */
 	.lower.in { animation: ltIn 0.45s cubic-bezier(0.2, 0.8, 0.2, 1); }
 	@keyframes ltIn { from { transform: translateX(-24px); opacity: 0; } to { transform: none; opacity: 1; } }
 	.lower .lt-tag { display: flex; align-items: center; padding: 0 12px; font-weight: 900; font-size: 15px; letter-spacing: 0.12em; background: #0d1216; color: var(--amber); border-radius: 3px 0 0 3px; }
@@ -1426,7 +1427,7 @@
 		<div class="key"><kbd>H</kbd><b>How to play</b>: every control for the keyboard, touch or a controller, and what the markers on the pitch mean. It pauses the match; <kbd>Esc</kbd> closes it. The How to play buttons (on the kick-off, pause and full-time cards, and next to Pause) do the same</div>
 		<div class="key"><kbd>F</kbd><b>Big pitch</b>: the ground fills the screen; Show menu brings the page back</div>
 		<div class="key"><b>Simulate</b> button (next to Pause): the whole match before kick-off, or the rest of it once it's on. The score so far stands.</div>
-		<p class="fine"><b>Controller.</b> Plug in or pair an Xbox or PlayStation controller and press a button. Left stick moves; A (✕) passes or switches; B (○) shoots, hold for power; X (□) slide tackles; Y (△) plays a through ball; RB (R1) hits a long ball; RT or LT sprints; Start pauses. The hints at the bottom of the pitch show what each button does at that moment; turn them off with Hints.</p>
+		<p class="fine"><b>Controller.</b> Plug in or pair an Xbox or PlayStation controller and press a button. Left stick moves; A (✕) passes or switches; B (○) shoots, hold for power; X (□) slide tackles; Y (△) plays a through ball; RB (R1) hits a long ball; RT or LT sprints; Back (Share) replays the last six seconds; Start pauses. The hints at the bottom of the pitch show what each button does at that moment; turn them off with Hints.</p>
 		<p class="fine"><b>Home and away.</b> The home side has the crowd behind it: it starts with a little momentum and the visitors play slightly below their rating. The stands fill with the home club's colours, with a corner of away fans. On a kit clash the away side changes, so you'll wear white on some away days. The scoreboard lists the home team first.</p>
 		<p class="fine"><b>Pass and they wilt.</b> String passes together and your side grows in confidence: sharper passing and touches, and the momentum bar swings your way (5 in a row gets a mention, 10 gets an Olé). The side chasing the ball gets tense: stray passes, heavy first touches, late and rash challenges, shakier keeping. It works both ways, so if the computer keeps it off you, your players get nervy too. Win the ball back, keep it for a few passes or score, and the nerves settle; a goal against the run of play flips the game.</p>
 		<p class="fine"><b>Crowd and music.</b> The crowd swells as the ball nears a goal, the home end sings with a drum beating under it, goals get a roar (or a groan from the home fans), and hard saves get an "ooh". After a long quiet spell, or with the home side cruising, the 3D crowd starts a Mexican wave that runs round the bowl. The menus play a stadium anthem in the Mexican style (two trumpets, guitarrón bass, strummed vihuela, güiro and drums); turn it off with Music.</p>
@@ -3566,7 +3567,7 @@
 			$("ovSim").textContent = "Simulate match";
 			$("ovSim").hidden = false;
 		}
-		ovText.textContent = `Difficulty: ${lv.name}. ` + ovText.textContent;
+		ovText.textContent = (seasonDone() ? `${lv.name} difficulty. ` : `Difficulty: ${lv.name}. `) + ovText.textContent;
 	}
 
 	function makePlayers () {
@@ -7066,6 +7067,7 @@
 		if (state !== "play") { return; }
 		state = "paused";
 		charging = false;
+		hideLineups();
 		const tiredNow = team(0).filter(p => p.role !== "gk" && (p.injured || staOf(p) < TIRED_STA)).sort((a, b) => staOf(a) - staOf(b));
 		const subTip = tiredNow.length && subsLeft > 0 ? ` ⚠ ${tiredNow.slice(0, 3).map(p => `${p.name || "Player"} (${p.injured ? "injured" : `${Math.round(staOf(p) * 100)}% legs`})`).join(", ")} ${tiredNow.length === 1 ? "is" : "are"} struggling: a substitution would help.` : "";
 		showOverlay("Paused", mode === "tutorial" ? "Take a breather." : `Take a breather. The clock is stopped. Or simulate the rest: the score so far stands and the time left is played out.${subTip}`, "Resume");
@@ -11286,6 +11288,7 @@
 			if (pressed(2)) { humanTackle(); }
 			if (pressed(3)) { passPress("through"); }
 			if (pressed(5)) { passPress("long"); }
+			if (pressed(8)) { startOdr(); }   // Back / Share / Select: replay the last six seconds
 		}
 		if (state === "play" || state === "goal") {
 			if (pressed(12)) { setMentality(0, mentality[0] + 1); }   // D-pad up: more attacking
@@ -11646,7 +11649,7 @@
 				row(K.tactic, "Tactic", `${howScheme === "keys" ? "1 Defensive, 2 Balanced, 3 Attacking, 4 All-out attack (T cycles)" : "Cycle Defensive, Balanced, Attacking, All-out attack"}. The tag at the top left of the pitch shows the current one.`),
 				row(K.pause, "Pause", "The clock stops. The pause card has the camera, sound and switching settings, your line and tackling instructions, substitutions, and Simulate the rest."),
 				row(K.cam, "Camera", "Overhead, TV or 3D. The one you pick is remembered. Graphics (Low, Medium, High) under the pitch or on the pause card sets how much the 3D view draws. After a goal in 3D there is a replay; any key or tap skips it."),
-				row(howScheme === "touch" ? "Replay" : "R", "Replay", "The last six seconds again, a little slower, with the clock stopped. Any key or tap ends it. Goals, parries and clearances off the line also go into slow motion for a moment."),
+				row(howScheme === "touch" ? "Replay" : howScheme === "pad" ? "Back / Share" : "R", "Replay", "The last six seconds again, a little slower, with the clock stopped. Any key or tap ends it. Goals, parries and clearances off the line also go into slow motion for a moment."),
 				row(K.big, "Big pitch", "The ground fills the screen with a small score bug; Show menu brings the page back."),
 				row(K.help, "How to play", "This screen.")
 			]),
