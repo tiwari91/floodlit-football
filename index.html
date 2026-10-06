@@ -1471,7 +1471,7 @@
 		<p class="fine"><b>Transfers and upgrades.</b> Your players have pace, shooting, passing and defending ratings that change how they play. When a season ends you earn prize money by where you finish. Until your first match of the next season, sign players from the transfer list (they join the bench, or replace your weakest player in that position once it is full) and build club upgrades that lift the whole squad. Rival clubs get stronger or weaker between seasons too.</p>
 		<p class="fine"><b>Eleven-a-side.</b> The camera follows the ball, and an arrow at the screen edge points to your player when they are out of view. Turn on the Minimap button for a small view of the whole pitch.</p>
 		<p class="fine"><b>Momentum.</b> Keep the ball and the bar under the clock swings your way. Tackles, completed passes and goals push it further. Once you are on top, the CPU gets rattled: it reacts slower, misplaces passes, shoots wider and tackles less, and your players run a little quicker. The same happens to you if the CPU keeps the ball.</p>
-		<p class="fine">The dashed ring shows who your pass will reach, and it avoids teammates with a red shirt in the way. Your receiver runs onto the ball by itself, and the arrows take over once they have it. When you defend, the Auto switch setting decides who you control. <b>Assisted</b> (the default) switches you once when the ball is lost, to the defender who can get to it first (allowing for where it is going, and preferring players goal-side of the attacker), and then leaves you alone: while you hold the arrows or A, control stays with your man unless he is clearly out of the play, and that happens at most once a spell with a message on screen. Let go of the arrows and the game moves you to a clearly better-placed defender, never more than once a second and never straight back to the man you just left. <b>Manual only</b> never switches by itself (except at restarts, or if your man is sent off or subbed): S is the only way to change player. <b>Aggressive</b> switches as soon as another defender is better placed, whatever you are doing. A white pulse shows who you now control. The dashed ring with an S shows who S will switch you to; press S again to cycle to the next best, and control stays with your choice for two and a half seconds or until the ball changes hands. Your teammates cover and mark while you press: chase the ball with E, or hold A and your man closes the carrier down and jockeys him for you.</p>
+		<p class="fine">The dashed ring shows who your pass will reach, and it avoids teammates with a red shirt in the way. Your receiver runs onto the ball by itself, and the arrows take over once they have it. When you defend, the Auto switch setting decides who you control. <b>Assisted</b> (the default) switches you once when the ball is lost, to the defender who can get to it first (allowing for where it is going, and preferring players goal-side of the attacker), and then leaves you alone: while you hold the arrows or A, control stays with your man unless he is clearly out of the play (at most once a spell, with a message on screen), or the ball arrives at a teammate's feet while your man is well off it, when that teammate is yours at once. Let go of the arrows and the game moves you to a clearly better-placed defender, never more than twice a second and never straight back to the man you just left. <b>Manual only</b> never switches by itself (except at restarts, or if your man is sent off or subbed): S is the only way to change player. <b>Aggressive</b> switches as soon as another defender is better placed, whatever you are doing. A white pulse shows who you now control. The dashed ring with an S shows who S will switch you to; press S again to cycle to the next best, and control stays with your choice for two and a half seconds or until the ball changes hands. Your teammates cover and mark while you press: chase the ball with E, or hold A and your man closes the carrier down and jockeys him for you.</p>
 	</section>
 </main>
 
@@ -1505,9 +1505,11 @@
 	const BASE_SPD = 2.5;
 	const KICKOFF_FREEZE = 90;          // 3-2-1 countdown, 30 frames per number
 	const MANUAL_LOCK = 150;            // frames a manual switch (S) overrides auto-switch: 2.5 s, or until possession changes
-	const AUTO_HOLD = 60;               // least frames between auto-switches (1 s)
-	const AUTO_HOLD_TURNOVER = 110;     // frames the turnover switch is kept (about 1.8 s)
-	const HANDBACK_GUARD = 120;         // frames before auto-switch may return to the man it just left (2 s)
+	const AUTO_HOLD = 30;               // least frames between auto-switches (0.5 s)
+	const AUTO_HOLD_TURNOVER = 75;      // frames the turnover switch is kept (1.25 s)
+	const HANDBACK_GUARD = 75;          // frames before auto-switch may return to the man it just left (1.25 s)
+	const NEAR_BALL = 12;               // frames: a teammate this close to the ball is on it, and control goes to him
+	const NEAR_GUARD = 30;              // frames before a near-ball switch may hand back to the man it just left
 	const STEER_RECENT = 24;            // frames since the last direction input that still count as steering (0.4 s)
 	const GOAL_CELEB = 420;             // frames of goal celebration (7 s); any key or tap skips it
 	const FALL_T = 55, DIVE_T = 26, THROW_T = 20;   // frames: a fouled player down and up, a keeper's dive, a throw-in's arms
@@ -4477,7 +4479,9 @@
 	// Otherwise the Auto switch setting decides:
 	//   assisted   one switch when the ball is lost, then held; while you steer or press, only an
 	//              out-of-the-play rescue (once a spell, with a message); idle, a clearly better man,
-	//              at most once a second and never straight back to the man just left.
+	//              at most twice a second and never straight back to the man just left. In every
+	//              mode but manual: the ball at a teammate's feet while your man is well off it
+	//              hands you that teammate at once, whatever you are doing.
 	//   manual     no auto-switch at all (restarts, send-offs and subs are handled elsewhere).
 	//   aggressive the quick rules: any clearly better-placed defender, whatever you are doing.
 	function switchToNearest (force) {
@@ -4498,7 +4502,19 @@
 			const turnover = turnoverPending;
 			turnoverPending = false;
 			const cs0 = switchScore(cur);
-			if (autoSwitchMode === "aggressive") {
+			// The ball is at (or about to be at) a teammate's feet and your man is well off it: he is
+			// yours at once, hold or no hold, steering or not. Not when your own man is nearly there
+			// too, and not straight back to the man you just left.
+			let near = null, nt = Infinity;
+			for (const m of outfield(0)) {
+				if (m === cur || (frame - leftAt < NEAR_GUARD && m === leftPlayer)) { continue; }
+				const t = timeToBall(m);
+				if (t < nt) { nt = t; near = m; }
+			}
+			const ct = timeToBall(cur);
+			if (near && nt <= NEAR_BALL && ct >= 14 && ct - nt > 10) {
+				best = near; hold = AUTO_HOLD; kind = "near";
+			} else if (autoSwitchMode === "aggressive") {
 				if (cs0 < 14) { return; }         // they are about to get there: leave them be
 				best = bestDefender(frame - leftAt < 45 ? leftPlayer : null);   // don't hand straight back
 				const fresh = frame - possLostAt < 40 || (ball.owner && ball.owner.team === 1 && cur.x > ball.owner.x + 30);
@@ -4529,14 +4545,14 @@
 					if (!far) { steerSwitchDone = true; }
 					hold = AUTO_HOLD_TURNOVER;
 					cue = far ? "Switched: your man was far from the ball" : "Switched: your man was out of the play"; kind = "rescue";
-				} else if (!(bs < cs0 * 0.8 && cs0 - bs > 6)) { return; }   // clearly better placed: sooner by a fifth and a tenth of a second
+				} else if (!(bs < cs0 * 0.85 && cs0 - bs > 4)) { return; }   // clearly better placed: sooner by a sixth and a fifteenth of a second
 			}
 		}
 		if (!best || best === cur) { return; }
 		leftPlayer = cur;
 		leftAt = frame;
 		ctrl = players.indexOf(best);
-		switchCd = force ? 15 : 24;
+		switchCd = force ? 15 : 12;
 		if (!force) { autoHold = hold; }
 		lastSwitchKind = kind;
 		if (cue) { toast(cue, "#eef6ea"); }
