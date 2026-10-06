@@ -5423,7 +5423,7 @@
 		sfx("whistle");
 		sfx("net");
 		buzz(scorer === 0 ? [ 70, 50, 70 ] : 120);
-		if (scorer === homeSide) { roar(1); } else { groan(); roar(0.35); }
+		if (scorer === homeSide) { roar(1); playGoalSong(clubIdOfTeam(homeSide)); } else { groan(); awayCornerCheer(); }
 		ev3d("goal", { scorer });
 		renderHud();
 	}
@@ -8263,6 +8263,68 @@
 			const a = sing(t0, song, 0, song.notes.length, 6, g, pan);
 			sing(t0 + a + 0.3, song, 0, song.notes.length, 6, g * 1.1, pan);
 		}
+	}
+
+	// Goal songs: when the home side scores, the stadium PA plays the club's own short goal song,
+	// worked out from its name like the chants (key, tempo, riff, sound), and the home end sings along.
+	const goalSongCache = new Map();
+	function goalSong (id) {
+		if (goalSongCache.has(id)) { return goalSongCache.get(id); }
+		const club = typeof teamOf === "function" ? teamOf(id) : (TEAMS[id] || FRIENDLY);
+		let h = hashStr(`${club.name}|goalsong`) || 1;
+		const r = n => { h = (h + 0x6D2B79F5) >>> 0; let z = Math.imul(h ^ (h >>> 15), 1 | h); z = (z + Math.imul(z ^ (z >>> 7), 61 | z)) ^ z; return (((z ^ (z >>> 14)) >>> 0) % n); };
+		const minor = r(4) === 0, scale = minor ? [ 0, 3, 5, 7, 10, 12, 15 ] : [ 0, 2, 4, 7, 9, 12, 14 ];   // pentatonic: it always sounds like a terrace tune
+		// A one-bar riff of eighths (0 = rest), played twice, then an answer bar and the riff again to finish.
+		const riff = [], answer = [];
+		let deg = r(3);
+		for (let i = 0; i < 8; i++) { deg = Math.max(0, Math.min(6, deg + [ -1, 0, 1, 1, 2, -2 ][r(6)])); riff.push(i > 0 && r(5) === 0 ? null : scale[deg]); }
+		for (let i = 0; i < 8; i++) { deg = Math.max(0, Math.min(6, deg + [ -1, 1, 0, -2 ][r(4)])); answer.push(i === 7 ? scale[[ 0, 2, 5 ][r(3)]] : i % 3 === 2 && r(2) ? null : scale[deg]); }
+		const song = { root: 57 + r(8), minor, bars: [ riff, riff, answer, riff ], eighth: 60 / (126 + r(5) * 8) / 2, lead: [ "square", "sawtooth", "triangle" ][r(3)], bass: r(2) === 1 };
+		goalSongCache.set(id, song);
+		return song;
+	}
+	function playGoalSong (id) {
+		if (!soundOn || !audio || bulkSim) { return; }
+		const song = goalSong(id), E = song.eighth, t0 = audio.currentTime + 1.6, g = 0.05;
+		// The PA: tinny (band-limited) with a slap of echo off the far stand.
+		const bus = audio.createGain(), bp = audio.createBiquadFilter(), dl = audio.createDelay(1), fb = audio.createGain();
+		bp.type = "bandpass"; bp.frequency.value = 1300; bp.Q.value = 0.5;
+		dl.delayTime.value = 0.23; fb.gain.value = 0.32;
+		bus.connect(bp); bp.connect(out()); bp.connect(dl); dl.connect(fb).connect(dl); dl.connect(out());
+		const len = song.bars.length * 8 * E;
+		bus.gain.setValueAtTime(1, t0); bus.gain.setValueAtTime(1, t0 + len - 0.2); bus.gain.linearRampToValueAtTime(0.0001, t0 + len + 0.6);
+		const tone = (t, n, dur, gain, type) => {
+			const o = audio.createOscillator(), og = audio.createGain();
+			o.type = type; o.frequency.value = midiHz(n);
+			og.gain.setValueAtTime(0.0001, t); og.gain.linearRampToValueAtTime(gain, t + 0.01); og.gain.setValueAtTime(gain * 0.8, t + dur * 0.7); og.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+			o.connect(og).connect(bus); o.start(t); o.stop(t + dur + 0.02);
+		};
+		song.bars.forEach((bar, b) => {
+			const bt = t0 + b * 8 * E;
+			bar.forEach((n, i) => { if (n !== null) { tone(bt + i * E, song.root + n, E * 0.9, g, song.lead); tone(bt + i * E, song.root + n + 12, E * 0.6, g * 0.3, "sine"); } });
+			for (let k = 0; k < 4; k++) {   // four on the floor, and a clap on two and four
+				const s0 = bt + k * 2 * E, o = audio.createOscillator(), dg = audio.createGain();
+				o.type = "sine"; o.frequency.setValueAtTime(120, s0); o.frequency.exponentialRampToValueAtTime(45, s0 + 0.2);
+				dg.gain.setValueAtTime(g * 3, s0); dg.gain.exponentialRampToValueAtTime(0.0001, s0 + 0.22); o.connect(dg).connect(bus); o.start(s0); o.stop(s0 + 0.24);
+				if (k % 2) { noiseBurst("white", s0, 0.1, g * 1.4, "bandpass", 1700, 1500, 1, 0); }
+				if (song.bass) { tone(s0 + E, song.root - 24 + (k === 2 ? 7 : 0), E * 0.8, g * 0.9, "triangle"); }
+			}
+		});
+		// The home end joins in from the second time through the riff: the tune on the voices.
+		const notes = [], rhythm = [];
+		for (const bar of song.bars.slice(1)) { for (const n of bar) { if (n === null && rhythm.length) { rhythm[rhythm.length - 1] += 1; } else { notes.push(n === null ? bar.find(x => x !== null) || 0 : n); rhythm.push(1); } } }
+		sing(t0 + 8 * E, { root: song.root - 12, notes, rhythm, beat: E, wave: "sawtooth" }, 0, notes.length, 6, 0.03, -0.25);
+		clapAlong(t0 + 8 * E, 24, 2 * E);
+		setTimeout(() => { try { bus.disconnect(); dl.disconnect(); fb.disconnect(); } catch (e) { /* already gone */ } }, (len + 6) * 1000);
+	}
+	function clapAlong (t, n, every) { for (let k = 0; k < n; k++) { noiseBurst("white", t + k * every, 0.08, 0.04, "bandpass", 1900, 1700, 0.9, -0.3); } }
+	// An away goal: only the away corner, a cheer and a burst of clapping from over in their end.
+	function awayCornerCheer () {
+		if (!soundOn || !audio || bulkSim) { return; }
+		const t = audio.currentTime + 0.1;
+		noiseBurst("pink", t, 3, 0.07, "bandpass", 700, 1200, 0.6, 0.65);
+		voices(t, 5, 260, 340, 2.2, 0.014, 1000, 0.65);
+		for (let k = 0; k < 14; k++) { noiseBurst("white", t + 1.2 + k * 0.3, 0.06, 0.03, "bandpass", 1900, 1700, 0.9, 0.65); }
 	}
 
 	// A partisan crowd. The home end cheers its side's chances, saves, tackles and clearances, and
@@ -11468,7 +11530,7 @@
 				return f;
 			},
 			get restartWalk () { return restartWalk; }, get review () { return review; }, get cpuSubs () { return cpuSubs; }, get surge () { return surge; }, get pressI () { return press; }, formBonus, get lastRatings () { return lastRatings; }, get stretcher () { return stretcher; }, injureTest (t, serious) { const v = outfield(t).find(p => !p.injured); const o = outfield(1 - t)[0]; if (v && o) { tackling[1 - t] = "hard"; const r = Math.random; Math.random = () => 0.01; try { commitFoul(o, v, true); } finally { Math.random = r; } } return v; }, staOf, get offside () { return offside; }, get deadBall () { return deadBall; }, get tally () { return tally; }, get freezeKind () { return freezeKind; }, fkDist () { return fkDist(); }, simExtra () { return { tally, poss: possFrames.slice() }; }, get setPieceKind () { return setPiece ? setPiece.kind : null; }, get gfxLevel () { return gfxLevel; }, setGfx, get musicBar () { return music ? music.bar : -1; }, get audioState () { return audio ? audio.state : "none"; }, get replayOn () { return replayOn(); }, get replay () { return replay; }, get recFrames () { return rec.n; }, REPLAY_AT, REPLAY_FR, GOAL_CELEB, get lastCaption () { return lastCaption; }, caption, get camMode () { return camMode; }, get crowdMood () { return crowdMood; }, get frameDt () { return frameDt; }, get crowdBed () { return crowd; }, get soundOn () { return soundOn; },
-			human, switchScore, outfield, dist, get cond () { return cond; }, clubSong, isDerby, celebrateTrophy, get fireworks () { return fireworks; }, chantTest (away) { ensureAudio(); chant(1, !!away); }, stepBallTest () { stepBall(); }, rematchTest () { clearLive(); state = "intro"; newMatch(); showIntro(); renderLeague(); },
+			human, switchScore, outfield, dist, get cond () { return cond; }, clubSong, isDerby, celebrateTrophy, get fireworks () { return fireworks; }, goalSongTest (id) { const s = goalSong(id); playGoalSong(id); return s; }, chantTest (away) { ensureAudio(); chant(1, !!away); }, stepBallTest () { stepBall(); }, rematchTest () { clearLive(); state = "intro"; newMatch(); showIntro(); renderLeague(); },
 			get officials () { return officials3; }, get flagCall () { return flagCall; }, refKit, deltaE,
 			proj (x, y, z) { return G3.cam ? proj3D(x, y, z) : null; }, get viewScale () { return scale; },
 			groundTest (o) { if (gstyle) { Object.assign(gstyle, o); } },
