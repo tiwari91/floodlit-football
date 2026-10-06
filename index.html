@@ -714,6 +714,19 @@
 	.sq-table tr.detail td { text-align: left; background: rgba(255, 255, 255, 0.03); }
 	.pl-detail { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font-size: 12px; color: var(--muted); white-space: normal; }
 	.pl-detail > span { flex: 1 1 100%; }
+	/* The player card: a five-point radar beside his form, morale, traits and contract. */
+	.pl-card { flex: 1 1 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; max-width: 100%; }
+	.pl-card svg { flex: 0 0 auto; width: 200px; height: 150px; }
+	.pl-card .rd-grid { fill: none; stroke: rgba(238, 246, 234, 0.14); stroke-width: 1; }
+	.pl-card .rd-shape { fill: rgba(242, 181, 46, 0.28); stroke: #f2b52e; stroke-width: 2; stroke-linejoin: round; }
+	.pl-card .rd-lbl { fill: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: 0.04em; }
+	.pl-card .rd-val { fill: #eef6ea; font-size: 10px; font-weight: 800; }
+	.pl-card .pc-info { flex: 1 1 150px; min-width: 0; display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+	.pl-card .pc-name { font-size: 15px; font-weight: 800; color: #eef6ea; overflow-wrap: anywhere; }
+	.pl-card .pc-name .formarrow { margin-right: 6px; }
+	.pl-card .pc-face { font-size: 18px; line-height: 1; vertical-align: -3px; margin-right: 4px; }
+	.pl-card .pc-badges { display: flex; flex-wrap: wrap; gap: 4px; }
+	.pl-card .pc-badges .trait { margin-left: 0; }
 	.pl-detail select, .pl-detail button { font-size: 12px; padding: 3px 8px; }
 	.gls { margin-left: 6px; font-size: 11px; font-weight: 700; color: #7fd49b; }
 	.inj { margin-left: 6px; font-size: 11px; font-weight: 700; color: #ef5b66; }
@@ -2597,6 +2610,40 @@
 		});
 	}
 
+	// The player card: a five-axis radar (pace, shooting, passing, defending and physical; physical is
+	// read from his defending, pace, age and build) with his form, morale, traits, age, nation and contract.
+	function physicalOf (pl, e) {
+		return Math.round(clamp(0.45 * e.def + 0.35 * e.pac + 22 - Math.max(0, (pl.age || 25) - 30) * 2 + (pl.trait === "target" ? 8 : 0) + (pl.pos === "gk" ? 6 : 0), 30, 99));
+	}
+	function playerCard (pl, e) {
+		const NS = "http://www.w3.org/2000/svg", mk = (t, a) => { const n = document.createElementNS(NS, t); for (const k in a) { n.setAttribute(k, a[k]); } return n; };
+		const axes = [ [ "PAC", e.pac ], [ "SHO", e.sho ], [ "PAS", e.pas ], [ "DEF", e.def ], [ "PHY", physicalOf(pl, e) ] ];
+		const cx = 100, cy = 80, R = 50, pt = (k, r) => { const a = -Math.PI / 2 + k * Math.PI * 2 / 5; return [ cx + Math.cos(a) * r, cy + Math.sin(a) * r ]; };
+		const svg = mk("svg", { viewBox: "0 0 200 150", role: "img", "aria-label": `${pl.name}: ${axes.map(([ k, v ]) => `${k} ${v}`).join(", ")}` });
+		for (const f of [ 0.25, 0.5, 0.75, 1 ]) { svg.append(mk("polygon", { class: "rd-grid", points: axes.map((x, k) => pt(k, R * f).map(v => v.toFixed(1)).join(",")).join(" ") })); }
+		axes.forEach((x, k) => { const [ x2, y2 ] = pt(k, R); svg.append(mk("line", { class: "rd-grid", x1: cx, y1: cy, x2: x2.toFixed(1), y2: y2.toFixed(1) })); });
+		svg.append(mk("polygon", { class: "rd-shape", points: axes.map(([ , v ], k) => pt(k, R * clamp(v, 0, 99) / 99).map(q => q.toFixed(1)).join(",")).join(" ") }));
+		axes.forEach(([ k, v ], i) => {
+			const [ lx, ly ] = pt(i, R + 12), anchor = Math.abs(lx - cx) < 4 ? "middle" : lx > cx ? "start" : "end";
+			const t = mk("text", { class: "rd-lbl", x: lx.toFixed(1), y: (ly + (i === 0 ? -2 : 3)).toFixed(1), "text-anchor": anchor });
+			t.textContent = k + " ";
+			const tv = mk("tspan", { class: "rd-val" }); tv.textContent = String(v); t.append(tv);
+			svg.append(t);
+		});
+		const card = el("div", "pl-card"), info = el("div", "pc-info"), name = el("div", "pc-name");
+		const fa = formAvg(pl), fb = formBonus(pl);
+		if (fa !== null) { const fm = el("span", "formarrow " + (fb > 0 ? "up" : fb < 0 ? "down" : "flat"), fb > 0 ? "▲" : fb < 0 ? "▼" : "▶"); fm.title = `Form ${fa.toFixed(1)}`; name.append(fm); }
+		name.append(document.createTextNode(`${pl.name} · ${POS_LABEL[pl.pos]}`));
+		const m = pl.morale, face = m >= 75 ? "😄" : m >= 55 ? "🙂" : m >= 40 ? "😐" : "🙁";
+		const mood = el("div"); mood.append(el("span", "pc-face", face), document.createTextNode(`Morale ${m}${fa !== null ? ` · form ${fa.toFixed(1)}` : ""}`));
+		const badges = el("div", "pc-badges");
+		for (const k of [ pl.trait ].filter(Boolean)) { const tg = el("span", "trait", traitName(k)); tg.title = TRAITS[k][1]; badges.append(tg); }
+		if (!badges.childElementCount) { badges.append(el("span", "", "No special trait")); }
+		info.append(name, mood, badges, el("div", "", `${pl.age} years old · ${NATIONS[pl.nat][0]}`), el("div", "", `Contract: ${pl.contract} season${pl.contract === 1 ? "" : "s"} left`));
+		card.append(svg, info);
+		return card;
+	}
+
 	function renderClub () {
 		const c = league.club;
 		const open = windowOpen(), five = league.fmt !== "11", used = slotsFor(league.fmt);
@@ -2654,6 +2701,7 @@
 				const dr = el("tr", "detail"), td = el("td");
 				td.colSpan = 9;
 				const role = roleOf(pl, c), box = el("div", "pl-detail");
+				box.append(playerCard(pl, e));
 				box.append(el("span", "", `${NATIONS[pl.nat][0]}, ${pl.age} · potential ${Math.round(pl.pot)} · value ${money(valueOf(pl))} · ${wageWeek(wageOf(pl))} · ${pl.contract} season${pl.contract === 1 ? "" : "s"} left · morale ${pl.morale}${pl.adapt > 0 ? ` · settling in (${Math.ceil(pl.adapt)} more games)` : ""}`));
 				const rs = el("select"); rs.setAttribute("aria-label", `Squad role for ${pl.name}`);
 				for (const [ k, v ] of [ [ "", `Role: ${ROLES[role]} (auto)` ], ...Object.entries(ROLES).map(([ k2, v2 ]) => [ k2, `Role: ${v2}` ]) ]) { const o2 = el("option", "", v); o2.value = k; rs.append(o2); }
