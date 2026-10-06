@@ -3817,7 +3817,7 @@
 		const d = Math.hypot(lx - ball.x, ly - ball.y);
 		// Your passes are zipped in a little firmer, so they beat the man in between.
 		const firm = p.team === 0 ? 1.18 : 1;
-		kick(p, lx, ly, clamp((d / 58 + 1.6) * cond.passComp * firm, 4.2, 16));
+		kick(p, lx, ly, clamp((d / 58 + 1.6) * cond.passComp * firm * passMul(), 4.2, 19));
 	}
 
 	// Lofted ball that comes down on (tx, ty): over any defender in the lane.
@@ -3826,6 +3826,7 @@
 	function loftTo (p, tx, ty, bow = 0, hang = 1) {
 		notePass(p);
 		const d = Math.hypot(tx - ball.x, ty - ball.y);
+		if (passPow >= 0) { hang *= 1.2 - passPow * 0.4; }   // a charged loft: soft floats, full is driven flatter
 		const T = Math.round(clamp(d / 9, 24, 70) * hang);     // frames in the air
 		kick(p, tx, ty, d * (1 - AIR_DRAG) / (1 - Math.pow(AIR_DRAG, T)));
 		ball.vz = GRAV * T / 2;
@@ -3942,9 +3943,10 @@
 	function startPass (p, m, lead) {
 		if (lead) {
 			// Through ball: into the space ahead of the teammate, toward goal.
-			const tx = clamp(m.x + 130, 40, FW - 40), ty = m.y;
+			// Charged: a soft one is played to feet-ish, a driven one well into the space.
+			const tx = clamp(m.x + (passPow < 0 ? 130 : 80 + passPow * 100), 40, FW - 40), ty = m.y;
 			const je = passErr(p);
-			kick(p, tx + (Math.random() * 2 - 1) * je, ty + (Math.random() * 2 - 1) * je, clamp((Math.hypot(tx - ball.x, ty - ball.y) / 55 + 2) * cond.passComp, 6, 16));
+			kick(p, tx + (Math.random() * 2 - 1) * je, ty + (Math.random() * 2 - 1) * je, clamp((Math.hypot(tx - ball.x, ty - ball.y) / 55 + 2) * cond.passComp * passMul(), 6, 19));
 		} else {
 			passTo(p, m);
 		}
@@ -3959,6 +3961,7 @@
 	// After any pass of yours: control follows the ball to whoever it is meant for.
 	function handOff (m, timer) {
 		charging = false;   // otherwise the receiver inherits the charge and fires on release
+		passCharge = null;
 		ctrl = players.indexOf(m);
 		receiver = m;
 		receiveTimer = timer;
@@ -4008,7 +4011,7 @@
 		if (laneBlockers(p, { x: tx, y: ty }) > 0 || d > 520) {
 			loftTo(p, tx, ty);
 		} else {
-			kick(p, tx, ty, clamp((d / 50 + 2.5) * cond.passComp, 7, 17));
+			kick(p, tx, ty, clamp((d / 50 + 2.5) * cond.passComp * passMul(), 7, 20));
 		}
 		handOff(m, 170);
 	}
@@ -4035,6 +4038,28 @@
 			if (Math.hypot(bx - p.x, by - p.y) <= reach * t + 14) { break; }
 		}
 		return [ clamp(bx, 12, FW - 12), clamp(by, 12, FH - 12) ];
+	}
+
+	// Hold to charge a pass: a tap rolls it softly, a full hold drives it. The pass goes on release.
+	let passCharge = null, passPow = -1;   // passPow < 0: no charge (the computer, set pieces)
+	const PASS_FN = { pass: () => humanPass(), through: () => humanThrough(), long: () => humanLong() };
+	const passMul = () => (passPow < 0 ? 1 : 0.78 + passPow * 0.5);
+	const chargeOf = start => clamp((frame - start) / 50, 0, 1);
+	function passPress (kind) {
+		const p = human();
+		if (state === "play" && freeze <= 0 && p && ball.owner === p && !(setPiece && setPiece.taker === p) && !charging) {
+			passCharge = { kind, start: frame };
+			return;
+		}
+		PASS_FN[kind]();
+	}
+	function passRelease (kind) {
+		if (!passCharge || passCharge.kind !== kind) { return; }
+		const pc = passCharge;
+		passCharge = null;
+		if (state !== "play" || freeze > 0 || ball.owner !== human()) { return; }
+		passPow = chargeOf(pc.start);
+		try { PASS_FN[kind](); } finally { passPow = -1; }
 	}
 
 	function humanPass () {
@@ -7925,6 +7950,10 @@
 			ctx.fillText(label, X, Y - 49);
 		}
 
+		if (isHuman && (charging || passCharge) && ball.owner === p) {
+			const [ ax, ay ] = chargeAim(p);
+			drawChargeUI(X, Y, MX + ax, MY + ay, 1);
+		}
 		if (isHuman && charging) {
 			const c = clamp((frame - chargeStart) / 50, 0, 1);
 			ctx.strokeStyle = "#f2b52e";
@@ -7933,6 +7962,30 @@
 			ctx.arc(X, Y, 29, -Math.PI / 2, -Math.PI / 2 + c * Math.PI * 2);
 			ctx.stroke();
 		}
+	}
+
+	// While a pass or shot charges: a small arrow from the player toward where it is going,
+	// and a power bar just under him. (fx, fy) is the foot on screen, (ax, ay) the arrow's tip.
+	function chargeAim (me) {
+		if (charging) { return aimY !== null && shotInRange(me) ? [ FW, aimY ] : [ me.x + Math.cos(me.dir) * 60, me.y + Math.sin(me.dir) * 60 ]; }
+		const m = passCharge.kind === "long" ? strikerTarget(me) : passTarget(me);
+		if (!m) { return [ me.x + Math.cos(me.dir) * 60, me.y + Math.sin(me.dir) * 60 ]; }
+		return passCharge.kind === "through" ? [ m.x + 80 + chargeOf(passCharge.start) * 100, m.y ] : [ m.x, m.y ];
+	}
+	function drawChargeUI (fx, fy, ax, ay, k) {
+		const power = chargeOf(charging ? chargeStart : passCharge.start);
+		const dx = ax - fx, dy = ay - fy, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d;
+		const L = (22 + power * 22) * k, tx = fx + ux * (16 * k + L), ty = fy + uy * (16 * k + L);
+		ctx.save();
+		ctx.strokeStyle = ctx.fillStyle = "#f2b52e";
+		ctx.lineWidth = 3;
+		ctx.beginPath(); ctx.moveTo(fx + ux * 16 * k, fy + uy * 16 * k); ctx.lineTo(tx - ux * 7, ty - uy * 7); ctx.stroke();
+		ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx - ux * 9 - uy * 5, ty - uy * 9 + ux * 5); ctx.lineTo(tx - ux * 9 + uy * 5, ty - uy * 9 - ux * 5); ctx.closePath(); ctx.fill();
+		const w = 36, h = 5, bx = fx - w / 2, by = fy + 18 * k + 6;
+		ctx.fillStyle = "rgba(7, 12, 10, 0.75)"; ctx.fillRect(bx - 2, by - 2, w + 4, h + 4);
+		ctx.fillStyle = power < 0.5 ? "#7fd49b" : power < 0.8 ? "#f2b52e" : "#e2594a";
+		ctx.fillRect(bx, by, w * power, h);
+		ctx.restore();
 	}
 
 	function drawBall () {
@@ -10509,6 +10562,10 @@
 					ctx.strokeStyle = "rgba(255, 255, 255, 0.35)"; ctx.lineWidth = 3;
 					ctx.beginPath(); ctx.ellipse(foot.x, foot.y, r, r * 0.42, 0, -Math.PI / 2, -Math.PI / 2 + c * Math.PI * 2); ctx.stroke();
 				}
+				if ((charging || passCharge) && ball.owner === me) {
+					const [ ax, ay ] = chargeAim(me), tip = proj3D(ax, ay, 0);
+					if (tip) { drawChargeUI(foot.x, foot.y, tip.x, tip.y, Math.max(0.6, foot.k)); }
+				}
 				if (charging) {
 					const c = clamp((frame - chargeStart) / 50, 0, 1), r = 28 * foot.k;
 					ctx.strokeStyle = "#f2b52e"; ctx.lineWidth = 4;
@@ -10783,17 +10840,20 @@
 			if (state === "play") { pause(); } else if (state === "paused" || state === "intro" || state === "full" || state === "half") { startPlay(); }
 		}
 		if (state === "play" && freeze <= 0) {
-			if (pressed(0)) { humanPass(); }
+			if (pressed(0)) { passPress("pass"); }
 			if (pressed(1)) { humanShootPress(); }
 			if (pressed(2)) { humanTackle(); }
-			if (pressed(3)) { humanThrough(); }
-			if (pressed(5)) { humanLong(); }
+			if (pressed(3)) { passPress("through"); }
+			if (pressed(5)) { passPress("long"); }
 		}
 		if (state === "play" || state === "goal") {
 			if (pressed(12)) { setMentality(0, mentality[0] + 1); }   // D-pad up: more attacking
 			if (pressed(13)) { setMentality(0, mentality[0] - 1); }   // D-pad down: more defensive
 		}
 		if (released(1)) { humanShootRelease(); }
+		if (released(0)) { passRelease("pass"); }
+		if (released(3)) { passRelease("through"); }
+		if (released(5)) { passRelease("long"); }
 		padPrev = now;
 	}
 	window.addEventListener("gamepadconnected", () => { padOn = true; toast("Controller connected", "#eef6ea"); });
@@ -10823,20 +10883,23 @@
 		if ((state === "play" || state === "goal") && e.code === "KeyT") { setMentality(0, mentality[0] >= 2 ? -1 : mentality[0] + 1); }
 		if (state === "goal" && GAME_KEYS.has(e.code)) { skipCelebration(); }
 		if (state !== "play" || freeze > 0) { return; }
-		if (e.code === "KeyS" || e.code === "Space") { humanPass(); }
+		if (e.code === "KeyS" || e.code === "Space") { passPress("pass"); }
 		if (e.code === "KeyD") { humanShootPress(); }
 		if (e.code === "KeyA") { pressHeld = true; humanTackle(); }
-		if (e.code === "KeyW") { humanThrough(); }
-		if (e.code === "KeyQ") { humanLong(); }
+		if (e.code === "KeyW") { passPress("through"); }
+		if (e.code === "KeyQ") { passPress("long"); }
 	});
 
 	window.addEventListener("keyup", e => {
 		keys.delete(e.code);
 		if (e.code === "KeyD") { humanShootRelease(); }
+		if (e.code === "KeyS" || e.code === "Space") { passRelease("pass"); }
+		if (e.code === "KeyW") { passRelease("through"); }
+		if (e.code === "KeyQ") { passRelease("long"); }
 		if (e.code === "KeyA") { pressHeld = false; }
 	});
 
-	window.addEventListener("blur", () => { keys.clear(); charging = false; padSprint = false; pressHeld = false; touchPress = false; });
+	window.addEventListener("blur", () => { keys.clear(); charging = false; passCharge = null; padSprint = false; pressHeld = false; touchPress = false; });
 
 	// Touch joystick
 	const stick = $("stick"), knob = $("knob");
@@ -10861,10 +10924,13 @@
 	// Tackle: a tap slides (or shoulders) as before; holding it is the press assist.
 	padTackle.addEventListener("pointerdown", e => { e.preventDefault(); skipCelebration(); touchPress = true; humanTackle(); });
 	for (const ev of [ "pointerup", "pointercancel", "pointerleave" ]) { padTackle.addEventListener(ev, () => { touchPress = false; }); }
-	$("padPass").addEventListener("pointerdown", e => { e.preventDefault(); skipCelebration(); if (state === "play" && freeze <= 0) { humanPass(); } });
-	$("padLong").addEventListener("pointerdown", e => { e.preventDefault(); skipCelebration(); if (state === "play" && freeze <= 0) { humanLong(); } });
+	for (const [ id, kind ] of [ [ "padPass", "pass" ], [ "padLong", "long" ], [ "padThrough", "through" ] ]) {
+		const b = $(id);
+		b.addEventListener("pointerdown", e => { e.preventDefault(); skipCelebration(); try { b.setPointerCapture(e.pointerId); } catch (err) { /* not capturable */ } if (state === "play" && freeze <= 0) { passPress(kind); } });
+		b.addEventListener("pointerup", () => passRelease(kind));
+		b.addEventListener("pointercancel", () => { passCharge = null; });
+	}
 	$("padTactic").addEventListener("pointerdown", e => { e.preventDefault(); if (state === "play" || state === "goal") { setMentality(0, mentality[0] >= 2 ? -1 : mentality[0] + 1); } });
-	$("padThrough").addEventListener("pointerdown", e => { e.preventDefault(); skipCelebration(); if (state === "play" && freeze <= 0) { humanThrough(); } });
 	$("padShoot").addEventListener("pointerdown", e => { e.preventDefault(); skipCelebration(); humanShootPress(); });
 	$("pitchwrap").addEventListener("pointerdown", () => skipCelebration());
 	$("padShoot").addEventListener("pointerup", () => humanShootRelease());
@@ -11363,7 +11429,7 @@
 			get manualLock () { return manualLock; }, get celeb () { return typeof celeb === "undefined" ? null : celeb; },
 			get autoSwitchMode () { return autoSwitchMode; }, set autoSwitchMode (v) { autoSwitchMode = v; autoSwitchSel.value = v; },
 			get autoHold () { return autoHold; }, set autoHold (v) { autoHold = v; },
-			get charging () { return charging; }, get meterRect () { return meterRect; }, get drawMs () { return drawMs; }, get scale () { return scale; }, get kits () { return KITS; }, get stats () { return stats; }, get oppStats () { return oppStats; }, get steerAt () { return steerAt; }, set steerAt (v) { steerAt = v; }, set possTeam (v) { possTeam = v; },
+			get charging () { return charging; }, get passCharge () { return passCharge; }, get meterRect () { return meterRect; }, get drawMs () { return drawMs; }, get scale () { return scale; }, get kits () { return KITS; }, get stats () { return stats; }, get oppStats () { return oppStats; }, get steerAt () { return steerAt; }, set steerAt (v) { steerAt = v; }, set possTeam (v) { possTeam = v; },
 			set steerSwitchDone (v) { steerSwitchDone = !!v; },
 			get lastSwitchKind () { return lastSwitchKind; }, get line () { return line; }, get tackling () { return tackling; }, setLine (t, v) { line[t] = v; }, setTackling (t, v) { tackling[t] = v; }, set lastSwitchKind (v) { lastSwitchKind = v; }, get setPiece () { return setPiece; },
 			get G3 () { return G3; }, get matchLog () { return matchLog; }, get league () { return league; }, simSeasonTest () { simulateSeason(); }, nextSeasonTest () { if (seasonDone()) { newSeason(league.fmt); newMatch(); renderLeague(); } }, renderLeagueTest () { renderLeague(); }, crowdReactTest (k, t) { crowdReactImpl(k, t); }, get shoot () { return shoot; }, cornerTest (att, top = true) { if (state !== "play") { return; } freeze = 0; awardCorner(att, att === 1, top); }, get cornerPlan () { return cornerPlan; },
