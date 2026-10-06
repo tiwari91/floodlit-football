@@ -140,6 +140,46 @@
 		.lower .lt-main b { font-size: 16px; }
 		.lower .lt-main small { font-size: 11px; }
 	}
+	/* Broadcast graphics: line-ups at kick-off, the fourth official's board, a results ticker. */
+	.bc-lineups { position: absolute; top: 60px; left: 50%; transform: translateX(-50%); z-index: 3; width: min(520px, calc(100% - 20px)); max-height: calc(100% - 110px); overflow: hidden;
+		display: grid; grid-template-columns: 1fr 1fr; gap: 0; background: rgba(9, 14, 12, 0.9); border-top: 4px solid var(--amber); border-radius: 4px; cursor: pointer;
+		font-family: var(--display); color: #eef6ea; filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.5)); animation: ltIn 0.45s cubic-bezier(0.2, 0.8, 0.2, 1); }
+	.bc-lineups[hidden], .bc-board[hidden], .bc-ticker[hidden] { display: none; }
+	.bc-col { padding: 8px 12px 10px; border-top: 3px solid var(--kit, #f2b52e); min-width: 0; }
+	.bc-col + .bc-col { border-left: 1px solid rgba(238, 246, 234, 0.12); }
+	.bc-team { font-weight: 900; font-size: 16px; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.bc-shape { font-size: 12px; font-weight: 800; letter-spacing: 0.1em; color: var(--amber); margin-bottom: 4px; }
+	.bc-col ol { list-style: none; margin: 0; padding: 0; font-family: var(--body, inherit); font-size: 12px; line-height: 1.35; }
+	.bc-col li { display: flex; gap: 8px; white-space: nowrap; overflow: hidden; }
+	.bc-col li b { flex: 0 0 20px; text-align: right; color: var(--muted); }
+	.bc-col li span { overflow: hidden; text-overflow: ellipsis; }
+	.bc-board { position: absolute; top: 84px; right: 10px; z-index: 3; pointer-events: none; display: grid; gap: 3px; padding: 6px 8px; border-radius: 6px; background: #121614;
+		border: 2px solid #2b322e; font-family: var(--display); filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.5)); animation: ltIn 0.35s ease-out; }
+	.bc-board .row { display: flex; align-items: center; gap: 8px; }
+	.bc-board .lbl { font-size: 10px; font-weight: 800; letter-spacing: 0.12em; color: #9aa69f; text-transform: uppercase; }
+	.bc-board .led { min-width: 46px; text-align: center; font-size: 30px; font-weight: 900; line-height: 1; letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+	.bc-board .off { color: #ff4d4d; text-shadow: 0 0 8px rgba(255, 77, 77, 0.7); }
+	.bc-board .on { color: #47e67a; text-shadow: 0 0 8px rgba(71, 230, 122, 0.7); }
+	.bc-board .add { color: #ffc93a; text-shadow: 0 0 8px rgba(255, 201, 58, 0.7); }
+	.bc-ticker { position: absolute; left: 0; right: 0; bottom: 0; height: 22px; display: flex; align-items: stretch; pointer-events: none; overflow: hidden; background: rgba(8, 12, 10, 0.86);
+		font-size: 12px; font-weight: 700; color: #eef6ea; border-top: 1px solid rgba(242, 181, 46, 0.5); }
+	.bc-tk-tag { flex: 0 0 auto; display: flex; align-items: center; padding: 0 10px; background: var(--amber); color: #10140f; font-family: var(--display); font-weight: 900; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; }
+	.bc-tk-run { position: relative; flex: 1 1 auto; overflow: hidden; }
+	.bc-tk-run > span { position: absolute; top: 0; bottom: 0; display: flex; align-items: center; white-space: nowrap; padding-left: 100%; animation: tkRun var(--tk-dur, 40s) linear infinite; }
+	.bc-tk-run i { font-style: normal; margin-right: 26px; }
+	.bc-tk-run i.new { color: var(--amber); }
+	.bc-tk-run i em { font-style: normal; color: var(--muted); margin-left: 4px; }
+	@keyframes tkRun { from { transform: translateX(0); } to { transform: translateX(-100%); } }
+	@media (prefers-reduced-motion: reduce) { .bc-tk-run > span { animation-duration: 120s; } }
+	@media (pointer: coarse), (max-width: 640px) {
+		.bc-lineups { top: 52px; }
+		.bc-team { font-size: 13px; }
+		.bc-col { padding: 6px 8px 8px; }
+		.bc-col ol { font-size: 11px; line-height: 1.25; }
+		.bc-board { top: 90px; }
+		.bc-board .led { font-size: 24px; min-width: 38px; }
+		.bc-tk-tag { font-size: 10px; padding: 0 6px; }
+	}
 	/* The replay's tag, top right under the menu button. */
 	.replaytag { position: absolute; top: 46px; right: 10px; z-index: 3; padding: 3px 10px 4px; font-family: var(--display); font-weight: 900; font-size: 15px; letter-spacing: 0.14em; text-transform: uppercase; background: #f2b52e; color: #10140f; border-radius: 3px; pointer-events: none; }
 	.replaytag[hidden] { display: none; }
@@ -1105,6 +1145,9 @@
 		<div class="scorebug" id="scoreBug" aria-hidden="true"><span id="bugHome">You</span><b id="bugScore">0 – 0</b><span id="bugAway">CPU</span><span class="t" id="bugClock">03:00</span><span class="bugbar"><span class="mfill" id="bugFill"></span></span><span class="bugmood" id="bugMood" hidden></span></div>
 		<div class="lower" id="lowerThird" aria-hidden="true" hidden><span class="lt-tag" id="ltTag">Goal</span><span class="lt-main"><b id="ltName"></b><small id="ltSub"></small></span></div>
 		<div class="replaytag" id="replayTag" aria-hidden="true" hidden>Replay<small>any key skips</small></div>
+		<div class="bc-ticker" id="bcTicker" aria-hidden="true" hidden><span class="bc-tk-tag">Around the league</span><span class="bc-tk-run"><span id="bcTickerText"></span></span></div>
+		<div class="bc-board" id="bcBoard" aria-hidden="true" hidden></div>
+		<div class="bc-lineups" id="bcLineups" aria-hidden="true" title="Tap to close" hidden></div>
 		<div class="banner" id="banner" hidden></div>
 		<div class="coach" id="coach" hidden>
 			<div class="coach-step" id="coachStep"></div>
@@ -2363,7 +2406,7 @@
 	function recordLeagueResult (lm, h, a) {
 		if (!league || league.round !== lm.round) { return; }
 		const mine = lm.home ? [ 0, lm.opp, h, a ] : [ lm.opp, 0, a, h ];
-		const others = league.fixtures[lm.round].filter(([ x, y ]) => x !== 0 && y !== 0).map(([ x, y ]) => simMatch(x, y));
+		const others = tickPlan && tickPlan.round === lm.round ? tickPlan.res.map(r => r.slice()) : league.fixtures[lm.round].filter(([ x, y ]) => x !== 0 && y !== 0).map(([ x, y ]) => simMatch(x, y));
 		league.results[lm.round] = [ mine, ...others ];
 		league.round = lm.round + 1;
 		updateFitness();
@@ -5055,7 +5098,7 @@
 			if (--goalTimer <= 0) {
 				banner.hidden = true;
 				if (shoot) { state = "play"; nextShootCorner(); return; }
-				if (timeLeft <= 0) { endMatch(); return; }
+				if (timeLeft <= 0 && stall <= 0) { endMatch(); return; }
 				state = "play";
 				kickoff(lastConceded);
 			}
@@ -5091,8 +5134,8 @@
 
 		if (shoot) { shootTick(); if (state !== "play") { return; } }
 		if (!tut && !shoot) {
-			timeLeft = Math.max(0, timeLeft - 1 / 60);
-			if (!halfDone && timeLeft <= matchLen / 2) { halfTime(); return; }
+			if (stall > 0) { stall = Math.max(0, stall - 1 / 60); } else { timeLeft = Math.max(0, timeLeft - 1 / 60); }
+			if (!halfDone && timeLeft <= matchLen / 2) { if (!addedDone[0]) { startAdded(0); } else if (stall <= 0) { halfTime(); return; } }
 		}
 		tutTick();
 
@@ -5111,7 +5154,7 @@
 			if (moodZone === -1) { toast("Nerves settling", "#7fd49b"); } else if (moodZone === 1) { toast(`${opp.short} settling`, "#f2b52e"); }
 			moodZone = 0;
 		}
-		if (timeLeft <= 0 && !shoot) { endMatch(); return; }
+		if (timeLeft <= 0 && !shoot) { if (!addedDone[1] && !tut) { startAdded(1); } else if (stall <= 0) { endMatch(); return; } }
 
 		if (frame % 120 === 0) { saveLive(); }
 		if (frame % 60 === 0) { cpuSubCheck(); tiredNudge(); }
@@ -5862,7 +5905,7 @@
 			vic.name = np.name; vic.attr = { pac: np.pac, sho: np.sho, pas: np.pas, def: np.def }; vic.injured = false; vic.yellow = 0;
 			cpuSubs--;
 			hurtText = `${was || "Their man"} is hurt: ${opp.short} bring on ${np.name}.`;
-			setTimeout(() => caption("Substitution", "sub", np.name, `${opp.short} · off: ${was || "injured"}`, 1), 2600);
+			setTimeout(() => { caption("Substitution", "sub", np.name, `${opp.short} · off: ${was || "injured"}`, 1); subBoard(1, vic); }, 2600);
 			logEvent(1, "sub", `${np.name} on for ${was || "the injured man"}`);
 		}
 		const extra = [ card ? `${card}${who}.` : `Foul${who}.`, red ? `${off.team === 0 ? "You're" : `${opp.short} are`} down to ${team(off.team).length - 1} men.` : "", hurtText ].filter(Boolean).join(" ");
@@ -5933,6 +5976,7 @@
 		if (!quiet) {
 			burst(p.x, p.y, "Sub on");
 			caption("Substitution", "sub", pl.name, `On for ${out} · ${minuteNow()}'`, 0);
+			subBoard(0, p);
 			$("announce").textContent = `Substitution: ${pl.name} on for ${out}.`;
 		}
 		updateSubsBtn();
@@ -5960,7 +6004,7 @@
 		cpuSubs--;
 		logEvent(1, "sub", `${np.name} on for ${was || "a tired man"}`);
 		caption("Substitution", "sub", np.name, `${opp.short} · off: ${was || "?"} (${why})`, 1);
-		if (typeof subBoard === "function") { subBoard(1, was, np.name); }
+		subBoard(1, p);
 	}
 	// When one of yours is running on empty (or limping), say so once and point at the pause card.
 	function tiredNudge () {
@@ -6662,6 +6706,8 @@
 		const oppStr = leagueMatch ? getStr(leagueMatch.opp) + (leagueMatch.home ? -0.3 : 0.3) : (mode === "corners" ? { easy: 1.5, normal: 2.2, hard: 3.4 } : { easy: 2, normal: 3, hard: 4.5 })[diffSel.value] || 3;
 		diff = strengthCfg(oppStr);
 		applyLevel();
+		subNo = [ 0, 0 ]; stall = 0; addedDone = [ false, false ];
+		planOthers(leagueMatch);
 		oppSquad = cpuSquad(leagueMatch ? leagueMatch.opp : 99, oppStr);
 		$("fmtName").textContent = FMT.label;
 		score = [ 0, 0 ];
@@ -6990,6 +7036,7 @@
 			newMatch();
 			freeze = KICKOFF_FREEZE;
 			if (mode === "corners") { startShootout(); return; }
+			showLineups();
 			if (mode !== "tutorial") { store.set("ff-played", String(playedCount() + 1)); }
 		}
 		if (state === "half") { toast("Second half: teams change ends", "#eef6ea"); }
@@ -8772,7 +8819,7 @@
 		ctx.textBaseline = "middle";
 		ctx.textAlign = "left";
 		let x = 12;
-		const y = VH - 22, maxX = minimapOn && (WW > VW || WH > VH) ? (VW - 190) / 2 - 10 : VW - 12;   // stay clear of the minimap when it's shown
+		const y = VH - 22 - tickerUp(), maxX = minimapOn && (WW > VW || WH > VH) ? (VW - 190) / 2 - 10 : VW - 12;   // stay clear of the minimap when it's shown
 		for (const [ key, label ] of items) {
 			ctx.font = "800 11px Barlow, Arial, sans-serif";
 			const kw = ctx.measureText(key).width + 10;
@@ -8799,7 +8846,7 @@
 		const me = human();
 		if (!charging || state !== "play" || !me || ball.owner !== me) { meterRect = null; return; }
 		const power = clamp((frame - chargeStart) / 50, 0, 1);
-		const w = Math.min(220, VW - 40), h = 10, x = (VW - w) / 2, y = VH - (coarse || !hintsOn ? 30 : 56);
+		const w = Math.min(220, VW - 40), h = 10, x = (VW - w) / 2, y = VH - (coarse || !hintsOn ? 30 : 56) - tickerUp();
 		meterRect = { x, y, w, h, power };
 		ctx.save();
 		ctx.fillStyle = "rgba(7, 12, 10, 0.7)";
@@ -8844,7 +8891,7 @@
 	let minimapOn = false;   // off unless you turn it on with the Minimap button
 	function drawMinimap () {
 		if (!minimapOn || (WW <= VW && WH <= VH)) { return; }
-		const w = 190, k = w / FW, h = FH * k, x0 = (VW - w) / 2, y0 = VH - h - 12;
+		const w = 190, k = w / FW, h = FH * k, x0 = (VW - w) / 2, y0 = VH - h - 12 - tickerUp();
 		ctx.fillStyle = "rgba(7, 12, 10, 0.72)";
 		ctx.fillRect(x0 - 5, y0 - 5, w + 10, h + 10);
 		ctx.strokeStyle = "rgba(238, 246, 234, 0.45)";
@@ -11073,6 +11120,85 @@
 		return out;
 	}
 
+	/* ---------- broadcast overlays ----------
+	   Line-ups and shapes for both sides at kick-off (a few seconds, or tap it away), the fourth
+	   official's board for substitutions (number off in red, number on in green) and for added time
+	   at 45 and 90 (the clock holds while it is played), and a ticker along the bottom with the other
+	   league games, their goals going in as they happen and the finals after your match. */
+	let bcLineT = 0, bcBoardT = 0, subNo = [ 0, 0 ], stall = 0, addedDone = [ false, false ], tickPlan = null, tickKey = "", tickNew = new Map();
+	const tickerUp = () => ($("bcTicker").hidden ? 0 : 24);   // canvas hints sit above the ticker
+	function hideLineups () { clearTimeout(bcLineT); $("bcLineups").hidden = true; }
+	function showLineups () {
+		if (bulkSim || mode === "tutorial" || mode === "corners") { return; }
+		const box = $("bcLineups");
+		box.replaceChildren();
+		for (const t of [ 0, 1 ]) {
+			const col = el("div", "bc-col");
+			col.style.setProperty("--kit", (KITS[t] || KITS[0]).outfield);
+			const sh = SHAPES[fmtKey] && teamShape[t] && SHAPES[fmtKey][teamShape[t]] ? SHAPES[fmtKey][teamShape[t]].label.split(" ")[0] : "";
+			col.append(el("div", "bc-team", t === 0 ? YOU.name : opp.name), el("div", "bc-shape", sh || FMT.label));
+			const ol = el("ol");
+			for (const p of team(t)) { const li = el("li"); li.append(el("b", "", String(p.num || "")), el("span", "", p.name || (p.role === "gk" ? "Keeper" : "Player"))); ol.append(li); }
+			col.append(ol);
+			box.append(col);
+		}
+		box.hidden = false;
+		box.style.animation = "none"; void box.offsetWidth; box.style.animation = "";
+		clearTimeout(bcLineT);
+		bcLineT = setTimeout(hideLineups, 6000);
+	}
+	function board (rows, ms) {
+		if (bulkSim || mode === "tutorial") { return; }
+		const b = $("bcBoard");
+		b.replaceChildren(...rows.map(([ lbl, cls, txt ]) => { const r = el("div", "row"); r.append(el("span", "led " + cls, txt), el("span", "lbl", lbl)); return r; }));
+		b.hidden = false;
+		b.style.animation = "none"; void b.offsetWidth; b.style.animation = "";
+		clearTimeout(bcBoardT);
+		bcBoardT = setTimeout(() => { b.hidden = true; }, ms);
+	}
+	// A substitution: the slot's number goes off; the new man gets the next bench number (12, 13 ...).
+	function subBoard (t, p) {
+		const on = 11 + (++subNo[t]);
+		board([ [ t === 0 ? "You" : opp.short, "off", String(p && p.num ? p.num : "–") ], [ "", "on", String(on) ] ], 5000);
+	}
+	// Added time: a minute, and half as many again as the stoppages (goals, cards, subs, knocks) in the half.
+	function startAdded (h) {
+		addedDone[h] = true;
+		const n = clamp(1 + Math.round(matchLog.filter(e => (h === 0 ? e.min <= 45 : e.min > 45)).length * 0.5), 1, 6);
+		stall = n * matchLen / 90;
+		board([ [ "Added time", "add", `+${n}` ] ], Math.max(4000, stall * 1000));
+		if (!bulkSim) { $("announce").textContent = `${n} minute${n === 1 ? "" : "s"} added on.`; }
+	}
+	// The rest of the matchday, settled at kick-off so the ticker can show the goals as they go in.
+	function planOthers (lm) {
+		if (!lm || !league) { tickPlan = null; return; }
+		const res = league.fixtures[lm.round].filter(([ x, y ]) => x !== 0 && y !== 0).map(([ x, y ]) => simMatch(x, y));
+		const mins = res.map(r => [ Array.from({ length: r[2] }, () => 1 + Math.floor(Math.random() * 90)), Array.from({ length: r[3] }, () => 1 + Math.floor(Math.random() * 90)) ]);
+		tickPlan = { round: lm.round, res, mins };
+		tickKey = ""; tickNew = new Map();
+	}
+	function renderTicker () {
+		const tk = $("bcTicker");
+		const live = tickPlan && mode === "league" && (state === "play" || state === "goal" || state === "paused" || state === "half" || state === "full");
+		if (!live) { if (!tk.hidden) { tk.hidden = true; } return; }
+		const done = state === "full", m = done ? 99 : minuteNow();
+		const sc = tickPlan.res.map((r, i) => [ tickPlan.mins[i][0].filter(x => x <= m).length, tickPlan.mins[i][1].filter(x => x <= m).length ]);
+		const nFresh = [ ...tickNew.values() ].filter(t0 => performance.now() - t0 < 30000).length;
+		const key = sc.map(x => x.join("-")).join(",") + (done ? "F" : state === "half" ? "H" : "") + "|" + nFresh;
+		if (key === tickKey && !tk.hidden) { return; }
+		if (tickKey) { const old = tickKey.split("|")[0].replace(/[FH]$/, "").split(","); sc.forEach((x, i) => { if (old[i] && old[i] !== x.join("-")) { tickNew.set(i, performance.now()); } }); }
+		tickKey = key;
+		const txt = $("bcTickerText");
+		txt.replaceChildren(...tickPlan.res.map(([ h, a ], i) => {
+			const fresh = tickNew.has(i) && performance.now() - tickNew.get(i) < 30000;
+			const it = el("i", fresh ? "new" : "", `${TEAMS[h].short} ${sc[i][0]}–${sc[i][1]} ${TEAMS[a].short}`);
+			it.append(el("em", "", done ? "FT" : state === "half" ? "HT" : fresh ? "GOAL" : ""));
+			return it;
+		}));
+		txt.style.setProperty("--tk-dur", `${Math.max(20, tickPlan.res.length * 4)}s`);
+		tk.hidden = false;
+	}
+
 	/* ---------- replay on demand, and slow motion ----------
 	   R (or the Replay pad) shows the last six seconds again from the same recording, a touch slower
 	   than life, in whichever view is on. Nothing moves on meanwhile and the clock stands still. Any
@@ -11108,6 +11234,7 @@
 		draw(odr ? 1 : acc / STEP);
 		drawMs += (performance.now() - d0 - drawMs) * 0.1;   // smoothed cost of a drawn frame, for the test harness
 		renderHud();
+		renderTicker();
 		updateRainSound();
 		updateCrowd();
 		updateMusic();
@@ -11232,6 +11359,7 @@
 		b.addEventListener("pointerup", () => passRelease(kind));
 		b.addEventListener("pointercancel", () => { passCharge = null; });
 	}
+	$("bcLineups").addEventListener("pointerdown", e => { e.stopPropagation(); hideLineups(); });
 	$("padReplay").addEventListener("pointerdown", e => { e.preventDefault(); if (odr) { endOdr(); } else { startOdr(); } });
 	$("padTactic").addEventListener("pointerdown", e => { e.preventDefault(); if (state === "play" || state === "goal") { setMentality(0, mentality[0] >= 2 ? -1 : mentality[0] + 1); } });
 	$("padShoot").addEventListener("pointerdown", e => { e.preventDefault(); skipCelebration(); humanShootPress(); });
