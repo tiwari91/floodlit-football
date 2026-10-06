@@ -685,6 +685,30 @@
 	.sq-table button.pick:hover { color: var(--amber); }
 	.sq-table button.pick[aria-pressed="true"] { color: var(--amber); text-decoration: underline; }
 	.oop { margin-left: 6px; font-size: 11px; font-weight: 700; color: #e0892f; }
+	/* Line-up: the starters on a pitch picture, dragged between positions and to and from the bench. */
+	.lineup { margin: 4px 0 14px; }
+	.lu-presets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+	.lu-presets button { padding: 4px 10px; font-size: 13px; }
+	.lu-presets button[aria-pressed="true"] { border-color: var(--amber); color: var(--amber); }
+	.lu-pitch { position: relative; width: 100%; max-width: 380px; aspect-ratio: 68 / 80; margin: 0 auto; border-radius: 8px; overflow: hidden;
+		background: repeating-linear-gradient(180deg, #2f6e3d 0 10%, #2a6537 10% 20%); border: 2px solid rgba(238, 246, 234, 0.55); }
+	.lu-pitch::before { content: ""; position: absolute; left: 22%; right: 22%; bottom: -2px; height: 16%; border: 2px solid rgba(238, 246, 234, 0.45); border-bottom: 0; }
+	.lu-pitch::after { content: ""; position: absolute; left: 30%; right: 30%; top: -12%; aspect-ratio: 1; border-radius: 50%; border: 2px solid rgba(238, 246, 234, 0.45); }
+	.lu-tok { position: absolute; transform: translate(-50%, -50%); z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 1px; width: 68px; padding: 2px 0; border: 0; border-radius: 6px;
+		background: transparent; color: #eef6ea; font-size: 11px; line-height: 1.15; touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }
+	.lu-tok .shirt { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: #f2b52e; color: #10160f; font-weight: 800; font-size: 12px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5); }
+	.lu-tok .nm { max-width: 68px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9); }
+	.lu-tok .badge { padding: 0 4px; border-radius: 3px; background: rgba(7, 12, 10, 0.75); font-size: 9px; font-weight: 800; letter-spacing: 0.05em; }
+	.lu-tok.oop .badge { background: #e0892f; color: #10160f; }
+	.lu-tok.oop .shirt { box-shadow: 0 0 0 2px #e0892f; }
+	.lu-tok.hurt .shirt { background: #c4505a; color: #fff; }
+	.lu-tok[aria-pressed="true"] .shirt, .lu-tok.over .shirt { box-shadow: 0 0 0 3px #eef6ea; }
+	.lu-bench { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; max-width: 380px; margin: 8px auto 0; padding: 6px; border-radius: 8px; background: var(--panel-2); }
+	.lu-bench .lu-tok { position: static; transform: none; color: var(--ink, #eef6ea); }
+	.lu-bench .lu-tok .nm { text-shadow: none; }
+	.lu-bench .lu-tok .shirt { background: #59645c; color: #eef6ea; }
+	.lu-warn { max-width: 380px; margin: 6px auto 0; font-size: 12px; font-weight: 700; color: #e0892f; text-align: center; }
+	.lu-ghost { position: fixed; z-index: 1000; pointer-events: none; transform: translate(-50%, -50%) scale(1.1); opacity: 0.9; }
 	.sq-table .meta { margin-left: 6px; font-size: 11px; color: var(--muted); white-space: nowrap; }
 	.sq-table button.more { margin-left: 6px; padding: 0 6px; border: 1px solid var(--rule); border-radius: 4px; background: transparent; color: var(--muted); font-size: 12px; line-height: 18px; }
 	.sq-table tr.detail td { text-align: left; background: rgba(255, 255, 255, 0.03); }
@@ -1260,7 +1284,8 @@
 		<div class="lg-club">
 			<div class="sq">
 				<div class="sq-head"><h4>Your squad</h4><span class="lg-meta" id="sqMeta"></span><button type="button" id="autoPick">Auto-pick best XI</button><button type="button" id="autoRot" aria-pressed="false">Auto-rotate off</button></div>
-				<p class="win-note">Tap a player, then tap another to swap them. Starters lose fitness each match and rested players recover, so rotate before legs go.</p>
+				<p class="win-note">Drag a player onto another position or to and from the bench, or tap one and then another to swap them. Starters lose fitness each match and rested players recover, so rotate before legs go.</p>
+				<div class="lineup" id="lineup" aria-label="Line-up"></div>
 				<div class="lg-tablewrap">
 					<table class="lg-table sq-table" aria-label="Your squad">
 						<thead><tr><th>No</th><th class="club">Player</th><th class="club">Pos</th><th>Fit</th><th class="wide">PAC</th><th class="wide">SHO</th><th class="wide">PAS</th><th class="wide" title="Defending; handling for keepers">DEF</th><th>OVR</th></tr></thead>
@@ -2630,6 +2655,7 @@
 		ar.textContent = on ? "Auto-rotate on" : "Auto-rotate off";
 		ar.setAttribute("aria-pressed", String(on));
 		const tiredN = tiredStarters().length;
+		renderLineup();
 		$("sqMeta").textContent = picked ? "Now tap who to swap with" : `Match strength ${Math.round(sum / Math.max(1, n))}${tiredN ? ` · ⚠ ${tiredN} starter${tiredN === 1 ? "" : "s"} tired` : ""}`;
 
 		$("winBudget").textContent = money(c.budget);
@@ -2943,6 +2969,97 @@
 		picked = null;
 		lastDeal = `${B.name} and ${A.name} swapped.`;
 		afterClubChange();
+	}
+
+	// The line-up picture: presets, the starters where the formation puts them, the bench underneath.
+	const LU_PRESETS = { "11": [ "442", "433", "352", "4231" ] };
+	function setLineupShape (fmt, key) {
+		if (currentFmt() === fmt && [ ...shapeSel.options ].some(o => o.value === key)) { shapeSel.value = key; shapeSel.dispatchEvent(new Event("change")); return; }
+		shapePref[fmt] = key; store.set("ff-shape-" + fmt, key); renderLeague();
+	}
+	function swapSlots (a, b) {
+		const c = league.club, A = c[a.list][a.i], B = c[b.list][b.i];
+		if (!A || !B || A === B) { return; }
+		c[a.list][a.i] = B; c[b.list][b.i] = A;
+		picked = null;
+		lastDeal = `${B.name} and ${A.name} swapped.`;
+		afterClubChange();
+	}
+	function renderLineup () {
+		const box = $("lineup");
+		if (!box || !league || !league.club) { return; }
+		const c = league.club, fmt = league.fmt, sh = shapeOf(fmt), cur = shapeKeyOf(fmt);
+		box.replaceChildren();
+		const pre = el("div", "lu-presets");
+		pre.setAttribute("role", "group"); pre.setAttribute("aria-label", "Formation");
+		for (const k of LU_PRESETS[fmt] || Object.keys(SHAPES[fmt] || {})) {
+			const b = el("button", "", SHAPES[fmt][k].label.split(" ")[0]);
+			b.type = "button"; b.setAttribute("aria-pressed", String(k === cur));
+			b.addEventListener("click", () => setLineupShape(fmt, k));
+			pre.append(b);
+		}
+		const pitch = el("div", "lu-pitch"), bench = el("div", "lu-bench");
+		let oopN = 0;
+		const tok = (pl, list, i, role) => {
+			const b = el("button", "lu-tok"), out = role && role !== pl.pos;
+			b.type = "button";
+			b.dataset.list = list; b.dataset.i = String(i);
+			if (out) { b.classList.add("oop"); oopN++; }
+			if (pl.inj > 0 || pl.ban > 0) { b.classList.add("hurt"); }
+			b.setAttribute("aria-pressed", String(!!(picked && picked.list === list && picked.i === i)));
+			b.title = `${pl.name}, ${POS_LABEL[pl.pos]}${out ? ` playing ${POS_LABEL[role]}: out of position` : ""}`;
+			b.append(el("span", "shirt", String(list === "squad" ? FORMATS["11"].nums[i] : 12 + i)), el("span", "nm", pl.name.split(" ").slice(-1)[0]), el("span", "badge", out ? `⚠ ${POS_LABEL[pl.pos]}→${POS_LABEL[role]}` : POS_LABEL[role || pl.pos]));
+			b.addEventListener("click", () => { if (luDrag && luDrag.moved) { return; } pickPlayer(list, i); });
+			b.addEventListener("pointerdown", luDown);
+			return b;
+		};
+		sh.pos.forEach((q, k) => {
+			const i = q[0], pl = c.squad[i];
+			if (!pl) { return; }
+			const b = tok(pl, "squad", i, sh.roles[k]);
+			b.style.left = `${clamp(q[3] * 100, 9, 91)}%`;
+			b.style.top = `${clamp(96 - (q[2] - 0.03) * 140, 7, 93)}%`;
+			pitch.append(b);
+		});
+		c.squad.forEach((pl, i) => { if (pl && !sh.slots.includes(i)) { bench.append(tok(pl, "squad", i, null)); } });
+		c.bench.forEach((pl, i) => bench.append(tok(pl, "bench", i, null)));
+		box.append(pre, pitch, bench);
+		if (oopN) { box.append(el("p", "lu-warn", `⚠ ${oopN} player${oopN === 1 ? "" : "s"} out of position`)); }
+	}
+	// Dragging, with mouse or finger: a ghost follows the pointer and whatever token it is dropped on swaps.
+	let luDrag = null;
+	function luTarget (x, y) { const e = document.elementFromPoint(x, y); return e && e.closest ? e.closest(".lu-tok") : null; }
+	function luDown (e) {
+		if (e.button > 0) { return; }
+		const b = e.currentTarget;
+		luDrag = { b, x0: e.clientX, y0: e.clientY, moved: false, ghost: null, over: null, id: e.pointerId };
+		try { b.setPointerCapture(e.pointerId); } catch (err) { /* not capturable */ }
+		b.addEventListener("pointermove", luMove);
+		b.addEventListener("pointerup", luUp);
+		b.addEventListener("pointercancel", luUp);
+	}
+	function luMove (e) {
+		const d = luDrag;
+		if (!d || e.pointerId !== d.id) { return; }
+		if (!d.moved && Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < 6) { return; }
+		e.preventDefault();
+		if (!d.moved) { d.moved = true; d.ghost = d.b.cloneNode(true); d.ghost.classList.add("lu-ghost"); document.body.append(d.ghost); d.b.style.opacity = "0.35"; }
+		d.ghost.style.left = `${e.clientX}px`; d.ghost.style.top = `${e.clientY}px`;
+		const t = luTarget(e.clientX, e.clientY);
+		if (d.over && d.over !== t) { d.over.classList.remove("over"); }
+		d.over = t && t !== d.b ? t : null;
+		if (d.over) { d.over.classList.add("over"); }
+	}
+	function luUp (e) {
+		const d = luDrag;
+		if (!d || e.pointerId !== d.id) { return; }
+		d.b.removeEventListener("pointermove", luMove); d.b.removeEventListener("pointerup", luUp); d.b.removeEventListener("pointercancel", luUp);
+		if (d.ghost) { d.ghost.remove(); }
+		d.b.style.opacity = "";
+		if (!d.moved) { luDrag = null; return; }
+		setTimeout(() => { if (luDrag === d) { luDrag = null; } }, 0);   // swallow the click that follows a drag
+		const t = e.type === "pointerup" ? luTarget(e.clientX, e.clientY) : null;
+		if (t && t !== d.b) { swapSlots({ list: d.b.dataset.list, i: Number(d.b.dataset.i) }, { list: t.dataset.list, i: Number(t.dataset.i) }); }
 	}
 
 	// Best XI: fill each starting slot with the strongest fit player for it.
@@ -11511,7 +11628,7 @@
 			get charging () { return charging; }, get passCharge () { return passCharge; }, get meterRect () { return meterRect; }, get drawMs () { return drawMs; }, get scale () { return scale; }, get kits () { return KITS; }, get stats () { return stats; }, get oppStats () { return oppStats; }, get steerAt () { return steerAt; }, set steerAt (v) { steerAt = v; }, set possTeam (v) { possTeam = v; },
 			set steerSwitchDone (v) { steerSwitchDone = !!v; },
 			get lastSwitchKind () { return lastSwitchKind; }, get line () { return line; }, get tackling () { return tackling; }, setLine (t, v) { line[t] = v; }, setTackling (t, v) { tackling[t] = v; }, set lastSwitchKind (v) { lastSwitchKind = v; }, get setPiece () { return setPiece; },
-			get G3 () { return G3; }, get matchLog () { return matchLog; }, get league () { return league; }, simSeasonTest () { simulateSeason(); }, nextSeasonTest () { if (seasonDone()) { newSeason(league.fmt); newMatch(); renderLeague(); } }, renderLeagueTest () { renderLeague(); }, get crowdHush () { return crowdHush; }, get crowdHeat () { return crowdHeat; }, crowdReactTest (k, t) { crowdReactImpl(k, t); }, get shoot () { return shoot; }, cornerTest (att, top = true) { if (state !== "play") { return; } freeze = 0; awardCorner(att, att === 1, top); }, get cornerPlan () { return cornerPlan; },
+			get G3 () { return G3; }, get matchLog () { return matchLog; }, get league () { return league; }, simSeasonTest () { simulateSeason(); }, nextSeasonTest () { if (seasonDone()) { newSeason(league.fmt); newMatch(); renderLeague(); } }, renderLeagueTest () { renderLeague(); }, get crowdHush () { return crowdHush; }, get crowdHeat () { return crowdHeat; }, renderLineupTest () { renderLineup(); }, crowdReactTest (k, t) { crowdReactImpl(k, t); }, get shoot () { return shoot; }, cornerTest (att, top = true) { if (state !== "play") { return; } freeze = 0; awardCorner(att, att === 1, top); }, get cornerPlan () { return cornerPlan; },
 			fkTest (t, x, y, indirect = false) { if (state !== "play") { return; } freeze = 0; const v = outfield(t).sort((a, b) => Math.hypot(a.x - x, a.y - y) - Math.hypot(b.x - x, b.y - y))[0]; v.x = x; v.y = y; awardFreeKick(t, v, { indirect }); },
 			penTest (t) { if (state !== "play") { return; } freeze = 0; awardPenalty(t, outfield(t)[0]); },
 			throwTest (t, x, top) { if (state !== "play") { return; } freeze = 0; awardThrow(t, x, top); },
