@@ -283,7 +283,7 @@
 		body.big .knob { background: rgba(72, 110, 88, 0.85); }
 		body.big .pads { grid-template-columns: repeat(3, 62px); gap: 8px; }
 		body.big .pad { height: 54px; background: rgba(24, 42, 33, 0.72); border-color: rgba(238, 246, 234, 0.25); font-size: 15px; }
-		body.big .pad.through, body.big .pad.long, body.big .pad.sprint, body.big .pad.tactic { height: 40px; font-size: 13px; }
+		body.big .pad.through, body.big .pad.long, body.big .pad.sprint, body.big .pad.tactic, body.big .pad.replay { height: 40px; font-size: 13px; }
 		body.big .pad.shoot { background: rgba(242, 181, 46, 0.9); border-color: rgba(242, 181, 46, 0.9); }
 		body.big .pad.sprint.on { background: rgba(127, 212, 155, 0.9); }
 		body.big .bar { margin-top: 12px; padding-inline: 14px; }
@@ -1012,7 +1012,7 @@
 	}
 
 	.pad.shoot { background: var(--amber); color: var(--amber-ink); border-color: var(--amber); }
-	.pad.through, .pad.long, .pad.sprint, .pad.tactic { height: 44px; }
+	.pad.through, .pad.long, .pad.sprint, .pad.tactic, .pad.replay { height: 44px; }
 	.pad.cooling { opacity: 0.4; }
 	.pad.sprint.on { background: #7fd49b; color: #0c1a12; border-color: #7fd49b; }
 	.pad.sprint.out { opacity: 0.45; }
@@ -1133,6 +1133,7 @@
 			<button class="pad long" id="padLong" type="button">Long</button>
 			<button class="pad sprint" id="padSprint" type="button">Sprint</button>
 			<button class="pad tactic" id="padTactic" type="button">Tactic</button>
+			<button class="pad replay" id="padReplay" type="button">Replay</button>
 		</div>
 	</div>
 
@@ -4184,6 +4185,7 @@
 	const passMul = () => (passPow < 0 ? 1 : 0.78 + passPow * 0.5);
 	const chargeOf = start => clamp((frame - start) / 50, 0, 1);
 	function passPress (kind) {
+		if (odr) { endOdr(); return; }
 		const p = human();
 		if (state === "play" && freeze <= 0 && p && ball.owner === p && !(setPiece && setPiece.taker === p) && !charging) {
 			passCharge = { kind, start: frame };
@@ -4251,6 +4253,7 @@
 	}
 
 	function humanShootPress () {
+		if (odr) { endOdr(); return; }
 		const p = human();
 		if (!ball.owner && ball.z > 4 && state === "play") { headIntent = { kind: "goal", at: frame }; }
 		if (state !== "play" || freeze > 0) { return; }
@@ -4266,6 +4269,7 @@
 	}
 
 	function humanTackle () {
+		if (odr) { endOdr(); return; }
 		const p = human();
 		if (state !== "play" || freeze > 0 || ball.owner === p || p === receiver) { return; }
 		if (p.lunge <= 0 && p.lungeCd <= 0) {
@@ -5523,6 +5527,7 @@
 		if (shoot) { if (shoot.live) { shootResult(scorer === shoot.att ? (ball.headed && ball.lastBy && ball.lastBy.team === scorer ? "Header, goal" : "Goal") : "Own goal", scorer); } else { return; } }
 		score[scorer]++;
 		tally.goals[scorer]++;
+		slowMotion(70);
 		if (ball.from === "free" && ball.lastBy && ball.lastBy.team === scorer) { tally.fkGoals[scorer]++; }
 		if (ball.from === "pen" && ball.lastBy && ball.lastBy.team === scorer) { tally.penGoals[scorer]++; }
 		if (ball.headed && ball.lastBy && ball.lastBy.team === scorer) { tally.headGoals[scorer]++; }
@@ -6508,6 +6513,7 @@
 	// (so if it goes over their own goal line, it's a corner).
 	// A keeper's save that doesn't stick: pushed away from goal, live for whoever gets there first.
 	function spill (gk, label) {
+		slowMotion(45);   // a parry: the moment in slow motion
 		const out = gk.team === 0 ? 1 : -1, a = (Math.random() * 2 - 1) * 1.1, sp = 3.2 + Math.random() * 2.8;
 		ball.owner = null;
 		ball.vx = Math.cos(a) * sp * out; ball.vy = Math.sin(a) * sp;
@@ -6522,6 +6528,7 @@
 	}
 
 	function blockShot (p) {
+		if (rel(p.team, p.x) < 40 * GH && Math.abs(p.y - FH / 2) < FMT.goal * 0.7) { slowMotion(45); }   // cleared off the line
 		ball.vx = -ball.vx * (0.2 + Math.random() * 0.25);
 		ball.vy = ball.vy * 0.4 + (Math.random() * 2 - 1) * 3.5;
 		ball.z = 0; ball.vz = Math.random() < 0.4 ? 2.5 : 0;
@@ -8875,6 +8882,11 @@
 	function snapCamera () { [ camX, camY ] = camTarget(); }
 
 	function draw (alpha = 1) {
+		// A replay on demand: the recorded moment goes in for drawing, then everything comes back.
+		if (odr) { const restore = applyReplay(odr, Math.min(odr.t, odr.len - 1.001), ODR_SPEED); try { drawPlain(1); } finally { restore(); } return; }
+		drawPlain(alpha);
+	}
+	function drawPlain (alpha) {
 		// Swap in in-between positions for drawing, then put the real ones back.
 		const real = players.map(p => [ p.x, p.y, p.dir, p.stride ]), realBall = ball ? [ ball.x, ball.y, ball.z ] : null;
 		const lerp = (a, b) => (a === undefined ? b : a + (b - a) * alpha);
@@ -8897,7 +8909,7 @@
 	const replayTagEl = $("replayTag");
 	function drawScene () {
 		// The REPLAY tag over the picture while one runs (and no GOAL banner over the replay).
-		const rp = camMode === "3d" && replayOn();
+		const rp = (camMode === "3d" && replayOn()) || !!odr;
 		if (replayTagEl && replayTagEl.hidden === rp) { replayTagEl.hidden = !rp; if (rp) { banner.hidden = true; } }
 		if (camMode === "3d" && drawScene3D()) { return; }   // while three.js loads, the TV camera stands in
 		if ((camMode === "tv" || camMode === "3d") && !benchCam()) { drawSceneTV(); return; }
@@ -10926,7 +10938,7 @@
 	   then back to the scorer and the restart. Any key or tap skips it, as it does the celebration.
 	   The match clock is stopped throughout, as it is for any goal. */
 	const REC_F = [ "x", "y", "dir", "stride", "runAmt", "vx", "vy", "kickA", "kickPow", "jump", "slideAI", "fall", "dive", "diveSide", "throwA", "idlePh", "shuf", "celebA", "kneel", "sulk" ];
-	const REC_N = 300, REC_P = 24, REC_W = REC_P * REC_F.length + 5 + 15;   // frames kept, players, floats a frame
+	const REC_N = 360, REC_P = 24, REC_W = REC_P * REC_F.length + 5 + 15;   // frames kept, players, floats a frame
 	const REPLAY_AT = 230, REPLAY_BEFORE = 150, REPLAY_AFTER = 28, REPLAY_SPEED = 0.64;
 	const REPLAY_FR = Math.round((REPLAY_BEFORE + REPLAY_AFTER) / REPLAY_SPEED);   // frames on screen
 	const rec = { buf: null, who: new Array(REC_N), head: 0, n: 0 };
@@ -10967,10 +10979,10 @@
 	const replayPos = () => clamp((celeb.t - REPLAY_AT) * REPLAY_SPEED, 0, replay.len - 1.001);
 	// Put the recorded moment onto the players, the ball and the officials for drawing; returns
 	// the function that puts everything back.
-	function applyReplay () {
-		const f = replayPos(), i0 = Math.floor(f), t = f - i0, NF = REC_F.length, b = rec.buf;
-		const row = k => (replay.end - (replay.len - 1 - k) + REC_N * 2) % REC_N;
-		const r0 = row(i0), r1 = row(Math.min(replay.len - 1, i0 + 1)), who = rec.who[r0] || players;
+	function applyReplay (clip = replay, f = replayPos(), spd = REPLAY_SPEED) {
+		const i0 = Math.floor(f), t = f - i0, NF = REC_F.length, b = rec.buf;
+		const row = k => (clip.end - (clip.len - 1 - k) + REC_N * 2) % REC_N;
+		const r0 = row(i0), r1 = row(Math.min(clip.len - 1, i0 + 1)), who = rec.who[r0] || players;
 		const keep = [], keepPlayers = players, keepCtrl = ctrl;
 		const lerpA = (a, c) => a + Math.atan2(Math.sin(c - a), Math.cos(c - a)) * t;
 		who.forEach((p, i) => {
@@ -10987,7 +10999,7 @@
 		const ob0 = r0 * REC_W + REC_P * NF, ob1 = r1 * REC_W + REC_P * NF;
 		const keepBall = [ ball.x, ball.y, ball.z, ball.vx, ball.vy ];
 		ball.x = b[ob0] + (b[ob1] - b[ob0]) * t; ball.y = b[ob0 + 1] + (b[ob1 + 1] - b[ob0 + 1]) * t; ball.z = b[ob0 + 2] + (b[ob1 + 2] - b[ob0 + 2]) * t;
-		ball.vx = b[ob0 + 3] * REPLAY_SPEED; ball.vy = b[ob0 + 4] * REPLAY_SPEED;
+		ball.vx = b[ob0 + 3] * spd; ball.vy = b[ob0 + 4] * spd;
 		const keepOff = officials3.map(o => [ o.x, o.y, o.dir, o.stride, o.runAmt ]);
 		officials3.forEach((o, k) => { const q = ob0 + 5 + k * 5, q1 = ob1 + 5 + k * 5; o.x = b[q] + (b[q1] - b[q]) * t; o.y = b[q + 1] + (b[q1 + 1] - b[q + 1]) * t; o.dir = b[q + 2]; o.stride = b[q + 3]; o.runAmt = b[q + 4]; });
 		players = who; ctrl = -1;
@@ -11013,6 +11025,23 @@
 		return out;
 	}
 
+	/* ---------- replay on demand, and slow motion ----------
+	   R (or the Replay pad) shows the last six seconds again from the same recording, a touch slower
+	   than life, in whichever view is on. Nothing moves on meanwhile and the clock stands still. Any
+	   key or tap ends it. Goals, parries and goal-line clearances also drop the match into slow
+	   motion for a moment before it picks up again. */
+	const ODR_SPEED = 0.8, SLOW_RATE = 0.35;
+	let odr = null, slowMo = 0;   // odr: { end, len, t }; slowMo: simulated frames still to run slowly
+	function startOdr () {
+		if (odr || state !== "play" || mode === "tutorial" || rec.n < 60 || !rec.buf) { return; }
+		keys.clear(); charging = false; passCharge = null; pressHeld = false; touchPress = false;
+		odr = { end: (rec.head - 1 + REC_N) % REC_N, len: Math.min(rec.n, 360), t: 0 };
+		toast("Replay", "#f2b52e");
+	}
+	function endOdr () { odr = null; last = performance.now(); acc = 0; }
+	function stepOdr () { odr.t += ODR_SPEED; if (odr.t >= odr.len - 1.001) { endOdr(); } }
+	function slowMotion (n) { if (!bulkSim && state !== "paused") { slowMo = Math.max(slowMo, n); } }
+
 	/* ---------- loop ---------- */
 	let last = performance.now(), acc = 0, drawMs = 0;
 	const STEP = 1000 / 60;
@@ -11020,11 +11049,15 @@
 	function loop (now) {
 		frameDt = clamp(now - last, 1, 100);
 		pollPad();
-		acc = Math.min(acc + (now - last), 250);
+		acc = Math.min(acc + (now - last) * (slowMo > 0 && !odr ? SLOW_RATE : 1), 250);
 		last = now;
-		while (acc >= STEP) { snapshotPrev(); update(); acc -= STEP; }
+		while (acc >= STEP) {
+			if (odr) { stepOdr(); } else { snapshotPrev(); update(); if (slowMo > 0) { slowMo--; } }
+			acc -= STEP;
+		}
+		if (odr && state !== "play") { endOdr(); }
 		const d0 = performance.now();
-		draw(acc / STEP);
+		draw(odr ? 1 : acc / STEP);
 		drawMs += (performance.now() - d0 - drawMs) * 0.1;   // smoothed cost of a drawn frame, for the test harness
 		renderHud();
 		updateRainSound();
@@ -11086,6 +11119,8 @@
 			return;
 		}
 		if (e.code === "KeyH" || e.key === "?") { if (!e.repeat) { openHowto(); } return; }
+		if (odr) { e.preventDefault(); if (!e.repeat) { endOdr(); } return; }   // any key ends a replay
+		if (e.code === "KeyR" && state === "play" && !e.repeat) { e.preventDefault(); startOdr(); return; }
 		if (e.code === "KeyP" || e.code === "Escape") {
 			if (state === "play") { pause(); } else if (state === "paused") { startPlay(); }
 			return;
@@ -11149,9 +11184,10 @@
 		b.addEventListener("pointerup", () => passRelease(kind));
 		b.addEventListener("pointercancel", () => { passCharge = null; });
 	}
+	$("padReplay").addEventListener("pointerdown", e => { e.preventDefault(); if (odr) { endOdr(); } else { startOdr(); } });
 	$("padTactic").addEventListener("pointerdown", e => { e.preventDefault(); if (state === "play" || state === "goal") { setMentality(0, mentality[0] >= 2 ? -1 : mentality[0] + 1); } });
 	$("padShoot").addEventListener("pointerdown", e => { e.preventDefault(); skipCelebration(); humanShootPress(); });
-	$("pitchwrap").addEventListener("pointerdown", () => skipCelebration());
+	$("pitchwrap").addEventListener("pointerdown", e => { if (odr && !(e.target.closest && e.target.closest("#padReplay"))) { endOdr(); } skipCelebration(); });
 	$("padShoot").addEventListener("pointerup", () => humanShootRelease());
 	$("padShoot").addEventListener("pointercancel", () => { charging = false; });
 	$("padSprint").addEventListener("pointerdown", e => { e.preventDefault(); padSprint = true; });
@@ -11419,6 +11455,7 @@
 				row(K.tactic, "Tactic", `${howScheme === "keys" ? "1 Defensive, 2 Balanced, 3 Attacking, 4 All-out attack (T cycles)" : "Cycle Defensive, Balanced, Attacking, All-out attack"}. The tag at the top left of the pitch shows the current one.`),
 				row(K.pause, "Pause", "The clock stops. The pause card has the camera, sound and switching settings, your line and tackling instructions, substitutions, and Simulate the rest."),
 				row(K.cam, "Camera", "Overhead, TV or 3D. The one you pick is remembered. Graphics (Low, Medium, High) under the pitch or on the pause card sets how much the 3D view draws. After a goal in 3D there is a replay; any key or tap skips it."),
+				row(howScheme === "touch" ? "Replay" : "R", "Replay", "The last six seconds again, a little slower, with the clock stopped. Any key or tap ends it. Goals, parries and clearances off the line also go into slow motion for a moment."),
 				row(K.big, "Big pitch", "The ground fills the screen with a small score bug; Show menu brings the page back."),
 				row(K.help, "How to play", "This screen.")
 			]),
