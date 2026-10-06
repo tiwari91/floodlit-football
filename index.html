@@ -1190,6 +1190,13 @@
 			</div>
 			<div class="bargroup" role="group" aria-labelledby="bgMatch">
 			<span class="eyebrow" id="bgMatch">Match</span>
+			<label class="field" for="level" title="How sharp the computer side is: how quickly it plays, how true its passes and shots go, how hard it presses and how far its keeper reaches. In the league it is kept with the season">Difficulty
+				<select id="level">
+					<option value="easy">Easy</option>
+					<option value="normal" selected>Normal</option>
+					<option value="hard">Hard</option>
+				</select>
+			</label>
 			<label class="field" for="difficulty" id="diffField">Opponent
 				<select id="difficulty">
 					<option value="easy">Sunday league</option>
@@ -1525,6 +1532,16 @@
 		normal: { spd: 1.0, tackle: 0.02, spread: 50, save: 0.3, think: 8 },
 		hard: { spd: 1.1, tackle: 0.034, spread: 30, save: 0.42, think: 5 }
 	};
+
+	// Difficulty: how sharp the computer side is, on top of its club's rating. Normal changes nothing.
+	// think: extra frames before it acts on the ball; pass / passAdd: its pass error; shot: its shot
+	// spread; press: how far out it closes you down; chase: its pressing sprint; gk: its keeper's reach.
+	const LEVELS = {
+		easy: { name: "Easy", think: 4, pass: 1.4, passAdd: 10, shot: 1.35, press: 0.75, chase: 0.95, gk: 0.86 },
+		normal: { name: "Normal", think: 0, pass: 1, passAdd: 0, shot: 1, press: 1, chase: 1, gk: 1 },
+		hard: { name: "Hard", think: -3, pass: 0.7, passAdd: 0, shot: 0.75, press: 1.25, chase: 1.04, gk: 1.1 }
+	};
+	let lv = LEVELS.normal;
 
 	/* ---------- clubs ---------- */
 	// Invented clubs. str (1-5) sets how well each one's AI plays and how it fares in simulated games.
@@ -1928,7 +1945,7 @@
 	const banner = $("banner");
 	const scoreHomeEl = $("scoreHome"), scoreAwayEl = $("scoreAway"), clockEl = $("clock");
 	const weatherSel = $("weather"), groundSel = $("ground"), shapeSel = $("shape"), styleSel = $("style"), pressSel = $("press"), autoSwitchSel = $("autoswitch");
-	const diffSel = $("difficulty"), lenSel = $("length"), fmtSel = $("format"), nextNote = $("nextNote");
+	const levelSel = $("level"), diffSel = $("difficulty"), lenSel = $("length"), fmtSel = $("format"), nextNote = $("nextNote");
 	const pauseBtn = $("pauseBtn"), restartBtn = $("restartBtn"), soundBtn = $("soundBtn");
 	const padTackle = $("padTackle"), ovStats = $("ovStats");
 
@@ -2248,6 +2265,7 @@
 			v: 1,
 			season: prev ? prev.season + 1 : 1,
 			fmt: FORMATS[fmt] ? fmt : "11",
+			level: prev && LEVELS[prev.level] ? prev.level : LEVELS[levelSel.value] ? levelSel.value : "normal",
 			round: 0,
 			members,
 			fixtures,
@@ -3441,6 +3459,7 @@
 			$("ovSim").textContent = "Simulate match";
 			$("ovSim").hidden = false;
 		}
+		ovText.textContent = `Difficulty: ${lv.name}. ` + ovText.textContent;
 	}
 
 	function makePlayers () {
@@ -3930,7 +3949,7 @@
 	function passTo (p, m) {
 		notePass(p);
 		// A rattled side's passes stray (yours a little, the computer-run ones more).
-		const err = Math.max(0, p.team === 0 && players.indexOf(p) === ctrl ? passErr(p) : (45 * edge(1 - p.team) + cond.wet * 8 + 30 * Math.max(0, 0.75 - staOf(p)) + 18 * wobble(p.team)) * (tr(p, "playmaker") ? 0.55 : 1));
+		const err = Math.max(0, p.team === 0 && players.indexOf(p) === ctrl ? passErr(p) : (45 * edge(1 - p.team) + cond.wet * 8 + 30 * Math.max(0, 0.75 - staOf(p)) + 18 * wobble(p.team)) * (tr(p, "playmaker") ? 0.55 : 1) * (p.team === 1 ? lv.pass : 1) + (p.team === 1 ? lv.passAdd : 0));
 		const lx = m.x + m.vx * 10 + (Math.random() * 2 - 1) * err;
 		const ly = m.y + m.vy * 10 + (Math.random() * 2 - 1) * err;
 		const d = Math.hypot(lx - ball.x, ly - ball.y);
@@ -4739,7 +4758,7 @@
 			return [ goal.x, FH / 2 + (p.y - FH / 2) * 0.7 ];
 		}
 		if (--p.think <= 0) {
-			p.think = Math.max(2, cfg.think + Math.round(6 * edge(1 - p.team) - 2 * edge(p.team)));   // rattled players dither; confident ones play quicker
+			p.think = Math.max(2, cfg.think + (p.team === 1 ? lv.think : 0) + Math.round(6 * edge(1 - p.team) - 2 * edge(p.team)));   // rattled players dither; confident ones play quicker
 			// Wide in the final third: cross it into the box.
 			if (rel(p.team, p.x) > FW * 0.72 && isWide(p.y) && Math.random() < 0.45) {
 				const goalX = attackX(p.team);
@@ -4761,7 +4780,7 @@
 			if (dg < 170 * range || (dg < 270 * range && Math.random() < 0.35) || longShot) {
 				// Better finishers are more accurate and hit it harder.
 				const fin = (clamp(1.3 - (A(p, "sho") - 50) / 100, 0.6, 1.4) + Math.max(0, 0.75 - staOf(p)) * 0.8) * (tr(p, "poacher") && inAttackBox(p) ? 0.7 : 1);
-				const aim = FH / 2 + ((Math.random() * 2 - 1) * 42 + (Math.random() * 2 - 1) * (cfg.spread + 45 * edge(1 - p.team)) * fin) * GH;
+				const aim = FH / 2 + ((Math.random() * 2 - 1) * 42 + (Math.random() * 2 - 1) * (cfg.spread + 45 * edge(1 - p.team)) * fin * (p.team === 1 ? lv.shot : 1)) * GH;
 				shootAt(p, clamp(0.55 + Math.random() * 0.45 + (A(p, "sho") - 65) * 0.004, 0.4, 1), aim);
 				return null;
 			}
@@ -5271,7 +5290,7 @@
 			} else if (p === cover1) {
 				const own = { x: FW, y: FH / 2 };
 				const k = press[1] === "high" ? 0.12 : press[1] === "low" ? 0.45 : 0.3;
-				const in1 = press[1] === "high" ? dist(p, ball) < 220 : press[1] === "low" ? dist(p, ball) < 90 : rel(1, ball.x) < FW * 0.5 && dist(p, ball) < 160;
+				const in1 = press[1] === "high" ? dist(p, ball) < 220 * lv.press : press[1] === "low" ? dist(p, ball) < 90 * lv.press : rel(1, ball.x) < FW * 0.5 && dist(p, ball) < 160 * lv.press;
 				target = in1 ? goalSide(ball.owner || ball, 1, dist(p, ball) > 70 ? 14 : 6) : [ ball.x + (own.x - ball.x) * k, ball.y + (own.y - ball.y) * k ];
 			} else if (p === second1 || p === second0) {
 				target = goalSide(ball.owner || ball, p.team, 80 * Math.sqrt(S));
@@ -5301,6 +5320,7 @@
 			const diving = p.role === "gk" && shotAt(p) ? 1.3 * (0.85 + 0.15 * defMul(p)) : 0;
 			// Real pace: a chaser at full tilt tops out near 10 m/s, and a man with the ball is a touch slower.
 			let sprint = diving || (p === chaser1 || p === cover0 || (p === cover1 && press[1] === "high") || ((p === second1 || p === second0) && dist(p, { x: target[0], y: target[1] }) > 60) ? 1.05 : ball.owner === p ? 0.96 : 1);
+			if (!diving && p.team === 1 && sprint > 1 && lv !== LEVELS.normal) { sprint *= lv.chase; }   // difficulty: how hard they press
 			// Off the ball, nobody runs flat out all game: they jog back into shape, stride out
 			// when they're well out of position or near the ball, and markers match their runner.
 			if (!diving && sprint === 1 && p.role !== "gk") {
@@ -6266,7 +6286,7 @@
 				const isReceiver = p === receiver;
 				// Cutting out one of your passes takes a defender really in the lane.
 				const cutIn = receiver && p.team === 1 && speed > 3.5 ? -3 : 0;
-				const reach = isGk ? (shotAt(p) ? 28 : 24) : isReceiver ? 26 : 19 + cutIn + clamp((A(p, "def") - 65) * 0.12, -3, 4);   // a diving keeper stretches
+				const reach = isGk ? (shotAt(p) ? 28 : 24) * (p.team === 1 ? lv.gk : 1) : isReceiver ? 26 : 19 + cutIn + clamp((A(p, "def") - 65) * 0.12, -3, 4);   // a diving keeper stretches
 				if (d > reach || d >= td) { continue; }
 				// A ball just struck is past the man closing the kicker down before he can react:
 				// pressing you forces a pass, it doesn't win it off your boot.
@@ -6586,6 +6606,7 @@
 		// The corner shootout is played against a side nearer your own level.
 		const oppStr = leagueMatch ? getStr(leagueMatch.opp) + (leagueMatch.home ? -0.3 : 0.3) : (mode === "corners" ? { easy: 1.5, normal: 2.2, hard: 3.4 } : { easy: 2, normal: 3, hard: 4.5 })[diffSel.value] || 3;
 		diff = strengthCfg(oppStr);
+		applyLevel();
 		oppSquad = cpuSquad(leagueMatch ? leagueMatch.opp : 99, oppStr);
 		$("fmtName").textContent = FMT.label;
 		score = [ 0, 0 ];
@@ -11499,6 +11520,20 @@
 			sel.blur();
 		});
 	}
+	// Difficulty: kept with the season in the league, and remembered for friendlies and new leagues.
+	function applyLevel () {
+		const k = mode === "league" && league ? (LEVELS[league.level] ? league.level : "normal") : (LEVELS[store.get("ff-level")] ? store.get("ff-level") : "normal");
+		levelSel.value = k;
+		lv = LEVELS[k];
+	}
+	levelSel.addEventListener("change", () => {
+		const k = LEVELS[levelSel.value] ? levelSel.value : "normal";
+		store.set("ff-level", k);
+		if (mode === "league" && league) { league.level = k; saveLeague(); }
+		lv = LEVELS[k];
+		if (state === "intro") { showIntro(); }
+		levelSel.blur();
+	});
 	diffSel.addEventListener("change", () => {
 		diff = DIFF[diffSel.value] || DIFF.normal;
 		store.set("ff-diff", diffSel.value);
@@ -11596,6 +11631,7 @@
 			else if (saved && saved.club) { league = null; newSeason(saved.fmt || fmtSel.value, saved.club); }
 		} catch (e) { league = null; }
 		mode = store.get("ff-mode") === "friendly" ? "friendly" : "league";
+		applyLevel();
 		$("modeLeague").setAttribute("aria-pressed", String(mode === "league"));
 		$("modeFriendly").setAttribute("aria-pressed", String(mode === "friendly"));
 		diffSel.disabled = weatherSel.disabled = groundSel.disabled = mode === "league";
