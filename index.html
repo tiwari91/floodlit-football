@@ -3751,7 +3751,7 @@
 		}
 		if (announce) { toast(t === 0 ? `Tactic: ${MENTALITY[m + 1]}` : `${opp.short} go ${MENTALITY[m + 1].toLowerCase()}`, t === 0 ? "#f2b52e" : textFor(KITS[1].outfield)); }
 	}
-	let crowdHeat = 0, crowdTense = 0;     // 0 quiet .. 1 on its feet; how nervous the home end is   // what a freeze is for: a kickoff countdown, or a free kick
+	let crowdHeat = 0, crowdTense = 0, crowdHush = 0, lateHold = 0;   // crowdHush: frames the home end stays stunned after conceding     // 0 quiet .. 1 on its feet; how nervous the home end is   // what a freeze is for: a kickoff countdown, or a free kick
 	function callOffside (p) {
 		const spot = { x: clamp(p.x, 20, FW - 20), y: clamp(p.y, 20, FH - 20) };
 		raiseFlag(p.x, "off");
@@ -4144,6 +4144,7 @@
 					burst(p.x, p.y, "Won it");
 					sfx("tackle");
 					stats.tackles++;
+					crowdReact("tackle", 0);
 				} else if (Math.random() < 0.1) {
 					commitFoul(p, o, false);
 				} else {
@@ -4838,8 +4839,17 @@
 			// Louder when the home side is bearing down on goal; when the visitors are, the noise
 			// tightens into a nervous hum (crowdTense) rather than rising.
 			const homeGoalX = homeSide === 0 ? 0 : FW, nearHome = 1 - clamp(Math.abs(ball.x - homeGoalX) / (FW * 0.33), 0, 1), nearAway = 1 - clamp(Math.abs(ball.x - (FW - homeGoalX)) / (FW * 0.33), 0, 1);
-			const heatTarget = state === "goal" ? (lastScorer === homeSide ? 1 : 0.25) : state === "play" ? Math.max(nearAway * nearAway * 0.95, nearHome * nearHome * 0.45) : 0.1;
+			// Build-up: a side in the final third with the ball lifts the noise, more with every pass strung
+			// together, the home side's far more than the visitors'.
+			const att = ball.owner ? ball.owner.team : -1;
+			const buildUp = state === "play" && att >= 0 && rel(att, ball.x) > FW * 0.67 ? (0.3 + 0.06 * Math.min(passStreak[att], 8)) * (att === homeSide ? 1 : 0.4) : 0;
+			// Conceding at home: a stunned few seconds, through the celebration and after the restart.
+			if (state === "goal" && lastScorer !== homeSide) { crowdHush = 240; } else if (crowdHush > 0) { crowdHush--; }
+			const heatTarget = crowdHush > 0 ? 0.05 : state === "goal" ? (lastScorer === homeSide ? 1 : 0.25) : state === "play" ? Math.max(nearAway * nearAway * 0.95, nearHome * nearHome * 0.45, buildUp) : 0.1;
 			crowdHeat += (heatTarget - crowdHeat) * 0.03;
+			// Late on, the side in front keeping the ball gets whistled.
+			const lead = score[0] === score[1] ? -1 : score[0] > score[1] ? 0 : 1;
+			if (state === "play" && lead >= 0 && minuteNow() >= 80 && att === lead) { if (++lateHold > 240) { crowdReact("late", lead); } } else if (att >= 0 && att !== lead) { lateHold = 0; }
 			crowdTense += ((state === "play" ? nearHome * nearHome : 0) - crowdTense) * 0.03;
 			stepCrowdMood(1 / 60);
 		}
@@ -5526,6 +5536,7 @@
 		const defTeam = leftEnd ? 0 : 1;   // you defend the left goal
 		raiseFlag(ball.x, "out");
 		if (ball.shot && frame - (ball.kickedAt || -999) < 120 && Math.abs(ball.y - FH / 2) < FMT.goal / 2 + 70 * GH && (ball.z || 0) < 95) { ooh(); ev3d("near"); if (ball.lastBy) { crowdReact("near", ball.lastBy.team); } }
+		else if (ball.shot && frame - (ball.kickedAt || -999) < 150 && ball.lastBy) { if (ball.lastBy.team === homeSide) { groan(); } crowdReact("miss", ball.lastBy.team); }   // a clear miss
 		if (lastTouch === defTeam) { awardCorner(1 - defTeam, leftEnd, ball.y < FH / 2); } else { awardGoalKick(defTeam, leftEnd); }
 	}
 
@@ -8261,9 +8272,10 @@
 	function crowdReactImpl (kind, t) {
 		if (bulkSim || (state !== "play" && state !== "goal") || !(t === 0 || t === 1)) { return; }
 		const key = kind + t, now = frame;
-		if (now - (reactAt[key] ?? -999) < (kind === "tackle" || kind === "clear" ? 150 : 50)) { return; }
+		if (now - (reactAt[key] ?? -999) < (kind === "late" ? 420 : kind === "tackle" || kind === "clear" ? 150 : 50)) { return; }
 		reactAt[key] = now;
 		const home = t === homeSide, m = crowdMood;
+		if (kind === "late") { m.home = Math.min(m.home, home ? 0.1 : -0.3); }
 		const lvl = { chance: 0.75, save: 0.9, near: 0.8, tackle: 0.45, clear: 0.4, foul: 0.7 }[kind] || 0.5;
 		if (kind === "foul") {
 			// t committed it: the home end jeers a visitor's foul; its own player's gets a shrug.
@@ -8290,6 +8302,8 @@
 			}
 		};
 		const awayPan = 0.5;
+		if (kind === "late") { jeer(home ? 0.7 : 1.2); return; }   // whistling for the final whistle, or at the visitors running it down
+		if (kind === "miss") { if (home) { murmur(0.8); } else { cheer(0.2, -0.2); } return; }
 		if (kind === "foul") { if (!home) { jeer(1); } else { murmur(0.4, awayPan); } return; }
 		if (home) {
 			if (kind === "chance") { cheer(0.75); }
@@ -8319,13 +8333,13 @@
 		if (!crowd) { return; }
 		const t = audio.currentTime, heat = live ? Math.max(crowdHeat, isDerby() ? 0.35 : 0) : 0;
 		const breathe = 1 + 0.12 * Math.sin(t * 0.63) + 0.08 * Math.sin(t * 1.71 + 1);
-		const quiet = (state === "half" ? 0.5 : 1) * (isDerby() ? 1.35 : 1);   // a derby is the loudest night of the season
+		const quiet = (state === "half" ? 0.5 : 1) * (isDerby() ? 1.35 : 1) * (crowdHush > 0 ? 0.35 : 1);   // a derby is the loudest night of the season
 		crowd.rumble.g.gain.setTargetAtTime(live ? (0.045 + 0.08 * heat) * breathe * quiet : 0, t, 0.4);
 		crowd.vox.g.gain.setTargetAtTime(live ? (0.022 + 0.085 * heat) * breathe * quiet : 0, t, 0.35);
 		crowd.air.g.gain.setTargetAtTime(live ? (0.004 + 0.01 * heat) * quiet : 0, t, 0.5);
 		crowd.vox.f.frequency.setTargetAtTime(620 + 650 * heat - 180 * crowdTense + 70 * Math.sin(t * 0.9), t, 0.4);
 		if (crowd.pan) { crowd.pan.pan.setTargetAtTime(0.22 * Math.sin(t * 0.21), t, 0.5); }
-		if (live && state === "play" && freeze <= 0 && t > crowd.nextChant) {
+		if (live && state === "play" && freeze <= 0 && crowdHush <= 0 && t > crowd.nextChant) {
 			// The home end sings, louder when the home side is on top; the away corner answers when theirs is.
 			// In a derby both ends sing all night, trading songs.
 			const awayUp = (isDerby() || edge(1 - homeSide) > 0.35) && Math.random() < 0.5;
@@ -11435,7 +11449,7 @@
 			get charging () { return charging; }, get passCharge () { return passCharge; }, get meterRect () { return meterRect; }, get drawMs () { return drawMs; }, get scale () { return scale; }, get kits () { return KITS; }, get stats () { return stats; }, get oppStats () { return oppStats; }, get steerAt () { return steerAt; }, set steerAt (v) { steerAt = v; }, set possTeam (v) { possTeam = v; },
 			set steerSwitchDone (v) { steerSwitchDone = !!v; },
 			get lastSwitchKind () { return lastSwitchKind; }, get line () { return line; }, get tackling () { return tackling; }, setLine (t, v) { line[t] = v; }, setTackling (t, v) { tackling[t] = v; }, set lastSwitchKind (v) { lastSwitchKind = v; }, get setPiece () { return setPiece; },
-			get G3 () { return G3; }, get matchLog () { return matchLog; }, get league () { return league; }, simSeasonTest () { simulateSeason(); }, nextSeasonTest () { if (seasonDone()) { newSeason(league.fmt); newMatch(); renderLeague(); } }, renderLeagueTest () { renderLeague(); }, crowdReactTest (k, t) { crowdReactImpl(k, t); }, get shoot () { return shoot; }, cornerTest (att, top = true) { if (state !== "play") { return; } freeze = 0; awardCorner(att, att === 1, top); }, get cornerPlan () { return cornerPlan; },
+			get G3 () { return G3; }, get matchLog () { return matchLog; }, get league () { return league; }, simSeasonTest () { simulateSeason(); }, nextSeasonTest () { if (seasonDone()) { newSeason(league.fmt); newMatch(); renderLeague(); } }, renderLeagueTest () { renderLeague(); }, get crowdHush () { return crowdHush; }, get crowdHeat () { return crowdHeat; }, crowdReactTest (k, t) { crowdReactImpl(k, t); }, get shoot () { return shoot; }, cornerTest (att, top = true) { if (state !== "play") { return; } freeze = 0; awardCorner(att, att === 1, top); }, get cornerPlan () { return cornerPlan; },
 			fkTest (t, x, y, indirect = false) { if (state !== "play") { return; } freeze = 0; const v = outfield(t).sort((a, b) => Math.hypot(a.x - x, a.y - y) - Math.hypot(b.x - x, b.y - y))[0]; v.x = x; v.y = y; awardFreeKick(t, v, { indirect }); },
 			penTest (t) { if (state !== "play") { return; } freeze = 0; awardPenalty(t, outfield(t)[0]); },
 			throwTest (t, x, top) { if (state !== "play") { return; } freeze = 0; awardThrow(t, x, top); },
