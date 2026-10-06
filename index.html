@@ -304,8 +304,12 @@
 		overflow: hidden;
 		background: #0f1d16;
 		box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
-		touch-action: none;
 	}
+	/* The pitch itself takes no browser gestures (so a finger on it never scrolls the page), but the
+	   cards over it do: a long full-time card has to scroll on a phone. */
+	.pitchwrap > canvas, .pitchwrap > .scorebug, .pitchwrap > .lower, .pitchwrap > .banner { touch-action: none; }
+	.overlay { touch-action: pan-y; }
+	.card-body { touch-action: pan-y; -webkit-overflow-scrolling: touch; }
 
 	@media (pointer: coarse) and (orientation: portrait) {
 		.pitchwrap, body.big .pitchwrap { height: max(300px, min(calc(100svh - 330px), calc(var(--pw) * 1.12), 760px)); }
@@ -1430,7 +1434,7 @@
 		<p class="fine"><b>Controller.</b> Plug in or pair an Xbox or PlayStation controller and press a button. Left stick moves; A (✕) passes or switches; B (○) shoots, hold for power; X (□) slide tackles; Y (△) plays a through ball; RB (R1) hits a long ball; RT or LT sprints; Back (Share) replays the last six seconds; Start pauses. The hints at the bottom of the pitch show what each button does at that moment; turn them off with Hints.</p>
 		<p class="fine"><b>Home and away.</b> The home side has the crowd behind it: it starts with a little momentum and the visitors play slightly below their rating. The stands fill with the home club's colours, with a corner of away fans. On a kit clash the away side changes, so you'll wear white on some away days. The scoreboard lists the home team first.</p>
 		<p class="fine"><b>Pass and they wilt.</b> String passes together and your side grows in confidence: sharper passing and touches, and the momentum bar swings your way (5 in a row gets a mention, 10 gets an Olé). The side chasing the ball gets tense: stray passes, heavy first touches, late and rash challenges, shakier keeping. It works both ways, so if the computer keeps it off you, your players get nervy too. Win the ball back, keep it for a few passes or score, and the nerves settle; a goal against the run of play flips the game.</p>
-		<p class="fine"><b>Crowd and music.</b> The crowd swells as the ball nears a goal, the home end sings with a drum beating under it, goals get a roar (or a groan from the home fans), and hard saves get an "ooh". After a long quiet spell, or with the home side cruising, the 3D crowd starts a Mexican wave that runs round the bowl. The menus play a stadium anthem in the Mexican style (two trumpets, guitarrón bass, strummed vihuela, güiro and drums); turn it off with Music.</p>
+		<p class="fine"><b>Crowd and music.</b> The crowd swells as the ball nears a goal, the home end sings with a drum beating under it, goals get a roar (or a groan from the home fans), and hard saves get an "ooh". After a long quiet spell, or with the home side cruising, the 3D crowd starts a Mexican wave that runs round the bowl. The menus play a stadium anthem: strings, a horn carrying the tune with a choir under it, bass, timpani and snare, in a hall; turn it off with Music.</p>
 		<p class="fine"><b>Goals.</b> The scorer wheels away to the corner, slides on his knees in front of the fans and is mobbed by his teammates while the other side trudges back and their keeper fetches the ball out of the net, which bulges and swings where the ball hit it. A caption names the scorer and the minute, and the score bug flashes. In the 3D view the celebration then gives way to an instant replay of the build-up in slow motion, from high behind the goal or low beside it, before the camera goes back to the scorer and cuts wide for the restart. The match clock is stopped throughout. Any key, button or tap skips the celebration and the replay. Cards and substitutions get captions too.</p>
 		<p class="fine"><b>Weather and grounds.</b> Every club has a home ground: grass, muddy or artificial turf. Mud slows the ball and the players and kills the bounce. Turf is quick and true. Rain holds the ball up (heavy rain and mud most of all), costs players grip on the turn, sends passes a little astray and makes shots harder for keepers to hold, so they spill more. Wind pushes the ball while it is in the air: long balls, crosses, corners and lofted shots carry with it and hang against it; the arrow and speed at the top left of the pitch show which way it blows. League fixtures kick off in the afternoon or at night under the floodlights, with the stands dark around a lit pitch. In the league, matchdays 10 to 26 are the rainy season, windier and mostly at night, and the forecast is shown in advance (☾ night, ☀ afternoon, ≈ windy); the kick-off card gives the time, the rain and which way the wind blows for you. In a friendly, pick the weather (including Windy) and ground yourself.</p>
 		<p class="fine"><b>Your season, backed up.</b> Your league saves in this browser. Export league saves it to a file; Import league loads a file back (press twice to confirm, since it replaces the season you have). Use it to keep a backup or carry your season to another browser or device.</p>
@@ -8023,7 +8027,7 @@
 			// Fixed by name, so a player looks the same every match.
 			const h = hashStr((p.name || `${p.team}-${p.idx}-${p.num}`) + "look");
 			const style = [ "short", "short", "short", "curly", "long", "buzz", "shaved" ][(h >> 5) % 7];
-			p.look = { skin: SKIN[h % SKIN.length], hair: HAIR[(h >> 2) % HAIR.length], shaved: style === "shaved", style };
+			p.look = { skin: SKIN[h % SKIN.length], hair: HAIR[(h >> 2) % HAIR.length], shaved: style === "shaved", style, face: (h >> 9) % 8 };
 		}
 		return p.look;
 	}
@@ -8669,41 +8673,70 @@
 		}
 	}
 
-	// The stadium anthem on the menus, in the Mexican manner: two trumpets a third apart (mariachi
-	// style) over a guitarrón bass, vihuela strums on the off-beats, a güiro, kick and clap, and a
-	// timbal fill every eighth bar. Sixteen bars in G at 116 beats a minute, all synthesised.
-	const BPM = 116, BEAT = 60 / BPM, BAR = BEAT * 4;
+	// The stadium anthem on the menus: a big, slow, broadcast-style theme in D major at 104 beats a
+	// minute. A detuned string pad holds each chord, a horn carries the tune in two voices with a
+	// choir "ah" under it, a bass walks the roots, timpani and a snare mark the beats, a cymbal
+	// swells into each eight-bar phrase, and the whole thing sits in a hall reverb. Sixteen bars,
+	// all synthesised; the second eight lift a step for the chorus.
+	const BPM = 104, BEAT = 60 / BPM, BAR = BEAT * 4;
 	const midiHz = n => 440 * Math.pow(2, (n - 69) / 12);
-	const CHORDS = { G: [ 55, 59, 62 ], C: [ 48, 52, 55 ], D: [ 50, 54, 57 ], Em: [ 52, 55, 59 ], D7: [ 50, 54, 60 ] };
-	const SONG = [   // [ chord, chord for the second half of the bar or null, eight melody notes (eighths) ]
-		[ "G", null, [ 74, 0, 71, 74, 79, 0, 0, 0 ] ], [ "G", null, [ 78, 79, 81, 0, 79, 0, 74, 0 ] ],
-		[ "C", null, [ 76, 0, 76, 79, 76, 0, 72, 0 ] ], [ "D", null, [ 74, 0, 78, 81, 78, 0, 74, 0 ] ],
-		[ "G", null, [ 71, 74, 79, 0, 83, 0, 81, 79 ] ], [ "Em", null, [ 79, 0, 76, 0, 71, 0, 76, 0 ] ],
-		[ "C", "D", [ 72, 76, 79, 0, 74, 78, 81, 0 ] ], [ "G", null, [ 79, 0, 0, 74, 79, 0, 0, 0 ] ],
-		[ "Em", null, [ 83, 0, 81, 79, 76, 0, 0, 0 ] ], [ "C", null, [ 76, 79, 84, 0, 83, 0, 81, 0 ] ],
-		[ "G", null, [ 74, 0, 79, 0, 83, 0, 79, 0 ] ], [ "D", null, [ 81, 0, 78, 0, 74, 0, 0, 0 ] ],
-		[ "Em", null, [ 79, 81, 83, 0, 88, 0, 83, 0 ] ], [ "C", null, [ 84, 0, 83, 81, 79, 0, 76, 0 ] ],
-		[ "D", null, [ 78, 0, 81, 0, 86, 0, 84, 0 ] ], [ "D7", null, [ 83, 0, 81, 0, 78, 0, 74, 0 ] ]
+	const CHORDS = { D: [ 50, 54, 57 ], A: [ 45, 49, 52 ], Bm: [ 47, 50, 54 ], G: [ 43, 47, 50 ], Em: [ 40, 43, 47 ], Asus: [ 45, 50, 52 ], "G/A": [ 45, 50, 54, 57 ] };
+	const SONG = [   // [ chord, chord for the second half of the bar or null, eight melody notes (eighths; 0 holds the last) ]
+		[ "D", null, [ 74, 0, 0, 0, 78, 0, 81, 0 ] ], [ "A", null, [ 81, 0, 0, 79, 78, 0, 76, 0 ] ],
+		[ "Bm", null, [ 78, 0, 0, 0, 74, 0, 76, 0 ] ], [ "G", null, [ 74, 0, 0, 0, 0, 0, 69, 0 ] ],
+		[ "D", null, [ 74, 0, 0, 0, 78, 0, 81, 0 ] ], [ "A", null, [ 81, 0, 0, 83, 81, 0, 79, 0 ] ],
+		[ "Bm", null, [ 78, 0, 0, 0, 81, 0, 78, 0 ] ], [ "G", "Asus", [ 76, 0, 0, 0, 74, 0, 0, 0 ] ],
+		[ "G", null, [ 79, 0, 0, 0, 78, 0, 76, 0 ] ], [ "D", null, [ 74, 0, 0, 0, 0, 0, 78, 0 ] ],
+		[ "Em", null, [ 76, 0, 0, 0, 79, 0, 76, 0 ] ], [ "A", null, [ 73, 0, 0, 0, 0, 0, 76, 0 ] ],
+		[ "G", null, [ 79, 0, 0, 0, 81, 0, 83, 0 ] ], [ "D", null, [ 81, 0, 0, 0, 0, 0, 78, 0 ] ],
+		[ "Bm", null, [ 78, 0, 76, 0, 74, 0, 76, 0 ] ], [ "G/A", null, [ 73, 0, 0, 0, 74, 0, 0, 0 ] ]
 	];
-	// A third below in G major: two steps down the scale.
-	const SCALE_G = [ 7, 9, 11, 0, 2, 4, 6 ];
-	const thirdBelow = n => { const pc = n % 12, i = SCALE_G.indexOf(pc); if (i < 0) { return n - 4; } const pc2 = SCALE_G[(i + 5) % 7]; let m = n - ((pc - pc2 + 12) % 12); if (m === n) { m -= 12; } return m; };
-	function trumpet (t, n, dur, gain) {
+	// A third below in D major: two steps down the scale.
+	const SCALE_D = [ 2, 4, 6, 7, 9, 11, 1 ];
+	const thirdBelow = n => { const pc = n % 12, i = SCALE_D.indexOf(pc); if (i < 0) { return n - 4; } const pc2 = SCALE_D[(i + 5) % 7]; let m = n - ((pc - pc2 + 12) % 12); if (m === n) { m -= 12; } return m; };
+	// The horn: two sawtooths a little apart through a lowpass that opens on the attack, a slow
+	// swell in, vibrato on held notes, and a soft release.
+	function horn (t, n, dur, gain) {
 		const g = audio.createGain(), f = audio.createBiquadFilter();
-		f.type = "lowpass"; f.Q.value = 2;
-		f.frequency.setValueAtTime(700, t); f.frequency.linearRampToValueAtTime(2600, t + 0.05); f.frequency.exponentialRampToValueAtTime(1500, t + Math.max(0.1, dur));
-		g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(gain, t + 0.025);
-		g.gain.setValueAtTime(gain * 0.8, t + Math.max(0.04, dur - 0.06)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.05);
+		f.type = "lowpass"; f.Q.value = 1.2;
+		f.frequency.setValueAtTime(500, t); f.frequency.linearRampToValueAtTime(1900, t + 0.09); f.frequency.exponentialRampToValueAtTime(1100, t + Math.max(0.15, dur));
+		g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(gain, t + 0.06);
+		g.gain.setValueAtTime(gain * 0.85, t + Math.max(0.08, dur - 0.08)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.16);
 		f.connect(g).connect(music.g);
-		for (const d of [ -7, 6 ]) {
+		for (const d of [ -5, 5 ]) {
 			const o = audio.createOscillator();
 			o.type = "sawtooth"; o.frequency.value = midiHz(n); o.detune.value = d;
-			if (dur > 0.4) {   // a held note gets a little vibrato
+			if (dur > 0.5) {
 				const lfo = audio.createOscillator(), lg = audio.createGain();
-				lfo.frequency.value = 5.6; lg.gain.setValueAtTime(0, t); lg.gain.linearRampToValueAtTime(9, t + dur);
-				lfo.connect(lg).connect(o.detune); lfo.start(t); lfo.stop(t + dur + 0.1);
+				lfo.frequency.value = 5.2; lg.gain.setValueAtTime(0, t); lg.gain.linearRampToValueAtTime(7, t + Math.min(dur, 0.7));
+				lfo.connect(lg).connect(o.detune); lfo.start(t); lfo.stop(t + dur + 0.2);
 			}
-			o.connect(f); o.start(t); o.stop(t + dur + 0.1);
+			o.connect(f); o.start(t); o.stop(t + dur + 0.2);
+		}
+	}
+	// The choir: a sine with two formant bandpasses ("ah"), slow in and out, under the tune.
+	function choir (t, n, dur, gain) {
+		const g = audio.createGain(), o = audio.createOscillator(), o2 = audio.createOscillator();
+		o.type = "triangle"; o.frequency.value = midiHz(n); o2.type = "sine"; o2.frequency.value = midiHz(n); o2.detune.value = 8;
+		g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(gain, t + 0.18); g.gain.setValueAtTime(gain, t + Math.max(0.2, dur - 0.1)); g.gain.linearRampToValueAtTime(0.0001, t + dur + 0.25);
+		for (const [ fq, q ] of [ [ 800, 6 ], [ 1150, 8 ] ]) {
+			const f = audio.createBiquadFilter(); f.type = "bandpass"; f.frequency.value = fq; f.Q.value = q;
+			o.connect(f); o2.connect(f); f.connect(g);
+		}
+		g.connect(music.g); o.start(t); o2.start(t); o.stop(t + dur + 0.3); o2.stop(t + dur + 0.3);
+	}
+	// The strings: for each chord note, two detuned sawtooths an octave apart through a warm
+	// lowpass, swelling in over the first beat and held to the end of the bar.
+	function strings (t, notes, dur, gain) {
+		const g = audio.createGain(), f = audio.createBiquadFilter();
+		f.type = "lowpass"; f.frequency.setValueAtTime(700, t); f.frequency.linearRampToValueAtTime(1300, t + dur * 0.6); f.Q.value = 0.6;
+		g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(gain, t + BEAT * 0.8); g.gain.setValueAtTime(gain, t + dur - 0.15); g.gain.linearRampToValueAtTime(0.0001, t + dur + 0.2);
+		f.connect(g).connect(music.g);
+		for (const n of notes) {
+			for (const [ oct, d ] of [ [ 0, -6 ], [ 0, 6 ], [ 12, 3 ] ]) {
+				const o = audio.createOscillator(); o.type = "sawtooth"; o.frequency.value = midiHz(n + oct); o.detune.value = d;
+				o.connect(f); o.start(t); o.stop(t + dur + 0.25);
+			}
 		}
 	}
 	function pluck (t, n, dur, gain, type = "triangle") {
@@ -8712,12 +8745,18 @@
 		g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(gain, t + 0.006); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
 		o.connect(g).connect(music.g); o.start(t); o.stop(t + dur + 0.02);
 	}
-	function hit (t, dur, gain, type, f0, f1, q = 1) {   // filtered noise: claps, güiro, shakers
+	function hit (t, dur, gain, type, f0, f1, q = 1) {   // filtered noise: a snare's rattle, hats, cymbals
 		const src = audio.createBufferSource(), f = audio.createBiquadFilter(), g = audio.createGain();
 		src.buffer = noise("white"); f.type = type; f.Q.value = q;
 		f.frequency.setValueAtTime(f0, t); f.frequency.linearRampToValueAtTime(f1, t + dur);
 		g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(gain, t + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
 		src.connect(f).connect(g).connect(music.g); src.start(t, Math.random()); src.stop(t + dur + 0.02);
+	}
+	function swell (t, dur, gain) {   // a cymbal roll that grows into the downbeat at t + dur
+		const src = audio.createBufferSource(), f = audio.createBiquadFilter(), g = audio.createGain();
+		src.buffer = noise("white"); f.type = "highpass"; f.frequency.value = 5000;
+		g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + dur); g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.9);
+		src.connect(f).connect(g).connect(music.g); src.start(t, Math.random()); src.stop(t + dur + 1);
 	}
 	function drum (t, f0, f1, dur, gain) {
 		const o = audio.createOscillator(), g = audio.createGain();
@@ -8726,33 +8765,54 @@
 		o.connect(g).connect(music.g); o.start(t); o.stop(t + dur + 0.02);
 	}
 	function scheduleBar (t, i) {
-		const [ c1, c2, mel ] = SONG[i % SONG.length], E = BEAT / 2;
-		// Drums: kick on one and three, a clap on two and four, the güiro scraping each beat.
+		const bar = i % SONG.length, [ c1, c2, mel ] = SONG[bar], E = BEAT / 2, chorus = bar >= 8;
+		// Drums: a timpani on one and three, a snare on two and four, hats on the eighths, and a fill
+		// at the end of each phrase. The first eight bars are quieter; the chorus brings the kit in.
+		const lvl = chorus ? 1 : 0.7;
 		for (let b = 0; b < 4; b++) {
 			const s = t + b * BEAT;
-			if (b % 2 === 0) { drum(s, 130, 48, 0.22, 0.9); } else { hit(s, 0.13, 0.35, "bandpass", 1600, 1200, 0.9); }
-			hit(s + E * 0.5, 0.16, 0.12, "bandpass", 3200, 4200, 2.5); hit(s + E * 1.2, 0.05, 0.1, "bandpass", 4000, 4000, 3);
+			if (b % 2 === 0) { drum(s, 95, 42, 0.35, 0.9 * lvl); drum(s, 190, 60, 0.1, 0.25 * lvl); }
+			else { hit(s, 0.17, 0.4 * lvl, "bandpass", 1900, 900, 0.8); drum(s, 220, 150, 0.08, 0.3 * lvl); }
+			if (chorus) { hit(s + E, 0.05, 0.08, "highpass", 7000, 7000, 1); }
 		}
-		if (i % 8 === 7) { for (let k = 0; k < 4; k++) { drum(t + 3 * BEAT + k * E / 2, 330 - k * 25, 220 - k * 20, 0.12, 0.45); } }   // a timbal fill into the next phrase
-		// Guitarrón: the root on one, the fifth on three, a walk into the next bar.
+		if (bar % 8 === 7) { for (let k = 0; k < 4; k++) { drum(t + 3 * BEAT + k * E / 2, 160 - k * 18, 70, 0.14, 0.5); hit(t + 3 * BEAT + k * E / 2, 0.08, 0.2, "bandpass", 1800, 1200, 1); } }
+		if (bar % 8 === 6) { swell(t + 2 * BEAT, 2 * BEAT, 0.09); }
+		if (bar % 8 === 0) { hit(t, 1.6, 0.11, "highpass", 6000, 3000, 0.7); }   // the crash on the downbeat
+		// Strings: the chord, held through its half of the bar.
+		for (let half = 0; half < 2; half++) {
+			if (half && !c2) { break; }
+			const ch = CHORDS[half ? c2 : c1], dur = c2 ? 2 * BEAT : BAR;
+			strings(t + half * 2 * BEAT, ch.map(n => n + 12), dur, chorus ? 0.085 : 0.065);
+		}
+		// Bass: the root on one and three, the fifth on the "and" of four, an octave below the chord.
 		for (let half = 0; half < 2; half++) {
 			const ch = CHORDS[half && c2 ? c2 : c1], root = ch[0] - 12, s = t + half * 2 * BEAT;
-			pluck(s, root, 0.42, 0.55); pluck(s, root + 12, 0.3, 0.12, "sine");
-			pluck(s + BEAT, root + 7, 0.36, 0.42);
+			pluck(s, root, 0.9, 0.5); pluck(s, root, 0.5, 0.18, "sine");
+			if (half) { pluck(s + BEAT + E, root + 7, 0.35, 0.3); } else { pluck(s + BEAT, root, 0.4, 0.3); }
 		}
-		// Vihuela: a bright chord on each off-beat.
-		for (let b = 0; b < 4; b++) {
-			const ch = CHORDS[b >= 2 && c2 ? c2 : c1], s = t + b * BEAT + E;
-			for (const n of ch) { pluck(s, n + 12, 0.11, 0.07, "square"); }
-		}
-		// The trumpets, in thirds.
+		// The tune: horn in two voices (a third apart), the choir an octave under the top line.
 		mel.forEach((n, k) => {
 			if (!n) { return; }
 			let len = 1;
-			while (k + len < mel.length && !mel[k + len] && len < 3) { len++; }
-			const s = t + k * E, dur = len * E * 0.92;
-			trumpet(s, n - 12, dur, 0.2); trumpet(s, thirdBelow(n) - 12, dur, 0.12);
+			while (k + len < mel.length && !mel[k + len]) { len++; }
+			const s = t + k * E, dur = len * E * 0.95;
+			horn(s, n - 12, dur, chorus ? 0.2 : 0.16); horn(s, thirdBelow(n) - 12, dur, chorus ? 0.11 : 0.08);
+			choir(s, n - 24, dur, chorus ? 0.12 : 0.08);
 		});
+	}
+	let hallBuf = null;
+	function hallImpulse () {   // stereo noise that dies away over 2.5 s, darker as it fades
+		if (hallBuf) { return hallBuf; }
+		const sr = audio.sampleRate, len = Math.floor(sr * 2.5), b = audio.createBuffer(2, len, sr);
+		for (let c = 0; c < 2; c++) {
+			const d = b.getChannelData(c); let lp = 0;
+			for (let i = 0; i < len; i++) {
+				const env = Math.pow(1 - i / len, 2.6), w = Math.random() * 2 - 1;
+				lp += (w - lp) * (0.35 - 0.25 * i / len);   // the tail loses its top end
+				d[i] = lp * env * (i < sr * 0.02 ? i / (sr * 0.02) : 1);
+			}
+		}
+		return (hallBuf = b);
 	}
 	function updateMusic () {
 		if (!audio) { return; }
@@ -8761,13 +8821,20 @@
 		if (want && !music) {
 			music = { g: audio.createGain(), next: t + 0.1, bar: 0 };
 			music.g.gain.value = 0;
-			music.g.gain.setTargetAtTime(0.05, t, 0.6);
+			music.g.gain.setTargetAtTime(0.055, t, 0.6);
 			music.g.connect(audio.destination);
+			// A hall around it: the dry mix plus a convolver with a two-and-a-half second decaying tail.
+			try {
+				const rv = audio.createConvolver(), wet = audio.createGain();
+				rv.buffer = hallImpulse(); wet.gain.value = 0.38;
+				music.g.connect(rv).connect(wet).connect(audio.destination);
+				music.wet = wet;
+			} catch (e) { /* no convolver: play it dry */ }
 		}
 		if (!want && music) {
-			const g = music.g;
+			const g = music.g, wet = music.wet;
 			g.gain.setTargetAtTime(0, t, 0.25);
-			setTimeout(() => { try { g.disconnect(); } catch (e) { /* gone */ } }, 2500);
+			setTimeout(() => { try { g.disconnect(); if (wet) { wet.disconnect(); } } catch (e) { /* gone */ } }, 2500);
 			music = null;
 			return;
 		}
@@ -10079,6 +10146,53 @@
 	const PATTERN3 = { plain: 0, stripes: 1, hoops: 2, halves: 3, sash: 4 };
 	const HAIR_SCALE3 = { short: [ 1, 1, 1 ], curly: [ 1.14, 1.2, 1.14 ], long: [ 1.06, 1.35, 1.06 ], buzz: [ 0.98, 0.96, 0.98 ], shaved: null };
 	const BOOTS3 = [ "#15181a", "#f2f2f2", "#15181a", "#2bd1ff", "#ff4f6a", "#15181a", "#f2b52e", "#8cff5a" ];
+	// One face into the atlas: cell (x0, y0), 256 wide (once round the head) by 128 (crown to chin).
+	// The front of the head is the middle of the cell; the eye line sits a little above the equator.
+	function paintFace3D (g, x0, y0, v) {
+		const cx = x0 + 128, ey = y0 + 62, brow = v % 4, mouth = (v >> 1) % 3, beard = v === 3 || v === 7, stubble = v === 2 || v === 5;
+		const ink = "#2a1a12", dark = "rgba(20, 12, 8, 0.55)";
+		g.save();
+		g.clearRect(x0, y0, 256, 128);
+		// A soft shadow under the brow and down the sides of the nose, so the face reads from a distance.
+		g.fillStyle = "rgba(30, 18, 10, 0.16)";
+		g.beginPath(); g.ellipse(cx, ey + 1, 30, 7, 0, 0, Math.PI * 2); g.fill();
+		g.fillStyle = "rgba(30, 18, 10, 0.11)";
+		g.beginPath(); g.moveTo(cx - 1.5, ey + 5); g.lineTo(cx - 4, ey + 18); g.lineTo(cx + 4, ey + 18); g.lineTo(cx + 1.5, ey + 5); g.closePath(); g.fill();
+		for (const sgn of [ -1, 1 ]) {
+			const x = cx + sgn * 15;
+			// the eye: a white almond, an iris, a pupil and a glint
+			g.fillStyle = "#f6f1ea"; g.beginPath(); g.ellipse(x, ey, 8.5, 5, 0, 0, Math.PI * 2); g.fill();
+			g.fillStyle = v % 3 === 1 ? "#3a5a7a" : v % 3 === 2 ? "#4a6a3a" : "#3a2414"; g.beginPath(); g.arc(x + sgn * 0.5, ey + 0.5, 3.6, 0, Math.PI * 2); g.fill();
+			g.fillStyle = "#120a06"; g.beginPath(); g.arc(x + sgn * 0.5, ey + 0.5, 1.9, 0, Math.PI * 2); g.fill();
+			g.fillStyle = "rgba(255, 255, 255, 0.85)"; g.beginPath(); g.arc(x - 1 + sgn * 0.5, ey - 1, 1, 0, Math.PI * 2); g.fill();
+			// the lid line
+			g.strokeStyle = dark; g.lineWidth = 1.6; g.beginPath(); g.ellipse(x, ey, 8.5, 5, 0, Math.PI, Math.PI * 2); g.stroke();
+			// the brow: flat, arched, heavy or raised
+			g.strokeStyle = ink; g.lineCap = "round"; g.lineWidth = brow === 2 ? 4.2 : 2.8;
+			g.beginPath();
+			if (brow === 1) { g.moveTo(x - sgn * 9, ey - 9); g.quadraticCurveTo(x, ey - 15, x + sgn * 9, ey - 10); }
+			else if (brow === 3) { g.moveTo(x - sgn * 9, ey - 10); g.lineTo(x + sgn * 9, ey - 13); }
+			else { g.moveTo(x - sgn * 9, ey - 10.5); g.lineTo(x + sgn * 9, ey - 10.5); }
+			g.stroke();
+		}
+		// the mouth: a straight line, a slight smile or a set jaw
+		g.strokeStyle = "rgba(60, 22, 18, 0.8)"; g.lineWidth = 2.2; g.lineCap = "round"; g.beginPath();
+		if (mouth === 1) { g.moveTo(cx - 9, ey + 26); g.quadraticCurveTo(cx, ey + 31, cx + 9, ey + 26); }
+		else if (mouth === 2) { g.moveTo(cx - 8, ey + 28); g.quadraticCurveTo(cx, ey + 25, cx + 8, ey + 28); }
+		else { g.moveTo(cx - 8, ey + 27); g.lineTo(cx + 8, ey + 27); }
+		g.stroke();
+		// the ears, a shade darker than the skin, out at the sides
+		g.fillStyle = "rgba(60, 30, 15, 0.22)";
+		for (const sgn of [ -1, 1 ]) { g.beginPath(); g.ellipse(cx + sgn * 62, ey + 6, 6, 9, 0, 0, Math.PI * 2); g.fill(); }
+		// stubble or a beard across the jaw
+		if (stubble || beard) {
+			g.fillStyle = beard ? "rgba(28, 18, 12, 0.78)" : "rgba(28, 18, 12, 0.3)";
+			g.beginPath(); g.moveTo(cx - 44, ey + 14); g.quadraticCurveTo(cx - 40, ey + 52, cx, ey + 56); g.quadraticCurveTo(cx + 40, ey + 52, cx + 44, ey + 14);
+			g.quadraticCurveTo(cx + 30, ey + 23, cx + 12, ey + 21); g.quadraticCurveTo(cx, ey + 19, cx - 12, ey + 21); g.quadraticCurveTo(cx - 30, ey + 23, cx - 44, ey + 14); g.closePath(); g.fill();
+			if (beard) { g.fillStyle = "rgba(90, 50, 35, 0.9)"; g.beginPath(); g.ellipse(cx, ey + 27, 7, 2.2, 0, 0, Math.PI * 2); g.fill(); }
+		}
+		g.restore();
+	}
 	function initFigures3D () {
 		const T = THREE;
 		const defs = {
@@ -10087,7 +10201,7 @@
 			shorts: () => { const g = new T.CylinderGeometry(3.75, 4.25, 4.6, 12); g.translate(0, -1.9, 0); g.scale(0.8, 1, 1); return g; },
 			neck: () => { const g = new T.CylinderGeometry(1.0, 1.15, 2, 8); g.translate(0, 0.7, 0); return g; },
 			head: () => { const g = new T.SphereGeometry(2.55, 14, 10); g.scale(0.96, 1.12, 0.94); g.translate(0.2, 2.5, 0); return g; },
-			hair: () => { const g = new T.SphereGeometry(2.78, 12, 7, 0, Math.PI * 2, 0, 1.8); g.scale(0.98, 1.08, 0.98); g.translate(-0.1, 2.6, 0); return g; },
+			hair: () => { const g = new T.SphereGeometry(2.82, 12, 7, 0, Math.PI * 2, 0, 1.55); g.scale(0.96, 1.12, 0.94); g.rotateZ(0.42); g.translate(0.2, 2.5, 0); return g; },   // concentric with the head, tilted: high at the brow, low at the nape
 			upperArm: () => { const g = new T.CapsuleGeometry(1.15, 4.4, 3, 7); g.translate(0, -2.4, 0); return g; },
 			foreArm: () => { const g = new T.CapsuleGeometry(0.95, 4.2, 3, 7); g.translate(0, -2.3, 0); return g; },
 			hand: () => { const g = new T.SphereGeometry(1.05, 7, 5); g.scale(1, 1.25, 0.8); g.translate(0, -0.7, 0); return g; },
@@ -10113,6 +10227,26 @@
 					diffuseColor.rgb = mix(diffuseColor.rgb, vCol2, km);`);
 		};
 		shirtMat.customProgramCacheKey = () => "ff-shirt";
+		// Faces: an atlas of eight, painted once (eyes, brows, a nose, a mouth, stubble or a beard on
+		// some), wrapped round the head sphere with the face at the front. Each figure picks its cell
+		// with an instanced attribute; the painted parts are laid over the skin colour, the rest is skin.
+		const fc = document.createElement("canvas"); fc.width = 1024; fc.height = 256;
+		const fg = fc.getContext && fc.getContext("2d");
+		if (fg) {
+			for (let v = 0; v < 8; v++) { paintFace3D(fg, (v % 4) * 256, Math.floor(v / 4) * 128, v); }
+		}
+		const faceTex = new T.CanvasTexture(fc);
+		faceTex.minFilter = T.LinearFilter; faceTex.magFilter = T.LinearFilter; faceTex.generateMipmaps = false;
+		const headMat = new T.MeshLambertMaterial({ color: 0xffffff, map: faceTex });
+		headMat.onBeforeCompile = sh => {
+			sh.vertexShader = sh.vertexShader
+				.replace("#include <common>", "#include <common>\nattribute float aFace;")
+				.replace("#include <uv_vertex>", "#include <uv_vertex>\nvUv = (uv + vec2(mod(aFace, 4.0), 1.0 - floor(aFace / 4.0))) / vec2(4.0, 2.0);");
+			sh.fragmentShader = sh.fragmentShader
+				.replace("#include <map_fragment>", "")
+				.replace("#include <color_fragment>", "#include <color_fragment>\nvec4 fx = texture2D(map, vUv); diffuseColor.rgb = mix(diffuseColor.rgb, fx.rgb, fx.a);");
+		};
+		headMat.customProgramCacheKey = () => "ff-face";
 		const parts = {}, white = new T.Color(1, 1, 1);
 		for (const name of Object.keys(defs)) {
 			const geo = defs[name], cap = MAXF3 * PER_FIG3[name];
@@ -10121,7 +10255,8 @@
 				g.setAttribute("aPat", new T.InstancedBufferAttribute(new Float32Array(cap), 1).setUsage(T.DynamicDrawUsage));
 				g.setAttribute("aCol2", new T.InstancedBufferAttribute(new Float32Array(cap * 3), 3).setUsage(T.DynamicDrawUsage));
 			}
-			const m = new T.InstancedMesh(g, name === "torso" ? shirtMat : plain, cap);
+			if (name === "head") { g.setAttribute("aFace", new T.InstancedBufferAttribute(new Float32Array(cap), 1).setUsage(T.DynamicDrawUsage)); }
+			const m = new T.InstancedMesh(g, name === "torso" ? shirtMat : name === "head" ? headMat : plain, cap);
 			m.instanceMatrix.setUsage(T.DynamicDrawUsage);
 			m.setColorAt(0, white);   // so the colour buffer exists before the first frame
 			m.frustumCulled = false; m.count = 0;
@@ -10325,7 +10460,7 @@
 			if (name === "torso") {
 				const g = mesh.geometry, pat = g.attributes.aPat, c2 = g.attributes.aCol2;
 				pat.setX(k, kit.pattern); C.set(kit.second); c2.setXYZ(k, C.r, C.g, C.b);
-			}
+			} else if (name === "head") { mesh.geometry.attributes.aFace.setX(k, lk.face || 0); }
 		}
 		const V = F.V.setFromMatrixPosition(rig.root.matrixWorld), x = V.x, z = V.z, air = Math.max(0, V.y);
 		F.blobs.setMatrixAt(F.blobs.count++, M.compose(V.set(x + 2, 0.2, z + 1.5), F.Q.identity(), F.S.set(11 + air * 0.15, 1, 7 + air * 0.1)));
@@ -10371,7 +10506,7 @@
 	let flagCall = null;   // { k: 1 or 2 (which assistant), kind: "off" | "out", t: frames left }
 	function raiseFlag (x, kind) { if (!bulkSim) { flagCall = { k: x < FW / 2 ? 1 : 2, kind, t: kind === "off" ? 100 : 70 }; } }
 	const officials3 = [ 0, 1, 2 ].map(i => ({ x: 0, y: 0, vx: 0, vy: 0, dir: -Math.PI / 2, stride: 0, runAmt: 0, idlePh: i * 2, role: "ref", team: -1,
-		look: { skin: [ "#e0ac86", "#9c6a44", "#f1c9a5" ][i], hair: "#1b1410", style: [ "buzz", "short", "shaved" ][i] } }));
+		look: { skin: [ "#e0ac86", "#9c6a44", "#f1c9a5" ][i], hair: "#1b1410", style: [ "buzz", "short", "shaved" ][i], face: [ 1, 4, 6 ][i] } }));
 	let officialsFor3 = null;
 	function stepOfficial3 (o, tx, ty, maxSpd, dt) {
 		const dx = tx - o.x, dy = ty - o.y, d = Math.hypot(dx, dy);
