@@ -4171,6 +4171,8 @@
 			const o = ball.owner, px = o.x + o.vx * 12, py = o.y + o.vy * 12;
 			return Math.hypot(px - m.x, py - m.y) / reach;
 		}
+		// A ball in the air: whoever gets to where it comes down.
+		if (ball.z > 4 && ball.landT > 0) { return Math.hypot(ball.landX - m.x, ball.landY - m.y) / reach; }
 		let bx = ball.x, by = ball.y, vx = ball.vx, vy = ball.vy;
 		for (let t = 1; t <= 120; t++) {
 			bx += vx; by += vy; vx *= cond.roll; vy *= cond.roll;
@@ -10859,7 +10861,7 @@
 	window.addEventListener("gamepadconnected", () => { padOn = true; toast("Controller connected", "#eef6ea"); });
 
 	/* ---------- input ---------- */
-	const GAME_KEYS = new Set([ "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Space", "KeyA", "KeyS", "KeyD", "KeyW", "KeyQ", "KeyE", "KeyT", "Digit1", "Digit2", "Digit3", "Digit4" ]);
+	const GAME_KEYS = new Set([ "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Space", "KeyA", "KeyS", "KeyD", "KeyW", "KeyQ", "KeyE", "KeyT", "Digit1", "Digit2", "Digit3", "Digit4", "Tab" ]);
 
 	window.addEventListener("keydown", e => {
 		if (e.target instanceof HTMLSelectElement) { return; }
@@ -10888,6 +10890,7 @@
 		if (e.code === "KeyA") { pressHeld = true; humanTackle(); }
 		if (e.code === "KeyW") { passPress("through"); }
 		if (e.code === "KeyQ") { passPress("long"); }
+		if (e.code === "Tab" && ball.owner !== human()) { switchToNearest(true); }   // switch player: cycles to the next best placed
 	});
 
 	window.addEventListener("keyup", e => {
@@ -11156,7 +11159,7 @@
 	   One screen with every control, for the keyboard, touch or a controller, and what the
 	   markers on the pitch mean. H opens it any time (and pauses the match). */
 	const HOWTO = {
-		keys: { move: "← ↑ → ↓", sprint: "E", pass: "S", through: "W", long: "Q", shoot: "D", tackle: "A", switch: "S", tactic: "1 – 4", pause: "P", cam: "C", big: "F", help: "H" },
+		keys: { move: "← ↑ → ↓", sprint: "E", pass: "S", through: "W", long: "Q", shoot: "D", tackle: "A", switch: "S / Tab", tactic: "1 – 4", pause: "P", cam: "C", big: "F", help: "H" },
 		touch: { move: "Joystick", sprint: "Sprint", pass: "Pass", through: "Through", long: "Long", shoot: "Shoot", tackle: "Tackle", switch: "Pass", tactic: "Tactic", pause: "Pause", cam: "Camera", big: "Big pitch", help: "How to play" },
 		pad: { move: "Left stick", sprint: "RT / LT", pass: "A / ✕", through: "Y / △", long: "RB / R1", shoot: "B / ○", tackle: "X / □", switch: "A / ✕", tactic: "D-pad ↑ ↓", pause: "Start", cam: "Camera", big: "F", help: "H" }
 	};
