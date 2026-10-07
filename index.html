@@ -1508,7 +1508,12 @@
 </div>
 
 <!-- three.js r147, for the 3D camera. Pinned; if it fails to load the game stays on its 2D cameras. -->
-<script id="threeLib" src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.147.0/three.min.js" integrity="sha384-vV17nr/rMaJqmeZkFUzXLpHdQ+ME5QHKdydaqqN+3Ga39RJlNrTatJxHwGV4ml2C" crossorigin="anonymous" async></script>
+<script id="threeLib" type="module">
+	// three.js ships only as an ES module now; the game's renderer reads it from the THREE global.
+	import("https://cdnjs.cloudflare.com/ajax/libs/three.js/0.186.1/three.module.min.js")
+		.then(m => { window.THREE = m; })
+		.catch(() => { const el = document.getElementById("threeLib"); if (el) { el.dispatchEvent(new Event("error")); } });
+</script>
 <script>
 (() => {
 	/* ---------- pitch geometry (logical units) ---------- */
@@ -5388,7 +5393,9 @@
 					p.lunge--;
 					movePlayer(p, Math.cos(p.dir) * BASE_SPD * 2, Math.sin(p.dir) * BASE_SPD * 2, cond.grip, 9);
 				} else {
-					// Your player answers the keys a little faster than the AI, and stops when you let go.
+					// Your player answers the keys a little faster than the AI, and stops when you let go:
+					// from a run that is a plant, weight back, before he is still.
+					if (inp.m < 0.1 && Math.hypot(p.vx, p.vy) > 1.6 && !(p.plant > 0)) { p.plant = 8; }
 					const grip = Math.max(cond.grip, 0.18) * (inp.m > 0.1 ? 1.3 : 1.7);
 					movePlayer(p, inp.x * spd, inp.y * spd, Math.min(0.45, grip), ACC_YOU, ball.owner === p ? 0.6 : 0.85);
 				}
@@ -5565,11 +5572,27 @@
 	function syncOwnedBall () {
 		const o = ball.owner;
 		if (!o) { return; }
-		// The ball rolls to the spot at your feet rather than jumping there.
-		const fxb = o.x + Math.cos(o.dir) * 18, fyb = o.y + Math.sin(o.dir) * 18;
+		// Dribbling is a run of touches, not a ball stuck to the boot. Each stride knocks it ahead,
+		// further the faster he runs (further still at a sprint and on wet grass, a little less for a
+		// nimble player), and he closes in on it before the next touch. A heavy touch leaves the ball
+		// a step away, where a defender can nick it (see the challenge below).
+		const v = Math.hypot(o.vx, o.vy), held = inHands(o) || (setPiece && setPiece.taker === o);
+		let ahead = 18;
+		if (!held && v > 0.6) {
+			const sprint = clamp(o.sprintAmt || 0, 0, 1);
+			const reach = 18 + Math.min(16, v * 3.2) + sprint * 7 + (cond.wet ? 3 : 0) - (build(o).agil - 1) * 20;
+			const ph = (((o.stride || 0) % Math.PI) + Math.PI) % Math.PI / Math.PI;   // 0 as a foot comes through, 1 just before the next
+			ahead = reach - (reach - 18) * ph * 0.75;
+			o.touchPh = ph;
+		} else {
+			o.touchPh = 1;
+		}
+		// The ball rolls to the spot at his feet rather than jumping there.
+		const fxb = o.x + Math.cos(o.dir) * ahead, fyb = o.y + Math.sin(o.dir) * ahead;
 		const settled = Math.hypot(fxb - ball.x, fyb - ball.y) > 60;   // a fresh gain from far away: take it
-		ball.x = settled ? fxb : ball.x + (fxb - ball.x) * 0.55;
-		ball.y = settled ? fyb : ball.y + (fyb - ball.y) * 0.55;
+		const k = settled ? 1 : held || v < 0.6 ? 0.55 : 0.4;
+		ball.x = settled ? fxb : ball.x + (fxb - ball.x) * k;
+		ball.y = settled ? fyb : ball.y + (fyb - ball.y) * k;
 		ball.vx = o.vx; ball.vy = o.vy;
 		ball.z = 0; ball.vz = 0;
 		ball.spin += Math.hypot(o.vx, o.vy) * 0.25;
@@ -6487,6 +6510,7 @@
 			let chance = (q.team === 1 ? diff.tackle : isHuman ? (pressHeld || touchPress || padPressBtn ? 0.045 : 0.035) : 0.022) * mood(q.team, 0.4) * defMul(q) * (isHuman ? 1 : TACKLE_FX[tackling[q.team]].win) * (0.8 + 0.2 * staOf(q)) * (wobble(q.team) ? 0.82 : 1);
 			if (tr(q, "winner")) { chance *= 1.4; }
 			if (tr(o, "target") && !sliding) { chance *= 0.7; }
+			if (dist(o, ball) > 27) { chance *= 1.5; }   // a heavy touch: the ball is a step from his feet
 			if (sliding) { chance = 0.3 * defMul(q) * (tr(q, "winner") ? 1.2 : 1); }
 			if (settling && q.team === 1) { chance *= sliding ? 0.5 : 0.15; }
 			const won = Math.random() < chance;
@@ -9631,6 +9655,8 @@
 		}
 		return m;
 	}
+	// A picture painted on a canvas is sRGB; tell three.js so it is not read as linear and washed out.
+	const tex3D = c => { const t = new THREE.CanvasTexture(c); if (THREE.SRGBColorSpace) { t.colorSpace = THREE.SRGBColorSpace; } return t; };
 	const flat3D = (geo, color, opacity) => new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false }));
 	function init3D () {
 		try {
@@ -9658,7 +9684,7 @@
 				bg.fillStyle = "#fbfdf9"; bg.fillRect(0, 0, 128, 64);
 				bg.fillStyle = "#1b2420";
 				for (const [ x, y ] of [ [ 16, 16 ], [ 64, 16 ], [ 112, 16 ], [ 40, 48 ], [ 88, 48 ], [ 64, 32 ] ]) { bg.beginPath(); bg.arc(x, y, 7, 0, Math.PI * 2); bg.fill(); }
-				const bt = new THREE.CanvasTexture(bc);
+				const bt = tex3D(bc);
 				ballMat = new THREE.MeshLambertMaterial({ map: bt });
 			}
 			G3.ball = new THREE.Mesh(g.ball, ballMat);
@@ -9684,7 +9710,7 @@
 				const grad = gg.createRadialGradient(32, 32, 2, 32, 32, 32);
 				grad.addColorStop(0, "rgba(255, 244, 210, 0.9)"); grad.addColorStop(0.35, "rgba(255, 244, 210, 0.3)"); grad.addColorStop(1, "rgba(255, 244, 210, 0)");
 				gg.fillStyle = grad; gg.fillRect(0, 0, 64, 64);
-				G3.glowTex = new THREE.CanvasTexture(gc);
+				G3.glowTex = tex3D(gc);
 			}
 			G3.shot = "";
 			return true;
@@ -9704,7 +9730,7 @@
 		return new THREE.Mesh(geo, material);
 	}
 	function canvasTex3D (c) {
-		const t = new THREE.CanvasTexture(c);
+		const t = tex3D(c);
 		if (G3.renderer.capabilities.isWebGL2) { t.anisotropy = Math.min(8, G3.renderer.capabilities.getMaxAnisotropy()); }
 		else { t.generateMipmaps = false; t.minFilter = THREE.LinearFilter; }
 		return t;
@@ -10080,7 +10106,7 @@
 			const stops = day ? (cond.wet ? [ "#454f58", "#6b7680", "#a2abb2" ] : [ "#2f639a", "#6e9cc6", "#c3d6e4" ]) : [ "#010206", "#060b11", "#121d26" ];
 			grad.addColorStop(0, stops[0]); grad.addColorStop(0.55, stops[1]); grad.addColorStop(1, stops[2]);
 			sg.fillStyle = grad; sg.fillRect(0, 0, 2, 128);
-			const sky = new THREE.Mesh(new THREE.SphereGeometry(FH * 9, 24, 12, 0, Math.PI * 2, 0, Math.PI * 0.52), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(sc), side: THREE.BackSide, fog: false }));
+			const sky = new THREE.Mesh(new THREE.SphereGeometry(FH * 9, 24, 12, 0, Math.PI * 2, 0, Math.PI * 0.52), new THREE.MeshBasicMaterial({ map: tex3D(sc), side: THREE.BackSide, fog: false }));
 			sky.position.set(FW / 2, -FH * 0.2, FH / 2); st.add(own(sky, true));
 		}
 		const starPts = [];
@@ -10093,10 +10119,12 @@
 		const stg = new THREE.BufferGeometry(); stg.setAttribute("position", new THREE.Float32BufferAttribute(starPts, 3));
 		const dayLit = cond.ko === "day";
 		if (!dayLit) { st.add(own(new THREE.Points(stg, new THREE.PointsMaterial({ color: 0xdde6ff, size: 1.8, sizeAttenuation: false, fog: false })), true)); }
-		st.add(new THREE.AmbientLight(dayLit ? 0x9aa7b2 : 0x5e6a74, dayLit ? 0.85 : 0.5));
-		st.add(new THREE.HemisphereLight(dayLit ? 0x9cb9d6 : 0x46586c, dayLit ? 0x2e4a34 : 0x1e3a2a, dayLit ? 0.7 : 0.45));
-		const key1 = new THREE.DirectionalLight(0xfff1d6, dayLit ? 0.9 : 0.75); key1.position.set(-FW * 0.2, FH * 1.6, FH * 1.6); key1.target.position.set(FW / 2, 0, FH / 2);
-		const key2 = new THREE.DirectionalLight(0xfff1d6, 0.45); key2.position.set(FW * 1.2, FH * 1.6, -FH * 0.5); key2.target.position.set(FW / 2, 0, FH / 2);
+		// Intensities carry the factor of PI that three.js scaled in for us before r155.
+		const LI = Math.PI;
+		st.add(new THREE.AmbientLight(dayLit ? 0x9aa7b2 : 0x5e6a74, (dayLit ? 0.85 : 0.5) * LI));
+		st.add(new THREE.HemisphereLight(dayLit ? 0x9cb9d6 : 0x46586c, dayLit ? 0x2e4a34 : 0x1e3a2a, (dayLit ? 0.7 : 0.45) * LI));
+		const key1 = new THREE.DirectionalLight(0xfff1d6, (dayLit ? 0.9 : 0.75) * LI); key1.position.set(-FW * 0.2, FH * 1.6, FH * 1.6); key1.target.position.set(FW / 2, 0, FH / 2);
+		const key2 = new THREE.DirectionalLight(0xfff1d6, 0.45 * LI); key2.position.set(FW * 1.2, FH * 1.6, -FH * 0.5); key2.target.position.set(FW / 2, 0, FH / 2);
 		st.add(key1, key1.target, key2, key2.target);
 		G3.scene.fog = new THREE.Fog(dayLit ? (cond.wet ? 0x8d979e : 0xa9bfd0) : 0x070d13, FH * 2.6, FH * 7);
 		G3.stadium = st;
@@ -10279,16 +10307,16 @@
 		if (fg) {
 			for (let v = 0; v < 8; v++) { paintFace3D(fg, (v % 4) * 256, Math.floor(v / 4) * 128, v); }
 		}
-		const faceTex = new T.CanvasTexture(fc);
+		const faceTex = tex3D(fc);
 		faceTex.minFilter = T.LinearFilter; faceTex.magFilter = T.LinearFilter; faceTex.generateMipmaps = false;
 		const headMat = new T.MeshLambertMaterial({ color: 0xffffff, map: faceTex });
 		headMat.onBeforeCompile = sh => {
 			sh.vertexShader = sh.vertexShader
 				.replace("#include <common>", "#include <common>\nattribute float aFace;")
-				.replace("#include <uv_vertex>", "#include <uv_vertex>\nvUv = (uv + vec2(mod(aFace, 4.0), 1.0 - floor(aFace / 4.0))) / vec2(4.0, 2.0);");
+				.replace("#include <uv_vertex>", "#include <uv_vertex>\nvMapUv = (uv + vec2(mod(aFace, 4.0), 1.0 - floor(aFace / 4.0))) / vec2(4.0, 2.0);");
 			sh.fragmentShader = sh.fragmentShader
 				.replace("#include <map_fragment>", "")
-				.replace("#include <color_fragment>", "#include <color_fragment>\nvec4 fx = texture2D(map, vUv); diffuseColor.rgb = mix(diffuseColor.rgb, fx.rgb, fx.a);");
+				.replace("#include <color_fragment>", "#include <color_fragment>\nvec4 fx = texture2D(map, vMapUv); diffuseColor.rgb = mix(diffuseColor.rgb, fx.rgb, fx.a);");
 		};
 		headMat.customProgramCacheKey = () => "ff-face";
 		const parts = {}, white = new T.Color(1, 1, 1);
@@ -10315,11 +10343,11 @@
 			ag.lineWidth = 5; ag.strokeStyle = "rgba(0, 0, 0, 0.45)"; ag.fillStyle = "#ffffff";
 			for (let n = 0; n < 100; n++) { const x = (n % 10) * 64 + 32, y = Math.floor(n / 10) * 64 + 35; ag.strokeText(String(n), x, y); ag.fillText(String(n), x, y); }
 		}
-		const numMat = new T.MeshLambertMaterial({ color: 0xffffff, map: new T.CanvasTexture(ac), alphaTest: 0.35, polygonOffset: true, polygonOffsetFactor: -2 });
+		const numMat = new T.MeshLambertMaterial({ color: 0xffffff, map: tex3D(ac), alphaTest: 0.35, polygonOffset: true, polygonOffsetFactor: -2 });
 		numMat.onBeforeCompile = sh => {
 			sh.vertexShader = sh.vertexShader
 				.replace("#include <common>", "#include <common>\nattribute float aCell;")
-				.replace("#include <uv_vertex>", "#include <uv_vertex>\nvUv = (uv + vec2(mod(aCell, 10.0), 9.0 - floor(aCell / 10.0))) / 10.0;");
+				.replace("#include <uv_vertex>", "#include <uv_vertex>\nvMapUv = (uv + vec2(mod(aCell, 10.0), 9.0 - floor(aCell / 10.0))) / 10.0;");
 		};
 		numMat.customProgramCacheKey = () => "ff-num";
 		const ng = new T.PlaneGeometry(5.0, 5.6).rotateY(-Math.PI / 2).translate(-3.35, 5.4, 0);
@@ -10370,7 +10398,7 @@
 	// A footballer's pose from the simulation: the run (its stride and how hard he is running), the
 	// idle weight shift, the keeper's set, a kick (pass or shot, its backswing from the power), a
 	// throw-in, a header, a slide, the keeper's dive, a fall when fouled, and the celebrations.
-	function pose3D (r, p, x, z, dir, turn, ballNear) {
+	function pose3D (r, p, x, z, dir, turn, ballNear, ballYaw = 0) {
 		resetRig3D(r);
 		const rm = reduceMotion;
 		const spd = Math.hypot(p.vx || 0, p.vy || 0);
@@ -10396,6 +10424,26 @@
 		r.hips.rotation.x = clamp(turn * 1.4, -0.3, 0.3) * clamp(spd, 0, 1);
 		r.neck.rotation.z = -r.spine.rotation.z * 0.6;
 		if (a < 0.2) { r.chest.rotation.y = Math.sin(idle * 0.5) * 0.05; r.sh[0].rotation.z += Math.sin(idle) * 0.03; r.sh[1].rotation.z -= Math.sin(idle) * 0.03; r.head.rotation.y = Math.sin(idle * 0.37) * 0.25; }
+		// Planting to stop or cut: knees bent, weight back, feet wide for a few frames.
+		const plant = !rm && p.plant > 0 && !down && jump <= 0 ? p.plant / 10 : 0;
+		if (plant > 0) {
+			r.spine.rotation.z -= 0.28 * plant; r.hips.position.y -= 1.4 * plant;
+			for (let i = 0; i < 2; i++) { r.kn[i].rotation.z -= 0.35 * plant; r.hip[i].rotation.x += (i ? 1 : -1) * 0.14 * plant; r.hip[i].rotation.z += 0.18 * plant; }
+		}
+		// Flat out: leaning further in, the arms pumping higher and tighter.
+		const sp = clamp(p.sprintAmt || 0, 0, 1) * a;
+		if (sp > 0) { r.spine.rotation.z += 0.14 * sp; for (let i = 0; i < 2; i++) { r.el[i].rotation.z += 0.3 * sp; r.sh[i].rotation.z *= 1 + 0.25 * sp; } }
+		// Eyes on the ball: the head turns toward it when it is near, and drops to the feet on the ball.
+		if (!rm && ball && fall < 0 && dive < 0 && thr < 0 && cel <= 0 && !down) {
+			if (ball.owner === p) {
+				r.neck.rotation.z += 0.2;
+				// Each touch: the boot comes through and flicks the ball on.
+				const tap = p.touchPh !== undefined && a > 0.2 ? Math.max(0, 1 - p.touchPh / 0.22) : 0;
+				if (tap > 0) { const kf = build(p).left ? 0 : 1; r.an[kf].rotation.z -= 0.4 * tap; r.kn[kf].rotation.z += 0.15 * tap; }
+			} else {
+				r.head.rotation.y += ballYaw;
+			}
+		}
 		// The keeper on his toes when the ball is near: knees bent, hands ready.
 		if (gk && ballNear > 0 && !down && jump <= 0 && fall < 0 && dive < 0 && !(p.kickA > 0)) {
 			const g = ballNear * (1 - a);
@@ -10603,8 +10651,13 @@
 			const rig = F.rigs[F.n], pd = F.prevDir.get(p);
 			const turn = pd === undefined ? 0 : Math.atan2(Math.sin(p.dir - pd), Math.cos(p.dir - pd)) / dt;
 			F.prevDir.set(p, p.dir);
-			const near = p.role === "gk" ? clamp(1 - Math.hypot(ball.x - p.x, ball.y - p.y) / (260 * S), 0, 1) : 0;
-			pose3D(rig, p, WX(p.x), p.y, WD(p.dir), WX(1) < WX(0) ? -turn : turn, near);
+			const dBall = Math.hypot(ball.x - p.x, ball.y - p.y);
+			const near = p.role === "gk" ? clamp(1 - dBall / (260 * S), 0, 1) : 0;
+			// How far the head turns to follow the ball: the angle from his facing to it, within a
+			// neck's reach, fading out past 420 units, mirrored with the pitch.
+			const relB = Math.atan2(Math.sin(Math.atan2(ball.y - p.y, ball.x - p.x) - p.dir), Math.cos(Math.atan2(ball.y - p.y, ball.x - p.x) - p.dir));
+			const yaw = -clamp(relB, -0.85, 0.85) * clamp(1 - dBall / (420 * S), 0, 1);
+			pose3D(rig, p, WX(p.x), p.y, WD(p.dir), WX(1) < WX(0) ? -turn : turn, near, WX(1) < WX(0) ? -yaw : yaw);
 			rig.root.scale.setScalar(0.95 + 0.1 * build(p).seed);   // tall and short
 			commitFigure3D(rig, look(p), kit3D(p), p.num);
 		}
