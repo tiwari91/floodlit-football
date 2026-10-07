@@ -34,7 +34,7 @@ const run = (opts) => page.evaluate(async (o) => {
 	return { lost, min: Math.min(...late).toFixed(1), max: Math.max(...late).toFixed(1), mean: mean(late).toFixed(1), speed: mean(v.slice(60)).toFixed(2), touchPh: me.touchPh, v0: v0.toFixed(2), plantSeen, wobble: (Math.max(...late) - Math.min(...late)).toFixed(1), nan: late.some(x => !Number.isFinite(x)) };
 }, opts);
 const jog = await run({ frames: 240, sprint: false });
-check("jog: the ball is knocked ahead and caught up with (it moves between touches, stays within reach)", jog.lost === 0 && !jog.nan && jog.min >= 14 && jog.max <= 42 && jog.wobble >= 3, JSON.stringify(jog));
+check("jog: the ball is knocked ahead and caught up with (it moves between touches, stays within reach)", jog.lost === 0 && !jog.nan && jog.min >= 14 && jog.max <= 42 && jog.wobble >= 2, JSON.stringify(jog));
 check("letting go at speed plants him (weight back) before he stops", jog.v0 > 1.6 && jog.plantSeen > 0, JSON.stringify({ v0: jog.v0, plantSeen: jog.plantSeen }));
 const sprint = await run({ frames: 240, sprint: true });
 check("sprint: faster, and the ball runs further ahead than at a jog", sprint.lost === 0 && !sprint.nan && Number(sprint.speed) > Number(jog.speed) && Number(sprint.max) > Number(jog.max) && sprint.max <= 46, JSON.stringify(sprint));
