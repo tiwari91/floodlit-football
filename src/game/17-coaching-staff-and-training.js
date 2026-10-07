@@ -565,21 +565,46 @@
 
 	// The coaching loop, in words: before a match, what the opponent does and what might beat it,
 	// with the state of your squad and training; after it, what the numbers say to change.
+	// The matchday card's coach and squad lines: what the opponent does and what might beat it, and
+	// the state of your eleven and its training.
 	function coachBrief () {
 		const tips = [];
-		if (press[1] === "high") { tips.push("They press high: going Direct, or a deep line, uses the space behind them"); }
-		else if (style[1] === "possession") { tips.push("They keep the ball: a mid block and getting stuck in can rattle them"); }
-		else if (style[1] === "direct" || style[1] === "counter") { tips.push("They go long and fast: a deep line takes away the ball over the top"); }
-		else if (press[1] === "low") { tips.push("They sit deep: Possession and patience, or crosses for your runners"); }
+		if (press[1] === "high") { tips.push("they press high: going Direct, or a deep line, uses the space behind them"); }
+		else if (style[1] === "possession") { tips.push("they keep the ball: a mid block and getting stuck in can rattle them"); }
+		else if (style[1] === "direct" || style[1] === "counter") { tips.push("they go long and fast: a deep line takes away the ball over the top"); }
+		else if (press[1] === "low") { tips.push("they sit deep: Possession and patience, or crosses for your runners"); }
 		if (tackling[1] === "hard") { tips.push("they get stuck in, so expect free kicks"); }
 		let squad = "";
 		if (league && league.club && mode === "league") {
 			const c = league.club, xi = slotsFor(league.fmt).map(i => c.squad[i]).filter(Boolean), mor = Math.round(xi.reduce((t, p) => t + (p.morale || 70), 0) / Math.max(1, xi.length));
 			ensureCoaching(c, league);
-			squad = ` Your eleven: morale ${mor}${mor < 50 ? " (low: a win would lift it)" : ""}, tactical familiarity ${Math.round(c.drill)}%, training ${c.training.focus} at ${c.training.load} intensity.`;
+			squad = `morale ${mor}${mor < 50 ? " (low: a win would lift it)" : ""}, tactical familiarity ${Math.round(c.drill)}%, training ${c.training.focus} at ${c.training.load} intensity`;
 		}
-		return tips.length ? `Coach: ${tips.join("; ")}.${squad} ` : squad ? `${squad.trim()} ` : "";
+		return { coach: tips.join("; "), squad };
 	}
+	// Who to watch and how they play, as separate pieces for the matchday card.
+	function keyMenParts () {
+		if (!oppSquad.length) { return { watch: "", how: "" }; }
+		const fw = oppSquad.filter(q => q.pos === "fwd").sort((a, b) => b.sho - a.sho)[0];
+		const df = oppSquad.filter(q => q.pos === "def").sort((a, b) => b.def - a.def)[0];
+		const shapeLabel = SHAPES[fmtKey] && teamShape[1] && SHAPES[fmtKey][teamShape[1]] ? SHAPES[fmtKey][teamShape[1]].label.split(" ")[0] : "";
+		return {
+			watch: fw && df ? `${fw.name} (shooting ${fw.sho}) up front, ${df.name} (defending ${df.def}) at the back` : "",
+			how: [ shapeLabel, `${STYLES[style[1]].toLowerCase()} football`, PRESSES[press[1]].toLowerCase() ].filter(Boolean).join(", ")
+		};
+	}
+	// The matchday card's body: one block per fact, its label in bold.
+	function cardLines (lines) {
+		ovText.classList.add("lines");
+		ovText.replaceChildren(...lines.filter(Boolean).map(l => {
+			const ln = el("span", "ln"), m = l.match(/^(Watch|They play|Coach|Your eleven|Conditions|Fitness): /);
+			if (m) { ln.append(el("b", "", `${m[1]}:`), ` ${l.slice(m[0].length)}`); } else { ln.textContent = l; }
+			if (/^Welcome/.test(l)) { ln.classList.add("lead"); }
+			return ln;
+		}));
+	}
+	// A brand-new player: nothing played, no tutorial, the very first matchday of the first season.
+	const firstVisit = () => !store.get("ff-tut-done") && playedCount() === 0 && mode === "league" && !!league && league.season === 1 && league.round === 0 && !!leagueMatch && leagueMatch.round === 0;
 	function coachReview () {
 		const tot = possFrames[0] + possFrames[1], poss = tot ? Math.round(100 * possFrames[0] / tot) : 50, [ h, a ] = score;
 		if (stats.shots <= 2 && poss >= 55) { return "Review: plenty of the ball and little end product. Try a Direct style, an Attacking tactic, or an attacking training week."; }
@@ -599,17 +624,26 @@
 		pauseBtn.textContent = "Pause";
 		if (leagueMatch) {
 			const o = TEAMS[leagueMatch.opp], derby = isDerby();
-			showOverlay(`Matchday ${leagueMatch.round + 1}${derby ? " · Derby" : ""}`,
-				`${derby ? `Derby day: the local rivals, and the loudest crowd of the season. Both ends will sing all night. ` : ""}${o.name}, ${leagueMatch.home ? "at home" : "away"} at ${(leagueMatch.home ? YOU : o).ground}. Rated ${stars(Math.round(getStr(leagueMatch.opp)))}. ${keyMen()}${coachBrief()}Conditions: ${conditionsText()}. You kick off, attacking the goal on the right.`, "Kick off");
+			// One fact per line, so the card reads at a glance instead of as a paragraph.
+			const k = keyMenParts(), b = coachBrief(), first = firstVisit(), tired = tiredStarters();
+			showOverlay(`Matchday ${leagueMatch.round + 1}${derby ? " · Derby" : ""}`, "", "Kick off");
+			cardLines([
+				tired.length ? `Fitness: ⚠ ${tiredText(tired)} Tired players are slower and less sharp. Rest them: press "Rest tired players", or swap them yourself in the squad panel.` : "",
+				first ? "Welcome to Floodlit Football. You manage the club and play its matches. New to the controls? \"Learn the controls\" is a two-minute walk-through, then you're back here." : "",
+				`${o.name} · ${leagueMatch.home ? "at home" : "away"} at ${(leagueMatch.home ? YOU : o).ground} · rated ${stars(Math.round(getStr(leagueMatch.opp)))} · ${lv.name} difficulty`,
+				derby ? "Derby day: the local rivals, and the loudest crowd of the season." : "",
+				k.watch ? `Watch: ${k.watch}.` : "",
+				k.how ? `They play: ${k.how}.` : "",
+				b.coach ? `Coach: ${b.coach[0].toUpperCase()}${b.coach.slice(1)}.` : "",
+				b.squad ? `Your eleven: ${b.squad}.` : "",
+				`Conditions: ${conditionsText()}. You kick off, attacking the goal on the right.`
+			]);
+			$("ovLearn").hidden = !first;
 			$("ovSim").textContent = "Simulate match";
 			$("ovSim").hidden = false;
 			offerSeasonSim();
-			const tired = tiredStarters();
 			$("ovFix").textContent = "Rest tired players";
-			if (tired.length) {
-				ovText.textContent = `⚠ Fitness: ${tiredText(tired)} Tired players are slower and less sharp. Rest them: press "Rest tired players", or swap them yourself in the squad panel. ` + ovText.textContent;
-				$("ovFix").hidden = false;
-			}
+			if (tired.length) { $("ovFix").hidden = false; }
 		} else if (mode === "league" && seasonDone()) {
 			const rows = standings(), pos = rows.findIndex(r => r.id === 0) + 1;
 			showOverlay(`Season ${league.season} is over`,
@@ -629,7 +663,7 @@
 			$("ovSim").textContent = "Simulate match";
 			$("ovSim").hidden = false;
 		}
-		ovText.textContent = (seasonDone() ? `${lv.name} difficulty. ` : `Difficulty: ${lv.name}. `) + ovText.textContent;
+		if (!leagueMatch) { ovText.textContent = (seasonDone() ? `${lv.name} difficulty. ` : `Difficulty: ${lv.name}. `) + ovText.textContent; }   // the matchday card has it in its first line
 	}
 
 	function makePlayers () {

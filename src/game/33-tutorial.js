@@ -56,7 +56,8 @@
 			$("coach").hidden = true;
 			store.set("ff-tut-done", "1");
 			state = "full";
-			showOverlay("Tutorial complete", "You know the controls. Play a friendly to practise (it doesn't count), or switch to League to start your season. The Controls list below the pitch has everything, including formations and team instructions.", "Play a friendly");
+			const toLeague = store.get("ff-tut-return") === "league";
+			showOverlay("Tutorial complete", toLeague ? "You know the controls. Back to matchday 1 of your season. The Controls list below the pitch has everything, including formations and team instructions." : "You know the controls. Play a friendly to practise (it doesn't count), or switch to League to start your season. The Controls list below the pitch has everything, including formations and team instructions.", toLeague ? "Back to matchday 1" : "Play a friendly");
 			tutDone = true;
 			return;
 		}

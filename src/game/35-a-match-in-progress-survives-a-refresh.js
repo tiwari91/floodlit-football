@@ -51,7 +51,9 @@
 		ensureAudio();
 		if (audio && audio.state === "suspended") { audio.resume(); }
 		overlay.hidden = true;
-		if (tutDone) { tutDone = false; setMode("friendly"); return; }   // shows the friendly's kick-off card
+		// A finished tutorial goes back where it was started from: the league's first matchday when the
+		// welcome card sent the player there, otherwise a friendly to practise in.
+		if (tutDone) { tutDone = false; const back = store.get("ff-tut-return") === "league"; store.set("ff-tut-return", ""); setMode(back ? "league" : "friendly"); return; }
 		if (state === "intro" || state === "full") {
 			if (mode === "league" && seasonDone()) { newSeason(league.fmt); renderLeague(); renderShapes(); }
 			clearLive();
@@ -170,6 +172,7 @@
 	function showOverlay (title, text, btn, statRows) {
 		ovTitle.textContent = title;
 		ovText.textContent = text;
+		ovText.classList.remove("lines");
 		ovButton.textContent = btn;
 		$("ovSim").hidden = true;
 		$("ovFix").hidden = true;
@@ -181,6 +184,7 @@
 		$("ovKeys").hidden = true;
 		$("ovQuick").hidden = true;
 		$("ovHelp").hidden = true;
+		$("ovLearn").hidden = true;
 		ovCard()?.classList.toggle("wide", false);
 		ovStats.replaceChildren();
 		ovStats.hidden = !statRows;

@@ -79,6 +79,8 @@
 	}
 	$("howtoBtn").addEventListener("click", e => { e.currentTarget.blur(); openHowto(); });
 	$("ovHelp").addEventListener("click", () => openHowto());
+	// The welcome card's walk-through: the tutorial, then straight back to matchday 1.
+	$("ovLearn").addEventListener("click", e => { e.currentTarget.blur(); store.set("ff-tut-return", "league"); setMode("tutorial"); });
 	$("howtoClose").addEventListener("click", closeHowto);
 	$("howtoDone").addEventListener("click", closeHowto);
 	$("howto").addEventListener("click", e => { if (e.target === e.currentTarget) { closeHowto(); } });

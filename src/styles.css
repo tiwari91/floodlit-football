@@ -371,6 +371,12 @@
 	}
 
 	.card p { margin: 0; color: var(--muted); }
+	/* The matchday card: one fact per line, read down the left edge. */
+	.card p.lines { text-align: left; line-height: 1.45; display: grid; gap: 7px; }
+	.card p.lines .ln { display: block; }
+	.card p.lines .ln b { color: var(--fg, #eef6ea); font-weight: 700; margin-right: 2px; }
+	.card p.lines .lead { color: var(--fg, #eef6ea); }
+	.card:has(p.lines) { max-width: min(60ch, 100%); }
 	@media (max-height: 560px), (max-width: 440px) {
 		.overlay { padding: 10px; }
 		.card { padding: 12px 16px; gap: 8px; }
