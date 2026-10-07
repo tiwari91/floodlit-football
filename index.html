@@ -10871,7 +10871,8 @@
 	   One articulated rig per figure (hips, spine, chest, neck, head, shoulders, elbows, hands,
 	   hips, knees and ankles), posed from the simulation every frame. The body parts are instances
 	   of a dozen shared shapes, so every player and official together costs about fifteen draw
-	   calls. A figure is 32 units tall, about 1.95 m against the goal. */
+	   calls. A figure is 32 units tall, about 1.95 m against the goal; the head is about an eighth of that, the
+	   limbs athletic rather than toy-thick. */
 	const MAXF3 = 32;   // figures the instanced parts can hold: 22 players, 3 officials, room to spare
 	// Which joint carries which part. Limbs appear twice (left, right); the instance buffers are
 	// sized from this plan, so a pair of limbs always has two slots per figure.
@@ -10934,18 +10935,18 @@
 	function initFigures3D () {
 		const T = THREE;
 		const defs = {
-			torso: () => { const g = new T.CylinderGeometry(4.4, 3.4, 9.4, 14); g.translate(0, 4.7, 0); g.scale(0.74, 1, 1); return g; },
-			shoulders: () => { const g = new T.CapsuleGeometry(1.95, 6.2, 4, 10); g.rotateX(Math.PI / 2); g.translate(0, 8.6, 0); g.scale(0.8, 1, 1); return g; },
-			shorts: () => { const g = new T.CylinderGeometry(3.75, 4.25, 4.6, 12); g.translate(0, -1.9, 0); g.scale(0.8, 1, 1); return g; },
-			neck: () => { const g = new T.CylinderGeometry(1.0, 1.15, 2, 8); g.translate(0, 0.7, 0); return g; },
-			head: () => { const g = new T.SphereGeometry(2.55, 14, 10); g.scale(0.96, 1.12, 0.94); g.translate(0.2, 2.5, 0); return g; },
-			hair: () => { const g = new T.SphereGeometry(2.82, 12, 7, 0, Math.PI * 2, 0, 1.55); g.scale(0.96, 1.12, 0.94); g.rotateZ(0.42); g.translate(0.2, 2.5, 0); return g; },   // concentric with the head, tilted: high at the brow, low at the nape
-			upperArm: () => { const g = new T.CapsuleGeometry(1.15, 4.4, 3, 7); g.translate(0, -2.4, 0); return g; },
-			foreArm: () => { const g = new T.CapsuleGeometry(0.95, 4.2, 3, 7); g.translate(0, -2.3, 0); return g; },
-			hand: () => { const g = new T.SphereGeometry(1.05, 7, 5); g.scale(1, 1.25, 0.8); g.translate(0, -0.7, 0); return g; },
-			thigh: () => { const g = new T.CapsuleGeometry(1.6, 5.4, 3, 7); g.translate(0, -2.9, 0); return g; },
-			shin: () => { const g = new T.CapsuleGeometry(1.25, 5.0, 3, 7); g.translate(0, -2.9, 0); return g; },
-			boot: () => { const g = new T.BoxGeometry(4.3, 1.7, 2.3); g.translate(1.0, -0.2, 0); return g; }
+			torso: () => { const g = new T.CylinderGeometry(4.15, 3.05, 9.4, 14); g.translate(0, 4.7, 0); g.scale(0.7, 1, 1); return g; },
+			shoulders: () => { const g = new T.CapsuleGeometry(1.7, 6.4, 4, 10); g.rotateX(Math.PI / 2); g.translate(0, 8.7, 0); g.scale(0.78, 1, 1); return g; },
+			shorts: () => { const g = new T.CylinderGeometry(3.45, 3.95, 4.6, 12); g.translate(0, -1.9, 0); g.scale(0.78, 1, 1); return g; },
+			neck: () => { const g = new T.CylinderGeometry(0.9, 1.05, 2.2, 8); g.translate(0, 0.8, 0); return g; },
+			head: () => { const g = new T.SphereGeometry(2.15, 14, 10); g.scale(0.96, 1.12, 0.94); g.translate(0.2, 2.25, 0); return g; },
+			hair: () => { const g = new T.SphereGeometry(2.38, 12, 7, 0, Math.PI * 2, 0, 1.55); g.scale(0.96, 1.12, 0.94); g.rotateZ(0.42); g.translate(0.2, 2.25, 0); return g; },   // concentric with the head, tilted: high at the brow, low at the nape
+			upperArm: () => { const g = new T.CapsuleGeometry(0.98, 4.6, 3, 7); g.translate(0, -2.5, 0); return g; },
+			foreArm: () => { const g = new T.CapsuleGeometry(0.8, 4.4, 3, 7); g.translate(0, -2.4, 0); return g; },
+			hand: () => { const g = new T.SphereGeometry(0.9, 7, 5); g.scale(1, 1.25, 0.8); g.translate(0, -0.6, 0); return g; },
+			thigh: () => { const g = new T.CapsuleGeometry(1.38, 5.7, 3, 7); g.translate(0, -3.0, 0); return g; },
+			shin: () => { const g = new T.CapsuleGeometry(1.08, 5.2, 3, 7); g.translate(0, -3.0, 0); return g; },
+			boot: () => { const g = new T.CapsuleGeometry(0.75, 2.6, 3, 7); g.rotateZ(Math.PI / 2); g.scale(1, 0.95, 1.2); g.translate(1.0, -0.25, 0); return g; }
 		};
 		const plain = new T.MeshLambertMaterial({ color: 0xffffff });
 		// The shirt: the kit's pattern (stripes, hoops, halves, a sash) drawn in its second colour.
@@ -11016,7 +11017,7 @@
 				.replace("#include <uv_vertex>", "#include <uv_vertex>\nvMapUv = (uv + vec2(mod(aCell, 10.0), 9.0 - floor(aCell / 10.0))) / 10.0;");
 		};
 		numMat.customProgramCacheKey = () => "ff-num";
-		const ng = new T.PlaneGeometry(5.0, 5.6).rotateY(-Math.PI / 2).translate(-3.35, 5.4, 0);
+		const ng = new T.PlaneGeometry(4.6, 5.2).rotateY(-Math.PI / 2).translate(-3.08, 5.4, 0);
 		ng.setAttribute("aCell", new T.InstancedBufferAttribute(new Float32Array(MAXF3), 1).setUsage(T.DynamicDrawUsage));
 		const nums = new T.InstancedMesh(ng, numMat, MAXF3);
 		nums.instanceMatrix.setUsage(T.DynamicDrawUsage); nums.setColorAt(0, white); nums.frustumCulled = false; nums.count = 0;
@@ -11046,8 +11047,8 @@
 			const root = new T.Object3D();
 			root.rotation.order = "YXZ";   // lean and roll in his own frame, then face the way he runs
 			const hips = node(root, 0, 15.6, 0), spine = node(hips, 0, 0.6, 0), chest = node(spine, 0, 5.4, 0), neck = node(chest, 0, 3.4, 0), head = node(neck, 0, 1.6, 0);
-			const sh = [ node(chest, 0, 3.0, -5.3), node(chest, 0, 3.0, 5.3) ], el = sh.map(s => node(s, 0, -5.6, 0)), ha = el.map(e => node(e, 0, -5.2, 0));
-			const hip = [ node(hips, 0, -1.0, -2.7), node(hips, 0, -1.0, 2.7) ], kn = hip.map(h => node(h, 0, -7.3, 0)), an = kn.map(k => node(k, 0, -6.5, 0));
+			const sh = [ node(chest, 0, 3.0, -4.95), node(chest, 0, 3.0, 4.95) ], el = sh.map(s => node(s, 0, -5.6, 0)), ha = el.map(e => node(e, 0, -5.2, 0));
+			const hip = [ node(hips, 0, -1.0, -2.45), node(hips, 0, -1.0, 2.45) ], kn = hip.map(h => node(h, 0, -7.3, 0)), an = kn.map(k => node(k, 0, -6.5, 0));
 			rigs.push({ root, hips, spine, chest, neck, head, sh, el, ha, hip, kn, an });
 		}
 		G3.fig = { parts, nums, rings, blobs, longs, flags, rigs, cnt: {}, n: 0, M: new T.Matrix4(), M2: new T.Matrix4(), C: new T.Color(), V: new T.Vector3(), S: new T.Vector3(), Q: new T.Quaternion(), prevDir: new WeakMap() };
