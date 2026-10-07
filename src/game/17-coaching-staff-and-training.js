@@ -427,8 +427,9 @@
 
 	// Simulate the season: every fixture left, one after another, with everything that happens
 	// in them (cards and bans, injuries, tired legs, auto-rotate). It stops at the January
-	// window so you can do business, and at the end of the season.
-	function simulateSeason () {
+	// window so you can do business, and at the end of the season. The whole-season button runs
+	// straight through the window: January business is left to the Assistant, if it is on.
+	function simulateSeason (whole = false) {
 		if (mode !== "league" || !league || !league.club || seasonDone()) { return; }
 		const start = league.round, tally = { n: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, y: 0, r: 0, inj: 0 };
 		let stoppedJan = false;
@@ -445,7 +446,7 @@
 					if (e.team !== 0) { continue; }
 					if (e.kind === "yellow") { tally.y++; } else if (e.kind === "red") { tally.r++; } else if (e.kind === "injury") { tally.inj++; }
 				}
-				if (league.round === JANUARY && start < JANUARY) { stoppedJan = true; break; }
+				if (!whole && league.round === JANUARY && start < JANUARY) { stoppedJan = true; break; }
 			}
 		} finally {
 			bulkSim = false;
@@ -463,7 +464,8 @@
 		const line = `${tally.n} match${tally.n === 1 ? "" : "es"} simulated: won ${tally.w}, drew ${tally.d}, lost ${tally.l}, goals ${tally.gf}–${tally.ga}.`;
 		if (seasonDone()) {
 			const champ = rows[0].id === 0 ? `You are champions with ${pts} points!` : `${TEAMS[rows[0].id].name} are champions. You finished ${ordinal(pos)} on ${pts} points.`;
-			showOverlay(`Season ${league.season} simulated`, `${line} ${champ}${scorers}${disc} Prize money: ${money(league.prize || 0)}. The transfer window is open below the pitch.`, `Start season ${league.season + 1}`);
+			const jan = whole && start < JANUARY ? (assistMode === "off" ? " The January window went by without business: switch the Assistant on to have it handled next time." : " The Assistant handled the January window.") : "";
+			showOverlay(`Season ${league.season} simulated`, `${line} ${champ}${scorers}${disc} Prize money: ${money(league.prize || 0)}.${jan} The transfer window is open below the pitch.`, `Start season ${league.season + 1}`);
 			if (rows[0].id === 0) { celebrateTrophy("league trophy"); }
 		} else {
 			showOverlay(stoppedJan ? "January window" : "Simulated", `${line} You're ${ordinal(pos)} on ${pts} points.${scorers}${disc}${stoppedJan ? " The January transfer window is open: sign players below the pitch, then carry on." : ""}`, "Kick off");
@@ -478,6 +480,7 @@
 		if (mode !== "league" || !league || !league.club || seasonDone()) { b.hidden = true; return; }
 		b.textContent = league.round < JANUARY ? "Simulate to January" : "Simulate the season";
 		b.hidden = false;
+		$("ovSeasonAll").hidden = league.round >= JANUARY;   // after January the button above already runs to the end
 	}
 
 	// A simulated stretch of a match, minute by minute, so that what happens hangs together:

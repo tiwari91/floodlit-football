@@ -178,6 +178,7 @@
 		$("ovFix").hidden = true;
 		$("ovSubs").hidden = true;
 		$("ovSeason").hidden = true;
+		$("ovSeasonAll").hidden = true;
 		$("ovReport").hidden = true;
 		$("ovTrophy").hidden = true;
 		$("subPanel").hidden = true;

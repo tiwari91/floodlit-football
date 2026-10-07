@@ -101,6 +101,7 @@
 	$("ovSim").addEventListener("click", e => { e.currentTarget.blur(); simulateMine(); });
 	$("ovSubs").addEventListener("click", () => openSubs());
 	$("ovSeason").addEventListener("click", e => { e.currentTarget.blur(); simulateSeason(); });
+	$("ovSeasonAll").addEventListener("click", e => { e.currentTarget.blur(); simulateSeason(true); });
 	$("subsBtn").addEventListener("click", e => { e.currentTarget.blur(); openSubs(); });
 	// One click: field the fittest, strongest team from the whole squad.
 	$("ovFix").addEventListener("click", e => {

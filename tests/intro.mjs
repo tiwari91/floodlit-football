@@ -47,6 +47,15 @@ const paused = await page.evaluate(() => ({ title: document.getElementById("ovTi
 check("other cards drop the line layout and the button", !paused.cls.includes("lines") && !paused.learn, JSON.stringify(paused));
 await ctx.close();
 
+// Simulate whole season: offered before January, runs to the end without stopping at the window.
+({ ctx, page } = await fresh());
+const offer = await page.evaluate(() => { const b = document.getElementById("ovSeasonAll"), j = document.getElementById("ovSeason"); return { all: !b.hidden && b.textContent, jan: !j.hidden && j.textContent }; });
+check("matchday 1 offers both Simulate to January and Simulate whole season", offer.all === "Simulate whole season" && offer.jan === "Simulate to January", JSON.stringify(offer));
+await page.click("#ovSeasonAll"); await page.waitForFunction(() => /simulated/.test(document.getElementById("ovTitle").textContent), null, { timeout: 120000 });
+const whole = await page.evaluate(() => ({ title: document.getElementById("ovTitle").textContent, text: document.getElementById("ovText").textContent, round: window.__ff.league.round, n: window.__ff.league.fixtures.length, btn: document.getElementById("ovButton").textContent, allHidden: document.getElementById("ovSeasonAll").hidden }));
+check("Simulate whole season plays every fixture and ends on the season summary", /^Season 1 simulated/.test(whole.title) && whole.round >= whole.n && /^Start season 2/.test(whole.btn) && whole.allHidden && /January window went by|Assistant handled the January window/.test(whole.text), JSON.stringify({ ...whole, text: whole.text.slice(0, 200) }));
+await ctx.close();
+
 check("no console errors", errs.length === 0, errs.join(" | "));
 await browser.close(); server.stop();
 process.exit(done() ? 1 : 0);
