@@ -109,11 +109,14 @@
 		ctx.fillStyle = sky; ctx.fillRect(0, 0, VW, VH);
 		if (stands && back && front) {
 			const img = standTop(), rows = 40, rh = img.height / rows;
+			// The crowd is alive: rows sway, more as the match heats up, and jump when a goal goes in.
+			const tc = performance.now() / 1000, sway = reduceMotion ? 0 : state === "goal" ? 2.6 : 0.35 + 1.5 * clamp(crowdHeat || 0, 0, 1);
 			for (let i = 0; i < rows; i++) {
 				const u0 = 1 - i / rows, u1 = 1 - (i + 1) / rows;
 				const a = tvProj(xl, ...onTier(u0)), b = tvProj(xr, ...onTier(u0)), c = tvProj(xl, ...onTier(u1));
 				if (!a || !b || !c) { continue; }
-				ctx.drawImage(img, 0, i * rh, img.width, rh, a.x, a.y, b.x - a.x, c.y - a.y + 0.8);
+				const dy = sway ? -Math.abs(Math.sin(tc * (state === "goal" ? 7 : 2.4) + i * 0.83)) * sway * a.k : 0;
+				ctx.drawImage(img, 0, i * rh, img.width, rh, a.x, a.y + dy, b.x - a.x, c.y - a.y + 0.8);
 			}
 			if (st.roof) {
 				const r1 = tvProj(xl, -14 - standD * 1.05, standH * 1.12), r2 = tvProj(xr, -14 - standD * 1.05, standH * 1.12);

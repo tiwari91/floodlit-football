@@ -168,7 +168,35 @@
 		const spot = (x, y) => { ctx.beginPath(); ctx.arc(x, y, 3.5, 0, Math.PI * 2); ctx.fill(); };
 		spot(MX + FW / 2, MY + FH / 2);
 
-		// Futsal-style D areas: quarter circles round each post, joined by a line.
+		if (fmtKey === "11") {
+			// The full-size game's markings, drawn to the same penalty area the laws in the game use:
+			// the eighteen-yard box, the six-yard box and the arc from the penalty spot.
+			const Dp = FMT.box + 60, hw = FMT.goal / 2 + FMT.box, gd = Dp * 0.333, ghw = FMT.goal / 2 + Dp * 0.333, r = Dp * 0.555;
+			const th = Math.acos(clamp((Dp - FMT.spot) / r, -1, 1));
+			for (const left of [ true, false ]) {
+				const gx = left ? MX : MX + FW, dir = left ? 1 : -1;
+				ctx.strokeRect(left ? gx : gx - Dp, MY + FH / 2 - hw, Dp, hw * 2);
+				ctx.strokeRect(left ? gx : gx - gd, MY + FH / 2 - ghw, gd, ghw * 2);
+				const sx = gx + dir * FMT.spot;
+				ctx.beginPath();
+				if (left) { ctx.arc(sx, MY + FH / 2, r, -th, th); } else { ctx.arc(sx, MY + FH / 2, r, Math.PI - th, Math.PI + th); }
+				ctx.stroke();
+			}
+			if (forTex) {
+				// Wear: the goalmouths and the centre circle are where the grass takes a beating.
+				const wear = (x, y, rx, ry, a) => {
+					const g = ctx.createRadialGradient(x, y, 2, x, y, Math.max(rx, ry));
+					g.addColorStop(0, `rgba(122, 104, 66, ${a})`); g.addColorStop(1, "rgba(122, 104, 66, 0)");
+					ctx.save(); ctx.translate(x, y); ctx.scale(rx / Math.max(rx, ry), ry / Math.max(rx, ry)); ctx.translate(-x, -y);
+					ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, Math.max(rx, ry), 0, Math.PI * 2); ctx.fill(); ctx.restore();
+				};
+				const worn = cond.surfaceKey === "mud" ? 0.42 : cond.surfaceKey === "turf" ? 0.08 : 0.24;
+				wear(MX + gd * 0.5, MY + FH / 2, gd * 0.9, FMT.goal * 0.45, worn);
+				wear(MX + FW - gd * 0.5, MY + FH / 2, gd * 0.9, FMT.goal * 0.45, worn);
+				wear(MX + FW / 2, MY + FH / 2, FMT.circle * 0.8, FMT.circle * 0.55, worn * 0.6);
+			}
+		} else {
+			// Futsal-style D areas: quarter circles round each post, joined by a line.
 		const R = FMT.box;
 		ctx.beginPath();
 		ctx.arc(MX, MY + GOAL_T, R, -Math.PI / 2, 0);
@@ -180,6 +208,7 @@
 		ctx.lineTo(MX + FW - R, MY + GOAL_B);
 		ctx.arc(MX + FW, MY + GOAL_B, R, Math.PI, Math.PI / 2, true);
 		ctx.stroke();
+		}
 		spot(MX + FMT.spot, MY + FH / 2);
 		spot(MX + FW - FMT.spot, MY + FH / 2);
 
