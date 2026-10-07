@@ -83,9 +83,11 @@
 		try {
 			ctx.fillStyle = "rgba(0, 0, 0, 0.32)";
 			for (const p of players) { ctx.beginPath(); ctx.ellipse(MX + p.x + 3, MY + p.y + 2, 12, 5, 0, 0, Math.PI * 2); ctx.fill(); }
+			// The ball's shadow: sharp at its feet, softer and wider as it climbs, but never so faint
+			// that you lose where a high ball is coming down.
 			const bz = Math.max(0, ball.z);
-			ctx.fillStyle = `rgba(0, 0, 0, ${0.4 / (1 + bz / 40)})`;
-			ctx.beginPath(); ctx.ellipse(MX + ball.x + bz * 0.15, MY + ball.y + bz * 0.1, 5 + bz * 0.04, 3 + bz * 0.03, 0, 0, Math.PI * 2); ctx.fill();
+			ctx.fillStyle = `rgba(0, 0, 0, ${Math.max(0.2, 0.45 / (1 + bz / 60))})`;
+			ctx.beginPath(); ctx.ellipse(MX + ball.x + bz * 0.15, MY + ball.y + bz * 0.1, 6 + bz * 0.05, 3.6 + bz * 0.035, 0, 0, Math.PI * 2); ctx.fill();
 			drawFreeKickSpray(); drawPassTarget(); drawStrikerMarker(); drawSwitchPreview(); drawOffsideLine(); drawAim(); drawPenAim(false); drawReview(false); drawStretcher(false);
 			if (tut && tut.marker) {
 				ctx.strokeStyle = "#f2b52e"; ctx.lineWidth = 3;
@@ -342,15 +344,45 @@
 			}
 		}
 	}
+	// The ball, seen from the stand. Its panels turn with its spin along the way it is travelling, so a
+	// pass rolls rather than slides; a hard-hit ball leaves a faint streak behind it.
+	let tvBallPrev = null, tvBallAng = -0.6;
 	function drawBallTV () {
 		const q = tvProj(ball.x, ball.y, Math.max(0, ball.z) * Z_W + 3.2);
 		if (!q) { return; }
-		const r = Math.max(2.3, 3.4 * q.k);
+		const r = Math.max(2.8, 4.2 * q.k);
+		// Screen-space travel this frame: the streak's direction and length, and the roll's axis.
+		const dx = tvBallPrev ? q.x - tvBallPrev.x : 0, dy = tvBallPrev ? q.y - tvBallPrev.y : 0, mv = Math.hypot(dx, dy);
+		tvBallPrev = { x: q.x, y: q.y };
+		const fast = mv > r * 1.6 && mv < r * 14 && !reduceMotion;
+		if (fast) {
+			const g = ctx.createLinearGradient(q.x - dx * 2.2, q.y - dy * 2.2, q.x, q.y);
+			g.addColorStop(0, "rgba(255, 255, 255, 0)"); g.addColorStop(1, "rgba(255, 255, 255, 0.35)");
+			ctx.strokeStyle = g; ctx.lineWidth = r * 1.5; ctx.lineCap = "round";
+			ctx.beginPath(); ctx.moveTo(q.x - dx * 2.2, q.y - dy * 2.2); ctx.lineTo(q.x, q.y); ctx.stroke();
+			ctx.lineCap = "butt";
+		}
 		ctx.fillStyle = "#ffffff";
 		ctx.beginPath(); ctx.arc(q.x, q.y, r, 0, Math.PI * 2); ctx.fill();
-		ctx.strokeStyle = "rgba(0, 0, 0, 0.55)"; ctx.lineWidth = 1; ctx.stroke();
+		// Two dark panels on a band that rolls over the ball's face along its direction of travel.
+		if (mv > 0.25) { tvBallAng = Math.atan2(dy, dx); }   // the way it is rolling, as seen from the stand
+		const ang = tvBallAng;
+		const ph = (ball.spin || 0) * 0.35, ca = Math.cos(ang), sa = Math.sin(ang);
+		ctx.save();
+		ctx.beginPath(); ctx.arc(q.x, q.y, r, 0, Math.PI * 2); ctx.clip();
 		ctx.fillStyle = "#1a1a1a";
-		ctx.beginPath(); ctx.arc(q.x - r * 0.25, q.y - r * 0.2, r * 0.32, 0, Math.PI * 2); ctx.fill();
+		for (const off of [ 0, Math.PI ]) {
+			const s = Math.sin(ph + off), c = Math.cos(ph + off);
+			if (c < -0.15) { continue; }   // round the back of the ball
+			const px = q.x + ca * s * r * 0.62 - sa * r * 0.18, py = q.y + sa * s * r * 0.62 + ca * r * 0.18 - r * 0.12;
+			ctx.beginPath(); ctx.ellipse(px, py, r * 0.36 * (0.45 + 0.55 * c), r * 0.34, ang, 0, Math.PI * 2); ctx.fill();
+		}
+		ctx.restore();
+		// A soft highlight and an outline, so it reads against white lines and white kits.
+		ctx.fillStyle = "rgba(255, 255, 255, 0.55)";
+		ctx.beginPath(); ctx.arc(q.x - r * 0.35, q.y - r * 0.4, r * 0.3, 0, Math.PI * 2); ctx.fill();
+		ctx.strokeStyle = "rgba(0, 0, 0, 0.6)"; ctx.lineWidth = 1;
+		ctx.beginPath(); ctx.arc(q.x, q.y, r, 0, Math.PI * 2); ctx.stroke();
 	}
 	const CAM_LABEL = { top: "Camera: overhead", tv: "Camera: TV", "3d": "Camera: 3D" };
 	const CAM_NAME = { top: "Overhead camera", tv: "TV camera", "3d": "3D camera" };

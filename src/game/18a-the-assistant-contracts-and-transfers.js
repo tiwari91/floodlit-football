@@ -18,7 +18,7 @@
 		return starter || ovrNow(pl) >= squadMedian(c) || (role === "prospect" && (pl.pot || 0) >= ovrNow(pl) + 6);
 	}
 	// Why a last-year player is left to run down: only because he won't talk.
-	const assistWhyNot = pl => (pl.morale < 40 ? `unhappy, morale ${pl.morale}` : "");
+	const assistWhyNot = pl => (lastSeason(pl) ? `${pl.age}, retiring` : pl.morale < 40 ? `unhappy, morale ${pl.morale}` : "");
 	// Every player in his last year gets a new deal, the most valuable first so the money goes on the
 	// stars before the squad men, as far as the budget allows above the reserve. Only a player who
 	// won't talk (unhappy) is left to run down; the note says so.
@@ -26,7 +26,7 @@
 		const done = [], skint = [], left = [];
 		let need = 0;
 		const lastYear = [ ...c.squad, ...c.bench ].filter(pl => { ensurePlayer(pl); return pl.contract <= 1; });
-		const due = lastYear.filter(pl => pl.morale >= 40).sort((a, b) => valueOf(b) - valueOf(a));
+		const due = lastYear.filter(pl => pl.morale >= 40 && !lastSeason(pl)).sort((a, b) => valueOf(b) - valueOf(a));
 		for (const pl of due) {
 			const fee = round1(valueOf(pl) * 0.15);
 			if (c.budget - fee < reserve) { skint.push(pl.name); need = round1(need + fee); continue; }

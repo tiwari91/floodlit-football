@@ -381,23 +381,46 @@
 		return pl;
 	}
 	// Eleven starters and a bench of at most seven, a keeper among them: fill any gap from the academy.
-	function refillSquad (c) {
+	function refillSquad (c, pick = true) {
 		const pool = [ ...c.squad, ...c.bench ].filter(Boolean);
 		if (!pool.some(p => p.pos === "gk")) { pool.push(youthPlayer("gk")); }
 		const want = POS_OF_SLOT.length + 5;   // eleven and at least five on the bench
 		while (pool.length < want) { const pos = [ "def", "mid", "fwd", "def", "mid" ][pool.length % 5]; pool.push(youthPlayer(pos)); }
 		c.squad = pool.slice(0, POS_OF_SLOT.length); c.bench = pool.slice(POS_OF_SLOT.length, POS_OF_SLOT.length + BENCH);
-		autoPick(false, true);
+		if (pick) { autoPick(false, true); }   // not while a save is still being loaded
 	}
-	// A new season: everyone is a year older and a year closer to the end of his contract; whoever's
-	// contract has run out leaves on a free.
+	// Careers end. Outfield players may hang up their boots from 34 and all have by 38; keepers last
+	// two years longer. One-year deals only from 33 (keepers 35), and none in a player's last season.
+	const KEEPER_EXTRA = 2;
+	const retireFrom = pl => 34 + (pl.pos === "gk" ? KEEPER_EXTRA : 0);
+	const retireBy = pl => 38 + (pl.pos === "gk" ? KEEPER_EXTRA : 0);
+	const oneYearOnly = pl => pl.age >= 33 + (pl.pos === "gk" ? KEEPER_EXTRA : 0);
+	const lastSeason = pl => pl.age >= retireBy(pl) - 1;
+	function retireChance (pl) { return pl.age >= retireBy(pl) ? 1 : pl.age < retireFrom(pl) ? 0 : (pl.age - retireFrom(pl) + 1) * 0.25; }
+	// Who retires now: everyone past the last age, and (in the summer) some of those approaching it.
+	// Returns the names with their ages; the academy fills any gap.
+	function retireVeterans (c, summer, pick = true) {
+		const out = [];
+		for (const pl of [ ...c.squad, ...c.bench ]) {
+			ensurePlayer(pl);
+			if (pl.age >= retireBy(pl) || (summer && Math.random() < retireChance(pl))) { out.push(pl); }
+		}
+		if (!out.length) { return []; }
+		c.squad = c.squad.filter(p => !out.includes(p)); c.bench = c.bench.filter(p => !out.includes(p));
+		refillSquad(c, pick);
+		return out.map(p => `${p.name} (${p.age})`);
+	}
+	// A new season: everyone is a year older and a year closer to the end of his contract; the
+	// veterans may retire; whoever's contract has run out leaves on a free.
 	function rolloverClub (c) {
 		const gone = [], kept = [];
+		for (const pl of [ ...c.squad, ...c.bench ]) { ensurePlayer(pl); pl.age++; }
+		c.retired = retireVeterans(c, true);
 		for (const pl of [ ...c.squad, ...c.bench ]) {
-			ensurePlayer(pl); pl.age++; pl.contract--;
+			pl.contract--;
 			if (pl.contract > 0) { continue; }
 			// Out of contract: a happy player under 34 signs on for two more at a little more money; the rest go.
-			if (pl.morale >= 50 && pl.age < 34) { pl.contract = 2; pl.wage = Math.round(wageOf(pl) * 1.1 * 1000) / 1000; kept.push(pl.name); } else { gone.push(pl.name); }
+			if (pl.morale >= 50 && pl.age < 34) { pl.contract = oneYearOnly(pl) ? 1 : 2; pl.wage = Math.round(wageOf(pl) * 1.1 * 1000) / 1000; kept.push(pl.name); } else { gone.push(pl.name); }
 		}
 		if (gone.length) { c.squad = c.squad.filter(p => !gone.includes(p.name)); c.bench = c.bench.filter(p => !gone.includes(p.name)); }
 		if (gone.length || c.bench.length < 5) { refillSquad(c); }
@@ -408,11 +431,12 @@
 	// button and the assistant; says why when he won't or the club can't.
 	function renewDeal (pl, c) {
 		const fee = round1(valueOf(pl) * 0.15);
+		if (lastSeason(pl)) { return { ok: false, why: `${pl.name} (${pl.age}) is retiring at the end of the season; there's no new deal to offer.` }; }
 		if (pl.morale < 40) { return { ok: false, why: `${pl.name} won't talk about a new contract while he's unhappy (morale ${pl.morale}).` }; }
 		if (c.budget + 1e-9 < fee) { return { ok: false, why: `A new deal for ${pl.name} needs a ${money(fee)} signing-on fee.` }; }
 		c.budget = round1(c.budget - fee);
 		pl.wage = Math.round(wageOf(pl) * (roleOf(pl, c) === "key" ? 1.2 : 1.1) * 1000) / 1000;
-		pl.contract = Math.min(5, pl.contract + 2);
+		pl.contract = oneYearOnly(pl) ? Math.min(2, pl.contract + 1) : Math.min(5, pl.contract + 2);   // veterans: one more season at a time
 		pl.morale = clamp(pl.morale + 8, 0, 100);
 		return { ok: true, fee, why: `${pl.name} signs a new contract to ${pl.contract} seasons (${money(fee)} signing-on, ${wageWeek(pl.wage)}).` };
 	}

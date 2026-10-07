@@ -77,6 +77,9 @@
 	function ensureClub (lg) {
 		if (typeof applyIdentity === "function") { applyIdentity(lg); }   // the club you manage, by name and colours
 		lg.club = sanitizeClub(lg.club);
+		// Older saves never retired anyone: whoever is past the last playing age goes now.
+		const late = retireVeterans(lg.club, false, false);
+		if (late.length) { lg.news = `${lg.news || ""} Retired: ${late.join(", ")}. Academy players fill the gaps.`.trim(); }
 		for (const pl of lg.club.market) { capRating(pl); }
 		if (lg.cpuIn && typeof lg.cpuIn === "object") { for (const ins of Object.values(lg.cpuIn)) { if (Array.isArray(ins)) { for (const d of ins) { if (d && d.pl) { capRating(d.pl); } } } } }
 		ensureCoaching(lg.club, lg);

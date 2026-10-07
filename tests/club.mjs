@@ -18,6 +18,7 @@ check("the Assistant setting exists under Your team and starts off", setting.mod
 const contracts = await page.evaluate(() => {
 	const F = window.__ff, c = F.league.club;
 	F.setAssist("contracts");
+	[ ...c.squad, ...c.bench ].forEach(x => { x.contract = 3; });
 	const keep = c.squad[1], sulk = c.squad[2];
 	keep.contract = 1; keep.morale = 80; keep.age = 26; keep.role = "key";
 	sulk.contract = 1; sulk.morale = 20; sulk.age = 26; sulk.role = "key";
@@ -25,7 +26,7 @@ const contracts = await page.evaluate(() => {
 	const done = F.assistRun("test");
 	return { done, keep: keep.contract, sulk: sulk.contract, budget: c.budget, note: F.lastDeal, stored: localStorage.getItem("ff-assist") };
 });
-check("contracts: the happy key man in his last year signs on, the unhappy one is left alone", contracts.keep === 3 && contracts.sulk === 1 && contracts.budget < 5 && /Assistant \(test\)/.test(contracts.note), JSON.stringify(contracts));
+check("contracts: the happy key man in his last year signs on, the unhappy one is left alone", contracts.keep === 3 && contracts.sulk === 1 && contracts.budget <= 5 && /Assistant \(test\)/.test(contracts.note), JSON.stringify(contracts));
 check("the setting is remembered", contracts.stored === "contracts");
 const broke = await page.evaluate(() => {
 	const F = window.__ff, c = F.league.club, pl = c.bench[0];
@@ -84,7 +85,7 @@ const leftOut = await page.evaluate(() => {
 	const done = F.assistRun("test");
 	return { done, dud: dud.contract, old: old.contract, sulk: sulk.contract, names: [ dud.name, old.name, sulk.name ] };
 });
-check("contracts: every last-year player who will talk is renewed, squad men and veterans included; only the unhappy one is left and the note says so", leftOut.dud === 3 && leftOut.old === 3 && leftOut.sulk === 1 && leftOut.done.some(d => /left to run down/.test(d) && d.includes(leftOut.names[2]) && /unhappy/.test(d) && !d.includes(leftOut.names[0])), JSON.stringify(leftOut));
+check("contracts: every last-year player who will talk is renewed (a 34-year-old for one more season), squad men included; only the unhappy one is left and the note says so", leftOut.dud === 3 && leftOut.old === 2 && leftOut.sulk === 1 && leftOut.done.some(d => /left to run down/.test(d) && d.includes(leftOut.names[2]) && /unhappy/.test(d) && !d.includes(leftOut.names[0])), JSON.stringify(leftOut));
 
 // Offers for the manager: a title-winner hears from the big clubs, a bottom finisher only from below.
 const offers = await page.evaluate(() => {
@@ -186,7 +187,7 @@ const keys = await page.evaluate(() => {
 	return { role: F.roleOf(star, c), alerted, news, kept, after, skint, skintNote: F.lastDeal };
 });
 check("the January alert names the important players in their last year", keys.alerted.length >= 1 && /Contracts ending for/.test(keys.news), JSON.stringify(keys));
-check("with the assistant off, a key starter is still kept on in the summer when the money is there", keys.kept.length >= 1 && keys.after.contract >= 3 && keys.after.budget < 5 && /kept on before their deals ran out/.test(keys.after.note), JSON.stringify(keys));
+check("with the assistant off, a key starter is still kept on in the summer when the money is there", keys.kept.length >= 1 && keys.after.contract >= 2 && keys.after.budget < 5 && /kept on before their deals ran out/.test(keys.after.note), JSON.stringify(keys));
 // The assistant always says something under its control: what it did, or why there was nothing to do.
 const note = await page.evaluate(() => {
 	const F = window.__ff, lg = F.league, c = lg.club, p = document.getElementById("assistNote");
@@ -231,6 +232,37 @@ const summer = await page.evaluate(() => {
 });
 check("the summer settles an open question: kept on standard terms or gone, no stale buttons", summer.asked && !summer.short && summer.buttons === 0 && summer.kept && new RegExp(`kept ${summer.names[0].replace(".", "\\.")} on standard terms`).test(summer.note), JSON.stringify(summer));
 check("and the note says who could not be kept when the money is short", keys.skint.length === 0 && /no money to keep/.test(keys.skintNote), JSON.stringify(keys));
+// Careers end: retirement in the summer, one-year deals for veterans, none in a player's last season,
+// and an old save with impossible ages is cleaned up when it loads.
+const ages = await page.evaluate(() => {
+	const F = window.__ff, lg = F.league, c = lg.club;
+	const all = () => [ ...c.squad, ...c.bench ];
+	all().forEach(x => { x.age = 25; x.contract = 3; x.morale = 70; });
+	const vet = c.squad[2], gk = all().find(x => x.pos === "gk"), old37 = c.squad[3];
+	vet.age = 33; vet.contract = 1; old37.age = 37; old37.contract = 1; gk.age = 37; gk.contract = 1;
+	c.budget = 20;
+	const vetDeal = F.renewDeal(vet, c), oldDeal = F.renewDeal(old37, c), gkDeal = F.renewDeal(gk, c);
+	// a save with players of 42, 50 and 52
+	const s = all(); s[4].age = 42; s[5].age = 50; s[6].age = 52; const names = [ s[4].name, s[5].name, s[6].name ];
+	const gone = F.retireVeterans(c, false);
+	const max = Math.max(...all().map(x => x.age));
+	// many summers: nobody outfield passes 37, no keeper 39
+	let worstOut = 0, worstGk = 0;
+	for (let y = 0; y < 30; y++) { all().forEach(x => { x.age++; }); F.retireVeterans(c, true); all().forEach(x => { if (x.pos === "gk") { worstGk = Math.max(worstGk, x.age); } else { worstOut = Math.max(worstOut, x.age); } }); }
+	return { vet: [ vetDeal.ok, vet.contract ], old: [ oldDeal.ok, oldDeal.why ], gk: [ gkDeal.ok, gk.contract ], gone, names, max, size: [ c.squad.length, c.bench.length ], worstOut, worstGk };
+});
+check("a 33-year-old renews for one more season only", ages.vet[0] && ages.vet[1] === 2, JSON.stringify(ages.vet));
+check("a 37-year-old outfielder gets no new deal: he is retiring", !ages.old[0] && /retiring/.test(ages.old[1]), JSON.stringify(ages.old));
+check("keepers last longer: a 37-year-old keeper still renews", ages.gk[0] && ages.gk[1] === 2, JSON.stringify(ages.gk));
+check("players of 42, 50 and 52 retire at once and the academy fills the squad", ages.names.every(n => ages.gone.some(g => g.startsWith(n))) && ages.max <= 39 && ages.size[0] === 11 && ages.size[1] >= 5, JSON.stringify(ages));
+const loaded = await (async () => {
+	await page.evaluate(() => { const raw = JSON.parse(localStorage.getItem("ff-league")); raw.club.squad[4].age = 52; raw.club.bench[0].age = 50; raw.news = ""; localStorage.setItem("ff-league", JSON.stringify(raw)); });
+	await page.reload(); await page.waitForFunction(() => window.__ff && window.__ff.league && window.__ff.league.club, null, { timeout: 60000 });
+	return page.evaluate(() => { const c = window.__ff.league.club, all = [ ...c.squad, ...c.bench ]; return { max: Math.max(...all.map(x => x.age)), news: window.__ff.league.news, xi: c.squad.length }; });
+})();
+check("a saved league with a 52-year-old loads cleanly: he and the 50-year-old retire, the news says so", loaded.max <= 39 && /Retired: .*\(52\).*\(50\)|Retired: .*\(50\).*\(52\)/.test(loaded.news) && loaded.xi === 11, JSON.stringify(loaded));
+check("over thirty summers nobody plays past 37, no keeper past 39", ages.worstOut <= 37 && ages.worstGk <= 39, JSON.stringify(ages));
+
 check("no console errors", errs.length === 0, errs.join(" | "));
 await browser.close(); server.stop();
 process.exit(done() ? 1 : 0);
