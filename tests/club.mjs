@@ -97,16 +97,22 @@ check("a top-four finish brings one or two offers from strong clubs in the divis
 check("a bottom finish brings one offer, from the division below", offers.bottom.length === 1 && offers.bottom.every(o => o.below && !o.member), JSON.stringify(offers.bottom));
 const taken = await page.evaluate(() => {
 	const F = window.__ff, lg = F.league;
-	const offer = F.offerJobs(1)[0], target = F.TEAMS[offer.id], targetName = target.name, oldName = F.YOU.name, oldSquad = lg.club.squad.map(p => p.name);
+	const offer = F.offerJobs(1)[0], target = F.TEAMS[offer.id], targetName = target.name, oldName = F.YOU.name, oldSquad = lg.club.squad.slice();
+	lg.club.upgrades.training = 2; lg.club.staff.scout = { name: "Test Scout", lvl: 4, nat: "ENG", wage: 0.1 }; lg.club.training = { focus: "attack", load: "hard" };
 	F.league.round = lg.fixtures.length;
 	F.renderLeagueTest();
 	const shown = document.querySelectorAll("#jobOffers li").length;
+	const tags = [ ...document.querySelectorAll("#jobOffers .pos") ].map(x => x.textContent), pickShown = [ ...document.querySelectorAll("#jobOffers .ratings") ].some(x => /agent's pick/.test(x.textContent));
+	const best = F.bestOffer(lg.jobOffers);
 	const ok = F.takeJob(offer.id);
 	const c = lg.club;
-	return { ok, shown, youNow: F.YOU.name, targetNow: target.name, targetName, oldName, budget: c.budget, offerBudget: offer.budget, squad: c.squad.length, bench: c.bench.length, fresh: c.squad.every(p => !oldSquad.includes(p.name)), offersLeft: (lg.jobOffers || []).length, clubs: lg.career.clubs, career: document.getElementById("careerLine").textContent };
+	const carried = { training: c.upgrades.training, coaching: c.upgrades.coaching, scout: c.staff.scout && c.staff.scout.name, focus: c.training && c.training.focus, base: Math.max(0, Math.min(3, Math.round(offer.str) - 2)), tags, best, pickShown };
+	return { ok, shown, carried, youNow: F.YOU.name, targetNow: target.name, targetName, oldName, budget: c.budget, offerBudget: offer.budget, squad: c.squad.length, bench: c.bench.length, fresh: c.squad.every(p => !oldSquad.includes(p)), offersLeft: (lg.jobOffers || []).length, clubs: lg.career.clubs, career: document.getElementById("careerLine").textContent };
 });
 check("taking a job swaps you into that club: name, squad and budget, and your old club keeps its name", taken.ok && taken.shown >= 1 && taken.youNow === taken.targetName && taken.targetNow === taken.oldName && taken.budget === taken.offerBudget && taken.squad === 11 && taken.bench === 7 && taken.fresh && taken.offersLeft === 0 && taken.clubs.length === 2, JSON.stringify(taken));
 check("the career line records seasons, best finish and clubs", /Career: .*best finish 1st/.test(taken.career), taken.career);
+check("your staff, training plan and facilities come with you, and the new club's facilities match its standing", taken.carried.scout === "Test Scout" && taken.carried.focus === "attack" && taken.carried.training === Math.max(2, taken.carried.base) && taken.carried.coaching === taken.carried.base, JSON.stringify(taken.carried));
+check("with several offers the agent marks the best move and says why", taken.carried.best && taken.carried.tags.filter(t => t === "BEST MOVE").length === 1 && taken.carried.pickShown, JSON.stringify(taken.carried));
 // The move survives a reload: identities ride along with the league save.
 await page.reload(); await page.waitForFunction(() => window.__ff && window.__ff.league && window.__ff.league.club, null, { timeout: 60000 });
 const persisted = await page.evaluate(() => ({ you: window.__ff.YOU.name, old: window.__ff.TEAMS.some(t => t.name === "Floodlit FC"), budget: window.__ff.league.club.budget }));
@@ -116,7 +122,8 @@ check("after a reload you are still the new club and your old club keeps its nam
 const foryou = await page.evaluate(async () => {
 	const F = window.__ff, c = F.league.club, lg = F.league;
 	lg.round = 0;
-	const weakSlot = c.squad.map((p, i) => [ i, F.ovrNow(p) ]).filter(([ i ]) => i > 0).sort((a, b) => a[1] - b[1])[0][0], weak = c.squad[weakSlot];
+	const weakSlot = F.slotsFor(lg.fmt).filter(i => i > 0 && c.squad[i]).map(i => [ i, F.ovrNow(c.squad[i]) ]).sort((a, b) => a[1] - b[1])[0][0], weak = c.squad[weakSlot];
+	weak.pac = weak.sho = weak.pas = weak.def = 60;   // a clear hole for the shortlist to fill
 	const m = c.market[0]; m.pos = weak.pos; m.region = "home"; m.scouted = true; m.bids = 0; m.pac = m.sho = m.pas = m.def = 90; m.age = 24; m.ask = 0.7;
 	const m2 = c.market[1]; m2.pos = weak.pos; m2.region = "europe"; m2.scouted = false; m2.bids = 0; m2.pac = m2.sho = m2.pas = m2.def = 88; m2.age = 25; m2.ask = 0.9;
 	c.budget = 3; c.scoutLeft = 2; if (c.staff && c.staff.scout) { c.staff.scout.lvl = 1; }   // a modest scout, so the European pick is only an estimate
@@ -128,10 +135,11 @@ const foryou = await page.evaluate(async () => {
 	document.querySelectorAll("#mkActions button")[1].click(); await new Promise(r => setTimeout(r, 300));
 	const scouted = c.market.includes(m2) ? m2.scouted : "sold";
 	document.querySelectorAll("#mkActions button")[0].click(); await new Promise(r => setTimeout(r, 300));
-	return { tabs: tabs.slice(0, 2), firstRowHasGain: rows.length > 0 && /\+\d+ on /.test(rows[0]), acts, needs: /^Needs: /.test(needs), scouted, signed: [ ...c.squad, ...c.bench ].some(p => p.name === m.name), note: F.lastDeal, budget: c.budget };
+	return { tabs: tabs.slice(0, 2), firstRowHasGain: rows.length > 0 && /\+\d+ on /.test(rows[0]), acts, needs: /^Needs: /.test(needs), scouted, signed: [ ...c.squad, ...c.bench ].some(p => p.name === m.name), note: F.lastDeal, budget: c.budget, diag: { m: m.name, m2: m2.name, pos: weak.pos, assist: F.assistMode, log: (c.log || []).slice(-5), atPos: [ ...c.squad, ...c.bench ].filter(p => p.pos === weak.pos).map(p => `${p.name}:${F.ovrNow(p)}`), market: c.market.slice(0, 3).map(p => p.name) } };
 });
 check("the window opens on a For you shortlist with the gain over the starter it replaces, and a needs line", foryou.tabs[0][0] === "For you" && foryou.tabs[0][1] === "true" && foryou.firstRowHasGain && foryou.needs, JSON.stringify(foryou));
 check("Scout the shortlist spends a report on the unscouted pick, and Sign the best for me buys the step-up", foryou.scouted === true && foryou.signed && /^Assistant: signed/.test(foryou.note) && foryou.budget >= 0, JSON.stringify(foryou));
+check("a second signing in the same position replaces the weakest man there, never the first signing", !foryou.diag.log.some(l => l.includes(`; ${foryou.diag.m} (`)), JSON.stringify(foryou.diag.log));
 
 // The agent: January approaches, agreeing to one, and it heading the season-end offers.
 const agent = await page.evaluate(() => {
@@ -159,6 +167,26 @@ check("moving abroad gives a Spanish club, a fresh league and the career carried
 await page.reload(); await page.waitForFunction(() => window.__ff && window.__ff.league && window.__ff.league.club, null, { timeout: 60000 });
 const abroadKept = await page.evaluate(() => ({ you: window.__ff.YOU.name, season: window.__ff.league.season }));
 check("the move abroad survives a reload", abroadKept.you === "Ribera CF" && abroadKept.season === 1, JSON.stringify(abroadKept));
+
+// Important players never just walk: a heads-up, then kept on in the summer with the assistant off.
+const keys = await page.evaluate(() => {
+	const F = window.__ff, lg = F.league, c = lg.club;
+	F.setAssist("off");
+	[ ...c.squad, ...c.bench ].forEach(p => { p.contract = 3; });
+	const star = c.squad.slice().sort((a, b) => F.ovrNow(b) - F.ovrNow(a))[0];
+	star.contract = 1; star.morale = 45; star.age = 34;   // the free re-sign in rollover needs morale 50 and under 34, so this one would walk
+	c.budget = 5;
+	const alerted = F.contractAlerts().map(p => p.name);
+	const news = lg.news;
+	const kept = F.keyContracts(c);
+	const after = { contract: star.contract, budget: c.budget, note: F.lastDeal };
+	c.budget = 0.3; star.contract = 1;
+	const skint = F.keyContracts(c);
+	return { role: F.roleOf(star, c), alerted, news, kept, after, skint, skintNote: F.lastDeal };
+});
+check("the January alert names the important players in their last year", keys.alerted.length >= 1 && /Contracts ending for/.test(keys.news), JSON.stringify(keys));
+check("with the assistant off, a key starter is still kept on in the summer when the money is there", keys.kept.length >= 1 && keys.after.contract >= 3 && keys.after.budget < 5 && /kept on before their deals ran out/.test(keys.after.note), JSON.stringify(keys));
+check("and the note says who could not be kept when the money is short", keys.skint.length === 0 && /no money to keep/.test(keys.skintNote), JSON.stringify(keys));
 check("no console errors", errs.length === 0, errs.join(" | "));
 await browser.close(); server.stop();
 process.exit(done() ? 1 : 0);

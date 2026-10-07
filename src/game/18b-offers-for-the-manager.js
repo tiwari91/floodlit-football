@@ -48,6 +48,30 @@
 		return { abroad: region, kind: "abroad", nat, name: m.clubs[Math.floor(Math.random() * m.clubs.length)], str, budget: round1((1 + str * 0.9) * m.mult * 1.3), season: league.season };
 	}
 	const offerKey = o => (o.abroad ? `abroad:${o.name}` : `club:${o.id}`);
+	// What a club you join already has: facilities sized to its standing, never below what you built
+	// at the old club, and your own coaching staff and training plan come with you.
+	function inheritSetup (c, from, str) {
+		const base = clamp(Math.round(str) - 2, 0, 3);
+		for (const u of UPGRADES) { c.upgrades[u.key] = Math.max(base, (from && from.upgrades && from.upgrades[u.key]) || 0); }
+		c.staff = {};
+		for (const [ job, st ] of Object.entries((from && from.staff) || {})) { c.staff[job] = st ? { ...st } : null; }
+		if (from && from.training) { c.training = { ...from.training }; }
+		if (from && Number.isFinite(from.drill)) { c.drill = from.drill; }
+		return c;
+	}
+	// Your agent's pick among the offers: the strongest squad first, then the most to spend, with a
+	// nod to a new country; a drop to the division below counts against.
+	function bestOffer (offers) {
+		if (!offers || offers.length < 2) { return null; }
+		const score = o => o.str * 2 + o.budget * 0.5 + (o.abroad ? 1 : 0) - (o.below ? 3 : 0);
+		const best = offers.reduce((a, o) => (score(o) > score(a) ? o : a));
+		const maxStr = Math.max(...offers.map(o => o.str)), maxBud = Math.max(...offers.map(o => o.budget)), why = [];
+		if (best.str === maxStr) { why.push("the strongest squad"); }
+		if (best.budget === maxBud) { why.push("the most to spend"); }
+		if (best.abroad) { why.push("a new country on your record"); }
+		if (!why.length) { why.push("the best balance of squad and money"); }
+		return { key: offerKey(best), why: why.join(", ") };
+	}
 	// Your agent sounds clubs out at the January window: approaches you can agree to now and join when
 	// the season ends. One from home, sized to where you stand; a good position draws one from abroad.
 	function agentApproaches (when) {
@@ -85,7 +109,7 @@
 		const palette = [ [ "#c8102e", "#ffffff" ], [ "#1d4fa0", "#ffffff" ], [ "#f2b52e", "#1f2a36" ], [ "#155e3a", "#ffffff" ], [ "#8fc3e6", "#1f2a36" ], [ "#5b2a86", "#ffffff" ], [ "#e0662f", "#1f2a36" ] ];
 		const [ color, color2 ] = palette[hashStr(offer.name) % palette.length];
 		Object.assign(YOU, { name: offer.name, short: offer.name.split(" ")[0], color, color2, ground: `${offer.name} Stadium`, surface: offer.abroad === "europe" ? "grass" : "turf" });
-		const nats = natsOf(offer.abroad), base = cpuOvr(offer.str), c = newClub();
+		const nats = natsOf(offer.abroad), base = cpuOvr(offer.str), c = inheritSetup(newClub(), lg.club, offer.str);
 		const pick = (pos, i) => { const pl = genPlayer(pos, base + ((i * 7) % 5) - 2); pl.nat = nats[(i * 3 + 1) % nats.length]; pl.contract = 2 + (i % 2); return pl; };
 		c.squad = POS_OF_SLOT.map((pos, i) => pick(pos, i)); c.bench = BENCH_POS.map((pos, i) => pick(pos, i + POS_OF_SLOT.length));
 		c.budget = offer.budget; c.autoRotate = lg.club.autoRotate; c.scoutLeft = 2;
@@ -119,7 +143,7 @@
 		for (const k of [ "name", "short", "color", "color2", "ground", "surface" ]) { YOU[k] = to[k]; to[k] = from[k]; }
 		lg.clubStr[id] = oldStr;
 		rememberIdentity(lg);
-		const c = newClub(), base = cpuOvr(offer.str);
+		const c = inheritSetup(newClub(), lg.club, offer.str), base = cpuOvr(offer.str);
 		c.squad = cpuSquad(id, offer.str);
 		c.bench = BENCH_POS.map((pos, i) => genPlayer(pos, base - 5 + (i % 3)));
 		c.budget = offer.budget; c.autoRotate = lg.club.autoRotate; c.market = genMarket(); c.scoutLeft = 2;
@@ -148,16 +172,17 @@
 		const ul = $("jobOffers"), title = $("jobsTitle"), al = $("agentOffers"), at = $("agentTitle");
 		if (!ul || !title) { return; }
 		ul.replaceChildren();
-		const offers = league ? (league.jobOffers || []) : [];
+		const offers = league ? (league.jobOffers || []) : [], best = bestOffer(offers);
 		title.hidden = !offers.length;
 		for (const o of offers) {
-			const li = el("li"), key = offerKey(o);
-			li.append(el("span", "pos", o.agreed ? "AGREED" : "JOB"), el("span", "who", offerWho(o) + (o.agreed ? " (agreed in January)" : "")));
+			const li = el("li"), key = offerKey(o), isBest = best && best.key === key;
+			li.append(el("span", "pos", o.agreed ? "AGREED" : isBest ? "BEST MOVE" : "JOB"), el("span", "who", offerWho(o) + (o.agreed ? " (agreed in January)" : "")));
 			const btns = el("span", "bids");
 			const a = el("button", "", o.abroad ? "Move abroad" : "Take the job"); a.type = "button"; a.addEventListener("click", () => takeOffer(key));
 			const r = el("button", "", "Decline"); r.type = "button"; r.addEventListener("click", () => (o.abroad ? (league.jobOffers = league.jobOffers.filter(x => offerKey(x) !== key), afterClubChange()) : declineJob(o.id)));
 			btns.append(a, r); li.append(btns);
-			li.append(el("span", "ratings", o.abroad ? `You would leave ${YOU.name} for a fresh squad and a new league abroad; your career record comes with you.` : `You would leave ${YOU.name} and inherit their squad, ground and colours.`));
+			const carry = "Your coaching staff, training plan and facilities come with you.";
+			li.append(el("span", "ratings", (isBest ? `Your agent's pick: ${best.why}. ` : "") + (o.abroad ? `You would leave ${YOU.name} for a fresh squad and a new league abroad; your career record comes with you. ${carry}` : `You would leave ${YOU.name} and inherit their squad, ground and colours. ${carry}`)));
 			ul.append(li);
 		}
 		if (al && at) {

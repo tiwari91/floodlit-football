@@ -342,7 +342,7 @@
 		c.market.splice(i, 1);
 		picked = null;
 		lastDeal = (out ? `Signed ${pl.name} for ${money(price)}; ${out.name} left for ${money(fee)}.` : `Signed ${pl.name} for ${money(price)}, straight onto the bench.`) + (pl.adapt > 0 ? ` He'll need a few games to settle.` : "");
-		league.club.log = [ ...(league.club.log || []), `Signed ${pl.name} (${pl.nat}) for ${money(price)}` ].slice(-10);
+		league.club.log = [ ...(league.club.log || []), `Signed ${pl.name} (${pl.nat}) for ${money(price)}${out ? `; ${out.name} (${ovrNow(out)}) left for ${money(fee)}` : ""}` ].slice(-10);
 		afterClubChange();
 	}
 

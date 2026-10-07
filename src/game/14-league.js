@@ -79,6 +79,7 @@
 		if (prev) {
 			sanitizeClub(club);
 			if (typeof assistRun === "function") { assistRun("summer"); }   // new deals before contracts run out
+			if (typeof keyContracts === "function") { keyContracts(club); }   // the starters, even with the assistant off
 			gone = rolloverClub(club);
 			if (typeof seasonCoaching === "function") { seasonCoaching(club); }
 			if (gone.length) { league.news = `${league.news} Out of contract and gone: ${gone.join(", ")}. Academy players fill the gaps.`.trim(); }
@@ -147,6 +148,7 @@
 		if (!windowOpen()) { league.bidsIn = []; }
 		if (league.round === JANUARY) { league.club.market = genMarket(); league.club.scoutLeft = 2 + staffLvl(league.club, "scout"); if (typeof windowEvents === "function") { windowEvents("January"); } if (typeof agentApproaches === "function") { agentApproaches("January"); } }
 		if (typeof assistRun === "function") { assistRun(league.round === JANUARY ? "January window" : "this week"); }
+		if (typeof contractAlerts === "function" && (league.round === JANUARY || league.round === league.fixtures.length - 2)) { contractAlerts(); }
 		// Knocks from this match: out for one to three games, and off the team sheet.
 		const byName = n => [ ...league.club.squad, ...league.club.bench ].find(pl => pl.name === n);
 		for (const n of matchGoals) { const pl = byName(n); if (pl) { pl.goals = (pl.goals || 0) + 1; } }

@@ -39,6 +39,46 @@
 		if (left.length) { done.push(`left to run down: ${left.slice(0, 5).join(", ")}${left.length > 5 ? ` and ${left.length - 5} more` : ""}`); }
 		return done;
 	}
+	// Your important players: starters (key or first-team) in the last year of their deal.
+	function keyPlayers (c) {
+		return [ ...c.squad, ...c.bench ].filter(pl => { ensurePlayer(pl); const r = roleOf(pl, c); return (r === "key" || r === "first") && pl.contract <= 1; });
+	}
+	// Important players never just walk: even with the assistant off, the club renews its last-year
+	// starters in the summer, most valuable first, as far as the money allows. Says who it couldn't.
+	function keyContracts (c) {
+		if (assistMode !== "off" && assistDoes("contracts")) { return []; }   // the assistant has already been through them
+		const done = [], skint = [];
+		for (const pl of keyPlayers(c).filter(pl => assistKeeps(pl, c)).sort((a, b) => valueOf(b) - valueOf(a))) {
+			if (c.budget - round1(valueOf(pl) * 0.15) < ASSIST_RESERVE) { skint.push(pl.name); continue; }
+			const deal = renewDeal(pl, c);
+			if (deal.ok) { done.push(`${pl.name} to ${pl.contract} seasons`); }
+		}
+		const note = [];
+		if (done.length) { note.push(`kept on before their deals ran out: ${done.join(", ")}`); }
+		if (skint.length) { note.push(`no money to keep ${skint.join(", ")} (${money(ASSIST_RESERVE)} is kept for wages)`); }
+		if (note.length) {
+			lastDeal = `Contracts (summer): ${note.join("; ")}.`;
+			c.log = [ ...(c.log || []), lastDeal ].slice(-10);
+			if (league) { league.news = `${league.news || ""} ${lastDeal}`.trim(); }
+			toast(done.length ? `Kept on: ${done.length} key player${done.length === 1 ? "" : "s"}` : `No money to keep ${skint[0]}`, "#f2b52e");
+		}
+		return done;
+	}
+	// A heads-up at the January window and with two games to go: which important players are in
+	// their last year, and what will happen about it.
+	function contractAlerts () {
+		const c = league && league.club;
+		if (!c) { return []; }
+		const due = keyPlayers(c);
+		if (!due.length) { return []; }
+		const names = due.map(pl => `${pl.name} (${ovrNow(pl)})`);
+		const plan = assistMode !== "off" && assistDoes("contracts") ? "the assistant will sort their deals" : "renew in Your team, or they are kept on in the summer as far as the money allows";
+		lastDeal = `Contracts ending for ${names.slice(0, 4).join(", ")}${due.length > 4 ? ` and ${due.length - 4} more` : ""}: ${plan}.`;
+		c.log = [ ...(c.log || []), lastDeal ].slice(-10);
+		league.news = `${league.news || ""} ${lastDeal}`.trim();
+		toast(`Contracts ending: ${due.length} key player${due.length === 1 ? "" : "s"}, see League notes`, "#f2b52e");
+		return due;
+	}
 	// The shortlist: who on the market would improve the eleven, by how much, and in whose place.
 	// An unscouted player is judged on the middle of his estimate and marked as such.
 	function assistShortlist (c) {

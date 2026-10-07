@@ -140,9 +140,11 @@
 	function signingTarget (pos) {
 		const c = league.club;
 		if (c.bench.length < BENCH) { return { list: "bench", i: c.bench.length, out: null }; }
+		// The weakest man in that position anywhere in the squad makes way, bench or eleven, so a second
+		// signing never pushes out the first one just because he was the only one of his kind on the bench.
 		const cands = [];
 		c.bench.forEach((pl, i) => { if (pl.pos === pos) { cands.push({ list: "bench", i, pl }); } });
-		if (!cands.length) { c.squad.forEach((pl, i) => { if (pl.pos === pos) { cands.push({ list: "squad", i, pl }); } }); }
+		c.squad.forEach((pl, i) => { if (pl.pos === pos) { cands.push({ list: "squad", i, pl }); } });
 		if (!cands.length) { c.bench.forEach((pl, i) => cands.push({ list: "bench", i, pl })); }
 		const w = cands.reduce((a, b) => (ovrNow(b.pl) < ovrNow(a.pl) ? b : a));
 		return { list: w.list, i: w.i, out: w.pl };
