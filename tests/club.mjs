@@ -217,6 +217,19 @@ const ask = await page.evaluate(async () => {
 });
 check("short of money, the note asks the manager with the sums and two choices", ask.short && ask.short.names.length >= 1 && ask.btns.length === 2 && /Renew anyway/.test(ask.btns[0][0]) && /Leave them/.test(ask.btns[1][0]), JSON.stringify({ short: ask.short, btns: ask.btns }));
 check("Renew anyway spends the reserve on the deals it reaches and clears the question", ask.after.contracts.filter(x => x >= 3).length > ask.done.filter(d => / signed on to /.test(d)).length && ask.after.budget >= 0 && /your call, reserve spent/.test(ask.after.note) && ask.after.cleared && ask.after.btnsLeft === 0, JSON.stringify(ask.after));
+// A question left unanswered at season's end is settled by the summer, not left hanging.
+const summer = await page.evaluate(() => {
+	const F = window.__ff, lg = F.league, c = lg.club;
+	[ ...c.squad, ...c.bench ].forEach(x => { x.contract = 3; x.morale = 70; x.age = 26; });
+	const two = c.squad.slice(0, 2); two.forEach(x => { x.contract = 1; }); two[1].morale = 30;   // one is kept on standard terms, the sulker walks
+	c.budget = 0.3;
+	F.assistRun("test"); F.renderLeagueTest();
+	const asked = !!lg.assistShort, names = two.map(x => x.name);
+	lg.round = lg.fixtures.length; F.nextSeasonTest(); F.renderLeagueTest();
+	const p = document.getElementById("assistNote");
+	return { asked, names, short: F.league.assistShort, note: F.league.assistNote, buttons: p.querySelectorAll("button").length, kept: [ ...F.league.club.squad, ...F.league.club.bench ].some(x => x.name === names[0]) };
+});
+check("the summer settles an open question: kept on standard terms or gone, no stale buttons", summer.asked && !summer.short && summer.buttons === 0 && summer.kept && new RegExp(`kept ${summer.names[0].replace(".", "\\.")} on standard terms`).test(summer.note), JSON.stringify(summer));
 check("and the note says who could not be kept when the money is short", keys.skint.length === 0 && /no money to keep/.test(keys.skintNote), JSON.stringify(keys));
 check("no console errors", errs.length === 0, errs.join(" | "));
 await browser.close(); server.stop();

@@ -2421,6 +2421,11 @@
 			if (typeof assistRun === "function") { assistRun("summer"); }   // new deals before contracts run out
 			if (typeof keyContracts === "function") { keyContracts(club); }   // the starters, even with the assistant off
 			gone = rolloverClub(club);
+			if (league.assistShort) {   // the unpaid deals are settled by the summer: kept on standard terms, or gone
+				const names = league.assistShort.names, kept = names.filter(n => (club.resigned || []).includes(n)), lost = names.filter(n => gone.includes(n));
+				league.assistShort = null;
+				league.assistNote = `${league.assistNote || "Assistant (summer):"}${kept.length ? ` The club kept ${kept.join(", ")} on standard terms anyway.` : ""}${lost.length ? ` Out of contract and gone: ${lost.join(", ")}.` : ""}`;
+			}
 			if (typeof seasonCoaching === "function") { seasonCoaching(club); }
 			if (gone.length) { league.news = `${league.news} Out of contract and gone: ${gone.join(", ")}. Academy players fill the gaps.`.trim(); }
 			if (club.resigned && club.resigned.length) { league.news = `${league.news} Signed new deals: ${club.resigned.join(", ")}.`.trim(); }
