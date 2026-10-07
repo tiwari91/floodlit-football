@@ -73,6 +73,17 @@ const priority = await page.evaluate(() => {
 	return { done, star: star.contract, squadMan: squadMan.contract, note: F.lastDeal };
 });
 check("contracts: the most valuable player is signed first and the shortfall is reported", priority.star === 3 && priority.squadMan === 1 && /no money yet/.test(priority.note), JSON.stringify(priority));
+const leftOut = await page.evaluate(() => {
+	const F = window.__ff, c = F.league.club;
+	for (const pl of [ ...c.squad, ...c.bench ]) { pl.contract = 3; }
+	const dud = c.bench[2], old = c.bench[3];
+	dud.contract = 1; dud.morale = 80; dud.age = 27; dud.pac = dud.sho = dud.pas = dud.def = 40; dud.pot = 42; dud.role = "";
+	old.contract = 1; old.morale = 80; old.age = 34; old.pac = old.sho = old.pas = old.def = 70; old.role = "";
+	c.budget = 9;
+	const done = F.assistRun("test");
+	return { done, dud: dud.contract, old: old.contract, names: [ dud.name, old.name ] };
+});
+check("contracts: players not worth a deal are left to run down and the note says who and why", leftOut.dud === 1 && leftOut.old === 1 && leftOut.done.some(d => /left to run down/.test(d) && d.includes(leftOut.names[0]) && /not worth a new deal/.test(d) && /too old/.test(d)), JSON.stringify(leftOut));
 
 // Offers for the manager: a title-winner hears from the big clubs, a bottom finisher only from below.
 const offers = await page.evaluate(() => {

@@ -3854,16 +3854,26 @@
 		if (pl.morale < 40 || pl.age >= (starter ? 36 : 33)) { return false; }
 		return starter || ovrNow(pl) >= squadMedian(c) || (role === "prospect" && (pl.pot || 0) >= ovrNow(pl) + 6);
 	}
+	// Why a last-year player is left to run down, in a few words.
+	function assistWhyNot (pl, c) {
+		const role = roleOf(pl, c), starter = role === "key" || role === "first";
+		if (pl.morale < 40) { return "unhappy"; }
+		if (pl.age >= (starter ? 36 : 33)) { return `${pl.age}, too old`; }
+		return "not worth a new deal";
+	}
 	function assistContracts (c) {
-		const done = [], skint = [];
+		const done = [], skint = [], left = [];
 		// The most valuable first, so the money goes on the stars before the squad men.
-		const due = [ ...c.squad, ...c.bench ].filter(pl => { ensurePlayer(pl); return pl.contract <= 1 && assistKeeps(pl, c); }).sort((a, b) => valueOf(b) - valueOf(a));
+		const lastYear = [ ...c.squad, ...c.bench ].filter(pl => { ensurePlayer(pl); return pl.contract <= 1; });
+		const due = lastYear.filter(pl => assistKeeps(pl, c)).sort((a, b) => valueOf(b) - valueOf(a));
 		for (const pl of due) {
 			if (c.budget - round1(valueOf(pl) * 0.15) < ASSIST_RESERVE) { skint.push(pl.name); continue; }
 			const deal = renewDeal(pl, c);
 			if (deal.ok) { done.push(`${pl.name} signed on to ${pl.contract} seasons`); }
 		}
+		for (const pl of lastYear) { if (!due.includes(pl)) { left.push(`${pl.name} (${assistWhyNot(pl, c)})`); } }
 		if (skint.length) { done.push(`no money yet for new deals for ${skint.slice(0, 4).join(", ")}${skint.length > 4 ? ` and ${skint.length - 4} more` : ""} (${money(ASSIST_RESERVE)} is kept for wages)`); }
+		if (left.length) { done.push(`left to run down: ${left.slice(0, 5).join(", ")}${left.length > 5 ? ` and ${left.length - 5} more` : ""}`); }
 		return done;
 	}
 	function assistTransfers (c) {
@@ -3923,7 +3933,13 @@
 		if (run) { assistRun("now"); }
 	}
 	if (assistSel) {
-		assistSel.addEventListener("change", () => { setAssist(assistSel.value, true); toast(ASSIST[assistMode], "#f2b52e"); assistSel.blur(); });
+		assistSel.addEventListener("change", () => {
+			setAssist(assistSel.value, false);
+			const done = assistRun("now");
+			const acted = done.filter(d => !/^(no money yet|left to run down)/.test(d)).length;
+			toast(assistMode === "off" ? ASSIST.off : acted ? `Assistant: ${acted} done, see League notes` : done.length ? "Assistant: nothing it can do yet, see League notes" : "Assistant: nothing to do right now", "#f2b52e");
+			assistSel.blur();
+		});
 		setAssist(store.get("ff-assist") || "off");
 	}
 	/* ---------- offers for the manager ----------
