@@ -92,6 +92,7 @@
 		}
 		const tn = $("trNews");
 		tn.textContent = (lg.transferNews || []).length ? `Around the league: ${lg.transferNews.slice(0, 5).join("; ")}.` : "";
+		if (typeof renderOffers === "function") { renderOffers(); }
 	}
 	let oppSquad = [];
 

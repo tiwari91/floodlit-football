@@ -180,6 +180,7 @@
 			league.club.market = genMarket();
 			league.club.scoutLeft = 2 + staffLvl(league.club, "scout");
 			league.paid = true;
+			if (typeof offerJobs === "function") { offerJobs(pos); }
 		}
 		saveLeague();
 		renderLeague();

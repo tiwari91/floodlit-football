@@ -10,20 +10,23 @@
 	const assistDoes = what => assistMode === "both" || assistMode === what;
 	const squadMedian = c => { const v = [ ...c.squad, ...c.bench ].map(ovrNow).sort((a, b) => a - b); return v[Math.floor(v.length / 2)] || 0; };
 	// Worth a new deal: a key or first-team man, anyone at least as good as the middle of the squad,
-	// or a prospect with room to grow; still young enough, and not sulking.
+	// or a prospect with room to grow; not sulking. Age counts against the squad men, not the
+	// starters: a 34-year-old still in the eleven gets his deal, a 33-year-old reserve does not.
 	function assistKeeps (pl, c) {
-		const role = roleOf(pl, c);
-		return pl.age < 33 && pl.morale >= 40 && (role === "key" || role === "first" || ovrNow(pl) >= squadMedian(c) || (role === "prospect" && (pl.pot || 0) >= ovrNow(pl) + 6));
+		const role = roleOf(pl, c), starter = role === "key" || role === "first";
+		if (pl.morale < 40 || pl.age >= (starter ? 36 : 33)) { return false; }
+		return starter || ovrNow(pl) >= squadMedian(c) || (role === "prospect" && (pl.pot || 0) >= ovrNow(pl) + 6);
 	}
 	function assistContracts (c) {
-		const done = [];
-		for (const pl of [ ...c.squad, ...c.bench ]) {
-			ensurePlayer(pl);
-			if (pl.contract > 1 || !assistKeeps(pl, c)) { continue; }
-			if (c.budget - round1(valueOf(pl) * 0.15) < ASSIST_RESERVE) { continue; }
+		const done = [], skint = [];
+		// The most valuable first, so the money goes on the stars before the squad men.
+		const due = [ ...c.squad, ...c.bench ].filter(pl => { ensurePlayer(pl); return pl.contract <= 1 && assistKeeps(pl, c); }).sort((a, b) => valueOf(b) - valueOf(a));
+		for (const pl of due) {
+			if (c.budget - round1(valueOf(pl) * 0.15) < ASSIST_RESERVE) { skint.push(pl.name); continue; }
 			const deal = renewDeal(pl, c);
 			if (deal.ok) { done.push(`${pl.name} signed on to ${pl.contract} seasons`); }
 		}
+		if (skint.length) { done.push(`no money yet for new deals for ${skint.slice(0, 4).join(", ")}${skint.length > 4 ? ` and ${skint.length - 4} more` : ""} (${money(ASSIST_RESERVE)} is kept for wages)`); }
 		return done;
 	}
 	function assistTransfers (c) {

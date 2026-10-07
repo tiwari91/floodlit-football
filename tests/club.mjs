@@ -59,6 +59,42 @@ const shut = await page.evaluate(() => { const F = window.__ff, c = F.league.clu
 check("transfers: nothing happens while the window is shut", !shut.open && shut.done.length === 0, JSON.stringify(shut));
 const off = await page.evaluate(() => { const F = window.__ff, c = F.league.club; F.setAssist("off"); F.league.round = 0; c.squad[3].contract = 1; c.squad[3].morale = 90; c.budget = 9; return F.assistRun("off"); });
 check("off: the assistant does nothing", off.length === 0, JSON.stringify(off));
+
+// Contracts go to the stars first: with money for one deal, the 90-rated forward gets it and the squad man waits.
+const priority = await page.evaluate(() => {
+	const F = window.__ff, c = F.league.club;
+	F.setAssist("contracts");
+	for (const pl of [ ...c.squad, ...c.bench ]) { pl.contract = 3; }
+	const star = c.squad[9], squadMan = c.squad[1];
+	star.contract = 1; star.morale = 80; star.age = 23; star.pac = star.sho = star.pas = star.def = 90; star.role = "key";
+	squadMan.contract = 1; squadMan.morale = 80; squadMan.age = 29; squadMan.pac = squadMan.sho = squadMan.pas = squadMan.def = 80; squadMan.role = "first";   // a real fee, not pocket change
+	c.budget = Math.round(F.valueOf(star) * 0.15 * 10) / 10 + 0.5;   // one deal plus the reserve
+	const done = F.assistRun("test");
+	return { done, star: star.contract, squadMan: squadMan.contract, note: F.lastDeal };
+});
+check("contracts: the most valuable player is signed first and the shortfall is reported", priority.star === 3 && priority.squadMan === 1 && /no money yet/.test(priority.note), JSON.stringify(priority));
+
+// Offers for the manager: a title-winner hears from the big clubs, a bottom finisher only from below.
+const offers = await page.evaluate(() => {
+	const F = window.__ff, lg = F.league;
+	const top = F.offerJobs(1).map(o => ({ id: o.id, str: o.str, below: o.below, member: lg.members.includes(o.id) }));
+	const bottom = F.offerJobs(20).map(o => ({ id: o.id, str: o.str, below: o.below, member: lg.members.includes(o.id) }));
+	return { top, bottom, career: lg.career, title: document.getElementById("jobsTitle").hidden, items: document.querySelectorAll("#jobOffers li").length };
+});
+check("a top-four finish brings one or two offers from strong clubs in the division", offers.top.length >= 1 && offers.top.length <= 2 && offers.top.every(o => o.member && o.str >= 3), JSON.stringify(offers.top));
+check("a bottom finish brings one offer, from the division below", offers.bottom.length === 1 && offers.bottom.every(o => o.below && !o.member), JSON.stringify(offers.bottom));
+const taken = await page.evaluate(() => {
+	const F = window.__ff, lg = F.league;
+	const offer = F.offerJobs(1)[0], target = F.TEAMS[offer.id], targetName = target.name, oldName = F.YOU.name, oldSquad = lg.club.squad.map(p => p.name);
+	F.league.round = lg.fixtures.length;
+	F.renderLeagueTest();
+	const shown = document.querySelectorAll("#jobOffers li").length;
+	const ok = F.takeJob(offer.id);
+	const c = lg.club;
+	return { ok, shown, youNow: F.YOU.name, targetNow: target.name, targetName, oldName, budget: c.budget, offerBudget: offer.budget, squad: c.squad.length, bench: c.bench.length, fresh: c.squad.every(p => !oldSquad.includes(p.name)), offersLeft: (lg.jobOffers || []).length, clubs: lg.career.clubs, career: document.getElementById("careerLine").textContent };
+});
+check("taking a job swaps you into that club: name, squad and budget, and your old club keeps its name", taken.ok && taken.shown >= 1 && taken.youNow === taken.targetName && taken.targetNow === taken.oldName && taken.budget === taken.offerBudget && taken.squad === 11 && taken.bench === 7 && taken.fresh && taken.offersLeft === 0 && taken.clubs.length === 2, JSON.stringify(taken));
+check("the career line records seasons, best finish and clubs", /Career: .*best finish 1st/.test(taken.career), taken.career);
 check("no console errors", errs.length === 0, errs.join(" | "));
 await browser.close(); server.stop();
 process.exit(done() ? 1 : 0);

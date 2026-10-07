@@ -1394,6 +1394,9 @@
 				<ul class="market" id="bidsIn"></ul>
 				<ul class="market" id="winMarket"></ul>
 				<p class="win-note" id="trNews"></p>
+				<h4 class="up-title" id="jobsTitle" hidden>Offers for you</h4>
+				<ul class="market" id="jobOffers"></ul>
+				<p class="win-note" id="careerLine"></p>
 				<h4 class="up-title">Club upgrades</h4>
 				<ul class="upgrades" id="winUpgrades"></ul>
 			</div>
@@ -1461,6 +1464,7 @@
 		<p class="fine"><b>Weather and grounds.</b> Every club has a home ground: grass, muddy or artificial turf. Mud slows the ball and the players and kills the bounce. Turf is quick and true. Rain holds the ball up (heavy rain and mud most of all), costs players grip on the turn, sends passes a little astray and makes shots harder for keepers to hold, so they spill more. Wind pushes the ball while it is in the air: long balls, crosses, corners and lofted shots carry with it and hang against it; the arrow and speed at the top left of the pitch show which way it blows. League fixtures kick off in the afternoon or at night under the floodlights, with the stands dark around a lit pitch. In the league, matchdays 10 to 26 are the rainy season, windier and mostly at night, and the forecast is shown in advance (☾ night, ☀ afternoon, ≈ windy); the kick-off card gives the time, the rain and which way the wind blows for you. In a friendly, pick the weather (including Windy) and ground yourself.</p>
 		<p class="fine"><b>Your season, backed up.</b> Your league saves in this browser. Export league saves it to a file; Import league loads a file back (press twice to confirm, since it replaces the season you have). Use it to keep a backup or carry your season to another browser or device.</p>
 		<p class="fine"><b>Assistant.</b> Under Your team, the Assistant setting hands the club's paperwork to your assistant manager. Contracts: between matches he offers new deals to the players worth keeping (key and first-team men, anyone as good as the middle of the squad, prospects with room to grow) before their last year runs out, as long as it leaves money for wages. Transfers: when a window is open he answers bids (cashing in only well over a player's value, or on anyone past 31 at a fair price, never the only keeper), and signs at most two players a window where a known quantity, scouted or from home, is a clear step up on your weakest starter in that position. Everything he does appears in the notes on the League panel. Off by default.</p>
+		<p class="fine"><b>Offers for you.</b> You are the manager, not the club. When a season ends, clubs who liked your work come calling in the League panel: finish in the top four and the big clubs in the division want you, finish mid-table and a club at your level does, finish low and only the division below will. Take a job and you inherit that club's squad, ground and colours with a budget to match its size; your old club carries on under its own name. Decline, or start the next season, and the offers lapse. The career line under them keeps your record.</p>
 		<p class="fine"><b>On a phone.</b> Held upright, the overhead camera turns the pitch on its side so its whole width fits: you attack down the screen in the first half and up it in the second, and the joystick follows the picture. The settings, league table and help sit behind More under the pads.</p>
 		<p class="fine"><b>Big pitch.</b> The ground fills the screen with just a small score bug for the score and the clock. "Show menu" at the top right of the pitch (or F) brings back the title, the mode tabs and the full scoreboard; "Hide menu" puts it away again.</p>
 		<p class="fine"><b>Pause card.</b> Pause (P or Esc) stops the clock and puts the match settings in reach: tactic, camera, auto switch, sound, music, hints, kit contrast and Graphics, plus substitutions, Simulate the rest and How to play. The half-time card has the same switches.</p>
@@ -2500,6 +2504,7 @@
 			league.club.market = genMarket();
 			league.club.scoutLeft = 2 + staffLvl(league.club, "scout");
 			league.paid = true;
+			if (typeof offerJobs === "function") { offerJobs(pos); }
 		}
 		saveLeague();
 		renderLeague();
@@ -3738,6 +3743,7 @@
 		}
 		const tn = $("trNews");
 		tn.textContent = (lg.transferNews || []).length ? `Around the league: ${lg.transferNews.slice(0, 5).join("; ")}.` : "";
+		if (typeof renderOffers === "function") { renderOffers(); }
 	}
 	let oppSquad = [];
 
@@ -3841,20 +3847,23 @@
 	const assistDoes = what => assistMode === "both" || assistMode === what;
 	const squadMedian = c => { const v = [ ...c.squad, ...c.bench ].map(ovrNow).sort((a, b) => a - b); return v[Math.floor(v.length / 2)] || 0; };
 	// Worth a new deal: a key or first-team man, anyone at least as good as the middle of the squad,
-	// or a prospect with room to grow; still young enough, and not sulking.
+	// or a prospect with room to grow; not sulking. Age counts against the squad men, not the
+	// starters: a 34-year-old still in the eleven gets his deal, a 33-year-old reserve does not.
 	function assistKeeps (pl, c) {
-		const role = roleOf(pl, c);
-		return pl.age < 33 && pl.morale >= 40 && (role === "key" || role === "first" || ovrNow(pl) >= squadMedian(c) || (role === "prospect" && (pl.pot || 0) >= ovrNow(pl) + 6));
+		const role = roleOf(pl, c), starter = role === "key" || role === "first";
+		if (pl.morale < 40 || pl.age >= (starter ? 36 : 33)) { return false; }
+		return starter || ovrNow(pl) >= squadMedian(c) || (role === "prospect" && (pl.pot || 0) >= ovrNow(pl) + 6);
 	}
 	function assistContracts (c) {
-		const done = [];
-		for (const pl of [ ...c.squad, ...c.bench ]) {
-			ensurePlayer(pl);
-			if (pl.contract > 1 || !assistKeeps(pl, c)) { continue; }
-			if (c.budget - round1(valueOf(pl) * 0.15) < ASSIST_RESERVE) { continue; }
+		const done = [], skint = [];
+		// The most valuable first, so the money goes on the stars before the squad men.
+		const due = [ ...c.squad, ...c.bench ].filter(pl => { ensurePlayer(pl); return pl.contract <= 1 && assistKeeps(pl, c); }).sort((a, b) => valueOf(b) - valueOf(a));
+		for (const pl of due) {
+			if (c.budget - round1(valueOf(pl) * 0.15) < ASSIST_RESERVE) { skint.push(pl.name); continue; }
 			const deal = renewDeal(pl, c);
 			if (deal.ok) { done.push(`${pl.name} signed on to ${pl.contract} seasons`); }
 		}
+		if (skint.length) { done.push(`no money yet for new deals for ${skint.slice(0, 4).join(", ")}${skint.length > 4 ? ` and ${skint.length - 4} more` : ""} (${money(ASSIST_RESERVE)} is kept for wages)`); }
 		return done;
 	}
 	function assistTransfers (c) {
@@ -3916,6 +3925,81 @@
 	if (assistSel) {
 		assistSel.addEventListener("change", () => { setAssist(assistSel.value, true); toast(ASSIST[assistMode], "#f2b52e"); assistSel.blur(); });
 		setAssist(store.get("ff-assist") || "off");
+	}
+	/* ---------- offers for the manager ----------
+	   You are the manager, not the club. When a season ends, clubs who liked your work come calling:
+	   finish high and the bigger clubs in the division want you; finish mid-table, a club at your
+	   level; finish low and only the division below will have you. Take a job and you inherit that
+	   club's squad, ground and colours with a budget to match its size, and your old club carries on
+	   under its own name without you. Offers lapse when the next season kicks off. */
+	function offerJobs (pos) {
+		const lg = league;
+		if (!lg || !lg.club || !Array.isArray(lg.members)) { return []; }
+		if (!Number.isInteger(pos)) { pos = standings().findIndex(r => r.id === 0) + 1; }
+		const me = yourStr(), n = lg.members.length;
+		const inDiv = lg.members.filter(id => id !== 0), below = TEAMS.map((t, i) => i).filter(i => i !== 0 && !lg.members.includes(i));
+		let pool;
+		if (pos <= 4) { pool = inDiv.filter(id => getStr(id) >= Math.max(3, Math.ceil(me - 0.5))); }
+		else if (pos <= Math.floor(n / 2)) { pool = inDiv.filter(id => Math.abs(getStr(id) - me) <= 1); }
+		else if (pos <= n - 3) { pool = [ ...inDiv.filter(id => getStr(id) <= me), ...below.slice(0, 3) ]; }
+		else { pool = below; }
+		lg.jobOffers = shuffle(pool).slice(0, pos <= 4 ? 2 : 1).map(id => ({ id, str: getStr(id), budget: round1(1 + getStr(id) * 0.9), below: !lg.members.includes(id), season: lg.season }));
+		lg.career = { ...(lg.career || { clubs: [ YOU.name ] }), history: [ ...((lg.career && lg.career.history) || []), { season: lg.season, club: YOU.name, pos } ] };
+		return lg.jobOffers;
+	}
+	function declineJob (id) {
+		if (!league) { return; }
+		league.jobOffers = (league.jobOffers || []).filter(o => o.id !== id);
+		lastDeal = `You turned ${TEAMS[id].name} down.`;
+		afterClubChange();
+	}
+	function takeJob (id) {
+		const lg = league, offer = lg && (lg.jobOffers || []).find(o => o.id === id);
+		if (!offer) { return false; }
+		const to = TEAMS[id], from = { ...YOU }, oldStr = yourStr();
+		// The two clubs trade identities: you wear theirs now; your old side keeps its name and your old squad's strength.
+		for (const k of [ "name", "short", "color", "color2", "ground", "surface" ]) { YOU[k] = to[k]; to[k] = from[k]; }
+		lg.clubStr[id] = oldStr;
+		const c = newClub(), base = cpuOvr(offer.str);
+		c.squad = cpuSquad(id, offer.str);
+		c.bench = BENCH_POS.map((pos, i) => genPlayer(pos, base - 5 + (i % 3)));
+		c.budget = offer.budget; c.autoRotate = lg.club.autoRotate; c.market = genMarket(); c.scoutLeft = 2;
+		c.log = [ `You took the ${YOU.name} job, from ${from.name} (budget ${money(offer.budget)})` ];
+		if (typeof ensureCoaching === "function") { ensureCoaching(c, lg); }
+		lg.club = c;
+		if (lg.cpuIn) { delete lg.cpuIn[id]; }
+		lg.bidsIn = []; lg.jobOffers = [];
+		lg.career = { ...(lg.career || {}), clubs: [ ...((lg.career && lg.career.clubs) || [ from.name ]), YOU.name ] };
+		lg.news = `${lg.news || ""} You are the new manager of ${YOU.name}.`.trim();
+		lastDeal = `You are the new manager of ${YOU.name}: a squad of ${POS_OF_SLOT.length + c.bench.length}, ${money(offer.budget)} to spend.`;
+		autoPick(false, true);
+		afterClubChange();
+		return true;
+	}
+	const careerLine = () => {
+		const h = league && league.career && league.career.history;
+		if (!h || !h.length) { return ""; }
+		const best = h.reduce((b, x) => (x.pos < b.pos ? x : b));
+		return `Career: ${h.length} season${h.length === 1 ? "" : "s"}, best finish ${best.pos}${[ "st", "nd", "rd" ][best.pos - 1] || "th"} with ${best.club}, clubs: ${(league.career.clubs || [ YOU.name ]).join(", ")}.`;
+	};
+	function renderOffers () {
+		const ul = $("jobOffers"), title = $("jobsTitle");
+		if (!ul || !title) { return; }
+		ul.replaceChildren();
+		const offers = league ? (league.jobOffers || []) : [];
+		title.hidden = !offers.length;
+		for (const o of offers) {
+			const t = TEAMS[o.id], li = el("li");
+			li.append(el("span", "pos", "JOB"), el("span", "who", `${t.name} want you as manager: ${o.below ? "the division below" : "this division"}, strength ${"★".repeat(Math.round(o.str))}, ${money(o.budget)} to spend`));
+			const btns = el("span", "bids");
+			const a = el("button", "", "Take the job"); a.type = "button"; a.addEventListener("click", () => takeJob(o.id));
+			const r = el("button", "", "Decline"); r.type = "button"; r.addEventListener("click", () => declineJob(o.id));
+			btns.append(a, r); li.append(btns);
+			li.append(el("span", "ratings", `You would leave ${YOU.name} and inherit their squad, ground and colours.`));
+			ul.append(li);
+		}
+		const cl = $("careerLine");
+		if (cl) { cl.textContent = careerLine(); }
 	}
 	/* ---------- audio ----------
 	   Everything is synthesised in WebAudio: the ball off a boot, the referee's whistle, and a
@@ -12252,6 +12336,7 @@
 			get manualLock () { return manualLock; }, get celeb () { return typeof celeb === "undefined" ? null : celeb; },
 			get autoSwitchMode () { return autoSwitchMode; }, set autoSwitchMode (v) { autoSwitchMode = v; autoSwitchSel.value = v; },
 			get assistMode () { return assistMode; }, setAssist, assistRun, get lastDeal () { return lastDeal; }, valueOf, ovrNow, windowOpen,
+			offerJobs, takeJob, declineJob, get YOU () { return YOU; }, get TEAMS () { return TEAMS; },
 			get autoHold () { return autoHold; }, set autoHold (v) { autoHold = v; },
 			get charging () { return charging; }, get passCharge () { return passCharge; }, get meterRect () { return meterRect; }, get drawMs () { return drawMs; }, get drawn () { return drawn; }, frameDue, get scale () { return scale; }, get kits () { return KITS; }, get stats () { return stats; }, get oppStats () { return oppStats; }, get steerAt () { return steerAt; }, set steerAt (v) { steerAt = v; }, set possTeam (v) { possTeam = v; },
 			set steerSwitchDone (v) { steerSwitchDone = !!v; },
