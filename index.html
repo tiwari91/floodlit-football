@@ -4,12 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="description" content="Floodlit Football: an 11, 6 or 5-a-side football game with a 38-round league, transfers, fouls and cards.">
+<title>Floodlit Football</title>
+<meta property="og:title" content="Floodlit Football">
+<meta property="og:description" content="An 11, 6 or 5-a-side football game in the browser: a 38-round league, transfers, fouls, cards and a 3D camera.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://tiwari91.github.io/floodlit-football/">
+<meta name="twitter:card" content="summary">
+<meta name="theme-color" content="#0d1612">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230f1d16'/%3E%3Cpath d='M9 8l12 10M55 8L43 18' stroke='%23f2b52e' stroke-width='5' stroke-linecap='round'/%3E%3Ccircle cx='32' cy='38' r='19' fill='%23ffffff'/%3E%3Cpath d='M32 29l8.5 6.2-3.2 10H26.7l-3.2-10z' fill='%2316201b'/%3E%3Cpath d='M32 19v10M40.5 35.2l9.3-3.1M37.3 45.2l5.4 8.2M26.7 45.2l-5.4 8.2M23.5 35.2l-9.3-3.1' stroke='%2316201b' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E">
 <style>body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>
 </head>
 <body>
-<title>Floodlit Football</title>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230f1d16'/%3E%3Cpath d='M9 8l12 10M55 8L43 18' stroke='%23f2b52e' stroke-width='5' stroke-linecap='round'/%3E%3Ccircle cx='32' cy='38' r='19' fill='%23ffffff'/%3E%3Cpath d='M32 29l8.5 6.2-3.2 10H26.7l-3.2-10z' fill='%2316201b'/%3E%3Cpath d='M32 19v10M40.5 35.2l9.3-3.1M37.3 45.2l5.4 8.2M26.7 45.2l-5.4 8.2M23.5 35.2l-9.3-3.1' stroke='%2316201b' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Barlow:wght@400;500;600;700&display=swap">
@@ -312,7 +317,8 @@
 	.card-body { touch-action: pan-y; -webkit-overflow-scrolling: touch; }
 
 	@media (pointer: coarse) and (orientation: portrait) {
-		.pitchwrap, body.big .pitchwrap { height: max(300px, min(calc(100svh - 330px), calc(var(--pw) * 1.12), 760px)); }
+		.pitchwrap, body.big .pitchwrap { height: max(300px, min(calc(100svh - 300px), calc(var(--pw) * 1.5), 820px)); }
+		.pitchwrap .overlay { padding-top: 48px; }   /* the card starts under the Show menu button */
 	}
 	/* Landscape phones: the pitch takes the screen and the touch controls float over its bottom corners. */
 	@media (pointer: coarse) and (orientation: landscape) and (max-height: 520px) {
@@ -324,6 +330,7 @@
 			padding-inline: 14px; align-items: flex-end; pointer-events: none; z-index: 5;
 		}
 		body.big .touch > * { pointer-events: auto; }
+		body.big .wrap:has(.bc-ticker:not([hidden])) .touch { top: calc(100svh - 34px); }   /* the pads sit above the results ticker */
 		body.big .stick { width: 112px; height: 112px; background: rgba(19, 33, 26, 0.55); border-color: rgba(238, 246, 234, 0.25); }
 		body.big .knob { background: rgba(72, 110, 88, 0.85); }
 		body.big .pads { grid-template-columns: repeat(3, 62px); gap: 8px; }
@@ -910,6 +917,12 @@
 
 	/* Settings: the match actions on one row, then the settings in four labelled groups. */
 	.bar { display: grid; gap: 10px; }
+	/* On a phone the settings, league and help wait behind More; the match controls stay in reach. */
+	#moreBtn { display: none; }
+	@media (pointer: coarse) {
+		#moreBtn { display: inline-block; }
+		body:not(.more) .bargroups, body:not(.more) .league, body:not(.more) .help { display: none; }
+	}
 	.baractions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
 	#pauseBtn { border-color: var(--amber); color: var(--amber); min-width: 6em; }
 	.bargroups { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr)); gap: 10px; align-items: start; }
@@ -1205,6 +1218,7 @@
 			<button id="subsBtn" type="button">Subs</button>
 			<button id="restartBtn" type="button">New match</button>
 			<button id="howtoBtn" type="button" title="How to play (H)">How to play</button>
+			<button id="moreBtn" type="button" aria-expanded="false">More…</button>
 			<span class="note" id="nextNote" hidden>Applies from the next match</span>
 		</div>
 		<div class="bargroups">
@@ -1438,6 +1452,7 @@
 		<p class="fine"><b>Goals.</b> The scorer wheels away to the corner, slides on his knees in front of the fans and is mobbed by his teammates while the other side trudges back and their keeper fetches the ball out of the net, which bulges and swings where the ball hit it. A caption names the scorer and the minute, and the score bug flashes. In the 3D view the celebration then gives way to an instant replay of the build-up in slow motion, from high behind the goal or low beside it, before the camera goes back to the scorer and cuts wide for the restart. The match clock is stopped throughout. Any key, button or tap skips the celebration and the replay. Cards and substitutions get captions too.</p>
 		<p class="fine"><b>Weather and grounds.</b> Every club has a home ground: grass, muddy or artificial turf. Mud slows the ball and the players and kills the bounce. Turf is quick and true. Rain holds the ball up (heavy rain and mud most of all), costs players grip on the turn, sends passes a little astray and makes shots harder for keepers to hold, so they spill more. Wind pushes the ball while it is in the air: long balls, crosses, corners and lofted shots carry with it and hang against it; the arrow and speed at the top left of the pitch show which way it blows. League fixtures kick off in the afternoon or at night under the floodlights, with the stands dark around a lit pitch. In the league, matchdays 10 to 26 are the rainy season, windier and mostly at night, and the forecast is shown in advance (☾ night, ☀ afternoon, ≈ windy); the kick-off card gives the time, the rain and which way the wind blows for you. In a friendly, pick the weather (including Windy) and ground yourself.</p>
 		<p class="fine"><b>Your season, backed up.</b> Your league saves in this browser. Export league saves it to a file; Import league loads a file back (press twice to confirm, since it replaces the season you have). Use it to keep a backup or carry your season to another browser or device.</p>
+		<p class="fine"><b>On a phone.</b> Held upright, the overhead camera turns the pitch on its side so its whole width fits: you attack down the screen in the first half and up it in the second, and the joystick follows the picture. The settings, league table and help sit behind More under the pads.</p>
 		<p class="fine"><b>Big pitch.</b> The ground fills the screen with just a small score bug for the score and the clock. "Show menu" at the top right of the pitch (or F) brings back the title, the mode tabs and the full scoreboard; "Hide menu" puts it away again.</p>
 		<p class="fine"><b>Pause card.</b> Pause (P or Esc) stops the clock and puts the match settings in reach: tactic, camera, auto switch, sound, music, hints, kit contrast and Graphics, plus substitutions, Simulate the rest and How to play. The half-time card has the same switches.</p>
 		<p class="fine"><b>Kit contrast.</b> For colour vision that struggles with red against green, or any two kits that blur together: turn on Kit contrast and the other side plays in white (black when you are in white) with a dashed ring under every player, whatever club they are. It is remembered.</p>
@@ -5091,6 +5106,7 @@
 		if (keys.has("ArrowUp")) { y -= 1; }
 		if (keys.has("ArrowDown")) { y += 1; }
 		x += stickVec.x + padVec.x; y += stickVec.y + padVec.y;
+		if (rotTop) { const t = x; x = y; y = -t; }   // the picture is on its side: down the screen is along the pitch
 		if (endsSwapped()) { x = -x; }   // right on screen is towards the other goal now
 		const m = Math.hypot(x, y);
 		if (m > 0.2) { steerAt = frame; }
@@ -7395,6 +7411,9 @@
 
 	/* ---------- rendering ---------- */
 	let scale = 1;
+	// The screen in view units (SW across, SH down) and whether the overhead picture is turned on its
+	// side: on a portrait phone the pitch's long side runs down the screen so its width fits.
+	let SW = 0, SH = 0, rotTop = false;
 	function resize () {
 		const rect = canvas.getBoundingClientRect();
 		const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -7405,12 +7424,15 @@
 	}
 	// Keep the view the canvas's shape, 648 tall where it can be, never bigger than the ground.
 	function fitView () {
-		const a = canvas.width && canvas.height ? canvas.width / canvas.height : 1072 / 648;
-		let vw = 648 * a, vh = 648;
+		rotTop = camMode === "top" && canvas.height > canvas.width;
+		const cw = rotTop ? canvas.height : canvas.width, ch = rotTop ? canvas.width : canvas.height;
+		const a = cw && ch ? cw / ch : 1072 / 648, base = rotTop ? 600 : 648;
+		let vw = base * a, vh = base;
 		if (vw > WW) { vw = WW; vh = WW / a; }
 		if (vh > WH) { vh = WH; vw = WH * a; }
 		VW = vw; VH = vh;
-		scale = canvas.width / VW;
+		scale = cw / VW;
+		SW = canvas.width / scale; SH = canvas.height / scale;
 	}
 
 	// The playing surface. Turf is a brighter, even green; mud and grass are mown, each ground in its
@@ -8324,16 +8346,16 @@
 	function drawRain () {
 		if (cond.wet) {
 			ctx.fillStyle = `rgba(12, 20, 30, ${0.1 * cond.wet})`;
-			ctx.fillRect(0, 0, VW, VH);
+			ctx.fillRect(0, 0, SW, SH);
 			const want = reduceMotion ? 0 : 90 * cond.wet;
-			while (drops.length < want) { drops.push({ x: Math.random() * VW, y: Math.random() * VH, v: 14 + Math.random() * 10 }); }
+			while (drops.length < want) { drops.push({ x: Math.random() * SW, y: Math.random() * SH, v: 14 + Math.random() * 10 }); }
 			drops.length = Math.min(drops.length, want);
 			ctx.strokeStyle = "rgba(200, 220, 245, 0.35)";
 			ctx.lineWidth = 1.2;
 			ctx.beginPath();
 			for (const d of drops) {
 				d.x -= d.v * 0.18; d.y += d.v;
-				if (d.y > VH) { d.y = -20; d.x = Math.random() * (VW + 60); }
+				if (d.y > SH) { d.y = -20; d.x = Math.random() * (SW + 60); }
 				ctx.moveTo(d.x, d.y); ctx.lineTo(d.x + d.v * 0.18, d.y - d.v);
 			}
 			ctx.stroke();
@@ -8919,7 +8941,7 @@
 		ctx.textBaseline = "middle";
 		ctx.textAlign = "left";
 		let x = 12;
-		const y = VH - 22 - tickerUp(), maxX = minimapOn && (WW > VW || WH > VH) ? (VW - 190) / 2 - 10 : VW - 12;   // stay clear of the minimap when it's shown
+		const y = SH - 22 - tickerUp(), maxX = minimapOn && (WW > VW || WH > VH) ? (SW - 190) / 2 - 10 : SW - 12;   // stay clear of the minimap when it's shown
 		for (const [ key, label ] of items) {
 			ctx.font = "800 11px Barlow, Arial, sans-serif";
 			const kw = ctx.measureText(key).width + 10;
@@ -8946,7 +8968,7 @@
 		const me = human();
 		if (!charging || state !== "play" || !me || ball.owner !== me) { meterRect = null; return; }
 		const power = clamp((frame - chargeStart) / 50, 0, 1);
-		const w = Math.min(220, VW - 40), h = 10, x = (VW - w) / 2, y = VH - (coarse || !hintsOn ? 30 : 56) - tickerUp();
+		const w = Math.min(220, SW - 40), h = 10, x = (SW - w) / 2, y = SH - (coarse || !hintsOn ? 30 : 56) - tickerUp();
 		meterRect = { x, y, w, h, power };
 		ctx.save();
 		ctx.fillStyle = "rgba(7, 12, 10, 0.7)";
@@ -8980,9 +9002,9 @@
 			if (!f.toast) { continue; }
 			ctx.globalAlpha = Math.min(1, (1 - f.t / f.life) * 2.5);
 			ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
-			ctx.fillText(f.label.toUpperCase(), VW / 2 + 2, 114);
+			ctx.fillText(f.label.toUpperCase(), SW / 2 + 2, 114);
 			ctx.fillStyle = f.color;
-			ctx.fillText(f.label.toUpperCase(), VW / 2, 110);
+			ctx.fillText(f.label.toUpperCase(), SW / 2, 110);
 		}
 		ctx.globalAlpha = 1;
 	}
@@ -8991,7 +9013,7 @@
 	let minimapOn = false;   // off unless you turn it on with the Minimap button
 	function drawMinimap () {
 		if (!minimapOn || (WW <= VW && WH <= VH)) { return; }
-		const w = 190, k = w / FW, h = FH * k, x0 = (VW - w) / 2, y0 = VH - h - 12 - tickerUp();
+		const w = 190, k = w / FW, h = FH * k, x0 = (SW - w) / 2, y0 = SH - h - 12 - tickerUp();
 		ctx.fillStyle = "rgba(7, 12, 10, 0.72)";
 		ctx.fillRect(x0 - 5, y0 - 5, w + 10, h + 10);
 		ctx.strokeStyle = "rgba(238, 246, 234, 0.45)";
@@ -9023,9 +9045,12 @@
 	function drawOffscreenMarker () {
 		const me = human();
 		if (!me || state === "intro") { return; }
-		const sx0 = MX + me.x - camX, sx = endsSwapped() ? VW - sx0 : sx0, sy = MY + me.y - camY, pad = 26;
-		if (sx > 0 && sx < VW && sy > 0 && sy < VH) { return; }
-		const ex = clamp(sx, pad, VW - pad), ey = clamp(sy, pad, VH - pad);
+		const sx0 = MX + me.x - camX;
+		let sx = endsSwapped() ? VW - sx0 : sx0, sy = MY + me.y - camY;
+		if (rotTop) { [ sx, sy ] = [ SW - sy, sx ]; }
+		const pad = 26;
+		if (sx > 0 && sx < SW && sy > 0 && sy < SH) { return; }
+		const ex = clamp(sx, pad, SW - pad), ey = clamp(sy, pad, SH - pad);
 		const a = Math.atan2(sy - ey, sx - ex);
 		ctx.save();
 		ctx.translate(ex, ey);
@@ -9053,9 +9078,9 @@
 		ctx.textBaseline = "middle";
 		ctx.font = "900 120px 'Big Shoulders Display', 'Arial Narrow', Arial, sans-serif";
 		ctx.fillStyle = "rgba(0, 0, 0, 0.45)";
-		ctx.fillText(text.toUpperCase(), VW / 2 + 3, 179);
+		ctx.fillText(text.toUpperCase(), SW / 2 + 3, 179);
 		ctx.fillStyle = "#eef6ea";
-		ctx.fillText(text.toUpperCase(), VW / 2, 174);
+		ctx.fillText(text.toUpperCase(), SW / 2, 174);
 		ctx.restore();
 	}
 
@@ -9117,7 +9142,10 @@
 		const ease = reduceMotion ? 1 : 1 - Math.exp(-frameDt / 190);
 		camX += (tx - camX) * ease;
 		camY += (ty - camY) * ease;
-		if (endsSwapped()) { ctx.setTransform(-scale, 0, 0, scale, (camX + VW) * scale, -camY * scale); } else { ctx.setTransform(scale, 0, 0, scale, -camX * scale, -camY * scale); }
+		if (rotTop) {
+			// Pitch x runs down the screen, pitch y runs right to left: a quarter turn, mirrored for the second half.
+			if (endsSwapped()) { ctx.setTransform(0, -scale, -scale, 0, canvas.width + camY * scale, (camX + VW) * scale); } else { ctx.setTransform(0, scale, -scale, 0, canvas.width + camY * scale, -camX * scale); }
+		} else if (endsSwapped()) { ctx.setTransform(-scale, 0, 0, scale, (camX + VW) * scale, -camY * scale); } else { ctx.setTransform(scale, 0, 0, scale, -camX * scale, -camY * scale); }
 		drawPitch();
 		drawFreeKickSpray();
 		drawPassTarget();
@@ -11385,10 +11413,16 @@
 	function slowMotion (n) { if (!bulkSim && state !== "paused") { slowMo = Math.max(slowMo, n); } }
 
 	/* ---------- loop ---------- */
-	let last = performance.now(), acc = 0, drawMs = 0;
+	let last = performance.now(), acc = 0, drawMs = 0, drawn = 0;
+	// Never more than 60 pictures a second: a 120 Hz phone would otherwise draw twice as often for
+	// no visible gain and run its battery down. A frame is due once 60 Hz worth of time has passed,
+	// with a little slack so a 60 Hz screen's own jitter never drops a frame.
+	const MIN_FRAME = 1000 / 60 - 2.5;
+	const frameDue = (now, prev) => now - prev >= MIN_FRAME;
 	const STEP = 1000 / 60;
 	let frameDt = 16.7;
 	function loop (now) {
+		if (!frameDue(now, last)) { requestAnimationFrame(loop); return; }
 		frameDt = clamp(now - last, 1, 100);
 		pollPad();
 		acc = Math.min(acc + (now - last) * (slowMo > 0 && !odr ? SLOW_RATE : 1), 250);
@@ -11401,6 +11435,7 @@
 		const d0 = performance.now();
 		draw(odr ? 1 : acc / STEP);
 		drawMs += (performance.now() - d0 - drawMs) * 0.1;   // smoothed cost of a drawn frame, for the test harness
+		drawn++;
 		renderHud();
 		renderTicker();
 		updateRainSound();
@@ -11680,6 +11715,15 @@
 		if (on) { $("pitchwrap").scrollIntoView?.({ block: "start", behavior: reduceMotion ? "auto" : "smooth" }); }
 	}
 	$("bigBtn").addEventListener("click", e => { setBig(!(document.body && document.body.classList.contains("big"))); e.currentTarget.blur(); });
+	// Phones: the settings, league table and help sit behind More, closed until asked for.
+	function setMore (on) {
+		document.body.classList.toggle("more", on);
+		store.set("ff-more", on ? "1" : "0");
+		$("moreBtn").textContent = on ? "Less" : "More…";
+		$("moreBtn").setAttribute("aria-expanded", String(on));
+	}
+	$("moreBtn").addEventListener("click", e => { setMore(!document.body.classList.contains("more")); e.currentTarget.blur(); });
+	setMore(store.get("ff-more") === "1");
 	$("menuToggle").addEventListener("click", e => { setBig(!(document.body && document.body.classList.contains("big"))); e.currentTarget.blur(); });
 	// Big pitch is the default; the menu comes back with the button on the pitch (or F).
 	setBig(store.get("ff-big") !== "0");
@@ -12050,7 +12094,7 @@
 			get manualLock () { return manualLock; }, get celeb () { return typeof celeb === "undefined" ? null : celeb; },
 			get autoSwitchMode () { return autoSwitchMode; }, set autoSwitchMode (v) { autoSwitchMode = v; autoSwitchSel.value = v; },
 			get autoHold () { return autoHold; }, set autoHold (v) { autoHold = v; },
-			get charging () { return charging; }, get passCharge () { return passCharge; }, get meterRect () { return meterRect; }, get drawMs () { return drawMs; }, get scale () { return scale; }, get kits () { return KITS; }, get stats () { return stats; }, get oppStats () { return oppStats; }, get steerAt () { return steerAt; }, set steerAt (v) { steerAt = v; }, set possTeam (v) { possTeam = v; },
+			get charging () { return charging; }, get passCharge () { return passCharge; }, get meterRect () { return meterRect; }, get drawMs () { return drawMs; }, get drawn () { return drawn; }, frameDue, get scale () { return scale; }, get kits () { return KITS; }, get stats () { return stats; }, get oppStats () { return oppStats; }, get steerAt () { return steerAt; }, set steerAt (v) { steerAt = v; }, set possTeam (v) { possTeam = v; },
 			set steerSwitchDone (v) { steerSwitchDone = !!v; },
 			get lastSwitchKind () { return lastSwitchKind; }, get line () { return line; }, get tackling () { return tackling; }, setLine (t, v) { line[t] = v; }, setTackling (t, v) { tackling[t] = v; }, set lastSwitchKind (v) { lastSwitchKind = v; }, get setPiece () { return setPiece; },
 			get G3 () { return G3; }, get matchLog () { return matchLog; }, get league () { return league; }, simSeasonTest () { simulateSeason(); }, balanceTest () { const sl = slotsFor(league.fmt), avg = a => a.reduce((t, v) => t + v, 0) / a.length; const you = avg(sl.map(i => ovrOf(league.club.squad[i]))); const all = [], per = league.members.filter(id => id !== 0).map(id => { const sq = cpuSquad(id, getStr(id)); all.push(...sq.map(ovrOf)); return avg(sl.map(i => ovrOf(sq[i]))); }); all.sort((a, b) => b - a); return { season: league.season, you, lg: avg(per), max: all[0], top5: all.slice(0, 5).join("/") }; }, nextSeasonTest () { if (seasonDone()) { newSeason(league.fmt); newMatch(); renderLeague(); } }, renderLeagueTest () { renderLeague(); }, get crowdHush () { return crowdHush; }, get crowdHeat () { return crowdHeat; }, renderLineupTest () { renderLineup(); }, crowdReactTest (k, t) { crowdReactImpl(k, t); }, get shoot () { return shoot; }, cornerTest (att, top = true) { if (state !== "play") { return; } freeze = 0; awardCorner(att, att === 1, top); }, get cornerPlan () { return cornerPlan; },
