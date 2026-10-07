@@ -10116,12 +10116,14 @@
 		const shirt = p.role === "gk" ? kit.gk : kit.outfield, shorts = kit.second || "#1f2a36";
 		const cd = Math.cos(p.dir);
 		if (!p.faceTV || Math.abs(cd) > 0.3) { p.faceTV = cd >= 0 ? 1 : -1; }
+		if (Math.hypot(p.vx || 0, p.vy || 0) < 0.35 && Math.abs(ball.x - p.x) > 12) { p.faceTV = ball.x >= p.x ? 1 : -1; }   // standing: he watches the ball
 		const face = p.faceTV;
 		const sw = reduceMotion ? 0 : Math.sin(p.stride || 0) * clamp(p.runAmt || 0, 0, 1);
 		// The run cycle: thigh and shin with the knee folding as the leg swings through, a lean into
 		// the run and a lift off the ground each stride, arms bent at the elbow working against the
 		// legs, far-side limbs a shade darker. Walking is the same action, smaller and upright.
 		const a = down ? 0 : clamp(p.runAmt || 0, 0, 1), ph = reduceMotion ? 0 : p.stride || 0;
+		const vary = (((p.num || 0) * 37 + p.team * 11) % 10) / 10;   // each man stands a little differently
 		const shuf = down ? 0 : p.shuf || 0, ks = down || reduceMotion ? null : kickSwing(p), cel = p.celebA || 0;
 		// Leaning into the run, back against a planted cut, upright when shuffling.
 		const lean = a * a * 0.26 * (1 - 0.6 * shuf) - (p.plant > 0 ? 0.2 * p.plant / 10 : 0) + (ks ? 0.08 : 0);
@@ -10131,13 +10133,19 @@
 		const shX = hipX + face * Math.sin(lean) * H * 0.32, shY = hipY - Math.cos(lean) * H * 0.32;
 		const shade = (hex, f) => { const n = parseInt(hex.slice(1), 16); return `rgb(${[ n >> 16, (n >> 8) & 255, n & 255 ].map(v => Math.round(v * f)).join(",")})`; };
 		const Lt = H * 0.26, Ls = H * 0.26, Lu = H * 0.16, Lf = H * 0.15;
+		// The arms hang from the edges of the shirt and the legs from either side of the hips, so a
+		// standing man's arms are at his sides rather than across his front.
+		const armOff = i => (i ? 1 : -1) * face * H * 0.115, legOff = i => (i ? 1 : -1) * face * H * 0.035;
 		const legPts = i => {
 			if (down) { return i ? [ [ X + face * H * 0.3, Y - H * 0.25 ], [ X + face * H * 0.62, Y - H * 0.05 ] ] : [ [ X + face * H * 0.2, Y - H * 0.12 ], [ X + face * H * 0.5, Y ] ]; }
 			const f = ph + i * Math.PI;
 			let th = jump > 0 ? (i ? -0.25 : 0.2) * jump : (0.06 + a * 0.62 * (1 - 0.45 * shuf)) * Math.sin(f) + (i ? -0.04 : 0.04);
 			let kn = jump > 0 ? 0.9 * jump : a * (0.18 + 1.35 * (1 - 0.5 * shuf) * Math.max(0, Math.cos(f))) + (1 - a) * 0.05 + shuf * 0.3;
+			// Standing: a natural stance, one foot a little ahead of the other, knees soft; how wide
+			// differs from man to man.
+			if (!jump && !shuf && a < 0.15) { const r = 1 - a / 0.15; th = th * (1 - r) + ((i ? -0.11 : 0.13) + (i ? -1 : 1) * vary * 0.07) * r; kn = kn * (1 - r) + (0.1 + vary * 0.06) * r; }
 			if (ks) { if (i === 0) { th = ks.s; kn = ks.bend; } else { th = -0.12; kn = 0.2; } }   // kicking leg, and the one planted beside the ball
-			const kx = hipX + face * Math.sin(th) * Lt, ky = hipY + Math.cos(th) * Lt;
+			const kx = hipX + legOff(i) + face * Math.sin(th) * Lt, ky = hipY + Math.cos(th) * Lt;
 			return [ [ kx, ky ], [ kx + face * Math.sin(th - kn) * Ls, ky + Math.cos(th - kn) * Ls ] ];
 		};
 		const armPts = i => {
@@ -10145,8 +10153,11 @@
 			let ua = jump > 0 ? Math.PI * (0.55 + 0.3 * jump) + (i ? 0.25 : -0.1) : -(0.1 + a * 0.75 * (1 - 0.5 * shuf)) * Math.sin(f) + shuf * 0.25, eb = jump > 0 ? 0.3 : 0.25 + a * 1.25;
 			if (ks) { ua = i === 0 ? -0.6 : 0.9; eb = 0.5; }   // arms out for balance as he strikes it
 			if (cel > 0) { ua = ua * (1 - cel) + (i ? 1.9 : 1.5) * cel; eb = eb * (1 - cel) + 0.15 * cel; }   // arms out wide
-			if (!reduceMotion && a < 0.15 && !jump && !ks && !cel) { ua += Math.sin((p.idlePh || 0) + i) * 0.05; }
-			const ex = shX + face * Math.sin(ua) * Lu, ey = shY + Math.cos(ua) * Lu;
+			// Standing: arms hang loose at his sides, the near one a touch behind him and the far one a
+			// touch ahead, elbows nearly straight, so they never fold across his front.
+			if (a < 0.15 && !jump && !ks && !cel && !shuf) { const r = 1 - a / 0.15; ua = ua * (1 - r) + ((i ? 0.1 : -0.16) - vary * 0.05) * r; eb = eb * (1 - r) + (0.08 + vary * 0.06) * r; }
+			if (!reduceMotion && a < 0.15 && !jump && !ks && !cel) { ua += Math.sin((p.idlePh || 0) + i) * 0.04; }
+			const ex = shX + armOff(i) + face * Math.sin(ua) * Lu, ey = shY + Math.cos(ua) * Lu;
 			return [ [ ex, ey ], [ ex + face * Math.sin(ua + eb) * Lf, ey + Math.cos(ua + eb) * Lf ] ];
 		};
 		// Every body part is a tapered capsule between two joints (start and end radius), so limbs
@@ -10162,10 +10173,11 @@
 			const [ kn, f ] = legPts(i);
 			const at = t => [ kn[0] + (f[0] - kn[0]) * t, kn[1] + (f[1] - kn[1]) * t ];
 			// Thigh, then the shorts over the top half of it.
+			const hx0 = hipX + legOff(i);
 			ctx.fillStyle = skinOf(dark);
-			capsule(hipX, hipY, mn(H * 0.07), kn[0], kn[1], mn(H * 0.047));
+			capsule(hx0, hipY, mn(H * 0.07), kn[0], kn[1], mn(H * 0.047));
 			ctx.fillStyle = dark ? shade(shorts, 0.72) : shorts;
-			capsule(hipX, hipY - H * 0.01, mn(H * 0.085), hipX + (kn[0] - hipX) * 0.5, hipY + (kn[1] - hipY) * 0.5, mn(H * 0.074));
+			capsule(hx0, hipY - H * 0.01, mn(H * 0.085), hx0 + (kn[0] - hx0) * 0.5, hipY + (kn[1] - hipY) * 0.5, mn(H * 0.074));
 			// Knee, the calf swelling below it, then the sock down to the ankle.
 			const sk = at(0.28), calf = at(0.5);
 			ctx.fillStyle = skinOf(dark);
@@ -10182,7 +10194,7 @@
 			ctx.lineTo(f[0] - face * H * 0.04, f[1] + H * 0.012); ctx.closePath(); ctx.fill();
 		};
 		const drawArm = (i, dark) => {
-			const [ e, hnd ] = armPts(i), sx = shX, sy = shY + H * 0.03;
+			const [ e, hnd ] = armPts(i), sx = shX + armOff(i), sy = shY + H * 0.03;
 			const mid = [ sx + (e[0] - sx) * 0.6, sy + (e[1] - sy) * 0.6 ];
 			if (p.role === "gk") {   // long sleeves and gloves
 				ctx.fillStyle = dark ? shade(shirt, 0.72) : shirt;
