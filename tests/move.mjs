@@ -22,6 +22,7 @@ const run = (opts) => page.evaluate(async (o) => {
 	const d = [], v = []; let lost = 0, plantSeen = 0;
 	for (let i = 0; i < o.frames; i++) {
 		F.step(1);
+		for (const q of F.players) { if (q !== me) { q.x = q.team === 1 ? FW - 40 : 40; q.y = 30 + 20 * F.players.indexOf(q); q.vx = q.vy = 0; } }   // everyone else stays parked
 		if (F.ball.owner !== me) { lost++; }
 		d.push(Math.hypot(F.ball.x - me.x, F.ball.y - me.y)); v.push(Math.hypot(me.vx, me.vy));
 	}

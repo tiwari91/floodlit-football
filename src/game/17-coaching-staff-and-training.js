@@ -289,6 +289,7 @@
 
 	let lastDeal = "", mkTab = "all";
 	function afterClubChange () {
+		if (assistBatch) { return; }   // the assistant saves and redraws once, when it is done
 		saveLeague();
 		if (state === "intro") { newMatch(); showIntro(); }
 		renderLeague();

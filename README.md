@@ -76,7 +76,7 @@ dependency of the game: set `FF_PLAYWRIGHT_FROM` to a `package.json` whose `node
 Playwright and `FF_CHROME` to a Chrome binary if the defaults in `tests/_env.mjs` do not fit.
 `tests/switch.mjs` covers who you control when the ball changes hands, `tests/phone.mjs` the
 portrait and landscape layouts, the settings drawer and the 60-a-second frame cap, and
-`tests/move.mjs` dribbling, planting, sprinting, challenges and the 3D renderer. Screenshots land
+`tests/move.mjs` dribbling, planting, sprinting, challenges and the 3D renderer, and `tests/club.mjs` the assistant manager's contracts, bids and signings. Screenshots land
 in `tests/out/`.
 
 ## License

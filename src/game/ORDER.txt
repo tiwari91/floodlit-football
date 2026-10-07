@@ -16,6 +16,7 @@
 16-league-panel.js
 17-coaching-staff-and-training.js
 18-the-other-clubs-do-business-too.js
+18a-the-assistant-contracts-and-transfers.js
 19-audio.js
 20-kicking.js
 21-offside.js

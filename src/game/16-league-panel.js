@@ -390,17 +390,22 @@
 		c.resigned = kept;
 		return gone;
 	}
-	function renewPlayer (name) {
-		const c = league.club, pl = [ ...c.squad, ...c.bench ].find(q => q.name === name);
-		if (!pl) { return; }
+	// The deal itself: a signing-on fee, a rise, two more seasons (five at most). Shared by the Renew
+	// button and the assistant; says why when he won't or the club can't.
+	function renewDeal (pl, c) {
 		const fee = round1(valueOf(pl) * 0.15);
-		if (pl.morale < 40) { lastDeal = `${pl.name} won't talk about a new contract while he's unhappy (morale ${pl.morale}).`; afterClubChange(); return; }
-		if (c.budget + 1e-9 < fee) { lastDeal = `A new deal for ${pl.name} needs a ${money(fee)} signing-on fee.`; afterClubChange(); return; }
+		if (pl.morale < 40) { return { ok: false, why: `${pl.name} won't talk about a new contract while he's unhappy (morale ${pl.morale}).` }; }
+		if (c.budget + 1e-9 < fee) { return { ok: false, why: `A new deal for ${pl.name} needs a ${money(fee)} signing-on fee.` }; }
 		c.budget = round1(c.budget - fee);
 		pl.wage = Math.round(wageOf(pl) * (roleOf(pl, c) === "key" ? 1.2 : 1.1) * 1000) / 1000;
 		pl.contract = Math.min(5, pl.contract + 2);
 		pl.morale = clamp(pl.morale + 8, 0, 100);
-		lastDeal = `${pl.name} signs a new contract to ${pl.contract} seasons (${money(fee)} signing-on, ${wageWeek(pl.wage)}).`;
+		return { ok: true, fee, why: `${pl.name} signs a new contract to ${pl.contract} seasons (${money(fee)} signing-on, ${wageWeek(pl.wage)}).` };
+	}
+	function renewPlayer (name) {
+		const c = league.club, pl = [ ...c.squad, ...c.bench ].find(q => q.name === name);
+		if (!pl) { return; }
+		lastDeal = renewDeal(pl, c).why;
 		afterClubChange();
 	}
 	function releasePlayer (name) {
