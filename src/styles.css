@@ -813,6 +813,9 @@
 	.market .ratings, .market .swap, .upgrades .eff { grid-column: 2 / 3; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 	.market .ovr { font-family: var(--display); font-weight: 800; font-size: 20px; color: var(--chalk); }
 	.market button, .upgrades button { grid-row: span 2; padding: 5px 10px; font-size: 13px; white-space: nowrap; }
+	.assist-ask { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
+	.assist-ask span { flex: 1 1 100%; }
+	.assist-ask button { padding: 3px 10px; font-size: 12px; }
 	.market .bids { grid-row: span 3; display: grid; gap: 4px; justify-items: stretch; }
 	.market .bids button { grid-row: auto; padding: 3px 8px; font-size: 12px; }
 	.market .swap { grid-column: 2 / 3; }

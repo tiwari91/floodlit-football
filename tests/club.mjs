@@ -202,6 +202,21 @@ const note = await page.evaluate(() => {
 check("with the assistant off the note says what you handle yourself", /^Off: you renew contracts/.test(note.off), note.off);
 check("with nothing to do the note says so and why", note.done.length === 0 && /nothing to do right now \(nobody is in the last year of his deal; no bids in; the window is closed/.test(note.idle), note.idle);
 check("after it acts the note reports what it did", note.did.length >= 1 && /^Assistant \(test\): .* signed on to/.test(note.active), note.active);
+// Short of money, the assistant asks the manager: renew anyway (spend the reserve) or leave them.
+const ask = await page.evaluate(async () => {
+	const F = window.__ff, lg = F.league, c = lg.club, p = document.getElementById("assistNote");
+	F.setAssist("contracts");
+	[ ...c.squad, ...c.bench ].forEach(x => { x.contract = 3; x.morale = 70; x.age = 26; });
+	const three = c.squad.slice(0, 3); three.forEach(x => { x.contract = 1; });
+	const fees = three.map(x => Math.round(F.valueOf(x) * 0.15 * 10) / 10);
+	c.budget = Math.round((fees[0] + 0.3) * 10) / 10;   // one deal clears the reserve, the next two do not
+	const done = F.assistRun("test"); F.renderLeagueTest();
+	const short = lg.assistShort, btns = [ ...p.querySelectorAll("button") ].map(b => [ b.textContent, b.disabled ]);
+	const yes = p.querySelector("button"); yes.click(); await new Promise(r => setTimeout(r, 300));
+	return { done, short, btns, after: { contracts: three.map(x => x.contract), budget: c.budget, note: lg.assistNote, cleared: !lg.assistShort, btnsLeft: p.querySelectorAll("button").length } };
+});
+check("short of money, the note asks the manager with the sums and two choices", ask.short && ask.short.names.length >= 1 && ask.btns.length === 2 && /Renew anyway/.test(ask.btns[0][0]) && /Leave them/.test(ask.btns[1][0]), JSON.stringify({ short: ask.short, btns: ask.btns }));
+check("Renew anyway spends the reserve on the deals it reaches and clears the question", ask.after.contracts.filter(x => x >= 3).length > ask.done.filter(d => / signed on to /.test(d)).length && ask.after.budget >= 0 && /your call, reserve spent/.test(ask.after.note) && ask.after.cleared && ask.after.btnsLeft === 0, JSON.stringify(ask.after));
 check("and the note says who could not be kept when the money is short", keys.skint.length === 0 && /no money to keep/.test(keys.skintNote), JSON.stringify(keys));
 check("no console errors", errs.length === 0, errs.join(" | "));
 await browser.close(); server.stop();

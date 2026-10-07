@@ -834,6 +834,9 @@
 	.market .ratings, .market .swap, .upgrades .eff { grid-column: 2 / 3; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 	.market .ovr { font-family: var(--display); font-weight: 800; font-size: 20px; color: var(--chalk); }
 	.market button, .upgrades button { grid-row: span 2; padding: 5px 10px; font-size: 13px; white-space: nowrap; }
+	.assist-ask { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
+	.assist-ask span { flex: 1 1 100%; }
+	.assist-ask button { padding: 3px 10px; font-size: 12px; }
 	.market .bids { grid-row: span 3; display: grid; gap: 4px; justify-items: stretch; }
 	.market .bids button { grid-row: auto; padding: 3px 8px; font-size: 12px; }
 	.market .swap { grid-column: 2 / 3; }
@@ -1471,7 +1474,7 @@
 		<p class="fine"><b>Goals.</b> The scorer wheels away to the corner, slides on his knees in front of the fans and is mobbed by his teammates while the other side trudges back and their keeper fetches the ball out of the net, which bulges and swings where the ball hit it. A caption names the scorer and the minute, and the score bug flashes. In the 3D view the celebration then gives way to an instant replay of the build-up in slow motion, from high behind the goal or low beside it, before the camera goes back to the scorer and cuts wide for the restart. The match clock is stopped throughout. Any key, button or tap skips the celebration and the replay. Cards and substitutions get captions too.</p>
 		<p class="fine"><b>Weather and grounds.</b> Every club has a home ground: grass, muddy or artificial turf. Mud slows the ball and the players and kills the bounce. Turf is quick and true. Rain holds the ball up (heavy rain and mud most of all), costs players grip on the turn, sends passes a little astray and makes shots harder for keepers to hold, so they spill more. Wind pushes the ball while it is in the air: long balls, crosses, corners and lofted shots carry with it and hang against it; the arrow and speed at the top left of the pitch show which way it blows. League fixtures kick off in the afternoon or at night under the floodlights, with the stands dark around a lit pitch. In the league, matchdays 10 to 26 are the rainy season, windier and mostly at night, and the forecast is shown in advance (☾ night, ☀ afternoon, ≈ windy); the kick-off card gives the time, the rain and which way the wind blows for you. In a friendly, pick the weather (including Windy) and ground yourself.</p>
 		<p class="fine"><b>Your season, backed up.</b> Your league saves in this browser. Export league saves it to a file; Import league loads a file back (press twice to confirm, since it replaces the season you have). Use it to keep a backup or carry your season to another browser or device.</p>
-		<p class="fine"><b>Assistant.</b> Under Your team, the Assistant setting hands the club's paperwork to your assistant manager. Contracts: between matches he offers a new deal to every player in the last year of his contract, the most valuable first, as far as the money allows above the £0.4m wage reserve; only a player too unhappy to talk is left, and the notes say who. The shortfall is reported, and he tries again after the next match. Transfers: when a window is open he answers bids (cashing in only well over a player's value, or on anyone past 31 at a fair price, never the only keeper), and signs at most two players a window where a known quantity, scouted or from home, is a clear step up on your weakest starter in that position. Everything he does appears in the notes on the League panel. Off by default.</p>
+		<p class="fine"><b>Assistant.</b> Under Your team, the Assistant setting hands the club's paperwork to your assistant manager. Contracts: between matches he offers a new deal to every player in the last year of his contract, the most valuable first, as far as the money allows above the £0.4m wage reserve; only a player too unhappy to talk is left, and the notes say who. When the money runs short he puts it to you under the setting: renew anyway and spend the £0.4m wage reserve, or leave them for now, and he asks again when the money changes. Transfers: when a window is open he answers bids (cashing in only well over a player's value, or on anyone past 31 at a fair price, never the only keeper), and signs at most two players a window where a known quantity, scouted or from home, is a clear step up on your weakest starter in that position. Everything he does appears in the notes on the League panel. Off by default.</p>
 		<p class="fine"><b>The transfer window.</b> The market opens on the For you tab: a shortlist of the players who would improve your eleven, each with the gain over the starter he would replace (an estimate until he is scouted). "Sign the best for me" lets the assistant buy up to two known step-ups at the asking price, keeping money for wages; "Scout the shortlist" spends the window's reports on it, best first. The line above the tabs says where the eleven is thinnest. The other tabs show every market as before.</p>
 		<p class="fine"><b>Offers for you, and your agent.</b> You are the manager, not the club. When a season ends, clubs who liked your work come calling in the League panel: finish in the top four and the big clubs in the division want you, finish mid-table and a club at your level does, finish low and only the division below will, and a good season draws a club abroad. Take a job and you inherit that club's squad, ground and colours with a budget to match its size; your old club carries on under its own name. Move abroad and you start afresh in a new country: a new squad from that region, a new league, your career intact. Your agent also sounds clubs out at the January window: agree to an approach and you join when the season ends. Decline, or start the next season, and the offers lapse. With several offers on the table your agent marks the <b>best move</b> and says why: the strongest squad, the most to spend, a new country on your record. Your coaching staff, training plan and facilities come with you to any new club, and a bigger club's facilities are already built to its standing. The career line under them keeps your record.</p>
 		<p class="fine"><b>Contracts ending.</b> At the January window, and with two games to go, you get a heads-up naming the starters in the last year of their deals. Renew them under Your team, or leave it: in the summer the club keeps its last-year starters on anyway, most valuable first, as far as the money allows (£0.4m is always kept for wages), and the League notes say who could not be kept. Squad men are left to run down unless the Assistant is on.</p>
@@ -3889,17 +3892,21 @@
 	// Every player in his last year gets a new deal, the most valuable first so the money goes on the
 	// stars before the squad men, as far as the budget allows above the reserve. Only a player who
 	// won't talk (unhappy) is left to run down; the note says so.
-	function assistContracts (c) {
+	function assistContracts (c, reserve = ASSIST_RESERVE) {
 		const done = [], skint = [], left = [];
+		let need = 0;
 		const lastYear = [ ...c.squad, ...c.bench ].filter(pl => { ensurePlayer(pl); return pl.contract <= 1; });
 		const due = lastYear.filter(pl => pl.morale >= 40).sort((a, b) => valueOf(b) - valueOf(a));
 		for (const pl of due) {
-			if (c.budget - round1(valueOf(pl) * 0.15) < ASSIST_RESERVE) { skint.push(pl.name); continue; }
+			const fee = round1(valueOf(pl) * 0.15);
+			if (c.budget - fee < reserve) { skint.push(pl.name); need = round1(need + fee); continue; }
 			const deal = renewDeal(pl, c);
 			if (deal.ok) { done.push(`${pl.name} signed on to ${pl.contract} seasons`); }
 		}
 		for (const pl of lastYear) { if (!due.includes(pl)) { left.push(`${pl.name} (${assistWhyNot(pl)})`); } }
-		if (skint.length) { done.push(`no money yet for new deals for ${skint.slice(0, 4).join(", ")}${skint.length > 4 ? ` and ${skint.length - 4} more` : ""} (${money(ASSIST_RESERVE)} is kept for wages)`); }
+		if (skint.length) { done.push(`no money yet for new deals for ${skint.slice(0, 4).join(", ")}${skint.length > 4 ? ` and ${skint.length - 4} more` : ""} (${money(reserve)} is kept for wages)`); }
+		// Short of money: put the call to the manager rather than just reporting it (see renderAssistNote).
+		if (league) { league.assistShort = skint.length && reserve > 0 ? { names: skint, need, have: round1(Math.max(0, c.budget)), reserve } : null; }
 		if (left.length) { done.push(`left to run down: ${left.slice(0, 5).join(", ")}${left.length > 5 ? ` and ${left.length - 5} more` : ""}`); }
 		return done;
 	}
@@ -4047,6 +4054,32 @@
 		if (assistMode === "off") { p.textContent = "Off: you renew contracts, answer bids and sign players yourself. Starters in their last year are still kept on in the summer if the money is there."; return; }
 		const c = league && league.club;
 		p.textContent = c ? (league.assistNote || `Assistant: nothing to do right now (${assistIdleWhy(c)}). It looks again after every match and when a window opens.`) : "";
+		const sh = c && league.assistShort;
+		if (!sh || !sh.names.length) { return; }
+		// The manager's call: spend the wage reserve on the deals the money reaches, or leave them for now.
+		const canDo = sh.have > 0.05 ? `Spending the reserve covers about ${Math.min(sh.names.length, Math.max(0, Math.floor(sh.have / Math.max(0.05, sh.need / sh.names.length))))} of the ${sh.names.length}.` : "There is nothing to spend.";
+		const ask = el("div", "assist-ask");
+		ask.append(el("span", "", `${sh.names.length} new deal${sh.names.length === 1 ? "" : "s"} need${sh.names.length === 1 ? "s" : ""} ${money(sh.need)}; ${money(sh.have)} in the bank, ${money(sh.reserve)} of it the wage reserve. ${canDo} Your call:`));
+		const yes = el("button", "", "Renew anyway, spend the reserve"); yes.type = "button"; yes.disabled = sh.have <= 0.05; yes.addEventListener("click", () => assistRenewAnyway());
+		const no = el("button", "", "Leave them for now"); no.type = "button"; no.addEventListener("click", () => { league.assistShort = null; league.assistNote = `${league.assistNote || "Assistant:"} You chose to leave the unsigned deals for now; the assistant will ask again when the money changes.`; saveLeague(); renderAssistNote(); });
+		ask.append(yes, no);
+		p.append(ask);
+	}
+	// The manager said yes: the same renewals with no reserve, as far as the money goes.
+	function assistRenewAnyway () {
+		const c = league && league.club;
+		if (!c) { return []; }
+		assistBatch = true;
+		let done = [];
+		try { done = assistContracts(c, 0); } finally { assistBatch = false; }
+		league.assistShort = null;
+		league.assistNote = `Assistant (your call, reserve spent): ${done.length ? done.join("; ") : "nothing more could be signed"}.`;
+		lastDeal = league.assistNote;
+		c.log = [ ...(c.log || []), lastDeal ].slice(-10);
+		toast(`Renewed ${done.filter(d => / signed on to /.test(d)).length} on your say-so`, "#f2b52e");
+		afterClubChange();
+		renderAssistNote();
+		return done;
 	}
 	// Runs after a league week and when a window opens; also the moment the setting is switched on.
 	function assistRun (when) {
@@ -12626,7 +12659,7 @@
 			get autoSwitchMode () { return autoSwitchMode; }, set autoSwitchMode (v) { autoSwitchMode = v; autoSwitchSel.value = v; },
 			get assistMode () { return assistMode; }, setAssist, assistRun, get lastDeal () { return lastDeal; }, valueOf, ovrNow, windowOpen,
 			offerJobs, takeJob, declineJob, get YOU () { return YOU; }, get TEAMS () { return TEAMS; },
-			agentApproaches, agreeApproach, moveAbroad, takeOffer, assistShortlist, assistBuy, scoutShortlist, bestOffer, inheritSetup, keyContracts, contractAlerts, roleOf, slotsFor, renderAssistNote,
+			agentApproaches, agreeApproach, moveAbroad, takeOffer, assistShortlist, assistBuy, scoutShortlist, bestOffer, inheritSetup, keyContracts, contractAlerts, roleOf, slotsFor, renderAssistNote, assistRenewAnyway,
 			get autoHold () { return autoHold; }, set autoHold (v) { autoHold = v; },
 			get charging () { return charging; }, get passCharge () { return passCharge; }, get meterRect () { return meterRect; }, get drawMs () { return drawMs; }, get drawn () { return drawn; }, frameDue, get scale () { return scale; }, get kits () { return KITS; }, get stats () { return stats; }, get oppStats () { return oppStats; }, get steerAt () { return steerAt; }, set steerAt (v) { steerAt = v; }, set possTeam (v) { possTeam = v; },
 			set steerSwitchDone (v) { steerSwitchDone = !!v; },
