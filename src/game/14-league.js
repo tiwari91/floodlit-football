@@ -61,6 +61,7 @@
 			updated: 0,
 			club,
 			clubStr,
+			ident: prev && prev.ident ? prev.ident : undefined,
 			paid: false,
 			weather: genForecast(fixtures.length),
 			wind: genWind(fixtures.length),
@@ -144,7 +145,7 @@
 		updateFitness();
 		weeklyClub(lm, h, a);
 		if (!windowOpen()) { league.bidsIn = []; }
-		if (league.round === JANUARY) { league.club.market = genMarket(); league.club.scoutLeft = 2 + staffLvl(league.club, "scout"); if (typeof windowEvents === "function") { windowEvents("January"); } }
+		if (league.round === JANUARY) { league.club.market = genMarket(); league.club.scoutLeft = 2 + staffLvl(league.club, "scout"); if (typeof windowEvents === "function") { windowEvents("January"); } if (typeof agentApproaches === "function") { agentApproaches("January"); } }
 		if (typeof assistRun === "function") { assistRun(league.round === JANUARY ? "January window" : "this week"); }
 		// Knocks from this match: out for one to three games, and off the team sheet.
 		const byName = n => [ ...league.club.squad, ...league.club.bench ].find(pl => pl.name === n);

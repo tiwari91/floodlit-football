@@ -817,6 +817,10 @@
 	.market .bids button { grid-row: auto; padding: 3px 8px; font-size: 12px; }
 	.market .swap { grid-column: 2 / 3; }
 	.mk-tabs { flex-wrap: wrap; margin-bottom: 6px; }
+	.mk-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+	.mk-actions[hidden] { display: none; }
+	.mk-actions button { padding: 4px 10px; font-size: 13px; }
+	.market .gain { color: var(--amber); font-weight: 700; }
 	button:disabled { opacity: 0.45; cursor: not-allowed; }
 	.lg-clubs { display: grid; gap: 6px; }
 	.tabs { display: inline-flex; gap: 4px; }

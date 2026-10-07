@@ -292,14 +292,26 @@
 		const tabs = $("mkTabs");
 		tabs.replaceChildren();
 		tabs.hidden = !open;
-		for (const [ key, m ] of [ [ "all", { label: "All" } ], ...Object.entries(MARKETS) ]) {
+		for (const [ key, m ] of [ [ "foryou", { label: "For you" } ], [ "all", { label: "All" } ], ...Object.entries(MARKETS) ]) {
 			const b = el("button", "", m.label); b.type = "button"; b.setAttribute("aria-pressed", String(mkTab === key));
 			b.addEventListener("click", () => { mkTab = key; renderClub(); });
 			tabs.append(b);
 		}
-		$("mkScout").textContent = open ? `Scouting: ${c.scoutLeft || 0} report${c.scoutLeft === 1 ? "" : "s"} left this window${staffLvl(c, "scout") ? "" : " (hire a chief scout for more, and sharper estimates)"}` : "";
-		c.market.forEach((pl, i) => {
-			if (mkTab !== "all" && (pl.region || "home") !== mkTab) { return; }
+		$("mkScout").textContent = open ? `${needsLine(c)} Scouting: ${c.scoutLeft || 0} report${c.scoutLeft === 1 ? "" : "s"} left this window${staffLvl(c, "scout") ? "" : " (hire a chief scout for more, and sharper estimates)"}` : "";
+		// For you: the shortlist, best gain first, with one-click buying and scouting above it.
+		const acts = $("mkActions");
+		acts.replaceChildren();
+		acts.hidden = !open;
+		const shortlist = mkTab === "foryou" ? assistShortlist(c) : null;
+		if (open) {
+			const buy = el("button", "", "Sign the best for me"); buy.type = "button"; buy.title = "The assistant signs up to two known step-ups at the asking price, keeping money for wages";
+			buy.disabled = c.budget < 0; buy.addEventListener("click", () => assistBuy());
+			const sc = el("button", "", "Scout the shortlist"); sc.type = "button"; sc.title = "Spend this window's reports on the shortlist, best first";
+			sc.disabled = !(c.scoutLeft > 0) || !assistShortlist(c).some(x => x.est); sc.addEventListener("click", () => scoutShortlist());
+			acts.append(buy, sc);
+		}
+		const entries = shortlist ? shortlist.map(x => [ c.market[x.i], x.i, x ]) : c.market.map((pl, i) => [ pl, i, null ]).filter(([ pl ]) => mkTab === "all" || (pl.region || "home") === mkTab);
+		entries.forEach(([ pl, i, pick ]) => {
 			ensurePlayer(pl);
 			const ask = askOf(pl), tgt = signingTarget(pl.pos), out = tgt.out, rr = ratingRange(pl), ok = permitOk(pl), talks = pl.bids >= 0 || pl.bids === undefined;
 			const li = el("li");
@@ -318,9 +330,10 @@
 			const m = MARKETS[pl.region];
 			li.append(el("span", "swap", `${pl.from ? `${pl.from}, ` : ""}${m ? m.label : "Home"}${m && m.permit ? (ok ? " · work permit: yes" : ` · work permit: refused (needs ${PERMIT_OVR}+)`) : ""}${m && m.adapt ? ` · settles in about ${Math.max(0, Math.ceil(m.adapt - staffLvl(c, "scout") * 0.5))} games` : ""}${!talks ? " · talks broken off" : ""}`));
 			li.append(el("span", "swap", out ? `Replaces ${out.name} (${ovrNow(out)}), sold for ${money(round1(priceOf(out) * 0.5))}` : "Joins your bench"));
+			if (pick) { li.append(el("span", "swap gain", `+${pick.gain} on ${pick.weak.name} (${pick.weakOvr})${pick.est ? " by the estimate: scout him to be sure" : ""}`)); }
 			mk.append(li);
 		});
-		if (open && !c.market.length) { const li = el("li"); li.append(el("span", "swap", "Nobody left on the list this window.")); mk.append(li); }
+		if (open && !entries.length) { const li = el("li"); li.append(el("span", "swap", shortlist ? "Nobody on the list would improve the eleven right now: try the other tabs, or wait for the next window." : "Nobody left on the list this window.")); mk.append(li); }
 
 		renderCoaching();
 		renderBids();

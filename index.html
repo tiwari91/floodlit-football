@@ -838,6 +838,10 @@
 	.market .bids button { grid-row: auto; padding: 3px 8px; font-size: 12px; }
 	.market .swap { grid-column: 2 / 3; }
 	.mk-tabs { flex-wrap: wrap; margin-bottom: 6px; }
+	.mk-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+	.mk-actions[hidden] { display: none; }
+	.mk-actions button { padding: 4px 10px; font-size: 13px; }
+	.market .gain { color: var(--amber); font-weight: 700; }
 	button:disabled { opacity: 0.45; cursor: not-allowed; }
 	.lg-clubs { display: grid; gap: 6px; }
 	.tabs { display: inline-flex; gap: 4px; }
@@ -1389,6 +1393,7 @@
 				<div class="sq-head"><h4 id="winTitle">Transfer window</h4><span class="budget" id="winBudget"></span></div>
 				<p class="win-note" id="winNote"></p>
 				<div class="tabs mk-tabs" id="mkTabs" role="group" aria-label="Which market"></div>
+				<div class="mk-actions" id="mkActions" hidden></div>
 				<p class="win-note" id="mkScout"></p>
 				<h4 class="up-title" id="bidsTitle" hidden>Offers for your players</h4>
 				<ul class="market" id="bidsIn"></ul>
@@ -1396,6 +1401,8 @@
 				<p class="win-note" id="trNews"></p>
 				<h4 class="up-title" id="jobsTitle" hidden>Offers for you</h4>
 				<ul class="market" id="jobOffers"></ul>
+				<h4 class="up-title" id="agentTitle" hidden>Your agent</h4>
+				<ul class="market" id="agentOffers"></ul>
 				<p class="win-note" id="careerLine"></p>
 				<h4 class="up-title">Club upgrades</h4>
 				<ul class="upgrades" id="winUpgrades"></ul>
@@ -1464,7 +1471,8 @@
 		<p class="fine"><b>Weather and grounds.</b> Every club has a home ground: grass, muddy or artificial turf. Mud slows the ball and the players and kills the bounce. Turf is quick and true. Rain holds the ball up (heavy rain and mud most of all), costs players grip on the turn, sends passes a little astray and makes shots harder for keepers to hold, so they spill more. Wind pushes the ball while it is in the air: long balls, crosses, corners and lofted shots carry with it and hang against it; the arrow and speed at the top left of the pitch show which way it blows. League fixtures kick off in the afternoon or at night under the floodlights, with the stands dark around a lit pitch. In the league, matchdays 10 to 26 are the rainy season, windier and mostly at night, and the forecast is shown in advance (☾ night, ☀ afternoon, ≈ windy); the kick-off card gives the time, the rain and which way the wind blows for you. In a friendly, pick the weather (including Windy) and ground yourself.</p>
 		<p class="fine"><b>Your season, backed up.</b> Your league saves in this browser. Export league saves it to a file; Import league loads a file back (press twice to confirm, since it replaces the season you have). Use it to keep a backup or carry your season to another browser or device.</p>
 		<p class="fine"><b>Assistant.</b> Under Your team, the Assistant setting hands the club's paperwork to your assistant manager. Contracts: between matches he offers new deals to the players worth keeping (key and first-team men, anyone as good as the middle of the squad, prospects with room to grow) before their last year runs out, as long as it leaves money for wages. Transfers: when a window is open he answers bids (cashing in only well over a player's value, or on anyone past 31 at a fair price, never the only keeper), and signs at most two players a window where a known quantity, scouted or from home, is a clear step up on your weakest starter in that position. Everything he does appears in the notes on the League panel. Off by default.</p>
-		<p class="fine"><b>Offers for you.</b> You are the manager, not the club. When a season ends, clubs who liked your work come calling in the League panel: finish in the top four and the big clubs in the division want you, finish mid-table and a club at your level does, finish low and only the division below will. Take a job and you inherit that club's squad, ground and colours with a budget to match its size; your old club carries on under its own name. Decline, or start the next season, and the offers lapse. The career line under them keeps your record.</p>
+		<p class="fine"><b>The transfer window.</b> The market opens on the For you tab: a shortlist of the players who would improve your eleven, each with the gain over the starter he would replace (an estimate until he is scouted). "Sign the best for me" lets the assistant buy up to two known step-ups at the asking price, keeping money for wages; "Scout the shortlist" spends the window's reports on it, best first. The line above the tabs says where the eleven is thinnest. The other tabs show every market as before.</p>
+		<p class="fine"><b>Offers for you, and your agent.</b> You are the manager, not the club. When a season ends, clubs who liked your work come calling in the League panel: finish in the top four and the big clubs in the division want you, finish mid-table and a club at your level does, finish low and only the division below will, and a good season draws a club abroad. Take a job and you inherit that club's squad, ground and colours with a budget to match its size; your old club carries on under its own name. Move abroad and you start afresh in a new country: a new squad from that region, a new league, your career intact. Your agent also sounds clubs out at the January window: agree to an approach and you join when the season ends. Decline, or start the next season, and the offers lapse. The career line under them keeps your record.</p>
 		<p class="fine"><b>On a phone.</b> Held upright, the overhead camera turns the pitch on its side so its whole width fits: you attack down the screen in the first half and up it in the second, and the joystick follows the picture. The settings, league table and help sit behind More under the pads.</p>
 		<p class="fine"><b>Big pitch.</b> The ground fills the screen with just a small score bug for the score and the clock. "Show menu" at the top right of the pitch (or F) brings back the title, the mode tabs and the full scoreboard; "Hide menu" puts it away again.</p>
 		<p class="fine"><b>Pause card.</b> Pause (P or Esc) stops the clock and puts the match settings in reach: tactic, camera, auto switch, sound, music, hints, kit contrast and Graphics, plus substitutions, Simulate the rest and How to play. The half-time card has the same switches.</p>
@@ -1977,6 +1985,7 @@
 		return pl;
 	}
 	function ensureClub (lg) {
+		if (typeof applyIdentity === "function") { applyIdentity(lg); }   // the club you manage, by name and colours
 		lg.club = sanitizeClub(lg.club);
 		for (const pl of lg.club.market) { capRating(pl); }
 		if (lg.cpuIn && typeof lg.cpuIn === "object") { for (const ins of Object.values(lg.cpuIn)) { if (Array.isArray(ins)) { for (const d of ins) { if (d && d.pl) { capRating(d.pl); } } } } }
@@ -2385,6 +2394,7 @@
 			updated: 0,
 			club,
 			clubStr,
+			ident: prev && prev.ident ? prev.ident : undefined,
 			paid: false,
 			weather: genForecast(fixtures.length),
 			wind: genWind(fixtures.length),
@@ -2468,7 +2478,7 @@
 		updateFitness();
 		weeklyClub(lm, h, a);
 		if (!windowOpen()) { league.bidsIn = []; }
-		if (league.round === JANUARY) { league.club.market = genMarket(); league.club.scoutLeft = 2 + staffLvl(league.club, "scout"); if (typeof windowEvents === "function") { windowEvents("January"); } }
+		if (league.round === JANUARY) { league.club.market = genMarket(); league.club.scoutLeft = 2 + staffLvl(league.club, "scout"); if (typeof windowEvents === "function") { windowEvents("January"); } if (typeof agentApproaches === "function") { agentApproaches("January"); } }
 		if (typeof assistRun === "function") { assistRun(league.round === JANUARY ? "January window" : "this week"); }
 		// Knocks from this match: out for one to three games, and off the team sheet.
 		const byName = n => [ ...league.club.squad, ...league.club.bench ].find(pl => pl.name === n);
@@ -2850,14 +2860,26 @@
 		const tabs = $("mkTabs");
 		tabs.replaceChildren();
 		tabs.hidden = !open;
-		for (const [ key, m ] of [ [ "all", { label: "All" } ], ...Object.entries(MARKETS) ]) {
+		for (const [ key, m ] of [ [ "foryou", { label: "For you" } ], [ "all", { label: "All" } ], ...Object.entries(MARKETS) ]) {
 			const b = el("button", "", m.label); b.type = "button"; b.setAttribute("aria-pressed", String(mkTab === key));
 			b.addEventListener("click", () => { mkTab = key; renderClub(); });
 			tabs.append(b);
 		}
-		$("mkScout").textContent = open ? `Scouting: ${c.scoutLeft || 0} report${c.scoutLeft === 1 ? "" : "s"} left this window${staffLvl(c, "scout") ? "" : " (hire a chief scout for more, and sharper estimates)"}` : "";
-		c.market.forEach((pl, i) => {
-			if (mkTab !== "all" && (pl.region || "home") !== mkTab) { return; }
+		$("mkScout").textContent = open ? `${needsLine(c)} Scouting: ${c.scoutLeft || 0} report${c.scoutLeft === 1 ? "" : "s"} left this window${staffLvl(c, "scout") ? "" : " (hire a chief scout for more, and sharper estimates)"}` : "";
+		// For you: the shortlist, best gain first, with one-click buying and scouting above it.
+		const acts = $("mkActions");
+		acts.replaceChildren();
+		acts.hidden = !open;
+		const shortlist = mkTab === "foryou" ? assistShortlist(c) : null;
+		if (open) {
+			const buy = el("button", "", "Sign the best for me"); buy.type = "button"; buy.title = "The assistant signs up to two known step-ups at the asking price, keeping money for wages";
+			buy.disabled = c.budget < 0; buy.addEventListener("click", () => assistBuy());
+			const sc = el("button", "", "Scout the shortlist"); sc.type = "button"; sc.title = "Spend this window's reports on the shortlist, best first";
+			sc.disabled = !(c.scoutLeft > 0) || !assistShortlist(c).some(x => x.est); sc.addEventListener("click", () => scoutShortlist());
+			acts.append(buy, sc);
+		}
+		const entries = shortlist ? shortlist.map(x => [ c.market[x.i], x.i, x ]) : c.market.map((pl, i) => [ pl, i, null ]).filter(([ pl ]) => mkTab === "all" || (pl.region || "home") === mkTab);
+		entries.forEach(([ pl, i, pick ]) => {
 			ensurePlayer(pl);
 			const ask = askOf(pl), tgt = signingTarget(pl.pos), out = tgt.out, rr = ratingRange(pl), ok = permitOk(pl), talks = pl.bids >= 0 || pl.bids === undefined;
 			const li = el("li");
@@ -2876,9 +2898,10 @@
 			const m = MARKETS[pl.region];
 			li.append(el("span", "swap", `${pl.from ? `${pl.from}, ` : ""}${m ? m.label : "Home"}${m && m.permit ? (ok ? " · work permit: yes" : ` · work permit: refused (needs ${PERMIT_OVR}+)`) : ""}${m && m.adapt ? ` · settles in about ${Math.max(0, Math.ceil(m.adapt - staffLvl(c, "scout") * 0.5))} games` : ""}${!talks ? " · talks broken off" : ""}`));
 			li.append(el("span", "swap", out ? `Replaces ${out.name} (${ovrNow(out)}), sold for ${money(round1(priceOf(out) * 0.5))}` : "Joins your bench"));
+			if (pick) { li.append(el("span", "swap gain", `+${pick.gain} on ${pick.weak.name} (${pick.weakOvr})${pick.est ? " by the estimate: scout him to be sure" : ""}`)); }
 			mk.append(li);
 		});
-		if (open && !c.market.length) { const li = el("li"); li.append(el("span", "swap", "Nobody left on the list this window.")); mk.append(li); }
+		if (open && !entries.length) { const li = el("li"); li.append(el("span", "swap", shortlist ? "Nobody on the list would improve the eleven right now: try the other tabs, or wait for the next window." : "Nobody left on the list this window.")); mk.append(li); }
 
 		renderCoaching();
 		renderBids();
@@ -3273,7 +3296,7 @@
 	}
 	const tiredText = list => `${list.length === 1 ? "1 starter is" : `${list.length} starters are`} tired: ${list.slice(0, 4).map(pl => `${pl.name} ${fitOf(pl)}%`).join(", ")}${list.length > 4 ? ` and ${list.length - 4} more` : ""}.`;
 
-	let lastDeal = "", mkTab = "all";
+	let lastDeal = "", mkTab = "foryou";
 	function afterClubChange () {
 		if (assistBatch) { return; }   // the assistant saves and redraws once, when it is done
 		saveLeague();
@@ -3876,9 +3899,30 @@
 		if (left.length) { done.push(`left to run down: ${left.slice(0, 5).join(", ")}${left.length > 5 ? ` and ${left.length - 5} more` : ""}`); }
 		return done;
 	}
-	function assistTransfers (c) {
+	// The shortlist: who on the market would improve the eleven, by how much, and in whose place.
+	// An unscouted player is judged on the middle of his estimate and marked as such.
+	function assistShortlist (c) {
+		const lg = league, out = [];
+		c.market.forEach((pl, i) => {
+			if (!permitOk(pl) || pl.bids < 0) { return; }
+			const slots = slotsFor(lg.fmt).filter(sl => POS_OF_SLOT[sl] === pl.pos && c.squad[sl]);
+			if (!slots.length) { return; }
+			const weakSlot = slots.reduce((a, sl) => (matchOvr(c.squad[sl], POS_OF_SLOT[sl]) < matchOvr(c.squad[a], POS_OF_SLOT[a]) ? sl : a));
+			const weakest = matchOvr(c.squad[weakSlot], POS_OF_SLOT[weakSlot]), rr = ratingRange(pl);
+			const gain = (rr ? Math.round((rr[0] + rr[1]) / 2) : matchOvr(pl, pl.pos)) - weakest;
+			if (gain >= 2) { out.push({ i, pl, gain, est: !!rr, weak: c.squad[weakSlot], weakOvr: weakest, ask: askOf(pl) }); }
+		});
+		return out.sort((a, b) => b.gain - a.gain || a.ask - b.ask).slice(0, 6);
+	}
+	// Where the eleven is thinnest: the two positions whose weakest starter rates lowest.
+	function needsLine (c) {
+		const lg = league, byPos = {};
+		for (const sl of slotsFor(lg.fmt)) { const pos = POS_OF_SLOT[sl], pl = c.squad[sl]; if (!pl) { continue; } const o = matchOvr(pl, pos); if (!byPos[pos] || o < byPos[pos].o) { byPos[pos] = { o, pl }; } }
+		const worst = Object.entries(byPos).sort((a, b) => a[1].o - b[1].o).slice(0, 2);
+		return worst.length ? `Needs: ${worst.map(([ pos, w ]) => `${POS_LABEL[pos]} (${w.pl.name} ${w.o})`).join(", ")}.` : "";
+	}
+	function assistBids (c) {
 		const lg = league, done = [];
-		if (!windowOpen() || c.budget < 0) { return done; }
 		// Bids: cash in when the money is well over his value and he is not a key man, or he is past 31 and
 		// the price is fair; never the only keeper. Anything else is turned down.
 		for (const b of (lg.bidsIn || []).slice()) {
@@ -3889,17 +3933,21 @@
 			if (sell) { sellPlayer(pl.name, b.fee, b.club); done.push(`sold ${pl.name} to ${TEAMS[b.club].name} for ${money(b.fee)}`); }
 			else { rejectBid(pl.name); done.push(`turned down ${TEAMS[b.club].name} for ${pl.name}`); }
 		}
+		return done;
+	}
+	function assistSignings (c) {
+		const lg = league, done = [];
 		// Signings: the market player who most improves the weakest starter at his position, known
 		// quantities only (scouted, or from home), at the asking price, at most two a window.
 		for (let n = 0; n < 2; n++) {
 			let best = null;
 			c.market.forEach((pl, i) => {
-				if (!permitOk(pl) || pl.bids < 0 || !(pl.scouted || (pl.region || "home") === "home")) { return; }
+				if (!permitOk(pl) || pl.bids < 0 || ratingRange(pl)) { return; }   // known quantities only: scouted, from home, or a scout who reads him exactly
 				const ask = askOf(pl);
 				if (c.budget - ask < ASSIST_RESERVE) { return; }
-				const slots = slotsFor(lg.fmt).filter(s => POS_OF_SLOT[s] === pl.pos && c.squad[s]);
+				const slots = slotsFor(lg.fmt).filter(sl => POS_OF_SLOT[sl] === pl.pos && c.squad[sl]);
 				if (!slots.length) { return; }
-				const weakest = Math.min(...slots.map(s => matchOvr(c.squad[s], POS_OF_SLOT[s])));
+				const weakest = Math.min(...slots.map(sl => matchOvr(c.squad[sl], POS_OF_SLOT[sl])));
 				const gain = matchOvr(pl, pl.pos) - weakest;
 				if (gain >= 3 && (!best || gain > best.gain || (gain === best.gain && ask < best.ask))) { best = { i, gain, ask, pl }; }
 			});
@@ -3907,8 +3955,36 @@
 			signPlayer(best.i, best.ask);
 			done.push(`signed ${best.pl.name} (${ovrNow(best.pl)}, ${POS_LABEL[best.pl.pos]}) for ${money(best.ask)}`);
 		}
+		return done;
+	}
+	function assistTransfers (c) {
+		if (!windowOpen() || c.budget < 0) { return []; }
+		const done = [ ...assistBids(c), ...assistSignings(c) ];
 		if (done.some(d => d.startsWith("signed") || d.startsWith("sold"))) { autoPick(false, true); }
 		return done;
+	}
+	// One click from the window: the assistant's signings, whether or not he is switched on.
+	function assistBuy () {
+		const c = league && league.club;
+		if (!c || !windowOpen() || c.budget < 0) { return []; }
+		assistBatch = true;
+		let done = [];
+		try { done = assistSignings(c); } finally { assistBatch = false; }
+		if (done.length) { autoPick(false, true); }
+		lastDeal = done.length ? `Assistant: ${done.join("; ")}.` : "Assistant: nothing on the list is a clear step up at a price that keeps the wage reserve. Scout the shortlist, or bid yourself.";
+		if (done.length) { c.log = [ ...(c.log || []), lastDeal ].slice(-10); }
+		afterClubChange();
+		return done;
+	}
+	// Spend the window's scouting reports on the shortlist, best gain first.
+	function scoutShortlist () {
+		const c = league && league.club;
+		if (!c) { return 0; }
+		let n = 0;
+		for (const x of assistShortlist(c).filter(x => x.est)) { if (!(c.scoutLeft > 0)) { break; } c.market[x.i].scouted = true; c.scoutLeft--; n++; }
+		lastDeal = n ? `Scouted ${n} from the shortlist.` : c.scoutLeft > 0 ? "The shortlist is already scouted." : "No scouting reports left this window.";
+		afterClubChange();
+		return n;
 	}
 	// Runs after a league week and when a window opens; also the moment the setting is switched on.
 	function assistRun (when) {
@@ -3948,6 +4024,23 @@
 	   level; finish low and only the division below will have you. Take a job and you inherit that
 	   club's squad, ground and colours with a budget to match its size, and your old club carries on
 	   under its own name without you. Offers lapse when the next season kicks off. */
+	// Club identities (yours and any club you swapped with) travel with the league save, so a job move
+	// survives a reload and the next season; everything else about a club is rebuilt from its id.
+	const IDENT_KEYS = [ "name", "short", "color", "color2", "ground", "surface" ];
+	const identOf = t => Object.fromEntries(IDENT_KEYS.map(k => [ k, t[k] ]));
+	const DEFAULT_IDENT = TEAMS.map(identOf);
+	function rememberIdentity (lg) {
+		if (!lg) { return; }
+		const clubs = {};
+		TEAMS.forEach((t, i) => { if (i !== 0 && JSON.stringify(identOf(t)) !== JSON.stringify(DEFAULT_IDENT[i])) { clubs[i] = identOf(t); } });
+		lg.ident = { you: identOf(YOU), clubs };
+	}
+	function applyIdentity (lg) {
+		TEAMS.forEach((t, i) => Object.assign(t, DEFAULT_IDENT[i]));
+		if (!lg || !lg.ident || typeof lg.ident !== "object") { return; }
+		if (lg.ident.you) { Object.assign(YOU, lg.ident.you); }
+		for (const [ i, id ] of Object.entries(lg.ident.clubs || {})) { if (TEAMS[i] && Number(i) !== 0) { Object.assign(TEAMS[i], id); } }
+	}
 	function offerJobs (pos) {
 		const lg = league;
 		if (!lg || !lg.club || !Array.isArray(lg.members)) { return []; }
@@ -3959,9 +4052,78 @@
 		else if (pos <= Math.floor(n / 2)) { pool = inDiv.filter(id => Math.abs(getStr(id) - me) <= 1); }
 		else if (pos <= n - 3) { pool = [ ...inDiv.filter(id => getStr(id) <= me), ...below.slice(0, 3) ]; }
 		else { pool = below; }
-		lg.jobOffers = shuffle(pool).slice(0, pos <= 4 ? 2 : 1).map(id => ({ id, str: getStr(id), budget: round1(1 + getStr(id) * 0.9), below: !lg.members.includes(id), season: lg.season }));
+		lg.jobOffers = shuffle(pool).slice(0, pos <= 4 ? 2 : 1).map(id => ({ id, kind: "home", str: getStr(id), budget: round1(1 + getStr(id) * 0.9), below: !lg.members.includes(id), season: lg.season }));
+		// A good season draws a club from abroad too.
+		if (pos <= Math.max(6, Math.floor(n / 3))) { lg.jobOffers.push(abroadOffer(pos)); }
+		// What you agreed with your agent in January comes first.
+		if (lg.agreed) { lg.jobOffers.unshift({ ...lg.agreed, agreed: true }); lg.agreed = null; }
 		lg.career = { ...(lg.career || { clubs: [ YOU.name ] }), history: [ ...((lg.career && lg.career.history) || []), { season: lg.season, club: YOU.name, pos } ] };
 		return lg.jobOffers;
+	}
+	// A club abroad: its region, country and name from the markets, its stature from how you did.
+	function abroadOffer (pos) {
+		const regions = Object.keys(MARKETS).filter(r => r !== "home"), region = regions[Math.floor(Math.random() * regions.length)], m = MARKETS[region];
+		const nats = natsOf(region), nat = nats[Math.floor(Math.random() * nats.length)];
+		const str = clamp(Math.round(pos <= 4 ? 3 + Math.random() * 2 : 2 + Math.random() * 2), 1, 5);
+		return { abroad: region, kind: "abroad", nat, name: m.clubs[Math.floor(Math.random() * m.clubs.length)], str, budget: round1((1 + str * 0.9) * m.mult * 1.3), season: league.season };
+	}
+	const offerKey = o => (o.abroad ? `abroad:${o.name}` : `club:${o.id}`);
+	// Your agent sounds clubs out at the January window: approaches you can agree to now and join when
+	// the season ends. One from home, sized to where you stand; a good position draws one from abroad.
+	function agentApproaches (when) {
+		const lg = league;
+		if (!lg || !lg.club || !Array.isArray(lg.members)) { return []; }
+		const rows = standings(), pos = rows.length && rows.some(r => r.p > 0) ? rows.findIndex(r => r.id === 0) + 1 : Math.ceil(lg.members.length / 2);
+		const me = yourStr(), n = lg.members.length;
+		const inDiv = lg.members.filter(id => id !== 0), below = TEAMS.map((t, i) => i).filter(i => i !== 0 && !lg.members.includes(i));
+		const pool = pos <= 4 ? inDiv.filter(id => getStr(id) >= 3) : pos <= Math.floor(n / 2) ? inDiv.filter(id => Math.abs(getStr(id) - me) <= 1) : [ ...below.slice(0, 3), ...inDiv.filter(id => getStr(id) < me) ];
+		const offers = shuffle(pool).slice(0, 1).map(id => ({ id, kind: "home", str: getStr(id), budget: round1(1 + getStr(id) * 0.9), below: !lg.members.includes(id), season: lg.season }));
+		if (pos <= Math.max(6, Math.floor(n / 3)) || Math.random() < 0.3) { offers.push(abroadOffer(pos)); }
+		lg.agent = { when, pos, offers };
+		return offers;
+	}
+	function agreeApproach (key) {
+		const lg = league, o = lg && lg.agent && (lg.agent.offers || []).find(x => offerKey(x) === key);
+		if (!o) { return false; }
+		lg.agreed = o;
+		lg.agent.offers = [];
+		lastDeal = `Agreed: you join ${o.name || TEAMS[o.id].name} when the season ends.`;
+		afterClubChange();
+		return true;
+	}
+	function declineApproach (key) {
+		const lg = league;
+		if (!lg || !lg.agent) { return; }
+		lg.agent.offers = (lg.agent.offers || []).filter(x => offerKey(x) !== key);
+		afterClubChange();
+	}
+	// A move abroad: a new identity in a new country, a fresh squad from that region, a new league,
+	// your career carried over.
+	function moveAbroad (offer) {
+		const lg = league, m = MARKETS[offer.abroad], from = YOU.name, fmt = lg.fmt, country = NATIONS[offer.nat] ? NATIONS[offer.nat][0] : m.label;
+		const career = { ...(lg.career || { history: [] }), clubs: [ ...((lg.career && lg.career.clubs) || [ from ]), `${offer.name} (${country})` ] };
+		const palette = [ [ "#c8102e", "#ffffff" ], [ "#1d4fa0", "#ffffff" ], [ "#f2b52e", "#1f2a36" ], [ "#155e3a", "#ffffff" ], [ "#8fc3e6", "#1f2a36" ], [ "#5b2a86", "#ffffff" ], [ "#e0662f", "#1f2a36" ] ];
+		const [ color, color2 ] = palette[hashStr(offer.name) % palette.length];
+		Object.assign(YOU, { name: offer.name, short: offer.name.split(" ")[0], color, color2, ground: `${offer.name} Stadium`, surface: offer.abroad === "europe" ? "grass" : "turf" });
+		const nats = natsOf(offer.abroad), base = cpuOvr(offer.str), c = newClub();
+		const pick = (pos, i) => { const pl = genPlayer(pos, base + ((i * 7) % 5) - 2); pl.nat = nats[(i * 3 + 1) % nats.length]; pl.contract = 2 + (i % 2); return pl; };
+		c.squad = POS_OF_SLOT.map((pos, i) => pick(pos, i)); c.bench = BENCH_POS.map((pos, i) => pick(pos, i + POS_OF_SLOT.length));
+		c.budget = offer.budget; c.autoRotate = lg.club.autoRotate; c.scoutLeft = 2;
+		c.log = [ `You moved abroad: ${offer.name}, ${country}, from ${from} (budget ${money(offer.budget)})` ];
+		league = null;
+		newSeason(fmt, c);
+		league.career = career;
+		rememberIdentity(league);
+		league.news = `${league.news || ""} A new country: you are the manager of ${YOU.name} in ${country}.`.trim();
+		lastDeal = `You are the new manager of ${YOU.name} in ${country}: a fresh league, ${money(offer.budget)} to spend.`;
+		saveLeague();
+		state = "intro"; banner.hidden = true; newMatch(); showIntro(); renderLeague();
+		return true;
+	}
+	function takeOffer (key) {
+		const o = (league && league.jobOffers || []).find(x => offerKey(x) === key);
+		if (!o) { return false; }
+		return o.abroad ? moveAbroad(o) : takeJob(o.id);
 	}
 	function declineJob (id) {
 		if (!league) { return; }
@@ -3976,6 +4138,7 @@
 		// The two clubs trade identities: you wear theirs now; your old side keeps its name and your old squad's strength.
 		for (const k of [ "name", "short", "color", "color2", "ground", "surface" ]) { YOU[k] = to[k]; to[k] = from[k]; }
 		lg.clubStr[id] = oldStr;
+		rememberIdentity(lg);
 		const c = newClub(), base = cpuOvr(offer.str);
 		c.squad = cpuSquad(id, offer.str);
 		c.bench = BENCH_POS.map((pos, i) => genPlayer(pos, base - 5 + (i % 3)));
@@ -3998,21 +4161,41 @@
 		const best = h.reduce((b, x) => (x.pos < b.pos ? x : b));
 		return `Career: ${h.length} season${h.length === 1 ? "" : "s"}, best finish ${best.pos}${[ "st", "nd", "rd" ][best.pos - 1] || "th"} with ${best.club}, clubs: ${(league.career.clubs || [ YOU.name ]).join(", ")}.`;
 	};
+	const offerWho = o => (o.abroad
+		? `${o.name} (${NATIONS[o.nat] ? NATIONS[o.nat][0] : MARKETS[o.abroad].label}) want you as manager: a new country, strength ${"★".repeat(Math.round(o.str))}, ${money(o.budget)} to spend`
+		: `${TEAMS[o.id].name} want you as manager: ${o.below ? "the division below" : "this division"}, strength ${"★".repeat(Math.round(o.str))}, ${money(o.budget)} to spend`);
 	function renderOffers () {
-		const ul = $("jobOffers"), title = $("jobsTitle");
+		const ul = $("jobOffers"), title = $("jobsTitle"), al = $("agentOffers"), at = $("agentTitle");
 		if (!ul || !title) { return; }
 		ul.replaceChildren();
 		const offers = league ? (league.jobOffers || []) : [];
 		title.hidden = !offers.length;
 		for (const o of offers) {
-			const t = TEAMS[o.id], li = el("li");
-			li.append(el("span", "pos", "JOB"), el("span", "who", `${t.name} want you as manager: ${o.below ? "the division below" : "this division"}, strength ${"★".repeat(Math.round(o.str))}, ${money(o.budget)} to spend`));
+			const li = el("li"), key = offerKey(o);
+			li.append(el("span", "pos", o.agreed ? "AGREED" : "JOB"), el("span", "who", offerWho(o) + (o.agreed ? " (agreed in January)" : "")));
 			const btns = el("span", "bids");
-			const a = el("button", "", "Take the job"); a.type = "button"; a.addEventListener("click", () => takeJob(o.id));
-			const r = el("button", "", "Decline"); r.type = "button"; r.addEventListener("click", () => declineJob(o.id));
+			const a = el("button", "", o.abroad ? "Move abroad" : "Take the job"); a.type = "button"; a.addEventListener("click", () => takeOffer(key));
+			const r = el("button", "", "Decline"); r.type = "button"; r.addEventListener("click", () => (o.abroad ? (league.jobOffers = league.jobOffers.filter(x => offerKey(x) !== key), afterClubChange()) : declineJob(o.id)));
 			btns.append(a, r); li.append(btns);
-			li.append(el("span", "ratings", `You would leave ${YOU.name} and inherit their squad, ground and colours.`));
+			li.append(el("span", "ratings", o.abroad ? `You would leave ${YOU.name} for a fresh squad and a new league abroad; your career record comes with you.` : `You would leave ${YOU.name} and inherit their squad, ground and colours.`));
 			ul.append(li);
+		}
+		if (al && at) {
+			al.replaceChildren();
+			const ag = league && league.agent && !seasonDone() ? (league.agent.offers || []) : [];
+			const agreed = league && league.agreed;
+			at.hidden = !ag.length && !agreed;
+			if (agreed) { const li = el("li"); li.append(el("span", "pos", "AGREED"), el("span", "who", `${agreed.name || TEAMS[agreed.id].name}: you join when the season ends.`)); al.append(li); }
+			for (const o of ag) {
+				const li = el("li"), key = offerKey(o);
+				li.append(el("span", "pos", o.abroad ? "ABROAD" : "HOME"), el("span", "who", offerWho(o)));
+				const btns = el("span", "bids");
+				const a = el("button", "", "Agree: join at season's end"); a.type = "button"; a.addEventListener("click", () => agreeApproach(key));
+				const r = el("button", "", "Not interested"); r.type = "button"; r.addEventListener("click", () => declineApproach(key));
+				btns.append(a, r); li.append(btns);
+				li.append(el("span", "ratings", `Sounded out by your agent at the ${league.agent.when} window, with you ${league.agent.pos}${[ "st", "nd", "rd" ][league.agent.pos - 1] || "th"} at the time.`));
+				al.append(li);
+			}
 		}
 		const cl = $("careerLine");
 		if (cl) { cl.textContent = careerLine(); }
@@ -12353,6 +12536,7 @@
 			get autoSwitchMode () { return autoSwitchMode; }, set autoSwitchMode (v) { autoSwitchMode = v; autoSwitchSel.value = v; },
 			get assistMode () { return assistMode; }, setAssist, assistRun, get lastDeal () { return lastDeal; }, valueOf, ovrNow, windowOpen,
 			offerJobs, takeJob, declineJob, get YOU () { return YOU; }, get TEAMS () { return TEAMS; },
+			agentApproaches, agreeApproach, moveAbroad, takeOffer, assistShortlist, assistBuy, scoutShortlist,
 			get autoHold () { return autoHold; }, set autoHold (v) { autoHold = v; },
 			get charging () { return charging; }, get passCharge () { return passCharge; }, get meterRect () { return meterRect; }, get drawMs () { return drawMs; }, get drawn () { return drawn; }, frameDue, get scale () { return scale; }, get kits () { return KITS; }, get stats () { return stats; }, get oppStats () { return oppStats; }, get steerAt () { return steerAt; }, set steerAt (v) { steerAt = v; }, set possTeam (v) { possTeam = v; },
 			set steerSwitchDone (v) { steerSwitchDone = !!v; },

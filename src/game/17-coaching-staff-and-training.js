@@ -287,7 +287,7 @@
 	}
 	const tiredText = list => `${list.length === 1 ? "1 starter is" : `${list.length} starters are`} tired: ${list.slice(0, 4).map(pl => `${pl.name} ${fitOf(pl)}%`).join(", ")}${list.length > 4 ? ` and ${list.length - 4} more` : ""}.`;
 
-	let lastDeal = "", mkTab = "all";
+	let lastDeal = "", mkTab = "foryou";
 	function afterClubChange () {
 		if (assistBatch) { return; }   // the assistant saves and redraws once, when it is done
 		saveLeague();

@@ -75,6 +75,7 @@
 		return pl;
 	}
 	function ensureClub (lg) {
+		if (typeof applyIdentity === "function") { applyIdentity(lg); }   // the club you manage, by name and colours
 		lg.club = sanitizeClub(lg.club);
 		for (const pl of lg.club.market) { capRating(pl); }
 		if (lg.cpuIn && typeof lg.cpuIn === "object") { for (const ins of Object.values(lg.cpuIn)) { if (Array.isArray(ins)) { for (const d of ins) { if (d && d.pl) { capRating(d.pl); } } } } }

@@ -39,9 +39,30 @@
 		if (left.length) { done.push(`left to run down: ${left.slice(0, 5).join(", ")}${left.length > 5 ? ` and ${left.length - 5} more` : ""}`); }
 		return done;
 	}
-	function assistTransfers (c) {
+	// The shortlist: who on the market would improve the eleven, by how much, and in whose place.
+	// An unscouted player is judged on the middle of his estimate and marked as such.
+	function assistShortlist (c) {
+		const lg = league, out = [];
+		c.market.forEach((pl, i) => {
+			if (!permitOk(pl) || pl.bids < 0) { return; }
+			const slots = slotsFor(lg.fmt).filter(sl => POS_OF_SLOT[sl] === pl.pos && c.squad[sl]);
+			if (!slots.length) { return; }
+			const weakSlot = slots.reduce((a, sl) => (matchOvr(c.squad[sl], POS_OF_SLOT[sl]) < matchOvr(c.squad[a], POS_OF_SLOT[a]) ? sl : a));
+			const weakest = matchOvr(c.squad[weakSlot], POS_OF_SLOT[weakSlot]), rr = ratingRange(pl);
+			const gain = (rr ? Math.round((rr[0] + rr[1]) / 2) : matchOvr(pl, pl.pos)) - weakest;
+			if (gain >= 2) { out.push({ i, pl, gain, est: !!rr, weak: c.squad[weakSlot], weakOvr: weakest, ask: askOf(pl) }); }
+		});
+		return out.sort((a, b) => b.gain - a.gain || a.ask - b.ask).slice(0, 6);
+	}
+	// Where the eleven is thinnest: the two positions whose weakest starter rates lowest.
+	function needsLine (c) {
+		const lg = league, byPos = {};
+		for (const sl of slotsFor(lg.fmt)) { const pos = POS_OF_SLOT[sl], pl = c.squad[sl]; if (!pl) { continue; } const o = matchOvr(pl, pos); if (!byPos[pos] || o < byPos[pos].o) { byPos[pos] = { o, pl }; } }
+		const worst = Object.entries(byPos).sort((a, b) => a[1].o - b[1].o).slice(0, 2);
+		return worst.length ? `Needs: ${worst.map(([ pos, w ]) => `${POS_LABEL[pos]} (${w.pl.name} ${w.o})`).join(", ")}.` : "";
+	}
+	function assistBids (c) {
 		const lg = league, done = [];
-		if (!windowOpen() || c.budget < 0) { return done; }
 		// Bids: cash in when the money is well over his value and he is not a key man, or he is past 31 and
 		// the price is fair; never the only keeper. Anything else is turned down.
 		for (const b of (lg.bidsIn || []).slice()) {
@@ -52,17 +73,21 @@
 			if (sell) { sellPlayer(pl.name, b.fee, b.club); done.push(`sold ${pl.name} to ${TEAMS[b.club].name} for ${money(b.fee)}`); }
 			else { rejectBid(pl.name); done.push(`turned down ${TEAMS[b.club].name} for ${pl.name}`); }
 		}
+		return done;
+	}
+	function assistSignings (c) {
+		const lg = league, done = [];
 		// Signings: the market player who most improves the weakest starter at his position, known
 		// quantities only (scouted, or from home), at the asking price, at most two a window.
 		for (let n = 0; n < 2; n++) {
 			let best = null;
 			c.market.forEach((pl, i) => {
-				if (!permitOk(pl) || pl.bids < 0 || !(pl.scouted || (pl.region || "home") === "home")) { return; }
+				if (!permitOk(pl) || pl.bids < 0 || ratingRange(pl)) { return; }   // known quantities only: scouted, from home, or a scout who reads him exactly
 				const ask = askOf(pl);
 				if (c.budget - ask < ASSIST_RESERVE) { return; }
-				const slots = slotsFor(lg.fmt).filter(s => POS_OF_SLOT[s] === pl.pos && c.squad[s]);
+				const slots = slotsFor(lg.fmt).filter(sl => POS_OF_SLOT[sl] === pl.pos && c.squad[sl]);
 				if (!slots.length) { return; }
-				const weakest = Math.min(...slots.map(s => matchOvr(c.squad[s], POS_OF_SLOT[s])));
+				const weakest = Math.min(...slots.map(sl => matchOvr(c.squad[sl], POS_OF_SLOT[sl])));
 				const gain = matchOvr(pl, pl.pos) - weakest;
 				if (gain >= 3 && (!best || gain > best.gain || (gain === best.gain && ask < best.ask))) { best = { i, gain, ask, pl }; }
 			});
@@ -70,8 +95,36 @@
 			signPlayer(best.i, best.ask);
 			done.push(`signed ${best.pl.name} (${ovrNow(best.pl)}, ${POS_LABEL[best.pl.pos]}) for ${money(best.ask)}`);
 		}
+		return done;
+	}
+	function assistTransfers (c) {
+		if (!windowOpen() || c.budget < 0) { return []; }
+		const done = [ ...assistBids(c), ...assistSignings(c) ];
 		if (done.some(d => d.startsWith("signed") || d.startsWith("sold"))) { autoPick(false, true); }
 		return done;
+	}
+	// One click from the window: the assistant's signings, whether or not he is switched on.
+	function assistBuy () {
+		const c = league && league.club;
+		if (!c || !windowOpen() || c.budget < 0) { return []; }
+		assistBatch = true;
+		let done = [];
+		try { done = assistSignings(c); } finally { assistBatch = false; }
+		if (done.length) { autoPick(false, true); }
+		lastDeal = done.length ? `Assistant: ${done.join("; ")}.` : "Assistant: nothing on the list is a clear step up at a price that keeps the wage reserve. Scout the shortlist, or bid yourself.";
+		if (done.length) { c.log = [ ...(c.log || []), lastDeal ].slice(-10); }
+		afterClubChange();
+		return done;
+	}
+	// Spend the window's scouting reports on the shortlist, best gain first.
+	function scoutShortlist () {
+		const c = league && league.club;
+		if (!c) { return 0; }
+		let n = 0;
+		for (const x of assistShortlist(c).filter(x => x.est)) { if (!(c.scoutLeft > 0)) { break; } c.market[x.i].scouted = true; c.scoutLeft--; n++; }
+		lastDeal = n ? `Scouted ${n} from the shortlist.` : c.scoutLeft > 0 ? "The shortlist is already scouted." : "No scouting reports left this window.";
+		afterClubChange();
+		return n;
 	}
 	// Runs after a league week and when a window opens; also the moment the setting is switched on.
 	function assistRun (when) {
