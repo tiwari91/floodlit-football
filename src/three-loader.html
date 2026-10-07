@@ -1,0 +1,6 @@
+<script id="threeLib" type="module">
+	// three.js ships only as an ES module now; the game's renderer reads it from the THREE global.
+	import("https://cdnjs.cloudflare.com/ajax/libs/three.js/0.186.1/three.module.min.js")
+		.then(m => { window.THREE = m; })
+		.catch(() => { const el = document.getElementById("threeLib"); if (el) { el.dispatchEvent(new Event("error")); } });
+</script>

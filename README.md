@@ -56,6 +56,29 @@ Settings sit under the pitch in four groups (your team, the match, controls and 
 
 On a phone, landscape fills the screen with the pitch and floats the joystick and pads over it; portrait keeps a tall pitch with the controls below. Xbox and PlayStation controllers work too.
 
+## Working on the game
+
+`index.html` is the one file GitHub Pages serves, and it is built, not edited. The source lives in
+`src/`: `head.html`, `body-top.html`, `styles.css`, `markup.html`, `three-loader.html`, `tail.html`,
+and the game script as 51 files under `src/game/` in the order given by `src/game/ORDER.txt`, one
+per section of the engine (pitch geometry, clubs, the league, the simulation, rendering, the 3D
+camera, input and so on). The game parts are concatenated into a single script in one shared scope,
+so a change in one file sees everything the others declare, exactly as before the split.
+
+```sh
+node tools/build.mjs          # rebuild index.html from src/
+node tools/build.mjs --check  # fail if index.html is not what src/ builds (run before a push)
+node tests/run.mjs            # the build check, then the three browser suites
+```
+
+The browser suites under `tests/` drive headless Chrome through Playwright, which is not a
+dependency of the game: set `FF_PLAYWRIGHT_FROM` to a `package.json` whose `node_modules` has
+Playwright and `FF_CHROME` to a Chrome binary if the defaults in `tests/_env.mjs` do not fit.
+`tests/switch.mjs` covers who you control when the ball changes hands, `tests/phone.mjs` the
+portrait and landscape layouts, the settings drawer and the 60-a-second frame cap, and
+`tests/move.mjs` dribbling, planting, sprinting, challenges and the 3D renderer. Screenshots land
+in `tests/out/`.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
