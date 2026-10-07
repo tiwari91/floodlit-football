@@ -76,14 +76,15 @@ check("contracts: the most valuable player is signed first and the shortfall is 
 const leftOut = await page.evaluate(() => {
 	const F = window.__ff, c = F.league.club;
 	for (const pl of [ ...c.squad, ...c.bench ]) { pl.contract = 3; }
-	const dud = c.bench[2], old = c.bench[3];
+	const dud = c.bench[2], old = c.bench[3], sulk = c.bench[4];
 	dud.contract = 1; dud.morale = 80; dud.age = 27; dud.pac = dud.sho = dud.pas = dud.def = 40; dud.pot = 42; dud.role = "";
 	old.contract = 1; old.morale = 80; old.age = 34; old.pac = old.sho = old.pas = old.def = 70; old.role = "";
+	sulk.contract = 1; sulk.morale = 25; sulk.age = 27;
 	c.budget = 9;
 	const done = F.assistRun("test");
-	return { done, dud: dud.contract, old: old.contract, names: [ dud.name, old.name ] };
+	return { done, dud: dud.contract, old: old.contract, sulk: sulk.contract, names: [ dud.name, old.name, sulk.name ] };
 });
-check("contracts: players not worth a deal are left to run down and the note says who and why", leftOut.dud === 1 && leftOut.old === 1 && leftOut.done.some(d => /left to run down/.test(d) && d.includes(leftOut.names[0]) && /not worth a new deal/.test(d) && /too old/.test(d)), JSON.stringify(leftOut));
+check("contracts: every last-year player who will talk is renewed, squad men and veterans included; only the unhappy one is left and the note says so", leftOut.dud === 3 && leftOut.old === 3 && leftOut.sulk === 1 && leftOut.done.some(d => /left to run down/.test(d) && d.includes(leftOut.names[2]) && /unhappy/.test(d) && !d.includes(leftOut.names[0])), JSON.stringify(leftOut));
 
 // Offers for the manager: a title-winner hears from the big clubs, a bottom finisher only from below.
 const offers = await page.evaluate(() => {
@@ -186,6 +187,21 @@ const keys = await page.evaluate(() => {
 });
 check("the January alert names the important players in their last year", keys.alerted.length >= 1 && /Contracts ending for/.test(keys.news), JSON.stringify(keys));
 check("with the assistant off, a key starter is still kept on in the summer when the money is there", keys.kept.length >= 1 && keys.after.contract >= 3 && keys.after.budget < 5 && /kept on before their deals ran out/.test(keys.after.note), JSON.stringify(keys));
+// The assistant always says something under its control: what it did, or why there was nothing to do.
+const note = await page.evaluate(() => {
+	const F = window.__ff, lg = F.league, c = lg.club, p = document.getElementById("assistNote");
+	F.setAssist("off"); F.renderLeagueTest();
+	const off = p.textContent;
+	[ ...c.squad, ...c.bench ].forEach(x => { x.contract = 3; }); lg.bidsIn = []; lg.round = 5;
+	F.setAssist("both"); const done = F.assistRun("test"); F.renderLeagueTest();
+	const idle = p.textContent;
+	c.squad[1].contract = 1; c.squad[1].morale = 70; c.squad[1].age = 27; c.budget = 5;
+	const did = F.assistRun("test"); F.renderLeagueTest();
+	return { off, done, idle, did, active: p.textContent };
+});
+check("with the assistant off the note says what you handle yourself", /^Off: you renew contracts/.test(note.off), note.off);
+check("with nothing to do the note says so and why", note.done.length === 0 && /nothing to do right now \(nobody is in the last year of his deal; no bids in; the window is closed/.test(note.idle), note.idle);
+check("after it acts the note reports what it did", note.did.length >= 1 && /^Assistant \(test\): .* signed on to/.test(note.active), note.active);
 check("and the note says who could not be kept when the money is short", keys.skint.length === 0 && /no money to keep/.test(keys.skintNote), JSON.stringify(keys));
 check("no console errors", errs.length === 0, errs.join(" | "));
 await browser.close(); server.stop();

@@ -17,24 +17,21 @@
 		if (pl.morale < 40 || pl.age >= (starter ? 36 : 33)) { return false; }
 		return starter || ovrNow(pl) >= squadMedian(c) || (role === "prospect" && (pl.pot || 0) >= ovrNow(pl) + 6);
 	}
-	// Why a last-year player is left to run down, in a few words.
-	function assistWhyNot (pl, c) {
-		const role = roleOf(pl, c), starter = role === "key" || role === "first";
-		if (pl.morale < 40) { return "unhappy"; }
-		if (pl.age >= (starter ? 36 : 33)) { return `${pl.age}, too old`; }
-		return "not worth a new deal";
-	}
+	// Why a last-year player is left to run down: only because he won't talk.
+	const assistWhyNot = pl => (pl.morale < 40 ? `unhappy, morale ${pl.morale}` : "");
+	// Every player in his last year gets a new deal, the most valuable first so the money goes on the
+	// stars before the squad men, as far as the budget allows above the reserve. Only a player who
+	// won't talk (unhappy) is left to run down; the note says so.
 	function assistContracts (c) {
 		const done = [], skint = [], left = [];
-		// The most valuable first, so the money goes on the stars before the squad men.
 		const lastYear = [ ...c.squad, ...c.bench ].filter(pl => { ensurePlayer(pl); return pl.contract <= 1; });
-		const due = lastYear.filter(pl => assistKeeps(pl, c)).sort((a, b) => valueOf(b) - valueOf(a));
+		const due = lastYear.filter(pl => pl.morale >= 40).sort((a, b) => valueOf(b) - valueOf(a));
 		for (const pl of due) {
 			if (c.budget - round1(valueOf(pl) * 0.15) < ASSIST_RESERVE) { skint.push(pl.name); continue; }
 			const deal = renewDeal(pl, c);
 			if (deal.ok) { done.push(`${pl.name} signed on to ${pl.contract} seasons`); }
 		}
-		for (const pl of lastYear) { if (!due.includes(pl)) { left.push(`${pl.name} (${assistWhyNot(pl, c)})`); } }
+		for (const pl of lastYear) { if (!due.includes(pl)) { left.push(`${pl.name} (${assistWhyNot(pl)})`); } }
 		if (skint.length) { done.push(`no money yet for new deals for ${skint.slice(0, 4).join(", ")}${skint.length > 4 ? ` and ${skint.length - 4} more` : ""} (${money(ASSIST_RESERVE)} is kept for wages)`); }
 		if (left.length) { done.push(`left to run down: ${left.slice(0, 5).join(", ")}${left.length > 5 ? ` and ${left.length - 5} more` : ""}`); }
 		return done;
@@ -166,6 +163,24 @@
 		afterClubChange();
 		return n;
 	}
+	// What the assistant has to say, standing under its control: what it did last, or why there was
+	// nothing to do, so switching it on is never a silent act.
+	function assistIdleWhy (c) {
+		const lastYear = [ ...c.squad, ...c.bench ].filter(pl => { ensurePlayer(pl); return pl.contract <= 1; }), why = [];
+		if (assistDoes("contracts")) { why.push(lastYear.length ? `${lastYear.length} in the last year of a deal but none will talk while unhappy` : "nobody is in the last year of his deal"); }
+		if (assistDoes("transfers")) {
+			why.push((league.bidsIn || []).length ? "bids are waiting for your answer" : "no bids in");
+			why.push(windowOpen() ? "nothing on the market is a clear step up at a price that keeps the wage reserve" : "the window is closed, so no signings until it opens");
+		}
+		return why.join("; ");
+	}
+	function renderAssistNote () {
+		const p = $("assistNote");
+		if (!p) { return; }
+		if (assistMode === "off") { p.textContent = "Off: you renew contracts, answer bids and sign players yourself. Starters in their last year are still kept on in the summer if the money is there."; return; }
+		const c = league && league.club;
+		p.textContent = c ? (league.assistNote || `Assistant: nothing to do right now (${assistIdleWhy(c)}). It looks again after every match and when a window opens.`) : "";
+	}
 	// Runs after a league week and when a window opens; also the moment the setting is switched on.
 	function assistRun (when) {
 		if (!league || !league.club || assistMode === "off") { return []; }
@@ -175,11 +190,13 @@
 			if (assistDoes("contracts")) { done.push(...assistContracts(c)); }
 			if (assistDoes("transfers")) { done.push(...assistTransfers(c)); }
 		} finally { assistBatch = false; }
+		league.assistNote = done.length ? `Assistant (${when}): ${done.join("; ")}.` : null;
 		if (done.length) {
-			lastDeal = `Assistant (${when}): ${done.join("; ")}.`;
+			lastDeal = league.assistNote;
 			c.log = [ ...(c.log || []), lastDeal ].slice(-10);
 			afterClubChange();
 		}
+		renderAssistNote();
 		return done;
 	}
 	function setAssist (m, run = false) {
@@ -194,6 +211,7 @@
 			const done = assistRun("now");
 			const acted = done.filter(d => !/^(no money yet|left to run down)/.test(d)).length;
 			toast(assistMode === "off" ? ASSIST.off : acted ? `Assistant: ${acted} done, see League notes` : done.length ? "Assistant: nothing it can do yet, see League notes" : "Assistant: nothing to do right now", "#f2b52e");
+			renderAssistNote();
 			assistSel.blur();
 		});
 		setAssist(store.get("ff-assist") || "off");

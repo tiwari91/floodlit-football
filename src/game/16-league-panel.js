@@ -273,6 +273,7 @@
 		$("winBudget").textContent = money(c.budget);
 		$("winBudget").title = `Wage bill ${money(squadWages(c))} a season${c.week ? `; last matchday wages ${money(c.week.wages)}, gate ${money(c.week.gate)}` : ""}`;
 		$("winTitle").textContent = open ? "Transfer window: open" : "Transfer window: closed";
+		if (typeof renderAssistNote === "function") { renderAssistNote(); }
 		const notes = [];
 		if (lastDeal) { notes.push(lastDeal); }
 		if (open) {
