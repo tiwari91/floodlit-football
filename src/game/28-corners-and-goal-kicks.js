@@ -45,7 +45,7 @@
 		if (shoot) { shootEnd(ball.shot ? "Off target" : "Out of play"); return; }
 		const defTeam = leftEnd ? 0 : 1;   // you defend the left goal
 		raiseFlag(ball.x, "out");
-		if (ball.shot && frame - (ball.kickedAt || -999) < 120 && Math.abs(ball.y - FH / 2) < FMT.goal / 2 + 70 * GH && (ball.z || 0) < 95) { ooh(); ev3d("near"); if (ball.lastBy) { crowdReact("near", ball.lastBy.team); } }
+		if (ball.shot && frame - (ball.kickedAt || -999) < 120 && Math.abs(ball.y - FH / 2) < FMT.goal / 2 + 70 * GH && (ball.z || 0) < 95) { ooh(); ev3d("near"); if (ball.lastBy) { crowdReact("near", ball.lastBy.team); benchReact("near", { team: ball.lastBy.team }); } }
 		else if (ball.shot && frame - (ball.kickedAt || -999) < 150 && ball.lastBy) { if (ball.lastBy.team === homeSide) { groan(); } crowdReact("miss", ball.lastBy.team); }   // a clear miss
 		if (lastTouch === defTeam) { awardCorner(1 - defTeam, leftEnd, ball.y < FH / 2); } else { awardGoalKick(defTeam, leftEnd); }
 	}

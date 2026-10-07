@@ -535,7 +535,7 @@
 				ctx.restore();
 			}
 		}
-		drawMinimap();
+		drawMinimap(); drawTouchlineCam();
 		drawPenAim(true);
 		drawReview(true);
 		drawStretcher(true);

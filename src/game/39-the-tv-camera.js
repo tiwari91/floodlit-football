@@ -170,7 +170,7 @@
 		ctx.globalAlpha = 1;
 		ctx.setTransform(scale, 0, 0, scale, 0, 0);
 		drawRain();
-		drawMinimap();
+		drawMinimap(); drawTouchlineCam();
 		drawHints();
 		drawPowerMeter();
 		drawToasts();

@@ -100,7 +100,7 @@
 		ctx.setTransform(scale, 0, 0, scale, 0, 0);
 		drawRain();
 		drawOffscreenMarker();
-		drawMinimap();
+		drawMinimap(); drawTouchlineCam();
 		drawHints();
 		drawPowerMeter();
 		drawToasts();

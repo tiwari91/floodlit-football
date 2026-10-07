@@ -465,7 +465,7 @@
 				taker = p; td = d;
 			}
 			if (taker && taker.role === "gk" && speed > 11) {
-				ooh(); ev3d("save", taker.team); crowdReact("save", taker.team);
+				ooh(); ev3d("save", taker.team); crowdReact("save", taker.team); benchReact("near", { team: taker.team });
 				// Not every save sticks: a hard shot or a wet ball can be spilled back into play.
 				if (Math.random() < 0.1 + (speed > 14 ? 0.06 : 0) + 0.7 * (1 - cond.handling)) { spill(taker, cond.wet ? "Spilled" : "Parried"); return; }
 			}

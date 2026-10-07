@@ -45,6 +45,7 @@
 43-the-crowd-in-3d.js
 44-the-replay.js
 45-broadcast-overlays.js
+45a-the-touchline-cam.js
 46-replay-on-demand-and-slow-motion.js
 47-loop.js
 48-game-controller-standard-mapping-xbox-pl.js

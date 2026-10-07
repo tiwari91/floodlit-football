@@ -56,6 +56,33 @@ const whole = await page.evaluate(() => ({ title: document.getElementById("ovTit
 check("Simulate whole season plays every fixture and ends on the season summary", /^Season 1 simulated/.test(whole.title) && whole.round >= whole.n && /^Start season 2/.test(whole.btn) && whole.allHidden && /January window went by|Assistant handled the January window/.test(whole.text), JSON.stringify({ ...whole, text: whole.text.slice(0, 200) }));
 await ctx.close();
 
+// The touchline cam: a real foul cuts to the fouled side's manager for a couple of seconds while
+// play goes on; a run of fouls doesn't keep cutting away; a simulated match never shows it.
+({ ctx, page } = await fresh());
+await page.evaluate(() => localStorage.setItem("ff-played", "5")); await page.reload();
+await page.waitForFunction(() => window.__ff && window.__ff.league && window.__ff.league.club, null, { timeout: 60000 });
+await page.click("#ovButton"); await page.waitForFunction(() => window.__ff.state === "play", null, { timeout: 60000 });
+await page.waitForTimeout(400);
+const tl = await page.evaluate(async () => {
+	const F = window.__ff, wait = ms => new Promise(r => setTimeout(r, ms));
+	F.freeze = 0; F.tlcLast = -1e9;
+	const off = F.players.find(p => p.team === 1 && p.role !== "gk"), vic = F.players.find(p => p.team === 0 && p.role !== "gk");
+	vic.x = F.FW * 0.4; vic.y = F.FH * 0.5; off.x = vic.x + 10; off.y = vic.y;
+	F.commitFoul(off, vic, false);
+	const first = F.tlc && { team: F.tlc.team, pose: F.tlc.pose, line: F.tlc.line };
+	const t0 = F.tlc && F.tlc.t0;
+	// a second foul straight away does not cut away again
+	F.state === "play";
+	const again = (() => { const before = F.tlc && F.tlc.t0; F.benchReact("foul", { fouled: 1, offender: 0, card: false }); return F.tlc && F.tlc.t0 === before; })();
+	await wait(3000);
+	return { first, again, closed: F.tlc === null, t0 };
+});
+check("a foul cuts to the fouled side's manager shouting at the referee", tl.first && tl.first.team === 0 && /shout|furious/.test(tl.first.pose) && tl.first.line.length > 3, JSON.stringify(tl));
+check("a second foul straight after doesn't cut away again, and the box closes within three seconds", tl.again && tl.closed, JSON.stringify(tl));
+const bulk = await page.evaluate(() => { const F = window.__ff; F.tlcLast = -1e9; F.simulateMineTest(); return F.tlc; });
+check("a simulated match never shows the touchline cam", bulk === null, JSON.stringify(bulk));
+await ctx.close();
+
 check("no console errors", errs.length === 0, errs.join(" | "));
 await browser.close(); server.stop();
 process.exit(done() ? 1 : 0);

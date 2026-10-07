@@ -27,6 +27,7 @@
 			noteInjury(vic, rollInjury(serious));
 		}
 		burst(off.x, off.y, card ? card.split(":")[0] : "Foul");
+		benchReact("foul", { fouled: t, offender: off.team, card: !!card, red });   // the touchline cam: the fouled side's manager lets the referee know
 		vic.fall = FALL_T; vic.vx = vic.vy = 0;
 		ev3d("foul");
 		{ const s = off.team === 0 ? stats : oppStats; s.fouls = (s.fouls || 0) + 1; if (card) { s.cards = (s.cards || 0) + 1; } }
