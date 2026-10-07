@@ -10245,6 +10245,11 @@
 			ctx.beginPath(); ctx.arc(hnd[0], hnd[1], mn(H * 0.03), 0, Math.PI * 2); ctx.fill();
 			ctx.fillStyle = dark ? shade(shirt, 0.72) : shirt;
 			capsule(sx, sy, mn(H * 0.06), mid[0], mid[1], mn(H * 0.048));
+			if (fine) {   // a cuff at the end of the sleeve
+				const c0 = [ sx + (mid[0] - sx) * 0.82, sy + (mid[1] - sy) * 0.82 ];
+				ctx.fillStyle = shade(shirt.length === 7 ? shirt : "#888888", dark ? 0.6 : 0.8);   // a shade of the shirt, so it reads as trim, not a patch
+				capsule(c0[0], c0[1], mn(H * 0.049), mid[0], mid[1], mn(H * 0.048));
+			}
 		};
 		ctx.lineCap = "round"; ctx.lineJoin = "round";
 		drawArm(1, true);
@@ -10254,6 +10259,10 @@
 			const sx2 = hipX + face * Math.sin(lean) * H * 0.06, sy2 = hipY - H * 0.06;
 			ctx.fillStyle = shorts;
 			capsule(sx2, sy2, mn(H * 0.1), hipX, hipY + H * 0.03, mn(H * 0.1));
+		}
+		if (fine) {   // a stripe down the side of the shorts, in the shirt colour
+			ctx.strokeStyle = shade(shirt.length === 7 ? shirt : "#888888", 0.95); ctx.lineWidth = Math.max(0.7, H * 0.02);
+			ctx.beginPath(); ctx.moveTo(hipX + face * Math.sin(lean) * H * 0.06, hipY - H * 0.07); ctx.lineTo(hipX, hipY + H * 0.1); ctx.stroke();
 		}
 		drawLeg(0, false);
 		{
@@ -10268,6 +10277,12 @@
 			ctx.bezierCurveTo(tx + nx * w1 + dx / dl * H * 0.085, ty + ny * w1 + dy / dl * H * 0.085, tx - nx * w1 + dx / dl * H * 0.085, ty - ny * w1 + dy / dl * H * 0.085, tx - nx * w1, ty - ny * w1);
 			ctx.lineTo(wx - nx * w0, wy - ny * w0); ctx.closePath(); ctx.fill();
 			ctx.strokeStyle = "rgba(0, 0, 0, 0.32)"; ctx.lineWidth = Math.max(0.6, 0.8 * k); ctx.stroke();
+			// Floodlight on his front: a soft highlight down the lit side of the shirt.
+			ctx.fillStyle = cond.ko === "day" ? "rgba(255, 255, 255, 0.1)" : "rgba(255, 246, 220, 0.14)";
+			ctx.beginPath();
+			ctx.moveTo(wx + nx * w0 * face * 0.2, wy + ny * w0 * face * 0.2); ctx.lineTo(tx + nx * w1 * face * 0.2, ty + ny * w1 * face * 0.2);
+			ctx.lineTo(tx + nx * w1 * face * 0.85, ty + ny * w1 * face * 0.85); ctx.lineTo(wx + nx * w0 * face * 0.85, wy + ny * w0 * face * 0.85); ctx.closePath();
+			ctx.fill();
 			ctx.fillStyle = "rgba(0, 0, 0, 0.2)";
 			const bs = -face;   // his back is in the shade
 			ctx.beginPath();
