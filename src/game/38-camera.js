@@ -21,6 +21,7 @@
 		drawPlain(alpha);
 	}
 	function drawPlain (alpha) {
+		if (window.__ffBeforeDraw) { window.__ffBeforeDraw(); }   // test harness only: pose players for a capture
 		// Swap in in-between positions for drawing, then put the real ones back.
 		const real = players.map(p => [ p.x, p.y, p.dir, p.stride ]), realBall = ball ? [ ball.x, ball.y, ball.z ] : null;
 		const lerp = (a, b) => (a === undefined ? b : a + (b - a) * alpha);

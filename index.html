@@ -9812,6 +9812,7 @@
 		drawPlain(alpha);
 	}
 	function drawPlain (alpha) {
+		if (window.__ffBeforeDraw) { window.__ffBeforeDraw(); }   // test harness only: pose players for a capture
 		// Swap in in-between positions for drawing, then put the real ones back.
 		const real = players.map(p => [ p.x, p.y, p.dir, p.stride ]), realBall = ball ? [ ball.x, ball.y, ball.z ] : null;
 		const lerp = (a, b) => (a === undefined ? b : a + (b - a) * alpha);
@@ -10106,7 +10107,7 @@
 		const kit = KITS[p.team], L = look(p), k = b.k;
 		const down = (p.lunge > 0 && players.indexOf(p) === ctrl) || p.slideAI > 0;
 		const jump = reduceMotion ? 0 : jumpAmt(p);
-		const H = 34 * k * (down ? 0.55 : 1), Y = b.y - jump * 34 * k * 0.32;
+		const H = 34 * k, Y = b.y - jump * 34 * k * 0.32;   // full size even on the ground: a slide is a man low on the grass, not a smaller man
 		let X = b.x;
 		// A soft shadow cast away from the floodlights, staying on the grass when he jumps.
 		ctx.fillStyle = "rgba(0, 0, 0, 0.16)";
@@ -10126,18 +10127,19 @@
 		const vary = (((p.num || 0) * 37 + p.team * 11) % 10) / 10;   // each man stands a little differently
 		const shuf = down ? 0 : p.shuf || 0, ks = down || reduceMotion ? null : kickSwing(p), cel = p.celebA || 0;
 		// Leaning into the run, back against a planted cut, upright when shuffling.
-		const lean = a * a * 0.26 * (1 - 0.6 * shuf) - (p.plant > 0 ? 0.2 * p.plant / 10 : 0) + (ks ? 0.08 : 0);
+		const lean = down ? -1.05 : a * a * 0.26 * (1 - 0.6 * shuf) - (p.plant > 0 ? 0.2 * p.plant / 10 : 0) + (ks ? 0.08 : 0);   // sliding: leaning right back
 		const bob = reduceMotion ? 0 : Math.abs(Math.cos(ph)) * a * H * 0.035;
 		if (!reduceMotion && a < 0.15 && !down && !jump) { X += Math.sin(p.idlePh || 0) * H * 0.012; }   // standing: shifting his weight
-		const hipX = X, hipY = Y - H * 0.5 - bob + shuf * H * 0.035;
+		const hipX = X, hipY = down ? Y - H * 0.11 : Y - H * 0.5 - bob + shuf * H * 0.035;
 		const shX = hipX + face * Math.sin(lean) * H * 0.32, shY = hipY - Math.cos(lean) * H * 0.32;
 		const shade = (hex, f) => { const n = parseInt(hex.slice(1), 16); return `rgb(${[ n >> 16, (n >> 8) & 255, n & 255 ].map(v => Math.round(v * f)).join(",")})`; };
 		const Lt = H * 0.26, Ls = H * 0.26, Lu = H * 0.16, Lf = H * 0.15;
 		// The arms hang from the edges of the shirt and the legs from either side of the hips, so a
 		// standing man's arms are at his sides rather than across his front.
-		const armOff = i => (i ? 1 : -1) * face * H * 0.115, legOff = i => (i ? 1 : -1) * face * H * 0.035;
+		const still = down ? 0 : 1 - clamp(a / 0.3, 0, 1);   // the side offsets are for a man standing; running, he is seen side-on
+		const armOff = i => (i ? 1 : -1) * face * H * 0.115 * still, legOff = i => (i ? 1 : -1) * face * H * 0.035 * still;
 		const legPts = i => {
-			if (down) { return i ? [ [ X + face * H * 0.3, Y - H * 0.25 ], [ X + face * H * 0.62, Y - H * 0.05 ] ] : [ [ X + face * H * 0.2, Y - H * 0.12 ], [ X + face * H * 0.5, Y ] ]; }
+			if (down) { return i ? [ [ X + face * H * 0.12, Y - H * 0.04 ], [ X - face * H * 0.06, Y - H * 0.01 ] ] : [ [ X + face * H * 0.3, Y - H * 0.07 ], [ X + face * H * 0.6, Y - H * 0.03 ] ]; }   // lead leg out along the grass, the other tucked under
 			const f = ph + i * Math.PI;
 			let th = jump > 0 ? (i ? -0.25 : 0.2) * jump : (0.06 + a * 0.62 * (1 - 0.45 * shuf)) * Math.sin(f) + (i ? -0.04 : 0.04);
 			let kn = jump > 0 ? 0.9 * jump : a * (0.18 + 1.35 * (1 - 0.5 * shuf) * Math.max(0, Math.cos(f))) + (1 - a) * 0.05 + shuf * 0.3;
@@ -10151,7 +10153,9 @@
 		const armPts = i => {
 			const f = ph + i * Math.PI;
 			let ua = jump > 0 ? Math.PI * (0.55 + 0.3 * jump) + (i ? 0.25 : -0.1) : -(0.1 + a * 0.75 * (1 - 0.5 * shuf)) * Math.sin(f) + shuf * 0.25, eb = jump > 0 ? 0.3 : 0.25 + a * 1.25;
+			if (!jump && !ks) { eb = 0.25 + a * (0.55 + 0.75 * Math.abs(Math.sin(f))); }   // the elbow bends most at the ends of the swing, so the forearm never lies across his chest
 			if (ks) { ua = i === 0 ? -0.6 : 0.9; eb = 0.5; }   // arms out for balance as he strikes it
+			if (down) { ua = i === 0 ? -1.15 : 1.75; eb = i === 0 ? 0.15 : -0.35; }   // one hand back on the grass, the other up for balance
 			if (cel > 0) { ua = ua * (1 - cel) + (i ? 1.9 : 1.5) * cel; eb = eb * (1 - cel) + 0.15 * cel; }   // arms out wide
 			// Standing: arms hang loose at his sides, the near one a touch behind him and the far one a
 			// touch ahead, elbows nearly straight, so they never fold across his front.
