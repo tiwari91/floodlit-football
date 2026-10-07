@@ -18,6 +18,7 @@
 18-the-other-clubs-do-business-too.js
 18a-the-assistant-contracts-and-transfers.js
 18b-offers-for-the-manager.js
+18c-foreign-leagues.js
 19-audio.js
 20-kicking.js
 21-offside.js

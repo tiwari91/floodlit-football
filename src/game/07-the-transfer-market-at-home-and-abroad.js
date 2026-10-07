@@ -76,6 +76,7 @@
 	}
 	function ensureClub (lg) {
 		if (typeof applyIdentity === "function") { applyIdentity(lg); }   // the club you manage, by name and colours
+		if (typeof repairForeignLeague === "function") { repairForeignLeague(lg); }   // older saves abroad: the home clubs become that country's
 		lg.club = sanitizeClub(lg.club);
 		// Older saves never retired anyone: whoever is past the last playing age goes now.
 		const late = retireVeterans(lg.club, false, false);

@@ -169,6 +169,19 @@ check("moving abroad gives a Spanish club, a fresh league and the career carried
 await page.reload(); await page.waitForFunction(() => window.__ff && window.__ff.league && window.__ff.league.club, null, { timeout: 60000 });
 const abroadKept = await page.evaluate(() => ({ you: window.__ff.YOU.name, season: window.__ff.league.season }));
 check("the move abroad survives a reload", abroadKept.you === "Ribera CF" && abroadKept.season === 1, JSON.stringify(abroadKept));
+// Abroad, the other clubs are that country's, with its league's name, and it all survives a reload.
+const foreign = await page.evaluate(() => {
+	const F = window.__ff, lg = F.league, opps = lg.members.filter(id => id !== 0).map(id => F.TEAMS[id].name);
+	return { div: F.divisionName(), country: lg.ident && lg.ident.country, opps, english: opps.filter(n => /Rovers|Wanderers|Albion|Athletic$|Harriers|Borough/.test(n)), grounds: lg.members.filter(id => id !== 0).slice(0, 3).map(id => F.TEAMS[id].ground), unique: new Set(opps).size === opps.length, head: document.getElementById("lgDivName").textContent };
+});
+check("moving to Spain makes the whole division Spanish: Primera División, Spanish clubs and grounds, no English names", foreign.country === "ESP" && /^Primera División \(Spain\)$/.test(foreign.div) && foreign.english.length === 0 && foreign.unique && foreign.grounds.every(g => /^Estadio de /.test(g)) && foreign.head === foreign.div, JSON.stringify(foreign));
+// An older save, already abroad with the home clubs around it, is repaired when it loads.
+const repaired = await (async () => {
+	await page.evaluate(() => { const raw = JSON.parse(localStorage.getItem("ff-league")); raw.ident = { you: { ...raw.ident.you, name: "AS Vence", short: "AS" }, clubs: {} }; localStorage.setItem("ff-league", JSON.stringify(raw)); });
+	await page.reload(); await page.waitForFunction(() => window.__ff && window.__ff.league && window.__ff.league.club, null, { timeout: 60000 });
+	return page.evaluate(() => { const F = window.__ff, lg = F.league; return { you: F.YOU.name, div: F.divisionName(), opps: lg.members.filter(id => id !== 0).slice(0, 5).map(id => F.TEAMS[id].name), country: lg.ident.country }; });
+})();
+check("an older save at AS Vence with English clubs around it loads as Ligue 1 with French clubs", repaired.you === "AS Vence" && repaired.country === "FRA" && /^Ligue 1/.test(repaired.div) && repaired.opps.every(n => !/Rovers|Wanderers|Albion|Harriers|Borough/.test(n)), JSON.stringify(repaired));
 
 // Important players never just walk: a heads-up, then kept on in the summer with the assistant off.
 const keys = await page.evaluate(() => {

@@ -323,8 +323,8 @@
 		const b = $("modeBadge");
 		if (mode === "tutorial") { b.textContent = "Tutorial · practice"; b.className = "modebadge tutorial"; }
 		else if (mode === "corners") { b.textContent = shoot ? `Corner shootout · corner ${Math.min(shoot.n + 1, shoot.total)} of ${shoot.total}` : "Corner shootout · practice"; b.className = "modebadge practice"; }
-		else if (mode === "league" && league && leagueMatch) { b.textContent = `Premier Division · Matchday ${leagueMatch.round + 1}`; b.className = "modebadge"; }
-		else if (mode === "league") { b.textContent = "Premier Division"; b.className = "modebadge"; }
+		else if (mode === "league" && league && leagueMatch) { b.textContent = `${divisionName()} · Matchday ${leagueMatch.round + 1}`; b.className = "modebadge"; }
+		else if (mode === "league") { b.textContent = divisionName(); b.className = "modebadge"; }
 		else { b.textContent = "Friendly · practice (doesn't count)"; b.className = "modebadge practice"; }
 	}
 

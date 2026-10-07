@@ -86,6 +86,7 @@
 		const grid = $("clubGrid");
 		grid.replaceChildren();
 		$("clubsDiv").setAttribute("aria-pressed", String(clubsView === "div"));
+		if ($("lgDivName")) { $("lgDivName").textContent = divisionName(); }
 		$("clubsBelow").setAttribute("aria-pressed", String(clubsView === "below"));
 		const rows = standings(), posOf = new Map(rows.map((r, i) => [ r.id, i + 1 ]));
 		const ids = clubsView === "div"

@@ -6,14 +6,14 @@
 	   under its own name without you. Offers lapse when the next season kicks off. */
 	// Club identities (yours and any club you swapped with) travel with the league save, so a job move
 	// survives a reload and the next season; everything else about a club is rebuilt from its id.
-	const IDENT_KEYS = [ "name", "short", "color", "color2", "ground", "surface" ];
+	const IDENT_KEYS = [ "name", "short", "color", "color2", "text", "ink", "ground", "surface" ];
 	const identOf = t => Object.fromEntries(IDENT_KEYS.map(k => [ k, t[k] ]));
 	const DEFAULT_IDENT = TEAMS.map(identOf);
 	function rememberIdentity (lg) {
 		if (!lg) { return; }
 		const clubs = {};
 		TEAMS.forEach((t, i) => { if (i !== 0 && JSON.stringify(identOf(t)) !== JSON.stringify(DEFAULT_IDENT[i])) { clubs[i] = identOf(t); } });
-		lg.ident = { you: identOf(YOU), clubs };
+		lg.ident = { you: identOf(YOU), clubs, country: lg.ident && lg.ident.country ? lg.ident.country : undefined };
 	}
 	function applyIdentity (lg) {
 		TEAMS.forEach((t, i) => Object.assign(t, DEFAULT_IDENT[i]));
@@ -43,9 +43,10 @@
 	// A club abroad: its region, country and name from the markets, its stature from how you did.
 	function abroadOffer (pos) {
 		const regions = Object.keys(MARKETS).filter(r => r !== "home"), region = regions[Math.floor(Math.random() * regions.length)], m = MARKETS[region];
-		const nats = natsOf(region), nat = nats[Math.floor(Math.random() * nats.length)];
+		const name = m.clubs[Math.floor(Math.random() * m.clubs.length)], nats = natsOf(region);
+		const nat = MARKET_CLUB_NAT[name] || nats[Math.floor(Math.random() * nats.length)];   // the club's own country, so the league fits it
 		const str = clamp(Math.round(pos <= 4 ? 3 + Math.random() * 2 : 2 + Math.random() * 2), 1, 5);
-		return { abroad: region, kind: "abroad", nat, name: m.clubs[Math.floor(Math.random() * m.clubs.length)], str, budget: round1((1 + str * 0.9) * m.mult * 1.3), season: league.season };
+		return { abroad: region, kind: "abroad", nat, name, str, budget: round1((1 + str * 0.9) * m.mult * 1.3), season: league.season };
 	}
 	const offerKey = o => (o.abroad ? `abroad:${o.name}` : `club:${o.id}`);
 	// What a club you join already has: facilities sized to its standing, never below what you built
@@ -110,14 +111,16 @@
 		const [ color, color2 ] = palette[hashStr(offer.name) % palette.length];
 		Object.assign(YOU, { name: offer.name, short: offer.name.split(" ")[0], color, color2, ground: `${offer.name} Stadium`, surface: offer.abroad === "europe" ? "grass" : "turf" });
 		const nats = natsOf(offer.abroad), base = cpuOvr(offer.str), c = inheritSetup(newClub(), lg.club, offer.str);
-		const pick = (pos, i) => { const pl = genPlayer(pos, base + ((i * 7) % 5) - 2); pl.nat = nats[(i * 3 + 1) % nats.length]; pl.contract = 2 + (i % 2); return pl; };
+		const pick = (pos, i) => { const pl = genPlayer(pos, base + ((i * 7) % 5) - 2); pl.nat = i % 3 ? offer.nat : nats[(i * 3 + 1) % nats.length]; pl.contract = 2 + (i % 2); return pl; };   // mostly locals
 		c.squad = POS_OF_SLOT.map((pos, i) => pick(pos, i)); c.bench = BENCH_POS.map((pos, i) => pick(pos, i + POS_OF_SLOT.length));
 		c.budget = offer.budget; c.autoRotate = lg.club.autoRotate; c.scoutLeft = 2;
 		c.log = [ `You moved abroad: ${offer.name}, ${country}, from ${from} (budget ${money(offer.budget)})` ];
+		applyForeignLeague(offer.nat);   // the other clubs become that country's
 		league = null;
 		newSeason(fmt, c);
 		league.career = career;
 		rememberIdentity(league);
+		league.ident.country = FOREIGN[offer.nat] ? offer.nat : undefined;
 		league.news = `${league.news || ""} A new country: you are the manager of ${YOU.name} in ${country}.`.trim();
 		lastDeal = `You are the new manager of ${YOU.name} in ${country}: a fresh league, ${money(offer.budget)} to spend.`;
 		saveLeague();
