@@ -7866,7 +7866,11 @@
 				btn = `Play matchday ${league.round + 1}`;
 			}
 		}
-		if (!simulated) { nudge += ` ${coachReview()}`; }
+		if (!simulated) {
+			const best = Object.entries(lastRatings).sort((x, y) => y[1] - x[1])[0];
+			if (best) { nudge += ` Man of the match: ${best[0]} (${best[1].toFixed(1)}).`; }
+			nudge += ` ${coachReview()}`;
+		}
 		updateNextNote();
 		$("announce").textContent = `Full time. ${line}`;
 		const wasSim = simulated;
