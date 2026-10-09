@@ -338,8 +338,39 @@
 		G3.cam.lookAt(G3.look);
 		G3.cam.updateMatrixWorld();
 	}
+	// The big screen: the score with the two sides' names and colours, redrawn only when it changes
+	// (and a GOAL! flash while a goal is being celebrated).
+	function screen3D () {
+		const S = G3.screen;
+		if (!S) { return; }
+		const l = leftIsYou ? score[0] : score[1], r = leftIsYou ? score[1] : score[0], goal = state === "goal";
+		const hn = $("homeName").textContent || "Home", an = $("awayName").textContent || "Away";
+		const key = `${hn}|${an}|${l}|${r}|${goal}|${KITS[0].outfield}${KITS[1].outfield}`;
+		if (key === S.key) { return; }
+		S.key = key;
+		const g = S.cv.getContext && S.cv.getContext("2d");
+		if (!g) { return; }
+		const w = S.cv.width, h = S.cv.height, lk = leftIsYou ? KITS[0] : KITS[1], rk = leftIsYou ? KITS[1] : KITS[0];
+		g.fillStyle = "#06090c"; g.fillRect(0, 0, w, h);
+		g.textAlign = "center"; g.textBaseline = "middle";
+		if (goal) {
+			g.fillStyle = "#f2b52e"; g.font = "800 132px 'Big Shoulders Display', 'Arial Narrow', Arial, sans-serif"; g.fillText("GOAL!", w / 2, h / 2 + 6);
+		} else {
+			g.fillStyle = lk.outfield; g.fillRect(18, 34, 16, 126);
+			g.fillStyle = rk.outfield; g.fillRect(w - 34, 34, 16, 126);
+			g.fillStyle = "#ffffff"; g.font = "700 46px 'Big Shoulders Display', 'Arial Narrow', Arial, sans-serif";
+			g.fillText(hn.toUpperCase().slice(0, 10), 150, h / 2 + 2); g.fillText(an.toUpperCase().slice(0, 10), w - 150, h / 2 + 2);
+			g.fillStyle = "#f2b52e"; g.font = "800 112px 'Big Shoulders Display', 'Arial Narrow', Arial, sans-serif";
+			g.fillText(`${l}-${r}`, w / 2, h / 2 + 6);
+		}
+		// the LED grain
+		g.fillStyle = "rgba(0, 0, 0, 0.28)";
+		for (let y = 0; y < h; y += 4) { g.fillRect(0, y, w, 1); }
+		S.tex.needsUpdate = true;
+	}
 	function sync3D () {
 		buildStadium3D();
+		screen3D();
 		const sw = endsSwapped(), WX = x => (sw ? FW - x : x), WD = d => (sw ? Math.PI - d : d);
 		camera3D();
 		// The broadcast camera sits in the near stand, so that side of the ground (its seats, fans, roof

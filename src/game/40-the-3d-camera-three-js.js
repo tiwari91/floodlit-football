@@ -395,6 +395,39 @@
 				G.push(cx + fx * 9, PH + 14, cz + fz * 9);
 			}
 		}
+		// The tunnel, in the middle of the near stand between the dugouts: a mouth in the front wall
+		// with a concrete surround and a light over it, and the club's extendable canopy out to the boards.
+		{
+			const tz = FH + F_SIDE3, r = 16, z1 = FH + 5, n = 12, white = [ 0.92, 0.93, 0.94 ], dark = [ 0.03, 0.035, 0.04 ];
+			accBox3(near, FW / 2, 13, tz + 3, 48, 26, 6, conc);
+			accQuad3(near, [ FW / 2 - 15, 0, tz - 0.2 ], [ FW / 2 + 15, 0, tz - 0.2 ], [ FW / 2 + 15, 19, tz - 0.2 ], [ FW / 2 - 15, 19, tz - 0.2 ], dark, [ 0, 0, 1 ]);
+			accBox3(nearLamp, FW / 2, 21.5, tz - 0.4, 26, 1.4, 0.6, [ 1.25, 1.18, 1.0 ]);
+			for (let k = 0; k < n; k++) {
+				const a0 = Math.PI * k / n, a1 = Math.PI * (k + 1) / n, am = (a0 + a1) / 2;
+				const P0 = z => [ FW / 2 + Math.cos(a0) * r, Math.sin(a0) * r, z ], P1 = z => [ FW / 2 + Math.cos(a1) * r, Math.sin(a1) * r, z ];
+				accQuad3(near, P0(tz - 0.5), P1(tz - 0.5), P1(z1), P0(z1), club, [ Math.cos(am), Math.sin(am), 0 ]);
+				// white hoops round the canopy, and its open end
+				for (const zr of [ z1 + 0.6, (z1 + tz) / 2, tz - 1.5 ]) {
+					const R0 = z => [ FW / 2 + Math.cos(a0) * (r + 0.35), Math.sin(a0) * (r + 0.35), z ], R1 = z => [ FW / 2 + Math.cos(a1) * (r + 0.35), Math.sin(a1) * (r + 0.35), z ];
+					accQuad3(near, R0(zr - 0.6), R1(zr - 0.6), R1(zr + 0.6), R0(zr + 0.6), white, [ Math.cos(am), Math.sin(am), 0 ]);
+				}
+			}
+		}
+		// The big screen above the end behind the left-hand goal, showing the score (hung under the
+		// roof's front edge where the roof runs round the ends, otherwise on legs on top of the stand).
+		{
+			const hung = gs.roof && A.ring, d = hung ? P.back * A.roofIn + 2 : P.back - 8, W = 180, H = 54;
+			const sx = -F_END3 - d, cy = hung ? P.top + 36 - 12 - H / 2 : P.top + 10 + H / 2, frameC = [ 0.07, 0.075, 0.085 ];
+			accBox3(main, sx - 2.5, cy, FH / 2, 4, H + 6, W + 6, frameC);
+			if (hung) { for (const zz of [ -W * 0.35, W * 0.35 ]) { accBeam3(main, [ sx - 2.5, cy + H / 2, FH / 2 + zz ], [ sx - 2.5, P.top + 27, FH / 2 + zz ], 1.2, frameC); } }
+			else { for (const zz of [ -W * 0.3, W * 0.3 ]) { accBeam3(main, [ sx - 2.5, P.top - 30, FH / 2 + zz ], [ sx - 2.5, cy, FH / 2 + zz ], 3, frameC); } }
+			const scv = document.createElement("canvas"); scv.width = 640; scv.height = 194;
+			const tex = canvasTex3D(scv);
+			const scr = own(new THREE.Mesh(new THREE.PlaneGeometry(W, H), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false })), true);
+			scr.rotation.y = Math.PI / 2; scr.position.set(sx + 0.2, cy, FH / 2);
+			st.add(scr);
+			G3.screen = { cv: scv, tex, key: "" };
+		}
 		// Mountains behind the far stand at some grounds, black against the night sky.
 		if (gs.mountains || gs.arch === "monterrey") {
 			let mh = 4242;
@@ -504,7 +537,7 @@
 			};
 			board(-F_END3 + 16, FW + F_END3 - 16, -12, 0, true);
 			const gaps = [ FW / 2 - dw * 0.62 - 20, FW / 2 + dw * 0.62 + 20 ].map(cx => [ cx - dw / 2 - 6, cx + dw / 2 + 6 ]);
-			board(-F_END3 + 16, gaps[0][0], FH + 12, Math.PI, true); board(gaps[0][1], gaps[1][0], FH + 12, Math.PI, true); board(gaps[1][1], FW + F_END3 - 16, FH + 12, Math.PI, true);
+			board(-F_END3 + 16, gaps[0][0], FH + 12, Math.PI, true); board(gaps[0][1], FW / 2 - 20, FH + 12, Math.PI, true); board(FW / 2 + 20, gaps[1][0], FH + 12, Math.PI, true); board(gaps[1][1], FW + F_END3 - 16, FH + 12, Math.PI, true);   // a gap for the tunnel
 			board(-6, FH + 6, -NET - 12, Math.PI / 2, false); board(-6, FH + 6, FW + NET + 12, -Math.PI / 2, false);
 		}
 		// 5. The night: a sky that darkens overhead, a few stars, and the floodlights lighting the players.
