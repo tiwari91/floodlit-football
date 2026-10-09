@@ -491,12 +491,7 @@
 					ctx.beginPath(); ctx.ellipse(foot.x, foot.y, r, r * 0.42, 0, -Math.PI / 2, -Math.PI / 2 + c * Math.PI * 2); ctx.stroke();
 				}
 			}
-			if (top && me.name) {
-				ctx.font = "700 12px Barlow, Arial, sans-serif";
-				const label = `${me.num} ${me.name}`, w = ctx.measureText(label).width;
-				ctx.fillStyle = "rgba(8, 13, 11, 0.8)"; ctx.fillRect(top.x - w / 2 - 5, top.y - 18, w + 10, 16);
-				ctx.fillStyle = "#eef6ea"; ctx.fillText(label, top.x, top.y - 10);
-			}
+			if (top && me.name) { drawPlate(me, top.x, top.y); ctx.textAlign = "center"; ctx.textBaseline = "middle"; }
 		}
 		if (playing && me && ball.owner === me) {
 			const m = strikerTarget(me), q = m && proj3D(m.x, m.y, 44);

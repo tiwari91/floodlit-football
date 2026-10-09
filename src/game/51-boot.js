@@ -15,7 +15,7 @@
 		if (l && [ ...lenSel.options ].some(o => o.value === l)) { lenSel.value = l; }
 		if (s === "0") { soundOn = false; soundBtn.textContent = "Sound off"; soundBtn.setAttribute("aria-pressed", "false"); }
 		if (store.get("ff-offside") === "0") { offsideRule = false; $("offsideBtn").textContent = "Offside off"; $("offsideBtn").setAttribute("aria-pressed", "false"); }
-		if (store.get("ff-map") === "1") { minimapOn = true; $("mapBtn").textContent = "Minimap on"; $("mapBtn").setAttribute("aria-pressed", "true"); }
+		minimapOn = store.get("ff-map") !== "0"; $("mapBtn").textContent = minimapOn ? "Minimap on" : "Minimap off"; $("mapBtn").setAttribute("aria-pressed", String(minimapOn));
 		if (store.get("ff-hints") === "0") { hintsOn = false; $("hintsBtn").textContent = "Hints off"; $("hintsBtn").setAttribute("aria-pressed", "false"); }
 		if (store.get("ff-music") === "0") { musicOn = false; $("musicBtn").textContent = "Music off"; $("musicBtn").setAttribute("aria-pressed", "false"); }
 		{ const g = store.get("ff-gfx"); if (g && GFX3[g]) { setGfx(g); } }

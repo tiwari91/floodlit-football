@@ -875,17 +875,8 @@
 			else { drawFigure(p, X, Y, kit); }
 		}
 
-		// Your controlled player's name, above the marker.
-		if (isHuman && p.name) {
-			ctx.font = "700 11px Barlow, Arial, sans-serif";
-			ctx.textAlign = "center";
-			ctx.textBaseline = "middle";
-			ctx.fillStyle = "rgba(7, 12, 10, 0.55)";
-			const label = `${p.num} ${p.name}`, w = ctx.measureText(label).width;
-			ctx.fillRect(X - w / 2 - 4, Y - 56, w + 8, 14);
-			ctx.fillStyle = "#ffffff";
-			ctx.fillText(label, X, Y - 49);
-		}
+		// Your controlled player's name plate, above the marker.
+		if (isHuman && p.name) { drawPlate(p, X, Y - 40); }
 
 		if (isHuman && (charging || passCharge) && ball.owner === p) {
 			const [ ax, ay ] = chargeAim(p);
@@ -918,10 +909,32 @@
 		ctx.lineWidth = 3;
 		ctx.beginPath(); ctx.moveTo(fx + ux * 16 * k, fy + uy * 16 * k); ctx.lineTo(tx - ux * 7, ty - uy * 7); ctx.stroke();
 		ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx - ux * 9 - uy * 5, ty - uy * 9 + ux * 5); ctx.lineTo(tx - ux * 9 + uy * 5, ty - uy * 9 - ux * 5); ctx.closePath(); ctx.fill();
-		const w = 36, h = 5, bx = fx - w / 2, by = fy + 18 * k + 6;
-		ctx.fillStyle = "rgba(7, 12, 10, 0.75)"; ctx.fillRect(bx - 2, by - 2, w + 4, h + 4);
-		ctx.fillStyle = power < 0.5 ? "#7fd49b" : power < 0.8 ? "#f2b52e" : "#e2594a";
-		ctx.fillRect(bx, by, w * power, h);
+		ctx.restore();
+	}
+	// Your man's name plate, FIFA style: number and name on a slim dark plate with a kit-colour edge,
+	// his stamina in a thin bar along its foot and, while a pass or shot charges, the power bar on top.
+	// (x, y) is the point just above his head the plate's pointer touches.
+	function drawPlate (p, x, y) {
+		ctx.save();
+		ctx.font = "700 11px Barlow, Arial, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+		const label = `${p.num} ${p.name}`.toUpperCase(), w = Math.max(60, Math.ceil(ctx.measureText(label).width) + 18), h = 16;
+		const x0 = Math.round(x - w / 2), yb = Math.round(y - 7), y0 = yb - h - 3;
+		ctx.fillStyle = "#f2b52e";
+		ctx.beginPath(); ctx.moveTo(x - 5, yb); ctx.lineTo(x + 5, yb); ctx.lineTo(x, yb + 6); ctx.closePath(); ctx.fill();
+		ctx.fillStyle = "rgba(10, 14, 20, 0.8)"; ctx.fillRect(x0, y0, w, h + 3);
+		ctx.fillStyle = (KITS[p.team] || KITS[0]).outfield; ctx.fillRect(x0, y0, 3, h + 3);
+		ctx.fillStyle = "#f4f6f2"; ctx.fillText(label, x0 + 1.5 + w / 2, y0 + h / 2 + 0.5);
+		const s = clamp((staOf(p) - 0.25) / 0.75, 0, 1);
+		ctx.fillStyle = "rgba(255, 255, 255, 0.14)"; ctx.fillRect(x0 + 3, yb - 3, w - 3, 3);
+		ctx.fillStyle = staOf(p) < TIRED_STA ? "#e2594a" : s < 0.6 ? "#f2b52e" : "#5fd38a"; ctx.fillRect(x0 + 3, yb - 3, (w - 3) * s, 3);
+		if ((charging || passCharge) && ball.owner === p) {
+			const power = chargeOf(charging ? chargeStart : passCharge.start), by = y0 - 9;
+			ctx.fillStyle = "rgba(10, 14, 20, 0.8)"; ctx.fillRect(x0, by - 1, w, 8);
+			const g = ctx.createLinearGradient(x0, 0, x0 + w, 0);
+			g.addColorStop(0, "#5fd38a"); g.addColorStop(0.55, "#f2d22e"); g.addColorStop(0.85, "#f28a2e"); g.addColorStop(1, "#e2394a");
+			ctx.fillStyle = g; ctx.fillRect(x0 + 1, by, (w - 2) * power, 6);
+			ctx.fillStyle = "rgba(255, 255, 255, 0.75)"; ctx.fillRect(x0 + 1 + (w - 2) * 0.8, by - 1, 1.5, 8);
+		}
 		ctx.restore();
 	}
 
@@ -985,35 +998,36 @@
 		} else {
 			drops = [];
 		}
-		ctx.font = "700 12px Barlow, Arial, sans-serif";
+		ctx.font = "700 11px Barlow, Arial, sans-serif";
 		ctx.textAlign = "left";
 		ctx.textBaseline = "middle";
 		const text = `${cond.label} · ${cond.ko === "day" ? "Afternoon" : "Night"}`.toUpperCase(), w = ctx.measureText(text).width;
-		// On a narrow screen the score bug sits top left too, so the tags drop below it.
-		const top = canvas.clientWidth < 640 && document.body.classList.contains("big") && overlay.hidden ? 78 : 10;
-		ctx.fillStyle = "rgba(7, 12, 10, 0.6)";
-		ctx.fillRect(10, top, w + 16, 22);
-		ctx.fillStyle = "rgba(238, 246, 234, 0.9)";
-		ctx.fillText(text, 18, top + 11.5);
+		// Top right, under the menu button, right-aligned and quiet: the score bug has the top left.
+		const top = 44, R = SW - 10, hasWind = cond.wind.s >= 6;
+		const wtx = `${cond.wind.s} KM/H`, ww = hasWind ? ctx.measureText(wtx).width + 30 : 0, x1 = R - ww - (hasWind ? 4 : 0) - (w + 16);
+		ctx.fillStyle = "rgba(10, 14, 20, 0.55)";
+		ctx.fillRect(x1, top, w + 16, 20);
+		ctx.fillStyle = "rgba(238, 246, 234, 0.88)";
+		ctx.fillText(text, x1 + 8, top + 10.5);
 		// The wind: an arrow the way it blows on screen (flipped with the picture after half time) and its speed.
-		if (cond.wind.s >= 6) {
-			const wtx = `${cond.wind.s} KM/H`, ww = ctx.measureText(wtx).width, x0 = 10 + w + 22;
+		if (hasWind) {
+			const x0 = R - ww;
 			const sx = Math.cos(cond.wind.a) * (endsSwapped() ? -1 : 1), sy = Math.sin(cond.wind.a) * (camMode === "top" ? 1 : 0.55), sl = Math.hypot(sx, sy) || 1;
-			ctx.fillStyle = cond.wind.s >= 20 ? "rgba(30, 60, 92, 0.78)" : "rgba(7, 12, 10, 0.6)";
-			ctx.fillRect(x0, top, ww + 36, 22);
-			const ax = x0 + 12, ay = top + 11, ux = sx / sl * 7, uy = sy / sl * 7;
+			ctx.fillStyle = cond.wind.s >= 20 ? "rgba(30, 60, 92, 0.75)" : "rgba(10, 14, 20, 0.55)";
+			ctx.fillRect(x0, top, ww, 20);
+			const ax = x0 + 11, ay = top + 10, ux = sx / sl * 6, uy = sy / sl * 6;
 			ctx.strokeStyle = "#cfe6ff"; ctx.fillStyle = "#cfe6ff"; ctx.lineWidth = 2;
 			ctx.beginPath(); ctx.moveTo(ax - ux, ay - uy); ctx.lineTo(ax + ux, ay + uy); ctx.stroke();
 			ctx.beginPath(); ctx.moveTo(ax + ux * 1.25, ay + uy * 1.25); ctx.lineTo(ax + ux * 0.3 - uy * 0.6, ay + uy * 0.3 + ux * 0.6); ctx.lineTo(ax + ux * 0.3 + uy * 0.6, ay + uy * 0.3 - ux * 0.6); ctx.closePath(); ctx.fill();
-			ctx.fillStyle = "rgba(238, 246, 234, 0.92)";
-			ctx.fillText(wtx, x0 + 24, top + 11.5);
+			ctx.fillStyle = "rgba(238, 246, 234, 0.9)";
+			ctx.fillText(wtx, x0 + 22, top + 10.5);
 		}
 		if (state === "play" || state === "goal" || state === "paused") {
 			const m = mentality[0], tag = `TACTIC: ${MENTALITY[m + 1].toUpperCase()}${coarse ? "" : "  (1-4 / T)"}`, tw = ctx.measureText(tag).width;
-			ctx.fillStyle = m > 0 ? "rgba(120, 70, 10, 0.75)" : m < 0 ? "rgba(20, 45, 80, 0.75)" : "rgba(7, 12, 10, 0.6)";
-			ctx.fillRect(10, top + 26, tw + 16, 22);
-			ctx.fillStyle = m > 0 ? "#ffd27a" : m < 0 ? "#bcd8f5" : "rgba(238, 246, 234, 0.9)";
-			ctx.fillText(tag, 18, top + 37.5);
+			ctx.fillStyle = m > 0 ? "rgba(120, 70, 10, 0.7)" : m < 0 ? "rgba(20, 45, 80, 0.7)" : "rgba(10, 14, 20, 0.55)";
+			ctx.fillRect(R - tw - 16, top + 24, tw + 16, 20);
+			ctx.fillStyle = m > 0 ? "#ffd27a" : m < 0 ? "#bcd8f5" : "rgba(238, 246, 234, 0.88)";
+			ctx.fillText(tag, R - tw - 8, top + 34.5);
 		}
 	}
 

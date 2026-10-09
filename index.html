@@ -85,26 +85,26 @@
 	/* The score bug: a broadcast graphic. Each side's name on a bar in its kit colour, the score in
 	   a white box, the clock in amber; the score box flashes when a goal goes in. */
 	.scorebug {
-		position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 3;
+		position: absolute; top: 14px; left: 16px; z-index: 3;
 		display: none; align-items: stretch; gap: 0; padding: 0;
-		background: linear-gradient(180deg, rgba(24, 31, 37, 0.96), rgba(8, 12, 15, 0.96)); border-radius: 3px;
-		box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-		font-family: var(--display); font-weight: 800; font-size: 19px; letter-spacing: 0.06em; text-transform: uppercase;
-		color: var(--chalk, #eef6ea); pointer-events: none; white-space: nowrap;
+		background: rgba(12, 16, 22, 0.78); border-radius: 4px; backdrop-filter: blur(3px);
+		box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+		font-family: Barlow, Arial, sans-serif; font-weight: 700; font-size: 15px; letter-spacing: 0.1em; text-transform: uppercase;
+		color: var(--chalk, #eef6ea); pointer-events: none; white-space: nowrap; line-height: 1;
 	}
-	.scorebug > span:not(.bugbar):not(.bugmood), .scorebug > b { display: inline-flex; align-items: center; padding: 4px 11px 5px; }
-	.scorebug #bugHome { border-left: 6px solid var(--left-kit, #f2b52e); border-radius: 3px 0 0 3px; }
-	.scorebug #bugAway { border-right: 6px solid var(--right-kit, #de4f5a); }
+	.scorebug > span:not(.bugbar):not(.bugmood), .scorebug > b { display: inline-flex; align-items: center; padding: 6px 10px 6px; }
+	.scorebug #bugHome { border-left: 4px solid var(--left-kit, #f2b52e); border-radius: 4px 0 0 4px; }
+	.scorebug #bugAway { border-right: 4px solid var(--right-kit, #de4f5a); }
 	body.big .scorebug { display: inline-flex; }
 	.pitchwrap:has(.overlay:not([hidden])) .scorebug { display: none; }   /* the card over the pitch has the details */
 	.menutoggle {
 		position: absolute; top: 10px; right: 10px; z-index: 4; padding: 5px 10px; font-size: 13px;
 		background: rgba(7, 12, 10, 0.82); border: 1px solid var(--rule); border-radius: 4px; color: var(--chalk, #eef6ea);
 	}
-	.scorebug b { font-size: 22px; font-variant-numeric: tabular-nums; background: #f4f6f2; color: #0d1612; letter-spacing: 0.04em; min-width: 3.3em; justify-content: center; }
+	.scorebug b { font-family: var(--display); font-weight: 800; font-size: 18px; font-variant-numeric: tabular-nums; background: rgba(244, 246, 242, 0.94); color: #0d1612; letter-spacing: 0.04em; min-width: 3em; justify-content: center; }
 	.scorebug b.flash { animation: bugflash 1.6s ease-out; }
 	@keyframes bugflash { 0%, 30% { background: var(--amber); } 100% { background: #f4f6f2; } }
-	.scorebug .t { color: #f2b52e; font-size: 17px; font-variant-numeric: tabular-nums; background: rgba(255, 255, 255, 0.07); border-radius: 0 3px 3px 0; }
+	.scorebug .t { color: #ffffff; font-size: 14px; font-variant-numeric: tabular-nums; letter-spacing: 0.06em; background: rgba(0, 0, 0, 0.42); border-radius: 0 4px 4px 0; margin-left: 2px; }
 	@media (max-width: 640px) {
 		.scorebug { left: 10px; transform: none; font-size: 14px; max-width: calc(100% - 118px); }
 		.scorebug > span:not(.bugbar):not(.bugmood), .scorebug > b { padding: 3px 7px 4px; }
@@ -116,7 +116,7 @@
 	}
 	/* Big pitch keeps the momentum: a strip along the bottom of the bug and a word under it. */
 	.scorebug .bugbar { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; overflow: hidden; border-radius: 0 0 3px 3px; background: rgba(255, 255, 255, 0.08); }
-	.scorebug .bugmood { position: absolute; top: calc(100% + 4px); left: 50%; transform: translateX(-50%); font-size: 12px; font-weight: 700; letter-spacing: 0.08em; padding: 2px 8px; border-radius: 3px; background: rgba(7, 12, 10, 0.78); color: var(--chalk, #eef6ea); }
+	.scorebug .bugmood { position: absolute; top: calc(100% + 4px); left: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; padding: 2px 8px; border-radius: 3px; background: rgba(7, 12, 10, 0.78); color: var(--chalk, #eef6ea); }
 	.scorebug .bugmood.home { color: var(--amber); }
 	.scorebug .bugmood.away { color: var(--opp-text); }
 	/* Lower-third captions: goals, cards and substitutions, like a broadcast. A tag (GOAL, YELLOW
@@ -1349,7 +1349,7 @@
 				</select>
 			</label>
 			<button id="hintsBtn" type="button" aria-pressed="true">Hints on</button>
-			<button id="mapBtn" type="button" aria-pressed="false">Minimap off</button>
+			<button id="mapBtn" type="button" aria-pressed="true">Minimap on</button>
 			<button id="bigBtn" type="button" aria-pressed="false">Big pitch: off</button>
 			<button id="contrastBtn" type="button" aria-pressed="false" title="High-contrast kits: the other side plays in white or black, with a dashed ring, so the teams never blur together">Kit contrast off</button>
 			</div>
@@ -8107,8 +8107,8 @@
 		scoreHomeEl.textContent = leftIsYou ? score[0] : score[1];
 		scoreAwayEl.textContent = leftIsYou ? score[1] : score[0];
 		clockEl.textContent = clock;
-		// Broadcast codes on a narrow screen: the first three letters of each side.
-		const code = n => (narrow ? (n.replace(/[^A-Za-z]/g, "").slice(0, 3) || n) : n);
+		// Broadcast codes, FIFA style: the first three letters of each side.
+		const code = n => n.replace(/[^A-Za-z]/g, "").slice(0, 3).toUpperCase() || n;
 		$("bugHome").textContent = code($("homeName").textContent);
 		$("bugAway").textContent = code($("awayName").textContent);
 		const bugScore = `${scoreHomeEl.textContent} – ${scoreAwayEl.textContent}`, bs = $("bugScore");
@@ -8997,17 +8997,8 @@
 			else { drawFigure(p, X, Y, kit); }
 		}
 
-		// Your controlled player's name, above the marker.
-		if (isHuman && p.name) {
-			ctx.font = "700 11px Barlow, Arial, sans-serif";
-			ctx.textAlign = "center";
-			ctx.textBaseline = "middle";
-			ctx.fillStyle = "rgba(7, 12, 10, 0.55)";
-			const label = `${p.num} ${p.name}`, w = ctx.measureText(label).width;
-			ctx.fillRect(X - w / 2 - 4, Y - 56, w + 8, 14);
-			ctx.fillStyle = "#ffffff";
-			ctx.fillText(label, X, Y - 49);
-		}
+		// Your controlled player's name plate, above the marker.
+		if (isHuman && p.name) { drawPlate(p, X, Y - 40); }
 
 		if (isHuman && (charging || passCharge) && ball.owner === p) {
 			const [ ax, ay ] = chargeAim(p);
@@ -9040,10 +9031,32 @@
 		ctx.lineWidth = 3;
 		ctx.beginPath(); ctx.moveTo(fx + ux * 16 * k, fy + uy * 16 * k); ctx.lineTo(tx - ux * 7, ty - uy * 7); ctx.stroke();
 		ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx - ux * 9 - uy * 5, ty - uy * 9 + ux * 5); ctx.lineTo(tx - ux * 9 + uy * 5, ty - uy * 9 - ux * 5); ctx.closePath(); ctx.fill();
-		const w = 36, h = 5, bx = fx - w / 2, by = fy + 18 * k + 6;
-		ctx.fillStyle = "rgba(7, 12, 10, 0.75)"; ctx.fillRect(bx - 2, by - 2, w + 4, h + 4);
-		ctx.fillStyle = power < 0.5 ? "#7fd49b" : power < 0.8 ? "#f2b52e" : "#e2594a";
-		ctx.fillRect(bx, by, w * power, h);
+		ctx.restore();
+	}
+	// Your man's name plate, FIFA style: number and name on a slim dark plate with a kit-colour edge,
+	// his stamina in a thin bar along its foot and, while a pass or shot charges, the power bar on top.
+	// (x, y) is the point just above his head the plate's pointer touches.
+	function drawPlate (p, x, y) {
+		ctx.save();
+		ctx.font = "700 11px Barlow, Arial, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+		const label = `${p.num} ${p.name}`.toUpperCase(), w = Math.max(60, Math.ceil(ctx.measureText(label).width) + 18), h = 16;
+		const x0 = Math.round(x - w / 2), yb = Math.round(y - 7), y0 = yb - h - 3;
+		ctx.fillStyle = "#f2b52e";
+		ctx.beginPath(); ctx.moveTo(x - 5, yb); ctx.lineTo(x + 5, yb); ctx.lineTo(x, yb + 6); ctx.closePath(); ctx.fill();
+		ctx.fillStyle = "rgba(10, 14, 20, 0.8)"; ctx.fillRect(x0, y0, w, h + 3);
+		ctx.fillStyle = (KITS[p.team] || KITS[0]).outfield; ctx.fillRect(x0, y0, 3, h + 3);
+		ctx.fillStyle = "#f4f6f2"; ctx.fillText(label, x0 + 1.5 + w / 2, y0 + h / 2 + 0.5);
+		const s = clamp((staOf(p) - 0.25) / 0.75, 0, 1);
+		ctx.fillStyle = "rgba(255, 255, 255, 0.14)"; ctx.fillRect(x0 + 3, yb - 3, w - 3, 3);
+		ctx.fillStyle = staOf(p) < TIRED_STA ? "#e2594a" : s < 0.6 ? "#f2b52e" : "#5fd38a"; ctx.fillRect(x0 + 3, yb - 3, (w - 3) * s, 3);
+		if ((charging || passCharge) && ball.owner === p) {
+			const power = chargeOf(charging ? chargeStart : passCharge.start), by = y0 - 9;
+			ctx.fillStyle = "rgba(10, 14, 20, 0.8)"; ctx.fillRect(x0, by - 1, w, 8);
+			const g = ctx.createLinearGradient(x0, 0, x0 + w, 0);
+			g.addColorStop(0, "#5fd38a"); g.addColorStop(0.55, "#f2d22e"); g.addColorStop(0.85, "#f28a2e"); g.addColorStop(1, "#e2394a");
+			ctx.fillStyle = g; ctx.fillRect(x0 + 1, by, (w - 2) * power, 6);
+			ctx.fillStyle = "rgba(255, 255, 255, 0.75)"; ctx.fillRect(x0 + 1 + (w - 2) * 0.8, by - 1, 1.5, 8);
+		}
 		ctx.restore();
 	}
 
@@ -9107,35 +9120,36 @@
 		} else {
 			drops = [];
 		}
-		ctx.font = "700 12px Barlow, Arial, sans-serif";
+		ctx.font = "700 11px Barlow, Arial, sans-serif";
 		ctx.textAlign = "left";
 		ctx.textBaseline = "middle";
 		const text = `${cond.label} · ${cond.ko === "day" ? "Afternoon" : "Night"}`.toUpperCase(), w = ctx.measureText(text).width;
-		// On a narrow screen the score bug sits top left too, so the tags drop below it.
-		const top = canvas.clientWidth < 640 && document.body.classList.contains("big") && overlay.hidden ? 78 : 10;
-		ctx.fillStyle = "rgba(7, 12, 10, 0.6)";
-		ctx.fillRect(10, top, w + 16, 22);
-		ctx.fillStyle = "rgba(238, 246, 234, 0.9)";
-		ctx.fillText(text, 18, top + 11.5);
+		// Top right, under the menu button, right-aligned and quiet: the score bug has the top left.
+		const top = 44, R = SW - 10, hasWind = cond.wind.s >= 6;
+		const wtx = `${cond.wind.s} KM/H`, ww = hasWind ? ctx.measureText(wtx).width + 30 : 0, x1 = R - ww - (hasWind ? 4 : 0) - (w + 16);
+		ctx.fillStyle = "rgba(10, 14, 20, 0.55)";
+		ctx.fillRect(x1, top, w + 16, 20);
+		ctx.fillStyle = "rgba(238, 246, 234, 0.88)";
+		ctx.fillText(text, x1 + 8, top + 10.5);
 		// The wind: an arrow the way it blows on screen (flipped with the picture after half time) and its speed.
-		if (cond.wind.s >= 6) {
-			const wtx = `${cond.wind.s} KM/H`, ww = ctx.measureText(wtx).width, x0 = 10 + w + 22;
+		if (hasWind) {
+			const x0 = R - ww;
 			const sx = Math.cos(cond.wind.a) * (endsSwapped() ? -1 : 1), sy = Math.sin(cond.wind.a) * (camMode === "top" ? 1 : 0.55), sl = Math.hypot(sx, sy) || 1;
-			ctx.fillStyle = cond.wind.s >= 20 ? "rgba(30, 60, 92, 0.78)" : "rgba(7, 12, 10, 0.6)";
-			ctx.fillRect(x0, top, ww + 36, 22);
-			const ax = x0 + 12, ay = top + 11, ux = sx / sl * 7, uy = sy / sl * 7;
+			ctx.fillStyle = cond.wind.s >= 20 ? "rgba(30, 60, 92, 0.75)" : "rgba(10, 14, 20, 0.55)";
+			ctx.fillRect(x0, top, ww, 20);
+			const ax = x0 + 11, ay = top + 10, ux = sx / sl * 6, uy = sy / sl * 6;
 			ctx.strokeStyle = "#cfe6ff"; ctx.fillStyle = "#cfe6ff"; ctx.lineWidth = 2;
 			ctx.beginPath(); ctx.moveTo(ax - ux, ay - uy); ctx.lineTo(ax + ux, ay + uy); ctx.stroke();
 			ctx.beginPath(); ctx.moveTo(ax + ux * 1.25, ay + uy * 1.25); ctx.lineTo(ax + ux * 0.3 - uy * 0.6, ay + uy * 0.3 + ux * 0.6); ctx.lineTo(ax + ux * 0.3 + uy * 0.6, ay + uy * 0.3 - ux * 0.6); ctx.closePath(); ctx.fill();
-			ctx.fillStyle = "rgba(238, 246, 234, 0.92)";
-			ctx.fillText(wtx, x0 + 24, top + 11.5);
+			ctx.fillStyle = "rgba(238, 246, 234, 0.9)";
+			ctx.fillText(wtx, x0 + 22, top + 10.5);
 		}
 		if (state === "play" || state === "goal" || state === "paused") {
 			const m = mentality[0], tag = `TACTIC: ${MENTALITY[m + 1].toUpperCase()}${coarse ? "" : "  (1-4 / T)"}`, tw = ctx.measureText(tag).width;
-			ctx.fillStyle = m > 0 ? "rgba(120, 70, 10, 0.75)" : m < 0 ? "rgba(20, 45, 80, 0.75)" : "rgba(7, 12, 10, 0.6)";
-			ctx.fillRect(10, top + 26, tw + 16, 22);
-			ctx.fillStyle = m > 0 ? "#ffd27a" : m < 0 ? "#bcd8f5" : "rgba(238, 246, 234, 0.9)";
-			ctx.fillText(tag, 18, top + 37.5);
+			ctx.fillStyle = m > 0 ? "rgba(120, 70, 10, 0.7)" : m < 0 ? "rgba(20, 45, 80, 0.7)" : "rgba(10, 14, 20, 0.55)";
+			ctx.fillRect(R - tw - 16, top + 24, tw + 16, 20);
+			ctx.fillStyle = m > 0 ? "#ffd27a" : m < 0 ? "#bcd8f5" : "rgba(238, 246, 234, 0.88)";
+			ctx.fillText(tag, R - tw - 8, top + 34.5);
 		}
 	}
 
@@ -9686,7 +9700,7 @@
 		ctx.textBaseline = "middle";
 		ctx.textAlign = "left";
 		let x = 12;
-		const y = SH - 22 - tickerUp(), maxX = minimapOn && (WW > VW || WH > VH) ? (SW - 190) / 2 - 10 : SW - 12;   // stay clear of the minimap when it's shown
+		const y = SH - 22 - tickerUp(), maxX = radarShown() ? (SW - RADAR_W) / 2 - 16 : SW - 12;   // stay clear of the minimap when it's shown
 		for (const [ key, label ] of items) {
 			ctx.font = "800 11px Barlow, Arial, sans-serif";
 			const kw = ctx.measureText(key).width + 10;
@@ -9713,11 +9727,11 @@
 		const me = human();
 		if (!charging || state !== "play" || !me || ball.owner !== me) { meterRect = null; return; }
 		const power = clamp((frame - chargeStart) / 50, 0, 1);
-		const w = Math.min(220, SW - 40), h = 10, x = (SW - w) / 2, y = SH - (coarse || !hintsOn ? 30 : 56) - tickerUp();
+		const w = Math.min(RADAR_W, SW - 40), h = 8, x = (SW - w) / 2, y = radarShown() ? SH - 12 - tickerUp() - FH * RADAR_W / FW - 26 : SH - (coarse || !hintsOn ? 30 : 56) - tickerUp();
 		meterRect = { x, y, w, h, power };
 		ctx.save();
-		ctx.fillStyle = "rgba(7, 12, 10, 0.7)";
-		ctx.fillRect(x - 8, y - 22, w + 16, h + 30);
+		ctx.fillStyle = "rgba(10, 16, 14, 0.62)";
+		ctx.fillRect(x - 6, y - 20, w + 12, h + 26);
 		ctx.fillStyle = "rgba(238, 246, 234, 0.14)";
 		ctx.fillRect(x, y, w, h);
 		// Green into amber, then red at full power, where a poor finisher can blaze it over.
@@ -9754,35 +9768,49 @@
 		ctx.globalAlpha = 1;
 	}
 
-	// Whole-pitch radar, shown when the camera can't fit the pitch on screen.
-	let minimapOn = false;   // off unless you turn it on with the Minimap button
+	// The radar, FIFA style: the whole pitch in a small dark panel at the bottom centre, both sides as
+	// dots in their kit colours, the ball in white and your man ringed. On unless you turn it off.
+	let minimapOn = true;
+	const RADAR_W = 168;
+	const radarShown = () => minimapOn && state !== "intro" && (camMode !== "top" || WW > VW || WH > VH);
 	function drawMinimap () {
-		if (!minimapOn || (WW <= VW && WH <= VH)) { return; }
-		const w = 190, k = w / FW, h = FH * k, x0 = (SW - w) / 2, y0 = SH - h - 12 - tickerUp();
-		ctx.fillStyle = "rgba(7, 12, 10, 0.72)";
-		ctx.fillRect(x0 - 5, y0 - 5, w + 10, h + 10);
-		ctx.strokeStyle = "rgba(238, 246, 234, 0.45)";
-		ctx.lineWidth = 1;
-		ctx.strokeRect(x0, y0, w, h);
-		ctx.beginPath(); ctx.moveTo(x0 + w / 2, y0); ctx.lineTo(x0 + w / 2, y0 + h); ctx.stroke();
+		if (!radarShown()) { return; }
+		const w = RADAR_W, k = w / FW, h = FH * k, x0 = (SW - w) / 2, y0 = SH - h - 12 - tickerUp();
 		ctx.save();
-		ctx.beginPath(); ctx.rect(x0, y0, w, h); ctx.clip();
-		ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
+		ctx.fillStyle = "rgba(10, 16, 14, 0.42)";
+		ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x0 - 6, y0 - 6, w + 12, h + 12, 6) : ctx.rect(x0 - 6, y0 - 6, w + 12, h + 12); ctx.fill();
+		ctx.fillStyle = "rgba(60, 120, 70, 0.16)"; ctx.fillRect(x0, y0, w, h);
+		ctx.strokeStyle = "rgba(238, 246, 234, 0.38)"; ctx.lineWidth = 1;
+		const bd = FW * 0.157 * k, bw = FH * 0.593 * k, gd = FW * 0.052 * k, gw = FH * 0.27 * k;
+		ctx.beginPath();
+		ctx.rect(x0 + 0.5, y0 + 0.5, w - 1, h - 1);
+		ctx.moveTo(x0 + w / 2, y0); ctx.lineTo(x0 + w / 2, y0 + h);
+		ctx.rect(x0 + 0.5, y0 + (h - bw) / 2, bd, bw); ctx.rect(x0 + w - 0.5 - bd, y0 + (h - bw) / 2, bd, bw);
+		ctx.rect(x0 + 0.5, y0 + (h - gw) / 2, gd, gw); ctx.rect(x0 + w - 0.5 - gd, y0 + (h - gw) / 2, gd, gw);
+		ctx.moveTo(x0 + w / 2 + h * 0.135, y0 + h / 2); ctx.arc(x0 + w / 2, y0 + h / 2, h * 0.135, 0, Math.PI * 2);
+		ctx.stroke();
 		const sw = endsSwapped(), mx = x => (sw ? FW - x : x);
-		ctx.strokeRect(x0 + (sw ? FW - (camX - MX) - VW : camX - MX) * k, y0 + (camY - MY) * k, VW * k, VH * k);
-		for (const p of players) {
-			const kit = KITS[p.team];
-			ctx.fillStyle = p.role === "gk" ? kit.gk : kit.outfield;
-			ctx.beginPath(); ctx.arc(x0 + mx(p.x) * k, y0 + p.y * k, 2.6, 0, Math.PI * 2); ctx.fill();
+		if (camMode === "top") {
+			ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
+			ctx.strokeRect(x0 + (sw ? FW - (camX - MX) - VW : camX - MX) * k, y0 + (camY - MY) * k, VW * k, VH * k);
 		}
 		const me = human();
-		if (me) {
-			ctx.strokeStyle = "#ffffff";
-			ctx.lineWidth = 1.5;
-			ctx.beginPath(); ctx.arc(x0 + mx(me.x) * k, y0 + me.y * k, 4.5, 0, Math.PI * 2); ctx.stroke();
+		ctx.lineWidth = 1; ctx.strokeStyle = "rgba(0, 0, 0, 0.55)";
+		for (const p of players) {
+			if (p === me) { continue; }
+			const kit = KITS[p.team];
+			ctx.fillStyle = p.role === "gk" ? kit.gk : kit.outfield;
+			ctx.beginPath(); ctx.arc(x0 + mx(p.x) * k, y0 + p.y * k, 2.6, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
 		}
-		ctx.fillStyle = "#ffffff";
-		ctx.beginPath(); ctx.arc(x0 + mx(ball.x) * k, y0 + ball.y * k, 2.2, 0, Math.PI * 2); ctx.fill();
+		if (me) {
+			const px = x0 + mx(me.x) * k, py = y0 + me.y * k;
+			ctx.fillStyle = KITS[0].outfield;
+			ctx.beginPath(); ctx.arc(px, py, 4, 0, Math.PI * 2); ctx.fill();
+			ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 1.6;
+			ctx.beginPath(); ctx.arc(px, py, 6, 0, Math.PI * 2); ctx.stroke();
+		}
+		ctx.fillStyle = "#ffffff"; ctx.strokeStyle = "rgba(0, 0, 0, 0.7)"; ctx.lineWidth = 1;
+		ctx.beginPath(); ctx.arc(x0 + mx(ball.x) * k, y0 + ball.y * k, 2.4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
 		ctx.restore();
 	}
 
@@ -10415,14 +10443,8 @@
 		// Your man: the marker and his name.
 		if (p.team === 0 && players.indexOf(p) === ctrl && state !== "intro") {
 			drawSprintBar(p, X, b.y + Math.max(4, 5 * k), Math.max(22, 30 * k));
-			ctx.fillStyle = "#f2b52e";
-			ctx.beginPath(); ctx.moveTo(X - 7, top - 12); ctx.lineTo(X + 7, top - 12); ctx.lineTo(X, top - 3); ctx.closePath(); ctx.fill();
-			if (p.name) {
-				ctx.font = "700 12px Barlow, Arial, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
-				const label = `${p.num} ${p.name}`, w = ctx.measureText(label).width;
-				ctx.fillStyle = "rgba(8, 13, 11, 0.8)"; ctx.fillRect(X - w / 2 - 5, top - 29, w + 10, 16);
-				ctx.fillStyle = "#eef6ea"; ctx.fillText(label, X, top - 15);
-			}
+			if (p.name) { drawPlate(p, X, top - 2); }
+			else { ctx.fillStyle = "#f2b52e"; ctx.beginPath(); ctx.moveTo(X - 7, top - 12); ctx.lineTo(X + 7, top - 12); ctx.lineTo(X, top - 3); ctx.closePath(); ctx.fill(); }
 		}
 	}
 	// The ball, seen from the stand. Its panels turn with its spin along the way it is travelling, so a
@@ -12251,12 +12273,7 @@
 					ctx.beginPath(); ctx.ellipse(foot.x, foot.y, r, r * 0.42, 0, -Math.PI / 2, -Math.PI / 2 + c * Math.PI * 2); ctx.stroke();
 				}
 			}
-			if (top && me.name) {
-				ctx.font = "700 12px Barlow, Arial, sans-serif";
-				const label = `${me.num} ${me.name}`, w = ctx.measureText(label).width;
-				ctx.fillStyle = "rgba(8, 13, 11, 0.8)"; ctx.fillRect(top.x - w / 2 - 5, top.y - 18, w + 10, 16);
-				ctx.fillStyle = "#eef6ea"; ctx.fillText(label, top.x, top.y - 10);
-			}
+			if (top && me.name) { drawPlate(me, top.x, top.y); ctx.textAlign = "center"; ctx.textBaseline = "middle"; }
 		}
 		if (playing && me && ball.owner === me) {
 			const m = strikerTarget(me), q = m && proj3D(m.x, m.y, 44);
@@ -13376,7 +13393,7 @@
 		if (l && [ ...lenSel.options ].some(o => o.value === l)) { lenSel.value = l; }
 		if (s === "0") { soundOn = false; soundBtn.textContent = "Sound off"; soundBtn.setAttribute("aria-pressed", "false"); }
 		if (store.get("ff-offside") === "0") { offsideRule = false; $("offsideBtn").textContent = "Offside off"; $("offsideBtn").setAttribute("aria-pressed", "false"); }
-		if (store.get("ff-map") === "1") { minimapOn = true; $("mapBtn").textContent = "Minimap on"; $("mapBtn").setAttribute("aria-pressed", "true"); }
+		minimapOn = store.get("ff-map") !== "0"; $("mapBtn").textContent = minimapOn ? "Minimap on" : "Minimap off"; $("mapBtn").setAttribute("aria-pressed", String(minimapOn));
 		if (store.get("ff-hints") === "0") { hintsOn = false; $("hintsBtn").textContent = "Hints off"; $("hintsBtn").setAttribute("aria-pressed", "false"); }
 		if (store.get("ff-music") === "0") { musicOn = false; $("musicBtn").textContent = "Music off"; $("musicBtn").setAttribute("aria-pressed", "false"); }
 		{ const g = store.get("ff-gfx"); if (g && GFX3[g]) { setGfx(g); } }

@@ -64,26 +64,26 @@
 	/* The score bug: a broadcast graphic. Each side's name on a bar in its kit colour, the score in
 	   a white box, the clock in amber; the score box flashes when a goal goes in. */
 	.scorebug {
-		position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 3;
+		position: absolute; top: 14px; left: 16px; z-index: 3;
 		display: none; align-items: stretch; gap: 0; padding: 0;
-		background: linear-gradient(180deg, rgba(24, 31, 37, 0.96), rgba(8, 12, 15, 0.96)); border-radius: 3px;
-		box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-		font-family: var(--display); font-weight: 800; font-size: 19px; letter-spacing: 0.06em; text-transform: uppercase;
-		color: var(--chalk, #eef6ea); pointer-events: none; white-space: nowrap;
+		background: rgba(12, 16, 22, 0.78); border-radius: 4px; backdrop-filter: blur(3px);
+		box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+		font-family: Barlow, Arial, sans-serif; font-weight: 700; font-size: 15px; letter-spacing: 0.1em; text-transform: uppercase;
+		color: var(--chalk, #eef6ea); pointer-events: none; white-space: nowrap; line-height: 1;
 	}
-	.scorebug > span:not(.bugbar):not(.bugmood), .scorebug > b { display: inline-flex; align-items: center; padding: 4px 11px 5px; }
-	.scorebug #bugHome { border-left: 6px solid var(--left-kit, #f2b52e); border-radius: 3px 0 0 3px; }
-	.scorebug #bugAway { border-right: 6px solid var(--right-kit, #de4f5a); }
+	.scorebug > span:not(.bugbar):not(.bugmood), .scorebug > b { display: inline-flex; align-items: center; padding: 6px 10px 6px; }
+	.scorebug #bugHome { border-left: 4px solid var(--left-kit, #f2b52e); border-radius: 4px 0 0 4px; }
+	.scorebug #bugAway { border-right: 4px solid var(--right-kit, #de4f5a); }
 	body.big .scorebug { display: inline-flex; }
 	.pitchwrap:has(.overlay:not([hidden])) .scorebug { display: none; }   /* the card over the pitch has the details */
 	.menutoggle {
 		position: absolute; top: 10px; right: 10px; z-index: 4; padding: 5px 10px; font-size: 13px;
 		background: rgba(7, 12, 10, 0.82); border: 1px solid var(--rule); border-radius: 4px; color: var(--chalk, #eef6ea);
 	}
-	.scorebug b { font-size: 22px; font-variant-numeric: tabular-nums; background: #f4f6f2; color: #0d1612; letter-spacing: 0.04em; min-width: 3.3em; justify-content: center; }
+	.scorebug b { font-family: var(--display); font-weight: 800; font-size: 18px; font-variant-numeric: tabular-nums; background: rgba(244, 246, 242, 0.94); color: #0d1612; letter-spacing: 0.04em; min-width: 3em; justify-content: center; }
 	.scorebug b.flash { animation: bugflash 1.6s ease-out; }
 	@keyframes bugflash { 0%, 30% { background: var(--amber); } 100% { background: #f4f6f2; } }
-	.scorebug .t { color: #f2b52e; font-size: 17px; font-variant-numeric: tabular-nums; background: rgba(255, 255, 255, 0.07); border-radius: 0 3px 3px 0; }
+	.scorebug .t { color: #ffffff; font-size: 14px; font-variant-numeric: tabular-nums; letter-spacing: 0.06em; background: rgba(0, 0, 0, 0.42); border-radius: 0 4px 4px 0; margin-left: 2px; }
 	@media (max-width: 640px) {
 		.scorebug { left: 10px; transform: none; font-size: 14px; max-width: calc(100% - 118px); }
 		.scorebug > span:not(.bugbar):not(.bugmood), .scorebug > b { padding: 3px 7px 4px; }
@@ -95,7 +95,7 @@
 	}
 	/* Big pitch keeps the momentum: a strip along the bottom of the bug and a word under it. */
 	.scorebug .bugbar { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; overflow: hidden; border-radius: 0 0 3px 3px; background: rgba(255, 255, 255, 0.08); }
-	.scorebug .bugmood { position: absolute; top: calc(100% + 4px); left: 50%; transform: translateX(-50%); font-size: 12px; font-weight: 700; letter-spacing: 0.08em; padding: 2px 8px; border-radius: 3px; background: rgba(7, 12, 10, 0.78); color: var(--chalk, #eef6ea); }
+	.scorebug .bugmood { position: absolute; top: calc(100% + 4px); left: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; padding: 2px 8px; border-radius: 3px; background: rgba(7, 12, 10, 0.78); color: var(--chalk, #eef6ea); }
 	.scorebug .bugmood.home { color: var(--amber); }
 	.scorebug .bugmood.away { color: var(--opp-text); }
 	/* Lower-third captions: goals, cards and substitutions, like a broadcast. A tag (GOAL, YELLOW

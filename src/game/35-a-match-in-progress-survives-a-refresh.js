@@ -376,8 +376,8 @@
 		scoreHomeEl.textContent = leftIsYou ? score[0] : score[1];
 		scoreAwayEl.textContent = leftIsYou ? score[1] : score[0];
 		clockEl.textContent = clock;
-		// Broadcast codes on a narrow screen: the first three letters of each side.
-		const code = n => (narrow ? (n.replace(/[^A-Za-z]/g, "").slice(0, 3) || n) : n);
+		// Broadcast codes, FIFA style: the first three letters of each side.
+		const code = n => n.replace(/[^A-Za-z]/g, "").slice(0, 3).toUpperCase() || n;
 		$("bugHome").textContent = code($("homeName").textContent);
 		$("bugAway").textContent = code($("awayName").textContent);
 		const bugScore = `${scoreHomeEl.textContent} – ${scoreAwayEl.textContent}`, bs = $("bugScore");

@@ -545,7 +545,7 @@
 		ctx.textBaseline = "middle";
 		ctx.textAlign = "left";
 		let x = 12;
-		const y = SH - 22 - tickerUp(), maxX = minimapOn && (WW > VW || WH > VH) ? (SW - 190) / 2 - 10 : SW - 12;   // stay clear of the minimap when it's shown
+		const y = SH - 22 - tickerUp(), maxX = radarShown() ? (SW - RADAR_W) / 2 - 16 : SW - 12;   // stay clear of the minimap when it's shown
 		for (const [ key, label ] of items) {
 			ctx.font = "800 11px Barlow, Arial, sans-serif";
 			const kw = ctx.measureText(key).width + 10;
@@ -572,11 +572,11 @@
 		const me = human();
 		if (!charging || state !== "play" || !me || ball.owner !== me) { meterRect = null; return; }
 		const power = clamp((frame - chargeStart) / 50, 0, 1);
-		const w = Math.min(220, SW - 40), h = 10, x = (SW - w) / 2, y = SH - (coarse || !hintsOn ? 30 : 56) - tickerUp();
+		const w = Math.min(RADAR_W, SW - 40), h = 8, x = (SW - w) / 2, y = radarShown() ? SH - 12 - tickerUp() - FH * RADAR_W / FW - 26 : SH - (coarse || !hintsOn ? 30 : 56) - tickerUp();
 		meterRect = { x, y, w, h, power };
 		ctx.save();
-		ctx.fillStyle = "rgba(7, 12, 10, 0.7)";
-		ctx.fillRect(x - 8, y - 22, w + 16, h + 30);
+		ctx.fillStyle = "rgba(10, 16, 14, 0.62)";
+		ctx.fillRect(x - 6, y - 20, w + 12, h + 26);
 		ctx.fillStyle = "rgba(238, 246, 234, 0.14)";
 		ctx.fillRect(x, y, w, h);
 		// Green into amber, then red at full power, where a poor finisher can blaze it over.
@@ -613,35 +613,49 @@
 		ctx.globalAlpha = 1;
 	}
 
-	// Whole-pitch radar, shown when the camera can't fit the pitch on screen.
-	let minimapOn = false;   // off unless you turn it on with the Minimap button
+	// The radar, FIFA style: the whole pitch in a small dark panel at the bottom centre, both sides as
+	// dots in their kit colours, the ball in white and your man ringed. On unless you turn it off.
+	let minimapOn = true;
+	const RADAR_W = 168;
+	const radarShown = () => minimapOn && state !== "intro" && (camMode !== "top" || WW > VW || WH > VH);
 	function drawMinimap () {
-		if (!minimapOn || (WW <= VW && WH <= VH)) { return; }
-		const w = 190, k = w / FW, h = FH * k, x0 = (SW - w) / 2, y0 = SH - h - 12 - tickerUp();
-		ctx.fillStyle = "rgba(7, 12, 10, 0.72)";
-		ctx.fillRect(x0 - 5, y0 - 5, w + 10, h + 10);
-		ctx.strokeStyle = "rgba(238, 246, 234, 0.45)";
-		ctx.lineWidth = 1;
-		ctx.strokeRect(x0, y0, w, h);
-		ctx.beginPath(); ctx.moveTo(x0 + w / 2, y0); ctx.lineTo(x0 + w / 2, y0 + h); ctx.stroke();
+		if (!radarShown()) { return; }
+		const w = RADAR_W, k = w / FW, h = FH * k, x0 = (SW - w) / 2, y0 = SH - h - 12 - tickerUp();
 		ctx.save();
-		ctx.beginPath(); ctx.rect(x0, y0, w, h); ctx.clip();
-		ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
+		ctx.fillStyle = "rgba(10, 16, 14, 0.42)";
+		ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x0 - 6, y0 - 6, w + 12, h + 12, 6) : ctx.rect(x0 - 6, y0 - 6, w + 12, h + 12); ctx.fill();
+		ctx.fillStyle = "rgba(60, 120, 70, 0.16)"; ctx.fillRect(x0, y0, w, h);
+		ctx.strokeStyle = "rgba(238, 246, 234, 0.38)"; ctx.lineWidth = 1;
+		const bd = FW * 0.157 * k, bw = FH * 0.593 * k, gd = FW * 0.052 * k, gw = FH * 0.27 * k;
+		ctx.beginPath();
+		ctx.rect(x0 + 0.5, y0 + 0.5, w - 1, h - 1);
+		ctx.moveTo(x0 + w / 2, y0); ctx.lineTo(x0 + w / 2, y0 + h);
+		ctx.rect(x0 + 0.5, y0 + (h - bw) / 2, bd, bw); ctx.rect(x0 + w - 0.5 - bd, y0 + (h - bw) / 2, bd, bw);
+		ctx.rect(x0 + 0.5, y0 + (h - gw) / 2, gd, gw); ctx.rect(x0 + w - 0.5 - gd, y0 + (h - gw) / 2, gd, gw);
+		ctx.moveTo(x0 + w / 2 + h * 0.135, y0 + h / 2); ctx.arc(x0 + w / 2, y0 + h / 2, h * 0.135, 0, Math.PI * 2);
+		ctx.stroke();
 		const sw = endsSwapped(), mx = x => (sw ? FW - x : x);
-		ctx.strokeRect(x0 + (sw ? FW - (camX - MX) - VW : camX - MX) * k, y0 + (camY - MY) * k, VW * k, VH * k);
-		for (const p of players) {
-			const kit = KITS[p.team];
-			ctx.fillStyle = p.role === "gk" ? kit.gk : kit.outfield;
-			ctx.beginPath(); ctx.arc(x0 + mx(p.x) * k, y0 + p.y * k, 2.6, 0, Math.PI * 2); ctx.fill();
+		if (camMode === "top") {
+			ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
+			ctx.strokeRect(x0 + (sw ? FW - (camX - MX) - VW : camX - MX) * k, y0 + (camY - MY) * k, VW * k, VH * k);
 		}
 		const me = human();
-		if (me) {
-			ctx.strokeStyle = "#ffffff";
-			ctx.lineWidth = 1.5;
-			ctx.beginPath(); ctx.arc(x0 + mx(me.x) * k, y0 + me.y * k, 4.5, 0, Math.PI * 2); ctx.stroke();
+		ctx.lineWidth = 1; ctx.strokeStyle = "rgba(0, 0, 0, 0.55)";
+		for (const p of players) {
+			if (p === me) { continue; }
+			const kit = KITS[p.team];
+			ctx.fillStyle = p.role === "gk" ? kit.gk : kit.outfield;
+			ctx.beginPath(); ctx.arc(x0 + mx(p.x) * k, y0 + p.y * k, 2.6, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
 		}
-		ctx.fillStyle = "#ffffff";
-		ctx.beginPath(); ctx.arc(x0 + mx(ball.x) * k, y0 + ball.y * k, 2.2, 0, Math.PI * 2); ctx.fill();
+		if (me) {
+			const px = x0 + mx(me.x) * k, py = y0 + me.y * k;
+			ctx.fillStyle = KITS[0].outfield;
+			ctx.beginPath(); ctx.arc(px, py, 4, 0, Math.PI * 2); ctx.fill();
+			ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 1.6;
+			ctx.beginPath(); ctx.arc(px, py, 6, 0, Math.PI * 2); ctx.stroke();
+		}
+		ctx.fillStyle = "#ffffff"; ctx.strokeStyle = "rgba(0, 0, 0, 0.7)"; ctx.lineWidth = 1;
+		ctx.beginPath(); ctx.arc(x0 + mx(ball.x) * k, y0 + ball.y * k, 2.4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
 		ctx.restore();
 	}
 

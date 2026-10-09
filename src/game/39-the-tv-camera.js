@@ -474,14 +474,8 @@
 		// Your man: the marker and his name.
 		if (p.team === 0 && players.indexOf(p) === ctrl && state !== "intro") {
 			drawSprintBar(p, X, b.y + Math.max(4, 5 * k), Math.max(22, 30 * k));
-			ctx.fillStyle = "#f2b52e";
-			ctx.beginPath(); ctx.moveTo(X - 7, top - 12); ctx.lineTo(X + 7, top - 12); ctx.lineTo(X, top - 3); ctx.closePath(); ctx.fill();
-			if (p.name) {
-				ctx.font = "700 12px Barlow, Arial, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
-				const label = `${p.num} ${p.name}`, w = ctx.measureText(label).width;
-				ctx.fillStyle = "rgba(8, 13, 11, 0.8)"; ctx.fillRect(X - w / 2 - 5, top - 29, w + 10, 16);
-				ctx.fillStyle = "#eef6ea"; ctx.fillText(label, X, top - 15);
-			}
+			if (p.name) { drawPlate(p, X, top - 2); }
+			else { ctx.fillStyle = "#f2b52e"; ctx.beginPath(); ctx.moveTo(X - 7, top - 12); ctx.lineTo(X + 7, top - 12); ctx.lineTo(X, top - 3); ctx.closePath(); ctx.fill(); }
 		}
 	}
 	// The ball, seen from the stand. Its panels turn with its spin along the way it is travelling, so a
