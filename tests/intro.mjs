@@ -81,6 +81,8 @@ check("a foul cuts to the fouled side's manager shouting at the referee", tl.fir
 check("a second foul straight after doesn't cut away again, and the box closes within three seconds", tl.again && tl.closed, JSON.stringify(tl));
 const bulk = await page.evaluate(() => { const F = window.__ff; F.tlcLast = -1e9; F.simulateMineTest(); return F.tlc; });
 check("a simulated match never shows the touchline cam", bulk === null, JSON.stringify(bulk));
+const nmg = await page.evaluate(() => { const F = window.__ff; F.state === "play" || (F.state = "play"); F.freeze = 0; F.tlcLast = -1e9; F.benchReact("near", { team: 0 }); const had = !!F.tlc; F.forceGoal(0); for (let i = 0; i < 60 && F.state !== "goal"; i++) { F.step(1); } return { had, state: F.state, cleared: F.tlc === null }; });
+check("a near-miss cutaway is cleared when a goal follows", nmg.had ? nmg.state === "goal" && nmg.cleared : true, JSON.stringify(nmg));
 await ctx.close();
 
 check("no console errors", errs.length === 0, errs.join(" | "));

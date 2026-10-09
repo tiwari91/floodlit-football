@@ -7905,6 +7905,7 @@
 	}
 
 	function showOverlay (title, text, btn, statRows) {
+		hideLineups();   // never stack the kick-off line-ups over a half-time or full-time card
 		ovTitle.textContent = title;
 		ovText.textContent = text;
 		ovText.classList.remove("lines");
