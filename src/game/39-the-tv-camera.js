@@ -184,11 +184,22 @@
 		const P = (x, y, z) => tvProj(x, y, z);
 		const seg = (a, b) => { if (a && b) { ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); } };
 		// The net: a mesh from the frame back to the rear bar.
-		ctx.strokeStyle = "rgba(255, 255, 255, 0.22)"; ctx.lineWidth = 1;
+		// A fine mesh over the roof and back, and the side nets either end, so it reads as netting
+		// rather than a few strings; the far side net a shade fainter.
+		ctx.lineWidth = 0.7;
+		ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
 		ctx.beginPath();
-		for (let y = GOAL_T; y <= GOAL_B + 0.1; y += (GOAL_B - GOAL_T) / 10) { seg(P(x0, y, cb), P(xb, y, bb)); seg(P(xb, y, bb), P(xb, y, 0)); }
-		for (let z = 0; z <= bb + 0.1; z += bb / 4) { seg(P(xb, GOAL_T, z), P(xb, GOAL_B, z)); }
+		for (let y = GOAL_T; y <= GOAL_B + 0.1; y += (GOAL_B - GOAL_T) / 24) { seg(P(x0, y, cb), P(xb, y, bb)); seg(P(xb, y, bb), P(xb, y, 0)); }
+		for (let z = 0; z <= bb + 0.1; z += bb / 9) { seg(P(xb, GOAL_T, z), P(xb, GOAL_B, z)); }
+		for (let t = 0.2; t < 1; t += 0.2) { const x = x0 + (xb - x0) * t, z = cb + (bb - cb) * t; seg(P(x, GOAL_T, z), P(x, GOAL_B, z)); }
 		ctx.stroke();
+		for (const y of [ GOAL_T, GOAL_B ]) {
+			ctx.strokeStyle = y === GOAL_T ? "rgba(255, 255, 255, 0.13)" : "rgba(255, 255, 255, 0.2)";
+			ctx.beginPath();
+			for (let t = 0; t <= 1.001; t += 1 / 6) { const x = x0 + (xb - x0) * t; seg(P(x, y, 0), P(x, y, cb + (bb - cb) * t)); }
+			for (let z = 0; z <= cb + 0.1; z += cb / 7) { seg(P(x0, y, Math.min(z, cb)), P(xb, y, Math.min(z, bb))); }
+			ctx.stroke();
+		}
 		ctx.strokeStyle = "#f7faf5"; ctx.lineCap = "round";
 		const k = (P(x0, (GOAL_T + GOAL_B) / 2, 0) || { k: 1 }).k;
 		ctx.lineWidth = Math.max(2, 3.2 * k);
@@ -201,6 +212,20 @@
 		seg(P(xb, GOAL_T, 0), P(xb, GOAL_T, bb)); seg(P(xb, GOAL_B, 0), P(xb, GOAL_B, bb));
 		ctx.stroke();
 		ctx.lineCap = "butt";
+		// The corner flags at this end: a thin white post and a flag that ripples.
+		const tf = performance.now() / 1000;
+		for (const y of [ 0, FH ]) {
+			const f0 = P(x0, y, 0), f1 = P(x0, y, 34 * Z_W);
+			if (!f0 || !f1) { continue; }
+			ctx.strokeStyle = "#f2f2ec"; ctx.lineWidth = Math.max(1, 1.4 * f0.k);
+			ctx.beginPath(); ctx.moveTo(f0.x, f0.y); ctx.lineTo(f1.x, f1.y); ctx.stroke();
+			const fw = 11 * f0.k, fh = 7 * f0.k, wv = reduceMotion ? 0 : Math.sin(tf * 5 + y) * 1.6 * f0.k, d = left ? 1 : -1;
+			ctx.fillStyle = "#f2b52e";
+			ctx.beginPath(); ctx.moveTo(f1.x, f1.y);
+			ctx.quadraticCurveTo(f1.x + d * fw * 0.5, f1.y + wv, f1.x + d * fw, f1.y + fh * 0.15 - wv * 0.5);
+			ctx.lineTo(f1.x + d * fw, f1.y + fh * 1.1 - wv * 0.5); ctx.quadraticCurveTo(f1.x + d * fw * 0.5, f1.y + fh + wv, f1.x, f1.y + fh);
+			ctx.closePath(); ctx.fill();
+		}
 	}
 	// A footballer seen from the stand: boots, legs, shorts, shirt, arms and head, running.
 	function drawPlayerTV (p) {
