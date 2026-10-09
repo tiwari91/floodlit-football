@@ -6399,7 +6399,7 @@
 			for (const p of players) { p.kneel = 0; p.sulk = 0; }
 			banner.textContent = ball.headed && ball.lastBy && ball.lastBy.team === scorer ? (scorer === 0 ? "Header! Goal" : `Header! ${opp.short} score`) : scorer === 0 ? "Goal" : `${opp.short} score`;
 			const by = ball.lastBy, own = by && by.team !== scorer, who = own ? by : hero;
-			caption(own ? "Own goal" : "Goal", "goal", (who && who.name) || (scorer === 0 ? "You" : opp.short), `${own ? "Own goal" : ball.headed ? "Header" : scorer === 0 ? "You" : opp.short} · ${minuteNow()}'`, own ? by.team : scorer);
+			caption(own ? "Own goal" : "Goal", "goal", (who && who.name) || (scorer === 0 ? "You" : opp.short), `${own ? "Own goal" : ball.headed ? "Header" : scorer === 0 ? "You" : opp.short} · ${minuteNow()}'${(() => { const n = scorer === 0 && !own && who && who.name ? matchGoals.filter(g => g === who.name).length : 0; return n === 2 ? " · Brace" : n === 3 ? " · Hat-trick" : n > 3 ? ` · ${n} goals` : ""; })()}`, own ? by.team : scorer);
 		}
 		banner.className = "banner " + (scorer === 0 ? "home" : "away");
 		banner.hidden = false;
