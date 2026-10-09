@@ -11098,16 +11098,20 @@
 	/* ---------- the footballers in 3D ----------
 	   One articulated rig per figure (hips, spine, chest, neck, head, shoulders, elbows, hands,
 	   hips, knees and ankles), posed from the simulation every frame. The body parts are instances
-	   of a dozen shared shapes, so every player and official together costs about fifteen draw
-	   calls. A figure is 32 units tall, about 1.95 m against the goal; the head is about an eighth of that, the
-	   limbs athletic rather than toy-thick. */
+	   of two dozen shared shapes, so every player and official together costs about twenty-five draw
+	   calls. A figure is 32 units tall, about 1.95 m against the goal; the head is about a seventh and a
+	   half of that. The shapes are lofted from cross-sections (a torso broad at the shoulders and narrow
+	   at the waist, a chest and shoulder blades, a calf and a thigh), so they read as athletes, not capsules. */
 	const MAXF3 = 32;   // figures the instanced parts can hold: 22 players, 3 officials, room to spare
 	// Which joint carries which part. Limbs appear twice (left, right); the instance buffers are
 	// sized from this plan, so a pair of limbs always has two slots per figure.
 	const PART_PLAN3 = [
-		[ "torso", "spine" ], [ "shoulders", "spine" ], [ "shorts", "hips" ], [ "neck", "neck" ], [ "head", "head" ], [ "hair", "head" ], [ "ear", "head" ], [ "ear", "head" ], [ "nose", "head" ], [ "tail", "head" ],
+		[ "torso", "spine" ], [ "collar", "spine" ], [ "shorts", "hips" ], [ "neck", "neck" ], [ "head", "head" ], [ "hair", "head" ], [ "ear", "head" ], [ "ear", "head" ], [ "nose", "head" ], [ "tail", "head" ],
+		[ "sleeve", "sh", 0 ], [ "sleeve", "sh", 1 ], [ "cuff", "sh", 0 ], [ "cuff", "sh", 1 ],
 		[ "upperArm", "sh", 0 ], [ "upperArm", "sh", 1 ], [ "foreArm", "el", 0 ], [ "foreArm", "el", 1 ], [ "hand", "ha", 0 ], [ "hand", "ha", 1 ],
-		[ "thigh", "hip", 0 ], [ "thigh", "hip", 1 ], [ "shin", "kn", 0 ], [ "shin", "kn", 1 ], [ "boot", "an", 0 ], [ "boot", "an", 1 ]
+		[ "shortLeg", "hip", 0 ], [ "shortLeg", "hip", 1 ], [ "thigh", "hip", 0 ], [ "thigh", "hip", 1 ], [ "knee", "kn", 0 ], [ "knee", "kn", 1 ],
+		[ "shin", "kn", 0 ], [ "shin", "kn", 1 ], [ "band", "kn", 0 ], [ "band", "kn", 1 ],
+		[ "boot", "an", 0 ], [ "boot", "an", 1 ], [ "sole", "an", 0 ], [ "sole", "an", 1 ]
 	];
 	const PER_FIG3 = PART_PLAN3.reduce((m, [ n ]) => { m[n] = (m[n] || 0) + 1; return m; }, {});
 	const PATTERN3 = { plain: 0, stripes: 1, hoops: 2, halves: 3, sash: 4 };
@@ -11181,13 +11185,73 @@
 		}
 		g.restore();
 	}
+	// A body part lofted through cross-sections. Each ring is [ y, half width (z), depth to the front
+	// (+x), depth to the back, x offset of its centre ]; the section is a rounded box (a superellipse,
+	// exponent ex), closed at both ends. Front and back differ, so a calf bulges behind and a shin pad
+	// in front, a chest forward and shoulder blades back.
+	function loft3D (rings, seg = 10, ex = 2.2) {
+		const pos = [], idx = [], e = 2 / ex, n = rings.length;
+		for (const [ y, w, df, db, ox = 0 ] of rings) {
+			for (let j = 0; j < seg; j++) {
+				const a = j / seg * Math.PI * 2, c = Math.cos(a), s = Math.sin(a);
+				pos.push(ox + Math.sign(c) * Math.pow(Math.abs(c), e) * (c >= 0 ? df : db), y, Math.sign(s) * Math.pow(Math.abs(s), e) * w);
+			}
+		}
+		const b = n * seg, t = b + 1, r0 = rings[0], r1 = rings[n - 1];
+		pos.push(r0[4] || 0, r0[0], 0, r1[4] || 0, r1[0], 0);
+		for (let i = 0; i < n - 1; i++) {
+			for (let j = 0; j < seg; j++) {
+				const a = i * seg + j, bb = i * seg + (j + 1) % seg, c = a + seg, d = bb + seg;
+				idx.push(a, c, bb, bb, c, d);
+			}
+		}
+		for (let j = 0; j < seg; j++) { idx.push(b, j, (j + 1) % seg); idx.push(t, (n - 1) * seg + (j + 1) % seg, (n - 1) * seg + j); }
+		const g = new THREE.BufferGeometry();
+		g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+		g.setIndex(idx);
+		// rings run either way (top down for limbs); keep the faces pointing out
+		if (rings[0][0] > rings[n - 1][0]) { const ix = g.index.array; for (let i = 0; i < ix.length; i += 3) { const k = ix[i + 1]; ix[i + 1] = ix[i + 2]; ix[i + 2] = k; } }
+		g.computeVertexNormals();
+		return g;
+	}
+	// Several shapes as one (positions and normals only; every part is a flat colour).
+	function merge3D (list) {
+		const pos = [], nor = [];
+		for (const g0 of list) {
+			const g = g0.index ? g0.toNonIndexed() : g0;
+			if (!g.attributes.normal) { g.computeVertexNormals(); }
+			pos.push(...g.attributes.position.array); nor.push(...g.attributes.normal.array);
+		}
+		const g = new THREE.BufferGeometry();
+		g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+		g.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3));
+		return g;
+	}
+	// The torso's sections (in the spine's frame, y 0 at the waist), shared by the shirt and the number on its back.
+	const TORSO3 = [
+		[ -0.75, 3.12, 2.08, 2.0 ], [ -0.45, 3.1, 2.06, 1.98 ], [ -0.4, 3.0, 1.98, 1.9 ], [ 1.2, 2.95, 1.95, 1.88 ], [ 3.0, 3.2, 2.08, 2.0 ],
+		[ 4.8, 3.66, 2.36, 2.1 ], [ 6.3, 4.02, 2.56, 2.24 ], [ 7.6, 4.26, 2.42, 2.36 ], [ 8.6, 4.28, 2.08, 2.2 ],
+		[ 9.3, 3.35, 1.68, 1.8 ], [ 9.85, 1.9, 1.36, 1.46 ]
+	];
+	const TORSO_EX3 = 2.5;
+	// How far the back of the shirt is from the spine at height y, across at z.
+	function backDepth3D (y, z) {
+		let i = 0;
+		while (i < TORSO3.length - 2 && TORSO3[i + 1][0] < y) { i++; }
+		const a = TORSO3[i], b = TORSO3[i + 1], t = clamp((y - a[0]) / (b[0] - a[0]), 0, 1);
+		const w = a[1] + (b[1] - a[1]) * t, db = a[3] + (b[3] - a[3]) * t, q = clamp(Math.abs(z) / w, 0, 0.999);
+		return db * Math.pow(1 - Math.pow(q, TORSO_EX3), 1 / TORSO_EX3);
+	}
 	function initFigures3D () {
 		const T = THREE;
 		const defs = {
-			torso: () => { const g = new T.CylinderGeometry(4.15, 3.05, 9.4, 14); g.translate(0, 4.7, 0); g.scale(0.7, 1, 1); return g; },
-			shoulders: () => { const g = new T.CapsuleGeometry(1.7, 6.4, 4, 10); g.rotateX(Math.PI / 2); g.translate(0, 8.7, 0); g.scale(0.78, 1, 1); return g; },
-			shorts: () => { const g = new T.CylinderGeometry(3.45, 3.95, 4.6, 12); g.translate(0, -1.9, 0); g.scale(0.78, 1, 1); return g; },
-			neck: () => { const g = new T.CylinderGeometry(0.9, 1.05, 2.2, 8); g.translate(0, 0.8, 0); return g; },
+			torso: () => loft3D(TORSO3, 16, TORSO_EX3),
+			// A ribbed collar round the base of the neck, in the trim colour.
+			collar: () => loft3D([ [ 9.2, 1.95, 1.62, 1.72 ], [ 9.55, 2.0, 1.66, 1.76 ], [ 10.05, 1.7, 1.48, 1.56 ], [ 10.25, 1.5, 1.3, 1.38 ] ], 12, 2.2),
+			// The shorts: a waistband and seat on the hips, and a leg for each thigh (shortLeg) so they move with the stride.
+			shorts: () => loft3D([ [ 1.6, 3.05, 2.02, 2.05 ], [ 1.75, 3.12, 2.08, 2.1 ], [ 0.6, 3.5, 2.15, 2.32 ], [ -0.9, 3.8, 2.18, 2.4 ], [ -1.9, 3.5, 2.0, 2.1 ], [ -2.3, 2.6, 1.6, 1.6 ] ], 12, 2.4),
+			shortLeg: () => loft3D([ [ 0.9, 1.7, 1.8, 1.95 ], [ -0.6, 1.88, 1.92, 2.04 ], [ -3.1, 1.84, 1.9, 1.94, 0.1 ], [ -3.4, 1.92, 1.98, 2.02, 0.12 ], [ -3.65, 1.9, 1.95, 1.99, 0.12 ], [ -3.7, 1.5, 1.5, 1.5, 0.12 ] ], 10, 2.2),
+			neck: () => loft3D([ [ -0.6, 1.4, 1.2, 1.3 ], [ 0.4, 1.22, 1.08, 1.12, -0.05 ], [ 1.4, 1.1, 1.0, 1.0, 0.05 ], [ 2.3, 1.0, 0.95, 0.95, 0.1 ], [ 2.5, 0.6, 0.6, 0.6, 0.1 ] ], 10, 2),
 			head: () => {
 			// A skull that narrows to a jaw and a chin rather than an egg: below the cheekbones the sides
 			// draw in and the back of the head tucks under; the front keeps its line down to the chin.
@@ -11202,12 +11266,39 @@
 		nose: () => { const g = new T.ConeGeometry(0.42, 1.0, 6); g.rotateZ(-0.35); g.scale(0.85, 1, 0.9); g.translate(2.12, 1.86, 0); return g; },
 		tail: () => new T.SphereGeometry(1, 9, 7),
 			hair: () => { const g = new T.SphereGeometry(2.38, 12, 7, 0, Math.PI * 2, 0, 1.55); g.scale(0.96, 1.12, 0.94); g.rotateZ(0.42); g.translate(0.2, 2.25, 0); return g; },   // concentric with the head, tilted: high at the brow, low at the nape
-			upperArm: () => { const g = new T.CapsuleGeometry(0.98, 4.6, 3, 7); g.translate(0, -2.5, 0); return g; },
-			foreArm: () => { const g = new T.CapsuleGeometry(0.8, 4.4, 3, 7); g.translate(0, -2.4, 0); return g; },
-			hand: () => { const g = new T.SphereGeometry(0.9, 7, 5); g.scale(1, 1.25, 0.8); g.translate(0, -0.6, 0); return g; },
-			thigh: () => { const g = new T.CapsuleGeometry(1.38, 5.7, 3, 7); g.translate(0, -3.0, 0); return g; },
-			shin: () => { const g = new T.CapsuleGeometry(1.08, 5.2, 3, 7); g.translate(0, -3.0, 0); return g; },
-			boot: () => { const g = new T.CapsuleGeometry(0.75, 2.6, 3, 7); g.rotateZ(Math.PI / 2); g.scale(1, 0.95, 1.2); g.translate(1.0, -0.25, 0); return g; }
+			// Short sleeves over the shoulder (a rounded cap, the deltoid under it) ending in a cuff.
+			sleeve: () => loft3D([ [ 1.45, 0.35, 0.35, 0.35 ], [ 1.25, 1.0, 1.0, 1.0 ], [ 0.7, 1.38, 1.36, 1.36 ], [ -0.4, 1.45, 1.42, 1.42 ], [ -1.9, 1.32, 1.3, 1.3 ], [ -2.35, 1.28, 1.26, 1.26 ], [ -2.4, 0.9, 0.9, 0.9 ] ], 10, 2.0),
+			cuff: () => loft3D([ [ -2.05, 1.33, 1.31, 1.31 ], [ -2.4, 1.33, 1.31, 1.31 ], [ -2.45, 1.0, 1.0, 1.0 ] ], 10, 2.0),
+			upperArm: () => loft3D([ [ 0.5, 0.75, 0.75, 0.75 ], [ 0, 1.02, 1.0, 1.0 ], [ -1.6, 1.0, 1.1, 0.98 ], [ -3.1, 0.9, 1.06, 0.92 ], [ -4.7, 0.78, 0.8, 0.8 ], [ -5.6, 0.72, 0.72, 0.76 ], [ -6.0, 0.4, 0.4, 0.45 ] ], 9, 2.0),
+			foreArm: () => loft3D([ [ 0.4, 0.5, 0.5, 0.55 ], [ 0, 0.76, 0.76, 0.8 ], [ -1.2, 0.86, 0.84, 0.9 ], [ -2.8, 0.72, 0.7, 0.72 ], [ -4.4, 0.56, 0.48, 0.5 ], [ -5.2, 0.52, 0.46, 0.46 ], [ -5.5, 0.3, 0.3, 0.3 ] ], 9, 2.0),
+			// A flat hand with the fingers together and a thumb in front.
+			hand: () => {
+				const palm = loft3D([ [ 0.2, 0.3, 0.42, 0.42 ], [ -0.35, 0.36, 0.58, 0.56 ], [ -1.2, 0.34, 0.6, 0.56 ], [ -1.9, 0.3, 0.52, 0.5 ], [ -2.3, 0.2, 0.36, 0.36 ], [ -2.45, 0.08, 0.15, 0.15 ] ], 8, 2.2);
+				const th = loft3D([ [ 0.1, 0.2, 0.2, 0.2 ], [ -0.2, 0.22, 0.24, 0.24 ], [ -0.9, 0.18, 0.2, 0.2 ], [ -1.15, 0.08, 0.08, 0.08 ] ], 6, 2);
+				th.rotateZ(0.45); th.translate(0.42, -0.45, 0.14);
+				return merge3D([ palm, th ]);
+			},
+			thigh: () => loft3D([ [ 0.9, 1.4, 1.4, 1.5 ], [ -0.6, 1.68, 1.72, 1.66 ], [ -2.6, 1.6, 1.82, 1.58 ], [ -4.6, 1.38, 1.6, 1.36 ], [ -6.3, 1.12, 1.24, 1.08 ], [ -7.2, 1.06, 1.18, 1.0 ], [ -7.8, 0.82, 0.86, 0.82 ], [ -8.0, 0.5, 0.5, 0.5 ] ], 10, 2.0),
+			knee: () => { const g = new T.SphereGeometry(1.0, 9, 7); g.scale(1.08, 1.0, 1.02); g.translate(0.08, -0.15, 0); return g; },
+			// The sock over the calf and the shin pad: the calf bulges behind, the pad stands proud in front.
+			shin: () => loft3D([ [ -0.4, 1.08, 1.05, 1.1 ], [ -1.3, 1.12, 1.28, 1.38 ], [ -2.6, 1.04, 1.32, 1.34 ], [ -3.8, 0.92, 1.24, 1.02 ], [ -4.4, 0.8, 0.86, 0.84 ], [ -5.6, 0.7, 0.7, 0.72 ], [ -6.5, 0.68, 0.66, 0.7 ], [ -6.9, 0.45, 0.45, 0.45 ] ], 10, 2.1),
+			// The sock turned over below the knee, in the trim colour.
+			band: () => loft3D([ [ -0.15, 1.1, 1.1, 1.12 ], [ -0.35, 1.18, 1.18, 1.2 ], [ -1.05, 1.2, 1.22, 1.3 ], [ -1.25, 1.12, 1.18, 1.26 ] ], 10, 2.1),
+			// The boot: lofted heel to toe (built along y, then laid along x with the sole underneath).
+			boot: () => {
+				const g = loft3D([ [ -1.3, 0.5, 0.46, 0.5, 0.22 ], [ -1.05, 0.76, 0.54, 1.0, 0.16 ], [ 0, 0.82, 0.52, 0.96, 0.18 ], [ 1.2, 0.86, 0.36, 0.56, 0.34 ], [ 2.4, 0.8, 0.28, 0.38, 0.42 ], [ 3.1, 0.62, 0.24, 0.26, 0.46 ], [ 3.5, 0.28, 0.2, 0.12, 0.5 ] ], 10, 2.3);
+				g.rotateZ(-Math.PI / 2); return g;
+			},
+			// The sole plate and its studs, in a colour that stands out from the boot.
+			sole: () => {
+				const plate = loft3D([ [ -1.32, 0.48, 0.09, 0.09 ], [ -1.0, 0.72, 0.09, 0.09 ], [ 0, 0.76, 0.09, 0.09 ], [ 1.2, 0.84, 0.09, 0.09 ], [ 2.4, 0.78, 0.09, 0.09 ], [ 3.1, 0.6, 0.09, 0.09 ], [ 3.48, 0.26, 0.09, 0.09 ] ], 10, 3);
+				plate.rotateZ(-Math.PI / 2); plate.translate(0, -0.75, 0);
+				const list = [ plate ];
+				for (const [ sx, sz ] of [ [ -0.75, -0.42 ], [ -0.75, 0.42 ], [ 1.0, -0.5 ], [ 1.0, 0.5 ], [ 2.1, -0.46 ], [ 2.1, 0.46 ], [ 2.9, 0 ] ]) {
+					const c = new T.CylinderGeometry(0.17, 0.13, 0.32, 5); c.translate(sx, -0.98, sz); list.push(c);
+				}
+				return merge3D(list);
+			}
 		};
 		const plain = new T.MeshLambertMaterial({ color: 0xffffff });
 		// The shirt: the kit's pattern (stripes, hoops, halves, a sash) drawn in its second colour.
@@ -11278,7 +11369,10 @@
 				.replace("#include <uv_vertex>", "#include <uv_vertex>\nvMapUv = (uv + vec2(mod(aCell, 10.0), 9.0 - floor(aCell / 10.0))) / 10.0;");
 		};
 		numMat.customProgramCacheKey = () => "ff-num";
-		const ng = new T.PlaneGeometry(4.6, 5.2).rotateY(-Math.PI / 2).translate(-3.08, 5.4, 0);
+		// curved onto the back of the shirt, just proud of it
+		const ng = new T.PlaneGeometry(4.2, 4.7, 6, 4).rotateY(-Math.PI / 2).translate(0, 5.6, 0), NP = ng.attributes.position;
+		for (let i = 0; i < NP.count; i++) { NP.setX(i, -backDepth3D(NP.getY(i), NP.getZ(i)) - 0.06); }
+		ng.computeVertexNormals();
 		ng.setAttribute("aCell", new T.InstancedBufferAttribute(new Float32Array(MAXF3), 1).setUsage(T.DynamicDrawUsage));
 		const nums = new T.InstancedMesh(ng, numMat, MAXF3);
 		nums.instanceMatrix.setUsage(T.DynamicDrawUsage); nums.setColorAt(0, white); nums.frustumCulled = false; nums.count = 0;
@@ -11307,8 +11401,9 @@
 		for (let i = 0; i < MAXF3; i++) {
 			const root = new T.Object3D();
 			root.rotation.order = "YXZ";   // lean and roll in his own frame, then face the way he runs
-			const hips = node(root, 0, 15.6, 0), spine = node(hips, 0, 0.6, 0), chest = node(spine, 0, 5.4, 0), neck = node(chest, 0, 3.4, 0), head = node(neck, 0, 1.6, 0);
-			const sh = [ node(chest, 0, 3.0, -4.95), node(chest, 0, 3.0, 4.95) ], el = sh.map(s => node(s, 0, -5.6, 0)), ha = el.map(e => node(e, 0, -5.2, 0));
+			const hips = node(root, 0, 15.6, 0), spine = node(hips, 0, 0.6, 0), chest = node(spine, 0, 5.4, 0), neck = node(chest, 0, 3.6, 0), head = node(neck, 0, 2.0, 0);
+			head.scale.setScalar(0.86);   // the head (and its hair, ears and nose) about 1/7.5 of his height
+			const sh = [ node(chest, 0, 2.95, -4.6), node(chest, 0, 2.95, 4.6) ], el = sh.map(s => node(s, 0, -5.6, 0)), ha = el.map(e => node(e, 0, -5.2, 0));
 			const hip = [ node(hips, 0, -1.0, -2.45), node(hips, 0, -1.0, 2.45) ], kn = hip.map(h => node(h, 0, -7.3, 0)), an = kn.map(k => node(k, 0, -6.5, 0));
 			rigs.push({ root, hips, spine, chest, neck, head, sh, el, ha, hip, kn, an });
 		}
@@ -11434,7 +11529,7 @@
 			r.neck.rotation.z = lerp3(r.neck.rotation.z, -0.35 * cel, cel);
 		}
 		if (kneel > 0) {
-			r.hips.position.y = lerp3(r.hips.position.y, 8, kneel);
+			r.hips.position.y = lerp3(r.hips.position.y, 9.2, kneel);   // on the knees, not through the turf
 			for (let i = 0; i < 2; i++) { r.hip[i].rotation.z = lerp3(r.hip[i].rotation.z, 0.05, kneel); r.kn[i].rotation.z = lerp3(r.kn[i].rotation.z, -1.6, kneel); r.an[i].rotation.z = 0.6 * kneel; }
 			r.spine.rotation.z = lerp3(r.spine.rotation.z, -0.4, kneel);
 		}
@@ -11456,6 +11551,8 @@
 			boots: BOOTS3[(p.num || 0) % BOOTS3.length], ring: shirt
 		};
 	}
+	// The trim (collar, cuffs, sock tops): the kit's second colour, or its number colour on a plain kit.
+	const trim3D = kit => (kit.second && kit.second !== kit.shirt ? kit.second : kit.ink || kit.shirt);
 	// Commit one posed rig to the instanced parts.
 	function commitFigure3D (rig, lk, kit, num) {
 		const F = G3.fig, M = F.M, C = F.C;
@@ -11481,8 +11578,10 @@
 			const k = F.cnt[name]++;
 			if (k >= mesh.instanceMatrix.count) { F.cnt[name]--; continue; }   // never past the buffer
 			mesh.setMatrixAt(k, mtx);
-			const c = name === "torso" || name === "shoulders" || name === "upperArm" || (name === "foreArm" && kit.sleeves) ? kit.shirt
-				: name === "shorts" ? kit.shorts : name === "shin" ? kit.socks : name === "boot" ? kit.boots
+			if (name === "cuff" && kit.sleeves) { continue; }   // a keeper's long sleeves have no cuff at the biceps
+			const c = name === "torso" || name === "sleeve" || ((name === "upperArm" || name === "foreArm") && kit.sleeves) ? kit.shirt
+				: name === "collar" || name === "cuff" || name === "band" ? trim3D(kit) : name === "sole" ? (lum(kit.boots) > 0.5 ? "#26292c" : "#e4e6e8")
+				: name === "shorts" || name === "shortLeg" ? kit.shorts : name === "shin" ? kit.socks : name === "boot" ? kit.boots
 				: name === "hair" || name === "tail" ? lk.hair : name === "hand" && kit.gloves ? kit.gloves : lk.skin;
 			mesh.setColorAt(k, C.set(c));
 			if (name === "torso") {
