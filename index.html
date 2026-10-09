@@ -12037,7 +12037,7 @@
 	}
 	// Which shot the broadcast is on: wide from the gantry between the action, tight behind a
 	// set piece, otherwise following the ball along the near stand.
-	const FOLLOW_FOV = 40;
+	const BROADCAST_FOV = 36;
 	// The kick-off sweep: at the start of each half the camera swings in from high over a corner of
 	// the ground and comes down to the broadcast position while the 3-2-1 runs, arriving with the
 	// whistle. Not with reduced motion.
@@ -12087,18 +12087,17 @@
 			out.look.set(WX(ball.x + dx * 140), 12, ball.y + dy * 140);
 			return out;
 		}
+		// Open play: the broadcast camera, FIFA "Tele" style. It sits high in the main stand near
+		// halfway and pans with play (the lens turns; the body only drifts part of the way along the
+		// gantry), leads the ball a little, and closes in a touch when an attack reaches the box.
 		const fx0 = o ? o.x : ball.x, fy0 = o ? o.y : ball.y, vx = o ? o.vx : ball.vx, vy = o ? o.vy : ball.vy;
-		let tx = fx0 + vx * 14;
-		const ty = clamp(fy0 + vy * 14, FH * 0.22, FH * 0.78);
-		// The near touchline is closest to the lens, so the view is narrowest there. Clamp the camera
-		// against that width, not the mid-pitch width, so it can travel far enough to keep the near
-		// corner flags and both goals in shot.
-		const eyeH = FH * 0.5, eyeZ = FH * 1.32, lookZ = FH * 0.5;
-		const tanX = Math.tan(FOLLOW_FOV * Math.PI / 360) * G3.cam.aspect;
-		const half = Math.hypot(eyeH, eyeZ - lookZ) * tanX, halfNear = Math.hypot(eyeH, eyeZ - FH) * tanX;
-		tx = half * 2 >= FW ? FW / 2 : clamp(tx, halfNear - MX * 0.55, FW - halfNear + MX * 0.55);
+		const tx = clamp(fx0 + vx * 16, FW * 0.04, FW * 0.96);
+		const ty = clamp(fy0 + vy * 12, FH * 0.25, FH * 0.75);
+		const inBox = Math.min(fx0, FW - fx0) < FW * 0.2 && fy0 > FH * 0.15 && fy0 < FH * 0.85;
+		const eyeH = FH * 0.6, eyeZ = FH * 1.38;
 		out.kind = "follow";
-		out.eye.set(WX(tx), eyeH, eyeZ);
+		out.fov = inBox ? BROADCAST_FOV - 5 : BROADCAST_FOV;
+		out.eye.set(WX(FW / 2 + (tx - FW / 2) * 0.5), eyeH, eyeZ);
 		out.look.set(WX(tx), 0, ty);
 		return out;
 	}
@@ -12106,16 +12105,19 @@
 	function camera3D () {
 		if (!shotWant.eye) { shotWant.eye = new THREE.Vector3(); shotWant.look = new THREE.Vector3(); }
 		G3.cam.aspect = VW / VH;
+		shotWant.fov = 0;
 		shot3D(shotWant);
-		// Open play uses a wider lens so the near touchline and corner flags fit; other shots keep 36.
-		G3.cam.fov = shotWant.kind === "follow" ? FOLLOW_FOV : 36;
-		G3.cam.updateProjectionMatrix();
-		// A new shot is a cut; within a shot the camera glides, eased by elapsed time.
-		if (shotWant.kind !== G3.shot) { G3.shot = shotWant.kind; G3.eye.copy(shotWant.eye); G3.look.copy(shotWant.look); }
+		const fov = shotWant.fov || 36;
+		// A new shot is a cut; within a shot the camera glides, eased by elapsed time. The broadcast
+		// camera's body lags more than its lens, and the zoom eases slowest of all, like an operator's.
+		if (shotWant.kind !== G3.shot) { G3.shot = shotWant.kind; G3.eye.copy(shotWant.eye); G3.look.copy(shotWant.look); G3.fov = fov; }
 		else {
-			const ease = reduceMotion ? 1 : 1 - Math.exp(-frameDt / 240);
-			G3.eye.lerp(shotWant.eye, ease); G3.look.lerp(shotWant.look, ease);
+			const slow = shotWant.kind === "follow";
+			const e = t => (reduceMotion ? 1 : 1 - Math.exp(-frameDt / t));
+			G3.eye.lerp(shotWant.eye, e(slow ? 520 : 240)); G3.look.lerp(shotWant.look, e(slow ? 300 : 240));
+			G3.fov += (fov - G3.fov) * e(900);
 		}
+		G3.cam.fov = G3.fov; G3.cam.updateProjectionMatrix();
 		G3.cam.position.copy(G3.eye);
 		G3.cam.lookAt(G3.look);
 		G3.cam.updateMatrixWorld();
