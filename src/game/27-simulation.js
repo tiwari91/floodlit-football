@@ -633,7 +633,7 @@
 	// knees in front of the fans; his teammates chase him and mob him; the other side trudges back
 	// with their heads down while their keeper fetches the ball out of the net. Then everyone jogs
 	// back for the restart. Seven seconds, or any key or tap to get on with it.
-	let celeb = null;
+	let celeb = null, lastCelebStyle = 0;
 	const celebTracking = () => state === "goal" && celeb && celeb.t > 45 && !replayOn();   // the camera is on the scorer
 	function celebrate () {
 		const C = celeb;
@@ -648,7 +648,15 @@
 			const scored = p.team === sc;
 			if (p === hero) {
 				if (home) { tx = p.bx; ty = p.by; spd = BASE_SPD * 0.7; }
-				else if (kneeling) {
+				else if (C.style !== 1) {
+					// The other celebrations: a run (arms out like wings for the aeroplane), then he stops
+					// and turns to the camera to pump his fist or kiss the badge in front of the fans.
+					if (C.posedAt < 0) {
+						[ tx, ty ] = C.target; spd = BASE_SPD; acc = 0.14;
+						if (Math.hypot(tx - p.x, ty - p.y) < 40 || T > 140) { C.posedAt = T; if (sc === homeSide) { roar(0.6); } }
+					}
+					p.celebK = C.posedAt < 0 && C.style !== 2 ? 0 : C.style;
+				} else if (kneeling) {
 					// Sliding on his knees: he carries his pace into the slide and it bleeds away.
 					p.vx *= 0.955; p.vy *= 0.955;
 					p.x = clamp(p.x + p.vx, 12, FW - 12); p.y = clamp(p.y + p.vy, 12, FH - 12);
@@ -664,7 +672,7 @@
 				if (home) { tx = p.bx; ty = p.by; spd = BASE_SPD * 0.7; }
 				else {
 					const d = dist(p, hero);
-					if (d > 36) { tx = hero.x; ty = hero.y; spd = BASE_SPD * (d > 120 ? 1.1 : 0.75); }
+					if (d > 36) { tx = hero.x; ty = hero.y; spd = BASE_SPD * (d > 120 ? 1.45 : 0.85); }
 					else if (T > (C.kneelAt >= 0 ? C.kneelAt + 20 : 120) && !(p.jump > 0) && Math.random() < 0.04) { p.jump = JUMP; }
 				}
 			} else if (scored) {   // their keeper wanders out of his goal
@@ -685,6 +693,14 @@
 			movePlayer(p, dvx, dvy, cond.grip, acc);
 			if (Math.hypot(p.vx, p.vy) > 0.4) { p.dir = turnToward(p.dir, Math.atan2(p.vy, p.vx), 0.15); }
 			else if (scored && p !== hero && !home) { p.dir = turnToward(p.dir, Math.atan2(hero.y - p.y, hero.x - p.x), 0.1); }
+			else if (p === hero && !home && (C.posedAt >= 0 || (C.style === 1 && C.kneelAt >= 0))) {
+				// Facing the camera, which is out on the pitch in front of him with the fans behind.
+				const ex = clamp(p.x + (p.x < FW / 2 ? 120 : -120), 30, FW - 30), ey = p.y + (p.y > FH / 2 ? -230 : 230);
+				p.dir = turnToward(p.dir, Math.atan2(ey - p.y, ex - p.x), 0.12);
+			}
+			// Team-mates who reach him wrap their arms round him; the rest jump and punch the air.
+			p.hug = clamp((p.hug || 0) + (scored && p !== hero && p.role !== "gk" && !home && dist(p, hero) < 40 ? 0.08 : -0.08), 0, 1);
+			if (home && p === hero) { p.celebK = 0; }
 			const armsUp = p === hero ? (home ? 0 : 1) : scored && p.role !== "gk" && !home && dist(p, hero) < 60 ? 0.7 : 0;
 			p.celebA = (p.celebA || 0) + (armsUp - (p.celebA || 0)) * 0.08;
 			if (p !== hero) { p.kneel = 0; }
@@ -724,11 +740,16 @@
 		{
 			const side = outfield(scorer);
 			const hero = ball.lastBy && ball.lastBy.team === scorer ? ball.lastBy : side[side.length - 1] || team(scorer)[0];
-			// He heads for the corner flag, but not a marathon: at most 260 units, so his teammates can catch him.
-			const cx = scorer === 0 ? FW - 70 : 70, cy = hero.y < FH / 2 ? 44 : FH - 44, dx = cx - hero.x, dy = cy - hero.y, L = Math.hypot(dx, dy) || 1, run = Math.min(L, 260);
-			celeb = { t: 0, hero, target: [ hero.x + dx / L * run, hero.y + dy / L * run ], kneelAt: -1, fetched: false, rp: goalTimer - GOAL_CELEB };
+			// How he celebrates: 1 knee slide, 2 aeroplane to the corner flag, 3 fist pump, 4 badge kiss
+			// (never the same twice running). He heads for the corner flag, but not a marathon: at most
+			// 260 units (less for the fist pump and the badge), so his teammates can catch him.
+			let style = 1 + Math.floor(Math.random() * 4);
+			if (style === lastCelebStyle) { style = style % 4 + 1; }
+			lastCelebStyle = style;
+			const cx = scorer === 0 ? FW - 70 : 70, cy = hero.y < FH / 2 ? 44 : FH - 44, dx = cx - hero.x, dy = cy - hero.y, L = Math.hypot(dx, dy) || 1, run = Math.min(L, style >= 3 ? 110 : 260);
+			celeb = { t: 0, hero, style, target: [ hero.x + dx / L * run, hero.y + dy / L * run ], kneelAt: -1, posedAt: -1, fetched: false, rp: goalTimer - GOAL_CELEB };
 			tlc = null;   // no touchline cutaway over a goal
-			for (const p of players) { p.kneel = 0; p.sulk = 0; }
+			for (const p of players) { p.kneel = 0; p.sulk = 0; p.celebK = 0; p.hug = 0; }
 			banner.textContent = ball.headed && ball.lastBy && ball.lastBy.team === scorer ? (scorer === 0 ? "Header! Goal" : `Header! ${opp.short} score`) : scorer === 0 ? "Goal" : `${opp.short} score`;
 			const by = ball.lastBy, own = by && by.team !== scorer, who = own ? by : hero;
 			caption(own ? "Own goal" : "Goal", "goal", (who && who.name) || (scorer === 0 ? "You" : opp.short), `${own ? "Own goal" : ball.headed ? "Header" : scorer === 0 ? "You" : opp.short} · ${minuteNow()}'${(() => { const n = scorer === 0 && !own && who && who.name ? matchGoals.filter(g => g === who.name).length : 0; return n === 2 ? " · Brace" : n === 3 ? " · Hat-trick" : n > 3 ? ` · ${n} goals` : ""; })()}`, own ? by.team : scorer);

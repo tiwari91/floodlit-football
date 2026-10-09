@@ -158,7 +158,7 @@
 			p.x = x; p.y = p.by; p.vx = p.vy = 0;
 			p.dir = p.team === 0 ? 0 : Math.PI;
 			p.kickCd = 0; p.lunge = 0; p.lungeCd = 0; p.hold = 0;
-			p.celebA = 0; p.kneel = 0; p.sulk = 0; p.kickA = 0; p.plant = 0; p.fall = 0; p.dive = 0; p.diveCd = 0; p.throwA = 0;
+			p.celebA = 0; p.kneel = 0; p.sulk = 0; p.celebK = 0; p.hug = 0; p.kickA = 0; p.plant = 0; p.fall = 0; p.dive = 0; p.diveCd = 0; p.throwA = 0;
 			p.run = null; p.tFrom = null; p.tKind = undefined; p.tx = undefined;
 		}
 		const side = outfield(kickTeam);   // (a side can be a man down after a red card)

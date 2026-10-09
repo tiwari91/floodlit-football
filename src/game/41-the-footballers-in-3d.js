@@ -425,8 +425,35 @@
 			for (let i = 0; i < 2; i++) { r.hip[i].rotation.z = (0.4 + 0.5 * i) * k; r.kn[i].rotation.z = -(0.9 + 0.6 * i) * k; r.sh[i].rotation.z = (-0.6 + 1.2 * i) * k; r.sh[i].rotation.x = (i ? 1 : -1) * 0.6 * k; r.el[i].rotation.z = 1.2 * k; }
 			r.spine.rotation.z = 0.35 * k; r.neck.rotation.z = 0.5 * k;
 		}
-		// Celebrating: arms up and out; on his knees he arches back and spreads them wide.
-		if (cel > 0 && fall < 0) {
+		// Celebrating: arms up and out; on his knees he arches back and spreads them wide. The scorer may
+		// instead fly to the corner like an aeroplane, pump his fist, or kiss the badge; team-mates who
+		// reach him hug him.
+		const ck = p.celebK | 0, hug = clamp(p.hug || 0, 0, 1) * cel;
+		if (cel > 0 && fall < 0 && ck === 2) {
+			const w = cel, bank = rm ? 0 : Math.sin(idle * 1.6) * 0.22 * a;
+			for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 0.15, w); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, (i ? 1 : -1) * (1.45 + (i ? 1 : -1) * bank * 0.6), w); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.12, w); }
+			r.root.rotation.x += bank; r.spine.rotation.z = lerp3(r.spine.rotation.z, 0.15, w); r.neck.rotation.z = lerp3(r.neck.rotation.z, -0.2, w);
+		} else if (cel > 0 && fall < 0 && ck === 3) {
+			// The fist pump: one bent arm driven down hard, again and again, leaning back and roaring.
+			const pump = rm ? 0.5 : Math.pow(0.5 + 0.5 * Math.sin(idle * 7), 2), w = cel;
+			r.sh[1].rotation.z = lerp3(r.sh[1].rotation.z, -1.5 + 1.0 * pump, w); r.sh[1].rotation.x = lerp3(r.sh[1].rotation.x, 0.35, w); r.el[1].rotation.z = lerp3(r.el[1].rotation.z, 1.9 - 0.4 * pump, w);
+			r.sh[0].rotation.z = lerp3(r.sh[0].rotation.z, -0.2, w); r.sh[0].rotation.x = lerp3(r.sh[0].rotation.x, -0.55, w); r.el[0].rotation.z = lerp3(r.el[0].rotation.z, 1.5, w);
+			r.spine.rotation.z = lerp3(r.spine.rotation.z, -0.18 + 0.12 * pump, w); r.neck.rotation.z = lerp3(r.neck.rotation.z, -0.45, w);
+			for (let i = 0; i < 2; i++) { r.hip[i].rotation.x = (i ? 1 : -1) * 0.12 * w; r.kn[i].rotation.z -= 0.25 * w * pump; }
+			r.hips.position.y -= 0.8 * w * pump;
+		} else if (cel > 0 && fall < 0 && ck === 4) {
+			// Kissing the badge: the shirt pulled up to the lips, the other arm pointing to the fans.
+			const w = cel, pt = rm ? 0 : Math.sin(idle * 2) * 0.12;
+			r.sh[0].rotation.z = lerp3(r.sh[0].rotation.z, -1.25, w); r.sh[0].rotation.x = lerp3(r.sh[0].rotation.x, 0.35, w); r.el[0].rotation.z = lerp3(r.el[0].rotation.z, 2.3, w);
+			r.sh[1].rotation.z = lerp3(r.sh[1].rotation.z, -2.55 + pt, w); r.sh[1].rotation.x = lerp3(r.sh[1].rotation.x, 0.45, w); r.el[1].rotation.z = lerp3(r.el[1].rotation.z, 0.1, w);
+			r.neck.rotation.z = lerp3(r.neck.rotation.z, 0.3, w); r.spine.rotation.z = lerp3(r.spine.rotation.z, 0.08, w);
+		} else if (hug > 0.02 && fall < 0) {
+			// The hug: arms forward and round him, leaning in, a little bounce.
+			const b = rm ? 0 : Math.sin(idle * 6 + x * 0.02) * 0.08;
+			for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, -1.35 + b, hug); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, (i ? 1 : -1) * 0.5, hug); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 1.25, hug); }
+			r.spine.rotation.z = lerp3(r.spine.rotation.z, 0.3, hug); r.neck.rotation.z = lerp3(r.neck.rotation.z, -0.1, hug);
+			r.hips.position.y += b * 6 * hug;
+		} else if (cel > 0 && fall < 0) {
 			const w = cel * (1 - 0.4 * kneel), wave = Math.sin(idle * 3 + x * 0.01) * 0.25 * cel;
 			for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, -0.45 + wave * (i ? -1 : 1), w); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, (i ? 1 : -1) * (2.35 + 0.5 * kneel), w); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.3, w); }
 			r.neck.rotation.z = lerp3(r.neck.rotation.z, -0.35 * cel, cel);
