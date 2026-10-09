@@ -10233,6 +10233,13 @@
 			capsule(sk[0], sk[1], mn(H * 0.05), calf[0], calf[1], mn(H * 0.052));
 			capsule(calf[0], calf[1], mn(H * 0.052), f[0], f[1], mn(H * 0.03));
 			if (fine) { ctx.fillStyle = shade(shirt.length === 7 ? shirt : "#888888", dark ? 0.55 : 0.75); capsule(sk[0], sk[1], mn(H * 0.051), ...at(0.31), mn(H * 0.051)); }   // a thin turn-over at the top of the sock
+			if (fine) {   // the shin pad under the sock catches the light down the front of the shin
+				const s0 = at(0.36), s1 = at(0.66), o = face * H * 0.018;
+				ctx.fillStyle = dark ? "rgba(255, 255, 255, 0.06)" : "rgba(255, 255, 255, 0.16)";
+				capsule(s0[0] + o, s0[1], mn(H * 0.024), s1[0] + o, s1[1], mn(H * 0.02));
+				ctx.fillStyle = "rgba(0, 0, 0, 0.18)";   // and the sock bunches at the ankle
+				capsule(...at(0.84), mn(H * 0.034), ...at(0.92), mn(H * 0.032));
+			}
 			// The boot: a low wedge pointing the way he faces.
 			ctx.fillStyle = dark ? "#0a0a0a" : "#141414";
 			ctx.beginPath();
@@ -10300,6 +10307,26 @@
 			ctx.moveTo(wx, wy); ctx.lineTo(tx, ty);
 			ctx.lineTo(tx + nx * w1 * bs, ty + ny * w1 * bs); ctx.lineTo(wx + nx * w0 * bs, wy + ny * w0 * bs); ctx.closePath();
 			ctx.fill();
+			if (fine) {
+				// Fabric: a couple of soft creases pulled from the waist toward the far shoulder as he
+				// moves, and the hem a shade darker where the shirt hangs over the shorts.
+				ctx.strokeStyle = "rgba(0, 0, 0, 0.14)"; ctx.lineWidth = Math.max(0.6, H * 0.014);
+				for (const f of [ 0.3, 0.62 ]) {
+					ctx.beginPath(); ctx.moveTo(wx + dx * f * 0.4 - nx * w0 * face * 0.5, wy + dy * f * 0.4 - ny * w0 * face * 0.5);
+					ctx.quadraticCurveTo(wx + dx * (f + 0.12), wy + dy * (f + 0.12), wx + dx * (f + 0.3) + nx * w1 * face * 0.45, wy + dy * (f + 0.3) + ny * w1 * face * 0.45); ctx.stroke();
+				}
+				ctx.strokeStyle = "rgba(0, 0, 0, 0.22)"; ctx.lineWidth = Math.max(0.7, H * 0.022);
+				ctx.beginPath(); ctx.moveTo(wx - nx * w0 * 0.95, wy - ny * w0 * 0.95); ctx.lineTo(wx + nx * w0 * 0.95, wy + ny * w0 * 0.95); ctx.stroke();
+				// His number on the back of the shirt, seen across his shoulder blade.
+				if (p.num && k > 0.95) {
+					const cx = wx + dx * 0.58 + nx * w1 * bs * 0.5, cy = wy + dy * 0.58 + ny * w1 * bs * 0.5;
+					const lum = (() => { const n = shirt.length === 7 ? parseInt(shirt.slice(1), 16) : 0x888888; return 0.3 * (n >> 16) + 0.59 * ((n >> 8) & 255) + 0.11 * (n & 255); })();
+					ctx.save(); ctx.translate(cx, cy); ctx.rotate(Math.atan2(dx, -dy)); ctx.scale(0.62, 1);
+					ctx.font = `bold ${Math.round(H * 0.15)}px Arial, sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+					ctx.fillStyle = lum > 150 ? "rgba(20, 24, 30, 0.85)" : "rgba(255, 255, 255, 0.88)";
+					ctx.fillText(String(p.num), 0, 0); ctx.restore();
+				}
+			}
 		}
 		if (kit.pattern === "stripes" && p.role !== "gk") {
 			ctx.strokeStyle = shorts; ctx.lineWidth = Math.max(0.8, H * 0.035);
