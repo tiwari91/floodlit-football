@@ -6396,6 +6396,7 @@
 			// He heads for the corner flag, but not a marathon: at most 260 units, so his teammates can catch him.
 			const cx = scorer === 0 ? FW - 70 : 70, cy = hero.y < FH / 2 ? 44 : FH - 44, dx = cx - hero.x, dy = cy - hero.y, L = Math.hypot(dx, dy) || 1, run = Math.min(L, 260);
 			celeb = { t: 0, hero, target: [ hero.x + dx / L * run, hero.y + dy / L * run ], kneelAt: -1, fetched: false, rp: goalTimer - GOAL_CELEB };
+			tlc = null;   // no touchline cutaway over a goal
 			for (const p of players) { p.kneel = 0; p.sulk = 0; }
 			banner.textContent = ball.headed && ball.lastBy && ball.lastBy.team === scorer ? (scorer === 0 ? "Header! Goal" : `Header! ${opp.short} score`) : scorer === 0 ? "Goal" : `${opp.short} score`;
 			const by = ball.lastBy, own = by && by.team !== scorer, who = own ? by : hero;
@@ -10354,7 +10355,7 @@
 	function drawBallTV () {
 		const q = tvProj(ball.x, ball.y, Math.max(0, ball.z) * Z_W + 3.2);
 		if (!q) { return; }
-		const r = Math.max(2.8, 4.2 * q.k);
+		const r = Math.max(3.6, 5.4 * q.k);   // big enough to find at a glance
 		// Screen-space travel this frame: the streak's direction and length, and the roll's axis.
 		const dx = tvBallPrev ? q.x - tvBallPrev.x : 0, dy = tvBallPrev ? q.y - tvBallPrev.y : 0, mv = Math.hypot(dx, dy);
 		tvBallPrev = { x: q.x, y: q.y };

@@ -420,7 +420,7 @@
 	function drawBallTV () {
 		const q = tvProj(ball.x, ball.y, Math.max(0, ball.z) * Z_W + 3.2);
 		if (!q) { return; }
-		const r = Math.max(2.8, 4.2 * q.k);
+		const r = Math.max(3.6, 5.4 * q.k);   // big enough to find at a glance
 		// Screen-space travel this frame: the streak's direction and length, and the roll's axis.
 		const dx = tvBallPrev ? q.x - tvBallPrev.x : 0, dy = tvBallPrev ? q.y - tvBallPrev.y : 0, mv = Math.hypot(dx, dy);
 		tvBallPrev = { x: q.x, y: q.y };

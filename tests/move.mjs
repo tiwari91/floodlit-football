@@ -73,5 +73,8 @@ await page.keyboard.down("ArrowRight"); await sleep(1200);
 await page.screenshot({ path: `${OUT}/3d-run.png` });
 await page.keyboard.up("ArrowRight");
 check("3D camera renders with the new poses, no errors", cam === "3d" && errs.length === 0, `cam=${cam} ${errs.join(" | ")}`);
+// Brace and hat-trick captions: the same man scoring again is named in the goal caption.
+const caps = await page.evaluate(() => { const F = window.__ff, out = []; F.autoPilot = false; F.timeLeft = 1e9; for (let k = 0; k < 3; k++) { F.freeze = 0; F.forceGoal(0); const s0 = F.score[0]; for (let i = 0; i < 200 && F.score[0] === s0; i++) { F.step(1); } out.push(F.lastCaption && F.lastCaption.sub); for (let i = 0; i < 3000 && F.state !== "play"; i++) { F.step(1); } } return out; });
+check("same scorer: first goal plain, then Brace, then Hat-trick", caps.length === 3 && !/Brace|Hat-trick/.test(caps[0]) && /Brace/.test(caps[1]) && /Hat-trick/.test(caps[2]), JSON.stringify(caps));
 await browser.close(); server.stop();
 process.exit(done() ? 1 : 0);

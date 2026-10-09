@@ -727,6 +727,7 @@
 			// He heads for the corner flag, but not a marathon: at most 260 units, so his teammates can catch him.
 			const cx = scorer === 0 ? FW - 70 : 70, cy = hero.y < FH / 2 ? 44 : FH - 44, dx = cx - hero.x, dy = cy - hero.y, L = Math.hypot(dx, dy) || 1, run = Math.min(L, 260);
 			celeb = { t: 0, hero, target: [ hero.x + dx / L * run, hero.y + dy / L * run ], kneelAt: -1, fetched: false, rp: goalTimer - GOAL_CELEB };
+			tlc = null;   // no touchline cutaway over a goal
 			for (const p of players) { p.kneel = 0; p.sulk = 0; }
 			banner.textContent = ball.headed && ball.lastBy && ball.lastBy.team === scorer ? (scorer === 0 ? "Header! Goal" : `Header! ${opp.short} score`) : scorer === 0 ? "Goal" : `${opp.short} score`;
 			const by = ball.lastBy, own = by && by.team !== scorer, who = own ? by : hero;
