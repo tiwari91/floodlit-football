@@ -415,7 +415,9 @@
 		}
 		// The big screen above the end behind the left-hand goal, showing the score (hung under the
 		// roof's front edge where the roof runs round the ends, otherwise on legs on top of the stand).
-		{
+		// Off: at most grounds it sat inside the end stand's crowd rather than above it.
+		const SHOW_BIG_SCREEN = false;
+		if (SHOW_BIG_SCREEN) {
 			const hung = gs.roof && A.ring, d = hung ? P.back * A.roofIn + 2 : P.back - 8, W = 180, H = 54;
 			const sx = -F_END3 - d, cy = hung ? P.top + 36 - 12 - H / 2 : P.top + 10 + H / 2, frameC = [ 0.07, 0.075, 0.085 ];
 			accBox3(main, sx - 2.5, cy, FH / 2, 4, H + 6, W + 6, frameC);
