@@ -8,6 +8,7 @@
 	let tlc = null, tlcLast = -1e9;
 	const pickOf = (list, seed) => list[Math.abs(Math.floor(seed)) % list.length];
 	function benchReact (kind, o = {}) {
+		staffReact(kind, o);
 		if (bulkSim || mode === "tutorial" || mode === "corners" || shoot || coarse || state === "intro") { return; }
 		const now = performance.now();
 		if (now - tlcLast < TLC_GAP && !o.card) { return; }   // a run of fouls doesn't keep cutting away; a card always does
@@ -168,4 +169,83 @@
 		if (typeof hex !== "string" || hex[0] !== "#" || hex.length !== 7) { return hex; }
 		const n = parseInt(hex.slice(1), 16);
 		return `rgb(${[ n >> 16, (n >> 8) & 255, n & 255 ].map(v => Math.round(v * f)).join(",")})`;
+	}
+
+	/* ---------- the managers and benches in 3D ----------
+	   Each manager stands in his technical area in front of his dugout, following play and pointing,
+	   clapping, protesting, holding his head after a miss, arms up for a goal. The substitutes (in
+	   bibs) and a coach (in a tracksuit) sit on the bench under the canopy and jump up for a goal.
+	   The touchline cutaway shows the same manager, in the same coat. Home side in the left dugout. */
+	const STAFF_COAT = [ "#1d2330", "#33252a" ];
+	const staff3 = [ 0, 1 ].map(t => ({
+		g: "", t: 0, up: 0, nextPoint: 3000 + t * 2500,
+		mgr: { x: 0, y: 0, vx: 0, vy: 0, dir: -Math.PI / 2, stride: 0, runAmt: 0, idlePh: t * 3, role: "staff", team: t },
+		bench: [ 0, 1, 2, 3 ].map(i => ({ x: 0, y: 0, vx: 0, vy: 0, dir: -Math.PI / 2, stride: 0, runAmt: 0, idlePh: i * 1.7 + t, role: "staff", team: t, hop: Math.random() * 6 })),
+		look: [ 0, 1, 2, 3, 4 ].map(i => ({ skin: [ "#e0ac86", "#9c6a44", "#f1c9a5", "#6b4630", "#c98e64" ][(i + t * 2) % 5], hair: i === 0 ? (t ? "#7d7d7d" : "#2a1d14") : [ "#1b1410", "#3a2416", "#0e0b09", "#6a4a2a" ][i % 4], style: [ "short", "buzz", "shaved", "short", "buzz" ][(i + t) % 5], face: (i * 3 + t) % 8 }))
+	}));
+	// A gesture for a while: "up" (arms raised), "head" (hands on head), "clap", "protest", "point".
+	function staffReact (kind, o = {}) {
+		const now = performance.now(), set = (t, g, ms) => { if (t === 0 || t === 1) { staff3[t].g = g; staff3[t].t = now + ms; } };
+		if (kind === "goal") { set(o.team, "up", 4200); set(1 - o.team, "head", 3200); staff3[o.team].up = now + 4200; }
+		else if (kind === "near") { set(o.team, Math.random() < 0.6 ? "head" : "clap", 2200); }
+		else if (kind === "foul") { set(o.fouled, "protest", 2400); }
+	}
+	function staffKit (t, kind) {
+		const kit = KITS[t] || KITS[0];
+		if (kind === "mgr") { return { shirt: STAFF_COAT[t], shorts: STAFF_COAT[t], socks: "#121418", second: "#e9e9e9", pattern: 0, ink: STAFF_COAT[t], gloves: null, sleeves: true, boots: "#121418", ring: null }; }
+		if (kind === "coach") { const c = kit.second && kit.second !== kit.outfield ? kit.second : "#1f2a36"; return { shirt: c, shorts: c, socks: c, second: kit.outfield, pattern: 0, ink: kit.outfield, gloves: null, sleeves: true, boots: "#15181a", ring: null }; }
+		const bib = t === 0 ? "#d6f03c" : "#ff7a1f";   // the substitutes' bibs over the kit
+		return { shirt: bib, shorts: kit.second || "#1f2a36", socks: kit.outfield, second: bib, pattern: 0, ink: bib, gloves: null, sleeves: true, boots: BOOTS3[t % BOOTS3.length], ring: null };
+	}
+	function staff3D (WX) {
+		const F = G3.fig;
+		if (!F || !ball || state === "intro" || bulkSim) { return; }
+		const now = performance.now(), rm = reduceMotion, dw = 190 * Math.sqrt(S), dt = frameDt / 16.7;
+		const bx = WX(ball.x), by = ball.y;
+		for (let t = 0; t < 2; t++) {
+			const sf = staff3[t], left = t === homeSide, cx = left ? FW / 2 - dw * 0.62 - 20 : FW / 2 + dw * 0.62 + 20;
+			if (sf.g && now > sf.t) { sf.g = ""; }
+			if (!sf.g && now > sf.nextPoint && state === "play") { sf.g = Math.random() < 0.7 ? "point" : "clap"; sf.t = now + 1500; sf.nextPoint = now + 5000 + Math.random() * 5000; }
+			// The manager: paces his technical area a little with the play, and watches the ball.
+			const m = sf.mgr;
+			if (!m.x) { m.x = cx; m.y = FH + 13; }
+			const tx = cx + clamp((bx - cx) * 0.06, -dw * 0.3, dw * 0.3), d = tx - m.x;
+			m.vx += ((Math.abs(d) > 6 ? Math.sign(d) * Math.min(0.9, Math.abs(d) / 25) : 0) - m.vx) * Math.min(1, 0.06 * dt);
+			m.x += m.vx * dt; m.y = FH + 13;
+			m.runAmt += (Math.min(1, Math.abs(m.vx) / 2.6) - m.runAmt) * Math.min(1, 0.1 * dt);
+			m.stride += Math.PI * 2 * (0.95 + 0.5 * Math.abs(m.vx)) / 60 * clamp(Math.abs(m.vx) / 0.4, 0, 1) * dt; m.idlePh += 0.028 * dt;
+			m.dir = Math.atan2(by - m.y, bx - m.x);
+			if (F.n < MAXF3) {
+				const r = F.rigs[F.n];
+				pose3D(r, m, m.x, m.y, m.dir, 0, 0);
+				const ph = rm ? 0 : m.idlePh, g = sf.g;
+				if (g === "up") { const b = rm ? 0 : Math.sin(ph * 6) * 0.15; for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = -0.3; r.sh[i].rotation.x = (i ? 1 : -1) * (2.55 + b); r.el[i].rotation.z = 0.25; } r.neck.rotation.z = -0.35; }
+				else if (g === "head") { for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = -2.3; r.sh[i].rotation.x = (i ? 1 : -1) * 0.95; r.el[i].rotation.z = 2.25; } r.spine.rotation.z = 0.2; r.neck.rotation.z = 0.35; }
+				else if (g === "clap") { const c = rm ? 0.5 : Math.abs(Math.sin(ph * 14)); for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = -1.15; r.sh[i].rotation.x = (i ? 1 : -1) * (0.05 + 0.25 * c); r.el[i].rotation.z = 1.1; } }
+				else if (g === "protest") { const c = rm ? 0 : Math.sin(ph * 5) * 0.15; for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = -0.75 + c; r.sh[i].rotation.x = (i ? 1 : -1) * 0.95; r.el[i].rotation.z = 0.55; } r.neck.rotation.z = -0.15; }
+				else if (g === "point") { r.sh[1].rotation.z = -1.55; r.sh[1].rotation.x = 0.35; r.el[1].rotation.z = 0.05; r.sh[0].rotation.z = -0.15; r.el[0].rotation.z = 0.9; }
+				else { for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = 0.25; r.sh[i].rotation.x = (i ? 1 : -1) * 0.25; r.el[i].rotation.z = 1.35; } }   // hands behind his back
+				commitFigure3D(r, sf.look[0], staffKit(t, "mgr"), null);
+			}
+			// The bench: only drawn when the dugouts are (the camera is not in the near stand).
+			if (!G3.showNear) { continue; }
+			const upAmt = now < sf.up ? 1 : 0;
+			sf.bench.forEach((q, i) => {
+				if (F.n >= MAXF3) { return; }
+				const r = F.rigs[F.n];
+				q.x = cx + (i - 1.5) * Math.min(26, dw / 5); q.y = FH + F_SIDE3 + 5; q.idlePh += 0.028 * dt;
+				q.st = (q.st || 0) + (upAmt - (q.st || 0)) * Math.min(1, (upAmt ? 0.12 : 0.04) * dt);
+				const st = q.st, ph = rm ? 0 : q.idlePh;
+				pose3D(r, q, q.x, q.y, -Math.PI / 2, 0, 0);
+				const sit = 1 - st, hop = rm ? 0 : Math.max(0, Math.sin(ph * 7 + q.hop)) * 4 * st;
+				r.hips.position.y = 15.6 * st + 9.2 * sit + hop;
+				for (let k = 0; k < 2; k++) {
+					r.hip[k].rotation.z = 1.5 * sit; r.kn[k].rotation.z = -1.5 * sit - 0.1; r.an[k].rotation.z = 0.1 * sit;
+					r.sh[k].rotation.z = -0.35 * sit - 0.3 * st; r.sh[k].rotation.x = (k ? 1 : -1) * (0.15 * sit + 2.5 * st); r.el[k].rotation.z = 1.0 * sit + 0.25 * st;
+				}
+				r.spine.rotation.z = 0.18 * sit; r.neck.rotation.z = -0.1 * sit + (rm ? 0 : Math.sin(ph * 0.4) * 0.05);
+				r.head.rotation.y = rm ? 0 : Math.sin(ph * 0.3 + i) * 0.3 * sit;
+				commitFigure3D(r, sf.look[i + 1], staffKit(t, i === 3 ? "coach" : "sub"), null);
+			});
+		}
 	}

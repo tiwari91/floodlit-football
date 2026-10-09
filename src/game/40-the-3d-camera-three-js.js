@@ -506,10 +506,13 @@
 		const dw = 190 * Math.sqrt(S);
 		for (const cx of [ FW / 2 - dw * 0.62 - 20, FW / 2 + dw * 0.62 + 20 ]) {
 			const dug = new THREE.Mesh(G3.geo.box, mat3D("#0c1214", false));
-			dug.scale.set(dw, 13, 18); dug.position.set(cx, 6.5, FH + F_SIDE3 + 8); st.add(dug);
+			dug.scale.set(dw, 13, 10); dug.position.set(cx, 6.5, FH + F_SIDE3 + 12); st.add(dug);
 			const roof = new THREE.Mesh(G3.geo.box, new THREE.MeshBasicMaterial({ color: 0x8cb4c8, transparent: true, opacity: 0.35 }));
 			roof.scale.set(dw + 6, 1.2, 22); roof.position.set(cx, 14, FH + F_SIDE3 + 7); st.add(ownMat(roof));
-			G3.nearRoof.push(dug, roof); dug.userData.dugout = cx;
+			// The bench the substitutes sit on, under the canopy.
+			const seat = new THREE.Mesh(G3.geo.box, mat3D("#2b323b", false));
+			seat.scale.set(dw - 6, 1.6, 6); seat.position.set(cx, 7, FH + F_SIDE3 + 5); st.add(seat);
+			G3.nearRoof.push(dug, roof, seat); dug.userData.dugout = cx;
 		}
 		// 4b. Advertising boards all round the pitch, lit like LED hoardings, with gaps for the dugouts.
 		const ac = document.createElement("canvas"); ac.width = 1024; ac.height = 48;

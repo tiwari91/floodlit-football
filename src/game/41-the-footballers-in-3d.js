@@ -5,7 +5,7 @@
 	   calls. A figure is 32 units tall, about 1.95 m against the goal; the head is about a seventh and a
 	   half of that. The shapes are lofted from cross-sections (a torso broad at the shoulders and narrow
 	   at the waist, a chest and shoulder blades, a calf and a thigh), so they read as athletes, not capsules. */
-	const MAXF3 = 32;   // figures the instanced parts can hold: 22 players, 3 officials, room to spare
+	const MAXF3 = 40;   // figures the instanced parts can hold: 22 players, 3 officials, 2 managers and 8 on the benches
 	// Which joint carries which part. Limbs appear twice (left, right); the instance buffers are
 	// sized from this plan, so a pair of limbs always has two slots per figure.
 	const PART_PLAN3 = [

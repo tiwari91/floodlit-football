@@ -100,6 +100,7 @@
 			if (k > 0 && F.flags.count < 2) { F.flags.setMatrixAt(F.flags.count++, rig.ha[1].matrixWorld); }
 		});
 		F.flags.instanceMatrix.needsUpdate = true;
+		staff3D(WX);
 		for (const k in F.parts) {
 			const m = F.parts[k];
 			m.count = F.cnt[k]; m.instanceMatrix.needsUpdate = true;
