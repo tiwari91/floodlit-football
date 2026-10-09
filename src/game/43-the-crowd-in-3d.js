@@ -17,6 +17,14 @@
 			for (let i = 0; i < 4; i++) { const [ x, y, z ] = q[i]; pos.push(x, y, z); nor.push(...(Array.isArray(n[0]) ? n[i] : n)); part.push(pt); }
 			idx.push(b, b + 1, b + 2, b, b + 2, b + 3);
 		};
+		const box = (cx, cy, cz, wt, wb, sy, sz, pt, topPt = pt) => {
+			const ht = wt / 2, hb = wb / 2, hy = sy / 2, hz = sz / 2, y0 = cy - hy, y1 = cy + hy;
+			const sl = (ht - hb) / sy, ln = Math.hypot(1, sl);
+			quad([ [ cx - ht, y1, cz - hz ], [ cx - ht, y1, cz + hz ], [ cx + ht, y1, cz + hz ], [ cx + ht, y1, cz - hz ] ], [ 0, 1, 0 ], topPt);
+			quad([ [ cx - hb, y0, cz + hz ], [ cx + hb, y0, cz + hz ], [ cx + ht, y1, cz + hz ], [ cx - ht, y1, cz + hz ] ], [ 0, 0, 1 ], pt);
+			quad([ [ cx + hb, y0, cz + hz ], [ cx + hb, y0, cz - hz ], [ cx + ht, y1, cz - hz ], [ cx + ht, y1, cz + hz ] ], [ 1 / ln, -sl / ln, 0 ], pt);
+			quad([ [ cx - hb, y0, cz - hz ], [ cx - hb, y0, cz + hz ], [ cx - ht, y1, cz + hz ], [ cx - ht, y1, cz - hz ] ], [ -1 / ln, -sl / ln, 0 ], pt);
+		};
 		// A rounded body part: rings [ y, r ] from bottom to top round (cx, cz), squashed front to back
 		// by kz; the faces turned away from the pitch are left out. Rings from hairFrom up are hair.
 		const lathe = (cx, cz, rings, segs, kz, pt, hairFrom = 99) => {
@@ -39,19 +47,12 @@
 			lathe(0, 0, [ [ 0.4, 1.8 ], [ 3.2, 2.05 ], [ 6.0, 2.55 ], [ 7.25, 2.45 ], [ 7.95, 1.65 ], [ 8.35, 0.85 ] ], 8, 0.62, 7);
 			lathe(0, 0, [ [ 8.0, 0.68 ], [ 9.3, 0.72 ] ], 6, 1, 1);
 			lathe(0.05, 0, [ [ 8.95, 0.55 ], [ 9.3, 1.22 ], [ 9.95, 1.52 ], [ 10.65, 1.6 ], [ 11.2, 1.46 ], [ 11.7, 1.02 ], [ 11.98, 0.3 ] ], 8, 0.94, 1, 11.2);
+			for (const ex of [ -0.55, 0.55 ]) { box(ex + 0.05, 10.55, 1.47, 0.42, 0.42, 0.34, 0.16, 9); }   // eyes: two dark marks, enough at this size
 			for (const sx of [ -2.6, 2.6 ]) {
 				lathe(sx * 1.04, 0, [ [ 7.2, 0.78 ], [ 10.4, 0.7 ], [ 13.5, 0.6 ] ], 6, 1, 8);
 				lathe(sx * 1.04, 0, [ [ 13.4, 0.62 ], [ 14.4, 0.58 ], [ 15.1, 0.2 ] ], 5, 0.8, 5);
 			}
 		}
-		const box = (cx, cy, cz, wt, wb, sy, sz, pt, topPt = pt) => {
-			const ht = wt / 2, hb = wb / 2, hy = sy / 2, hz = sz / 2, y0 = cy - hy, y1 = cy + hy;
-			const sl = (ht - hb) / sy, ln = Math.hypot(1, sl);
-			quad([ [ cx - ht, y1, cz - hz ], [ cx - ht, y1, cz + hz ], [ cx + ht, y1, cz + hz ], [ cx + ht, y1, cz - hz ] ], [ 0, 1, 0 ], topPt);
-			quad([ [ cx - hb, y0, cz + hz ], [ cx + hb, y0, cz + hz ], [ cx + ht, y1, cz + hz ], [ cx - ht, y1, cz + hz ] ], [ 0, 0, 1 ], pt);
-			quad([ [ cx + hb, y0, cz + hz ], [ cx + hb, y0, cz - hz ], [ cx + ht, y1, cz - hz ], [ cx + ht, y1, cz + hz ] ], [ 1 / ln, -sl / ln, 0 ], pt);
-			quad([ [ cx - hb, y0, cz - hz ], [ cx - hb, y0, cz + hz ], [ cx - ht, y1, cz + hz ], [ cx - ht, y1, cz - hz ] ], [ -1 / ln, -sl / ln, 0 ], pt);
-		};
 		const finish = () => {
 			const g = new THREE.BufferGeometry();
 			g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
@@ -64,10 +65,13 @@
 		if (lite) {
 			box(0, 4.2, 0, 5.0, 3.9, 7.2, 3.0, 0);    // body, sitting (the shader stands him up)
 			box(0, 9.7, 0, 2.9, 2.9, 3.2, 2.8, 1, 4);
+			box(0, 11.05, 1.44, 2.95, 2.95, 0.5, 0.12, 4);   // a fringe of hair over the brow
+			for (const ex of [ -0.6, 0.6 ]) { box(ex, 10.25, 1.47, 0.5, 0.5, 0.4, 0.12, 9); }
 		} else {
 			// Rounded but light: a torso with shoulders and a round head, the front halves only.
 			lathe(0, 0, [ [ 0.6, 1.9 ], [ 4.0, 2.2 ], [ 6.6, 2.6 ], [ 7.8, 1.75 ], [ 8.35, 0.8 ] ], 6, 0.62, 0);
 			lathe(0.05, 0, [ [ 8.7, 0.7 ], [ 9.3, 1.35 ], [ 10.3, 1.6 ], [ 11.2, 1.38 ], [ 11.95, 0.45 ] ], 6, 0.94, 1, 11.2);
+			for (const ex of [ -0.55, 0.55 ]) { box(ex + 0.05, 10.5, 1.52, 0.45, 0.45, 0.36, 0.14, 9); }
 		}
 		if (!lite) {
 			box(-3.3, 9.5, 0, 1.1, 1.1, 6.5, 1.1, 2);   // arms, modelled raised; the shader lowers them
@@ -90,6 +94,7 @@
 					int pt = int(aPart + 0.5);
 					if (pt == 1 || pt == 5) { vColor.rgb = aSkin; }
 					if (pt == 4) { float hq = fract(aFan.x * 7.31); vColor.rgb = hq > 0.9 ? vec3(0.62, 0.5, 0.3) : hq > 0.8 ? vec3(0.45, 0.45, 0.45) : aSkin * 0.22 + vec3(0.02); }
+					if (pt == 9) { vColor.rgb = vec3(0.05, 0.04, 0.035); }
 					if (pt == 6) { vColor.rgb = vColor.rgb * 0.12 + (fract(aFan.x * 3.7) > 0.5 ? vec3(0.1, 0.12, 0.18) : vec3(0.16, 0.15, 0.13)); }`)
 				.replace("#include <begin_vertex>", `
 					vec3 transformed = vec3(position);

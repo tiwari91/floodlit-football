@@ -8802,10 +8802,14 @@
 	const HAIR = [ "#1b1410", "#3b2616", "#6b4424", "#a0703a", "#d8b46a", "#2a2a2a" ];
 	function look (p) {
 		if (!p.look) {
-			// Fixed by name, so a player looks the same every match.
+			// Fixed by name, so a player looks the same every match. hashStr is unsigned: shift with >>>,
+			// or half the squad gets a negative face index (a blank head) and no hair colour.
 			const h = hashStr((p.name || `${p.team}-${p.idx}-${p.num}`) + "look");
-			const style = [ "short", "short", "short", "curly", "long", "buzz", "shaved" ][(h >> 5) % 7];
-			p.look = { skin: SKIN[h % SKIN.length], hair: HAIR[(h >> 2) % HAIR.length], shaved: style === "shaved", style, face: (h >> 9) % 8 };
+			// The broad style is fixed by the hash as before; a second draw splits it (crop or short,
+			// curly or a full afro, long or tied back), so nobody's look changes beyond recognition.
+			const base = [ "short", "short", "short", "curly", "long", "buzz", "shaved" ][(h >>> 5) % 7], alt = (h >>> 13) % 2;
+			const style = base === "short" && alt ? "crop" : base === "curly" && alt ? "afro" : base === "long" && alt ? "tied" : base;
+			p.look = { skin: SKIN[h % SKIN.length], hair: HAIR[(h >>> 2) % HAIR.length], shaved: style === "shaved", style, face: (h >>> 9) % 8 };
 		}
 		return p.look;
 	}
@@ -8898,9 +8902,10 @@
 		ctx.beginPath(); ctx.arc(hx, hy, 5.4, 0, Math.PI * 2); ctx.fill();
 		if (!lk.shaved) {
 			ctx.fillStyle = lk.hair;
-			const big = lk.style === "curly" ? 6.4 : lk.style === "buzz" ? 5.4 : 5.6, span = lk.style === "buzz" ? 0.3 : lk.style === "curly" ? 0.42 : 0.55;
+			const big = lk.style === "afro" ? 7.2 : lk.style === "curly" ? 6.4 : lk.style === "buzz" ? 5.4 : 5.6, span = lk.style === "buzz" ? 0.3 : lk.style === "curly" ? 0.42 : 0.55;
 			ctx.beginPath(); ctx.arc(hx, hy, big, p.dir + Math.PI * span, p.dir + Math.PI * (2 - span)); ctx.closePath(); ctx.fill();
 			if (lk.style === "long") { ctx.beginPath(); ctx.ellipse(hx - fx * 6, hy - fy * 6, 3.2, 2.4, p.dir, 0, Math.PI * 2); ctx.fill(); }
+			if (lk.style === "tied") { ctx.beginPath(); ctx.arc(hx - fx * 5, hy - fy * 5, 2, 0, Math.PI * 2); ctx.fill(); }
 		}
 		ctx.strokeStyle = "rgba(0, 0, 0, 0.35)";
 		ctx.lineWidth = 1;
@@ -10313,13 +10318,31 @@
 		if (fine) { ctx.fillStyle = shade(L.skin.length === 7 ? L.skin : "#c68a5e", 0.82); ctx.beginPath(); ctx.ellipse(hx - face * H * 0.02, hy + H * 0.01, H * 0.018, H * 0.026, 0, 0, Math.PI * 2); ctx.fill(); }
 		if (!L.shaved) {
 			ctx.fillStyle = L.hair;
-			const hr = H * (L.style === "curly" ? 0.102 : L.style === "buzz" ? 0.088 : 0.092);
+			const hr = H * (L.style === "afro" ? 0.118 : L.style === "curly" ? 0.102 : L.style === "buzz" ? 0.088 : 0.092);
 			ctx.beginPath(); ctx.arc(hx - face * H * 0.012, hy - H * (L.style === "buzz" ? 0.025 : 0.018), hr, Math.PI * 1.02, Math.PI * 1.98); ctx.closePath(); ctx.fill();
 			// hair down the back of the head
 			ctx.beginPath(); ctx.arc(hx - face * H * 0.03, hy - H * 0.01, hr * 0.92, face > 0 ? Math.PI * 0.75 : Math.PI * 1.75, face > 0 ? Math.PI * 1.5 : Math.PI * 0.25 + Math.PI * 2); ctx.closePath(); ctx.fill();
 			if (L.style === "long") { ctx.fillRect(hx - face * H * 0.09 - H * 0.03, hy - H * 0.02, H * 0.06, H * 0.12); }
+			if (L.style === "tied") { ctx.beginPath(); ctx.arc(hx - face * H * 0.085, hy - H * 0.07, H * 0.034, 0, Math.PI * 2); ctx.fill(); }
 		}
 		ctx.strokeStyle = "rgba(0, 0, 0, 0.3)"; ctx.lineWidth = Math.max(0.5, 0.7 * k); ctx.beginPath(); ctx.arc(hx, hy, H * 0.085, 0, Math.PI * 2); ctx.stroke();
+		// The face in profile, on the side he faces: an eye and brow at any size the head reads,
+		// and close up a nose, a mouth (open while he celebrates) and the beard or stubble.
+		if (H > 14) {
+			const ex = hx + face * H * 0.046, ey = hy - H * 0.008, er = Math.max(0.7, H * 0.013);
+			if (fine) { ctx.fillStyle = "#f4efe6"; ctx.beginPath(); ctx.ellipse(ex, ey, er * 1.5, er * 1.05, 0, 0, Math.PI * 2); ctx.fill(); }
+			ctx.fillStyle = "#1a100a"; ctx.beginPath(); ctx.arc(ex + face * er * 0.4, ey, er, 0, Math.PI * 2); ctx.fill();
+			ctx.strokeStyle = L.shaved || L.style === "buzz" ? "#2a1a10" : L.hair; ctx.lineWidth = Math.max(0.8, H * 0.012); ctx.lineCap = "round";
+			ctx.beginPath(); ctx.moveTo(ex - face * er * 1.4, ey - er * 2.2); ctx.lineTo(ex + face * er * 1.8, ey - er * 2.4); ctx.stroke();
+			if (fine) {
+				ctx.fillStyle = L.skin; ctx.beginPath(); ctx.moveTo(hx + face * H * 0.08, hy - H * 0.004); ctx.lineTo(hx + face * H * 0.104, hy + H * 0.026); ctx.lineTo(hx + face * H * 0.078, hy + H * 0.03); ctx.closePath(); ctx.fill();
+				const lf = L.face || 0;
+				if (lf === 3 || lf === 7 || lf === 2 || lf === 5) { ctx.fillStyle = lf === 3 || lf === 7 ? "rgba(26, 16, 10, 0.75)" : "rgba(26, 16, 10, 0.28)"; ctx.beginPath(); ctx.arc(hx + face * H * 0.03, hy + H * 0.035, H * 0.05, face > 0 ? -0.3 : Math.PI * 0.5, face > 0 ? Math.PI * 0.5 : Math.PI + 0.3); ctx.closePath(); ctx.fill(); }
+				const mx = hx + face * H * 0.066, my = hy + H * 0.05;
+				if ((p.celebA || 0) > 0.3) { ctx.fillStyle = "#3a0e0c"; ctx.beginPath(); ctx.ellipse(mx, my, H * 0.014, H * 0.018, 0, 0, Math.PI * 2); ctx.fill(); }
+				else { ctx.strokeStyle = "rgba(70, 22, 18, 0.85)"; ctx.lineWidth = Math.max(0.6, H * 0.008); ctx.beginPath(); ctx.moveTo(mx - face * H * 0.02, my); ctx.lineTo(mx + face * H * 0.008, my - H * 0.002); ctx.stroke(); }
+			}
+		}
 		const sh = shY;
 		ctx.lineCap = "butt";
 		const top = sh - H * 0.24;
@@ -11030,58 +11053,79 @@
 	// Which joint carries which part. Limbs appear twice (left, right); the instance buffers are
 	// sized from this plan, so a pair of limbs always has two slots per figure.
 	const PART_PLAN3 = [
-		[ "torso", "spine" ], [ "shoulders", "spine" ], [ "shorts", "hips" ], [ "neck", "neck" ], [ "head", "head" ], [ "hair", "head" ],
+		[ "torso", "spine" ], [ "shoulders", "spine" ], [ "shorts", "hips" ], [ "neck", "neck" ], [ "head", "head" ], [ "hair", "head" ], [ "ear", "head" ], [ "ear", "head" ], [ "nose", "head" ], [ "tail", "head" ],
 		[ "upperArm", "sh", 0 ], [ "upperArm", "sh", 1 ], [ "foreArm", "el", 0 ], [ "foreArm", "el", 1 ], [ "hand", "ha", 0 ], [ "hand", "ha", 1 ],
 		[ "thigh", "hip", 0 ], [ "thigh", "hip", 1 ], [ "shin", "kn", 0 ], [ "shin", "kn", 1 ], [ "boot", "an", 0 ], [ "boot", "an", 1 ]
 	];
 	const PER_FIG3 = PART_PLAN3.reduce((m, [ n ]) => { m[n] = (m[n] || 0) + 1; return m; }, {});
 	const PATTERN3 = { plain: 0, stripes: 1, hoops: 2, halves: 3, sash: 4 };
-	const HAIR_SCALE3 = { short: [ 1, 1, 1 ], curly: [ 1.14, 1.2, 1.14 ], long: [ 1.06, 1.35, 1.06 ], buzz: [ 0.98, 0.96, 0.98 ], shaved: null };
+	const HAIR_SCALE3 = { short: [ 1, 1, 1 ], crop: [ 1.02, 1.06, 1.02 ], curly: [ 1.14, 1.2, 1.14 ], afro: [ 1.3, 1.3, 1.3 ], long: [ 1.06, 1.12, 1.06 ], tied: [ 1.02, 1.04, 1.02 ], buzz: [ 0.98, 0.96, 0.98 ], shaved: null };
+	// Long hair falls down the back of the head; tied hair is a bun at the crown. One unit sphere, placed per style.
+	const TAIL3 = { long: [ -1.55, 1.45, 0, 0.8, 1.75, 1.6 ], tied: [ -1.95, 3.55, 0, 0.88, 0.85, 0.88 ] };
+	let HM3 = null;   // scratch matrices for the hair, made once three.js is here
 	const BOOTS3 = [ "#15181a", "#f2f2f2", "#15181a", "#2bd1ff", "#ff4f6a", "#15181a", "#f2b52e", "#8cff5a" ];
 	// One face into the atlas: cell (x0, y0), 256 wide (once round the head) by 128 (crown to chin).
 	// The front of the head is the middle of the cell; the eye line sits a little above the equator.
-	function paintFace3D (g, x0, y0, v) {
-		const cx = x0 + 128, ey = y0 + 62, brow = v % 4, mouth = (v >> 1) % 3, beard = v === 3 || v === 7, stubble = v === 2 || v === 5;
-		const ink = "#2a1a12", dark = "rgba(20, 12, 8, 0.55)";
+	// Features are drawn bold so the mipmapped texture still shows eyes and brows at mid distance.
+	// open: the celebrating version of the same face, mouth wide open.
+	function paintFace3D (g, x0, y0, v, open) {
+		const cx = x0 + 128, ey = y0 + 60, brow = v % 4, mouth = (v >> 1) % 3, beard = v === 3 || v === 7, stubble = v === 2 || v === 5;
+		const ink = "#22150e", dark = "rgba(20, 12, 8, 0.6)";
 		g.save();
 		g.clearRect(x0, y0, 256, 128);
-		// A soft shadow under the brow and down the sides of the nose, so the face reads from a distance.
-		g.fillStyle = "rgba(30, 18, 10, 0.16)";
-		g.beginPath(); g.ellipse(cx, ey + 1, 30, 7, 0, 0, Math.PI * 2); g.fill();
-		g.fillStyle = "rgba(30, 18, 10, 0.11)";
-		g.beginPath(); g.moveTo(cx - 1.5, ey + 5); g.lineTo(cx - 4, ey + 18); g.lineTo(cx + 4, ey + 18); g.lineTo(cx + 1.5, ey + 5); g.closePath(); g.fill();
+		g.lineCap = "round";
+		// Shadow under the brow ridge and in the eye sockets, down the sides of the nose, under the cheekbones.
+		g.fillStyle = "rgba(40, 20, 10, 0.2)";
+		for (const sgn of [ -1, 1 ]) { g.beginPath(); g.ellipse(cx + sgn * 16, ey - 1, 13, 8, 0, 0, Math.PI * 2); g.fill(); }
+		g.fillStyle = "rgba(40, 20, 10, 0.12)";
+		for (const sgn of [ -1, 1 ]) { g.beginPath(); g.ellipse(cx + sgn * 34, ey + 22, 9, 14, sgn * 0.3, 0, Math.PI * 2); g.fill(); }
+		g.fillStyle = "rgba(40, 20, 10, 0.16)";
+		g.beginPath(); g.moveTo(cx - 3, ey + 4); g.lineTo(cx - 8, ey + 20); g.lineTo(cx + 8, ey + 20); g.lineTo(cx + 3, ey + 4); g.closePath(); g.fill();
+		// warm cheeks
+		g.fillStyle = "rgba(200, 70, 60, 0.1)";
+		for (const sgn of [ -1, 1 ]) { g.beginPath(); g.ellipse(cx + sgn * 24, ey + 15, 8, 5, 0, 0, Math.PI * 2); g.fill(); }
 		for (const sgn of [ -1, 1 ]) {
-			const x = cx + sgn * 15;
-			// the eye: a white almond, an iris, a pupil and a glint
-			g.fillStyle = "#f6f1ea"; g.beginPath(); g.ellipse(x, ey, 8.5, 5, 0, 0, Math.PI * 2); g.fill();
-			g.fillStyle = v % 3 === 1 ? "#3a5a7a" : v % 3 === 2 ? "#4a6a3a" : "#3a2414"; g.beginPath(); g.arc(x + sgn * 0.5, ey + 0.5, 3.6, 0, Math.PI * 2); g.fill();
-			g.fillStyle = "#120a06"; g.beginPath(); g.arc(x + sgn * 0.5, ey + 0.5, 1.9, 0, Math.PI * 2); g.fill();
-			g.fillStyle = "rgba(255, 255, 255, 0.85)"; g.beginPath(); g.arc(x - 1 + sgn * 0.5, ey - 1, 1, 0, Math.PI * 2); g.fill();
-			// the lid line
-			g.strokeStyle = dark; g.lineWidth = 1.6; g.beginPath(); g.ellipse(x, ey, 8.5, 5, 0, Math.PI, Math.PI * 2); g.stroke();
-			// the brow: flat, arched, heavy or raised
-			g.strokeStyle = ink; g.lineCap = "round"; g.lineWidth = brow === 2 ? 4.2 : 2.8;
+			const x = cx + sgn * 16;
+			// the eye: a white almond, an iris, a pupil and a glint (wider open when celebrating)
+			const eh = open ? 6.6 : 5.6;
+			g.fillStyle = "#f8f4ee"; g.beginPath(); g.ellipse(x, ey, 9.5, eh, 0, 0, Math.PI * 2); g.fill();
+			g.fillStyle = v % 3 === 1 ? "#35577a" : v % 3 === 2 ? "#4a6a36" : "#3a2210"; g.beginPath(); g.arc(x + sgn * 0.5, ey + 0.4, 4.4, 0, Math.PI * 2); g.fill();
+			g.fillStyle = "#0c0604"; g.beginPath(); g.arc(x + sgn * 0.5, ey + 0.4, 2.3, 0, Math.PI * 2); g.fill();
+			g.fillStyle = "rgba(255, 255, 255, 0.9)"; g.beginPath(); g.arc(x - 1.3 + sgn * 0.5, ey - 1.3, 1.2, 0, Math.PI * 2); g.fill();
+			// upper lid and lashes, a fainter lower lid
+			g.strokeStyle = ink; g.lineWidth = 2.4; g.beginPath(); g.ellipse(x, ey, 9.5, eh, 0, Math.PI * 1.05, Math.PI * 1.95); g.stroke();
+			g.strokeStyle = "rgba(40, 20, 10, 0.35)"; g.lineWidth = 1.2; g.beginPath(); g.ellipse(x, ey, 9.5, eh, 0, Math.PI * 0.15, Math.PI * 0.85); g.stroke();
+			// the brow: flat, arched, heavy or angled; raised when celebrating
+			const by = open ? -4 : 0;
+			g.strokeStyle = ink; g.lineWidth = brow === 2 ? 6 : 4.4;
 			g.beginPath();
-			if (brow === 1) { g.moveTo(x - sgn * 9, ey - 9); g.quadraticCurveTo(x, ey - 15, x + sgn * 9, ey - 10); }
-			else if (brow === 3) { g.moveTo(x - sgn * 9, ey - 10); g.lineTo(x + sgn * 9, ey - 13); }
-			else { g.moveTo(x - sgn * 9, ey - 10.5); g.lineTo(x + sgn * 9, ey - 10.5); }
+			if (brow === 1) { g.moveTo(x - sgn * 10, ey - 10 + by); g.quadraticCurveTo(x, ey - 17 + by, x + sgn * 11, ey - 11 + by); }
+			else if (brow === 3) { g.moveTo(x - sgn * 10, ey - 11 + by); g.lineTo(x + sgn * 11, ey - 14 + by); }
+			else { g.moveTo(x - sgn * 10, ey - 12 + by); g.quadraticCurveTo(x, ey - 14 + by, x + sgn * 11, ey - 11.5 + by); }
 			g.stroke();
 		}
-		// the mouth: a straight line, a slight smile or a set jaw
-		g.strokeStyle = "rgba(60, 22, 18, 0.8)"; g.lineWidth = 2.2; g.lineCap = "round"; g.beginPath();
-		if (mouth === 1) { g.moveTo(cx - 9, ey + 26); g.quadraticCurveTo(cx, ey + 31, cx + 9, ey + 26); }
-		else if (mouth === 2) { g.moveTo(cx - 8, ey + 28); g.quadraticCurveTo(cx, ey + 25, cx + 8, ey + 28); }
-		else { g.moveTo(cx - 8, ey + 27); g.lineTo(cx + 8, ey + 27); }
-		g.stroke();
-		// the ears, a shade darker than the skin, out at the sides
-		g.fillStyle = "rgba(60, 30, 15, 0.22)";
-		for (const sgn of [ -1, 1 ]) { g.beginPath(); g.ellipse(cx + sgn * 62, ey + 6, 6, 9, 0, 0, Math.PI * 2); g.fill(); }
-		// stubble or a beard across the jaw
+		// nostrils and the underside of the nose
+		g.fillStyle = "rgba(50, 20, 12, 0.55)";
+		for (const sgn of [ -1, 1 ]) { g.beginPath(); g.ellipse(cx + sgn * 3.6, ey + 19, 2.2, 1.4, 0, 0, Math.PI * 2); g.fill(); }
+		// stubble or a beard across the jaw (under the mouth, so the lips sit on top)
 		if (stubble || beard) {
-			g.fillStyle = beard ? "rgba(28, 18, 12, 0.78)" : "rgba(28, 18, 12, 0.3)";
-			g.beginPath(); g.moveTo(cx - 44, ey + 14); g.quadraticCurveTo(cx - 40, ey + 52, cx, ey + 56); g.quadraticCurveTo(cx + 40, ey + 52, cx + 44, ey + 14);
-			g.quadraticCurveTo(cx + 30, ey + 23, cx + 12, ey + 21); g.quadraticCurveTo(cx, ey + 19, cx - 12, ey + 21); g.quadraticCurveTo(cx - 30, ey + 23, cx - 44, ey + 14); g.closePath(); g.fill();
-			if (beard) { g.fillStyle = "rgba(90, 50, 35, 0.9)"; g.beginPath(); g.ellipse(cx, ey + 27, 7, 2.2, 0, 0, Math.PI * 2); g.fill(); }
+			g.fillStyle = beard ? "rgba(26, 16, 10, 0.85)" : "rgba(26, 16, 10, 0.32)";
+			g.beginPath(); g.moveTo(cx - 46, ey + 12); g.quadraticCurveTo(cx - 42, ey + 54, cx, ey + 60); g.quadraticCurveTo(cx + 42, ey + 54, cx + 46, ey + 12);
+			g.quadraticCurveTo(cx + 30, ey + 24, cx + 12, ey + 22); g.quadraticCurveTo(cx, ey + 20, cx - 12, ey + 22); g.quadraticCurveTo(cx - 30, ey + 24, cx - 46, ey + 12); g.closePath(); g.fill();
+		}
+		// the mouth
+		if (open) {
+			g.fillStyle = "#3a0e0c"; g.beginPath(); g.ellipse(cx, ey + 31, 10, 8, 0, 0, Math.PI * 2); g.fill();
+			g.fillStyle = "#f2ece2"; g.fillRect(cx - 7, ey + 24, 14, 3);
+			g.fillStyle = "#b8524a"; g.beginPath(); g.ellipse(cx, ey + 36, 6, 2.4, 0, 0, Math.PI * 2); g.fill();
+			g.strokeStyle = "rgba(120, 40, 34, 0.9)"; g.lineWidth = 2; g.beginPath(); g.ellipse(cx, ey + 31, 10, 8, 0, 0, Math.PI * 2); g.stroke();
+		} else {
+			g.strokeStyle = "rgba(70, 22, 18, 0.9)"; g.lineWidth = 3; g.beginPath();
+			if (mouth === 1) { g.moveTo(cx - 10, ey + 28); g.quadraticCurveTo(cx, ey + 34, cx + 10, ey + 28); }
+			else if (mouth === 2) { g.moveTo(cx - 9, ey + 30); g.quadraticCurveTo(cx, ey + 27, cx + 9, ey + 30); }
+			else { g.moveTo(cx - 9, ey + 29); g.lineTo(cx + 9, ey + 29); }
+			g.stroke();
+			g.fillStyle = beard ? "rgba(178, 84, 70, 0.85)" : "rgba(160, 60, 50, 0.3)"; g.beginPath(); g.ellipse(cx, ey + 33, 7, 2.6, 0, 0, Math.PI * 2); g.fill();
 		}
 		g.restore();
 	}
@@ -11092,7 +11136,19 @@
 			shoulders: () => { const g = new T.CapsuleGeometry(1.7, 6.4, 4, 10); g.rotateX(Math.PI / 2); g.translate(0, 8.7, 0); g.scale(0.78, 1, 1); return g; },
 			shorts: () => { const g = new T.CylinderGeometry(3.45, 3.95, 4.6, 12); g.translate(0, -1.9, 0); g.scale(0.78, 1, 1); return g; },
 			neck: () => { const g = new T.CylinderGeometry(0.9, 1.05, 2.2, 8); g.translate(0, 0.8, 0); return g; },
-			head: () => { const g = new T.SphereGeometry(2.15, 14, 10); g.scale(0.96, 1.12, 0.94); g.translate(0.2, 2.25, 0); return g; },
+			head: () => {
+			// A skull that narrows to a jaw and a chin rather than an egg: below the cheekbones the sides
+			// draw in and the back of the head tucks under; the front keeps its line down to the chin.
+			const g = new T.SphereGeometry(2.15, 18, 14), P = g.attributes.position;
+			for (let i = 0; i < P.count; i++) {
+				const x = P.getX(i), y = P.getY(i), z = P.getZ(i), t = clamp(-y / 2.15, 0, 1), u = clamp((y + 0.3) / 1.5, 0, 1);
+				P.setXYZ(i, x * (x < 0 ? 1 - 0.22 * t : 1 + 0.03 * t), y, z * (1 - 0.3 * t * t) * (1 + 0.04 * (1 - u) * (1 - t)));
+			}
+			g.computeVertexNormals(); g.scale(0.96, 1.12, 0.94); g.translate(0.2, 2.25, 0); return g;
+		},
+		ear: () => { const g = new T.SphereGeometry(0.62, 8, 6); g.scale(0.55, 1.05, 0.38); g.translate(0.05, 2.3, 0); return g; },
+		nose: () => { const g = new T.ConeGeometry(0.42, 1.0, 6); g.rotateZ(-0.35); g.scale(0.85, 1, 0.9); g.translate(2.12, 1.86, 0); return g; },
+		tail: () => new T.SphereGeometry(1, 9, 7),
 			hair: () => { const g = new T.SphereGeometry(2.38, 12, 7, 0, Math.PI * 2, 0, 1.55); g.scale(0.96, 1.12, 0.94); g.rotateZ(0.42); g.translate(0.2, 2.25, 0); return g; },   // concentric with the head, tilted: high at the brow, low at the nape
 			upperArm: () => { const g = new T.CapsuleGeometry(0.98, 4.6, 3, 7); g.translate(0, -2.5, 0); return g; },
 			foreArm: () => { const g = new T.CapsuleGeometry(0.8, 4.4, 3, 7); g.translate(0, -2.4, 0); return g; },
@@ -11122,18 +11178,18 @@
 		// Faces: an atlas of eight, painted once (eyes, brows, a nose, a mouth, stubble or a beard on
 		// some), wrapped round the head sphere with the face at the front. Each figure picks its cell
 		// with an instanced attribute; the painted parts are laid over the skin colour, the rest is skin.
-		const fc = document.createElement("canvas"); fc.width = 1024; fc.height = 256;
+		const fc = document.createElement("canvas"); fc.width = 1024; fc.height = 512;
 		const fg = fc.getContext && fc.getContext("2d");
 		if (fg) {
-			for (let v = 0; v < 8; v++) { paintFace3D(fg, (v % 4) * 256, Math.floor(v / 4) * 128, v); }
+			for (let v = 0; v < 16; v++) { paintFace3D(fg, (v % 4) * 256, Math.floor(v / 4) * 128, v % 8, v >= 8); }
 		}
 		const faceTex = tex3D(fc);
-		faceTex.minFilter = T.LinearFilter; faceTex.magFilter = T.LinearFilter; faceTex.generateMipmaps = false;
+		faceTex.minFilter = T.LinearMipmapLinearFilter; faceTex.magFilter = T.LinearFilter; faceTex.generateMipmaps = true;   // mipmaps: at mid distance the eyes and brows blur to dark marks rather than flicker out
 		const headMat = new T.MeshLambertMaterial({ color: 0xffffff, map: faceTex });
 		headMat.onBeforeCompile = sh => {
 			sh.vertexShader = sh.vertexShader
 				.replace("#include <common>", "#include <common>\nattribute float aFace;")
-				.replace("#include <uv_vertex>", "#include <uv_vertex>\nvMapUv = (uv + vec2(mod(aFace, 4.0), 1.0 - floor(aFace / 4.0))) / vec2(4.0, 2.0);");
+				.replace("#include <uv_vertex>", "#include <uv_vertex>\nvMapUv = (uv + vec2(mod(aFace, 4.0), 3.0 - floor(aFace / 4.0))) / vec2(4.0, 4.0);");
 			sh.fragmentShader = sh.fragmentShader
 				.replace("#include <map_fragment>", "")
 				.replace("#include <color_fragment>", "#include <color_fragment>\nvec4 fx = texture2D(map, vMapUv); diffuseColor.rgb = mix(diffuseColor.rgb, fx.rgb, fx.a);");
@@ -11223,7 +11279,7 @@
 		const rm = reduceMotion;
 		const spd = Math.hypot(p.vx || 0, p.vy || 0);
 		const a = clamp(p.runAmt || 0, 0, 1), ph = rm ? 0 : p.stride || 0, jump = rm ? 0 : jumpAmt(p);
-		const shuf = clamp(p.shuf || 0, 0, 1), cel = clamp(p.celebA || 0, 0, 1), kneel = clamp(p.kneel || 0, 0, 1), sulk = clamp(p.sulk || 0, 0, 1);
+		const shuf = clamp(p.shuf || 0, 0, 1), cel = r.cel = clamp(p.celebA || 0, 0, 1), kneel = clamp(p.kneel || 0, 0, 1), sulk = clamp(p.sulk || 0, 0, 1);
 		const down = (p.lunge > 0 && players.indexOf(p) === ctrl) || p.slideAI > 0;
 		const fall = p.fall > 0 ? 1 - p.fall / FALL_T : -1, dive = p.dive > 0 ? 1 - p.dive / DIVE_T : -1, thr = p.throwA > 0 ? 1 - p.throwA / THROW_T : -1;
 		const idle = rm ? 0 : p.idlePh || 0, gk = p.role === "gk";
@@ -11354,25 +11410,33 @@
 		if (F.n >= MAXF3) { return; }
 		F.n++;
 		rig.root.updateMatrixWorld(true);
+		if (!HM3) { HM3 = [ new THREE.Matrix4(), new THREE.Matrix4() ]; }
 		for (const [ name, joint, side ] of PART_PLAN3) {
 			const mesh = F.parts[name], node = side === undefined ? rig[joint] : rig[joint][side];
 			let mtx = node.matrixWorld;
 			if (name === "hair") {
 				const s = HAIR_SCALE3[lk.style] === undefined ? HAIR_SCALE3.short : HAIR_SCALE3[lk.style];
 				if (!s) { continue; }
-				mtx = M.makeScale(s[0], s[1], s[2]).premultiply(node.matrixWorld);
+				// scaled about the middle of the head, so a big afro grows out all round rather than up
+				mtx = M.makeTranslation(0.2, 2.25, 0).multiply(HM3[0].makeScale(s[0], s[1], s[2])).multiply(HM3[1].makeTranslation(-0.2, -2.25, 0)).premultiply(node.matrixWorld);
+			} else if (name === "tail") {
+				const t = TAIL3[lk.style];
+				if (!t) { continue; }
+				mtx = M.makeTranslation(t[0], t[1], t[2]).multiply(HM3[0].makeScale(t[3], t[4], t[5])).premultiply(node.matrixWorld);
+			} else if (name === "ear") {
+				mtx = M.makeTranslation(0.05, 0, F.cnt.ear % 2 ? 1.92 : -1.92).premultiply(node.matrixWorld);
 			} else if (name === "hand" && kit.gloves) { mtx = M.makeScale(1.45, 1.3, 1.5).premultiply(node.matrixWorld); }
 			const k = F.cnt[name]++;
 			if (k >= mesh.instanceMatrix.count) { F.cnt[name]--; continue; }   // never past the buffer
 			mesh.setMatrixAt(k, mtx);
 			const c = name === "torso" || name === "shoulders" || name === "upperArm" || (name === "foreArm" && kit.sleeves) ? kit.shirt
 				: name === "shorts" ? kit.shorts : name === "shin" ? kit.socks : name === "boot" ? kit.boots
-				: name === "hair" ? lk.hair : name === "hand" && kit.gloves ? kit.gloves : lk.skin;
+				: name === "hair" || name === "tail" ? lk.hair : name === "hand" && kit.gloves ? kit.gloves : lk.skin;
 			mesh.setColorAt(k, C.set(c));
 			if (name === "torso") {
 				const g = mesh.geometry, pat = g.attributes.aPat, c2 = g.attributes.aCol2;
 				pat.setX(k, kit.pattern); C.set(kit.second); c2.setXYZ(k, C.r, C.g, C.b);
-			} else if (name === "head") { mesh.geometry.attributes.aFace.setX(k, lk.face || 0); }
+			} else if (name === "head") { mesh.geometry.attributes.aFace.setX(k, ((lk.face || 0) % 8 + 8) % 8 + ((rig.cel || 0) > 0.3 ? 8 : 0)); }   // celebrating: the open-mouthed face
 		}
 		const V = F.V.setFromMatrixPosition(rig.root.matrixWorld), x = V.x, z = V.z, air = Math.max(0, V.y);
 		F.blobs.setMatrixAt(F.blobs.count++, M.compose(V.set(x + 2, 0.2, z + 1.5), F.Q.identity(), F.S.set(11 + air * 0.15, 1, 7 + air * 0.1)));
@@ -11504,6 +11568,7 @@
 			m.count = F.cnt[k]; m.instanceMatrix.needsUpdate = true;
 			if (m.instanceColor) { m.instanceColor.needsUpdate = true; }
 		}
+		F.parts.head.geometry.attributes.aFace.needsUpdate = true;
 		const tg = F.parts.torso.geometry;
 		tg.attributes.aPat.needsUpdate = true; tg.attributes.aCol2.needsUpdate = true;
 		for (const m of [ F.nums, F.rings, F.blobs, F.longs ]) { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) { m.instanceColor.needsUpdate = true; } }
@@ -11528,6 +11593,14 @@
 			for (let i = 0; i < 4; i++) { const [ x, y, z ] = q[i]; pos.push(x, y, z); nor.push(...(Array.isArray(n[0]) ? n[i] : n)); part.push(pt); }
 			idx.push(b, b + 1, b + 2, b, b + 2, b + 3);
 		};
+		const box = (cx, cy, cz, wt, wb, sy, sz, pt, topPt = pt) => {
+			const ht = wt / 2, hb = wb / 2, hy = sy / 2, hz = sz / 2, y0 = cy - hy, y1 = cy + hy;
+			const sl = (ht - hb) / sy, ln = Math.hypot(1, sl);
+			quad([ [ cx - ht, y1, cz - hz ], [ cx - ht, y1, cz + hz ], [ cx + ht, y1, cz + hz ], [ cx + ht, y1, cz - hz ] ], [ 0, 1, 0 ], topPt);
+			quad([ [ cx - hb, y0, cz + hz ], [ cx + hb, y0, cz + hz ], [ cx + ht, y1, cz + hz ], [ cx - ht, y1, cz + hz ] ], [ 0, 0, 1 ], pt);
+			quad([ [ cx + hb, y0, cz + hz ], [ cx + hb, y0, cz - hz ], [ cx + ht, y1, cz - hz ], [ cx + ht, y1, cz + hz ] ], [ 1 / ln, -sl / ln, 0 ], pt);
+			quad([ [ cx - hb, y0, cz - hz ], [ cx - hb, y0, cz + hz ], [ cx - ht, y1, cz + hz ], [ cx - ht, y1, cz - hz ] ], [ -1 / ln, -sl / ln, 0 ], pt);
+		};
 		// A rounded body part: rings [ y, r ] from bottom to top round (cx, cz), squashed front to back
 		// by kz; the faces turned away from the pitch are left out. Rings from hairFrom up are hair.
 		const lathe = (cx, cz, rings, segs, kz, pt, hairFrom = 99) => {
@@ -11550,19 +11623,12 @@
 			lathe(0, 0, [ [ 0.4, 1.8 ], [ 3.2, 2.05 ], [ 6.0, 2.55 ], [ 7.25, 2.45 ], [ 7.95, 1.65 ], [ 8.35, 0.85 ] ], 8, 0.62, 7);
 			lathe(0, 0, [ [ 8.0, 0.68 ], [ 9.3, 0.72 ] ], 6, 1, 1);
 			lathe(0.05, 0, [ [ 8.95, 0.55 ], [ 9.3, 1.22 ], [ 9.95, 1.52 ], [ 10.65, 1.6 ], [ 11.2, 1.46 ], [ 11.7, 1.02 ], [ 11.98, 0.3 ] ], 8, 0.94, 1, 11.2);
+			for (const ex of [ -0.55, 0.55 ]) { box(ex + 0.05, 10.55, 1.47, 0.42, 0.42, 0.34, 0.16, 9); }   // eyes: two dark marks, enough at this size
 			for (const sx of [ -2.6, 2.6 ]) {
 				lathe(sx * 1.04, 0, [ [ 7.2, 0.78 ], [ 10.4, 0.7 ], [ 13.5, 0.6 ] ], 6, 1, 8);
 				lathe(sx * 1.04, 0, [ [ 13.4, 0.62 ], [ 14.4, 0.58 ], [ 15.1, 0.2 ] ], 5, 0.8, 5);
 			}
 		}
-		const box = (cx, cy, cz, wt, wb, sy, sz, pt, topPt = pt) => {
-			const ht = wt / 2, hb = wb / 2, hy = sy / 2, hz = sz / 2, y0 = cy - hy, y1 = cy + hy;
-			const sl = (ht - hb) / sy, ln = Math.hypot(1, sl);
-			quad([ [ cx - ht, y1, cz - hz ], [ cx - ht, y1, cz + hz ], [ cx + ht, y1, cz + hz ], [ cx + ht, y1, cz - hz ] ], [ 0, 1, 0 ], topPt);
-			quad([ [ cx - hb, y0, cz + hz ], [ cx + hb, y0, cz + hz ], [ cx + ht, y1, cz + hz ], [ cx - ht, y1, cz + hz ] ], [ 0, 0, 1 ], pt);
-			quad([ [ cx + hb, y0, cz + hz ], [ cx + hb, y0, cz - hz ], [ cx + ht, y1, cz - hz ], [ cx + ht, y1, cz + hz ] ], [ 1 / ln, -sl / ln, 0 ], pt);
-			quad([ [ cx - hb, y0, cz - hz ], [ cx - hb, y0, cz + hz ], [ cx - ht, y1, cz + hz ], [ cx - ht, y1, cz - hz ] ], [ -1 / ln, -sl / ln, 0 ], pt);
-		};
 		const finish = () => {
 			const g = new THREE.BufferGeometry();
 			g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
@@ -11575,10 +11641,13 @@
 		if (lite) {
 			box(0, 4.2, 0, 5.0, 3.9, 7.2, 3.0, 0);    // body, sitting (the shader stands him up)
 			box(0, 9.7, 0, 2.9, 2.9, 3.2, 2.8, 1, 4);
+			box(0, 11.05, 1.44, 2.95, 2.95, 0.5, 0.12, 4);   // a fringe of hair over the brow
+			for (const ex of [ -0.6, 0.6 ]) { box(ex, 10.25, 1.47, 0.5, 0.5, 0.4, 0.12, 9); }
 		} else {
 			// Rounded but light: a torso with shoulders and a round head, the front halves only.
 			lathe(0, 0, [ [ 0.6, 1.9 ], [ 4.0, 2.2 ], [ 6.6, 2.6 ], [ 7.8, 1.75 ], [ 8.35, 0.8 ] ], 6, 0.62, 0);
 			lathe(0.05, 0, [ [ 8.7, 0.7 ], [ 9.3, 1.35 ], [ 10.3, 1.6 ], [ 11.2, 1.38 ], [ 11.95, 0.45 ] ], 6, 0.94, 1, 11.2);
+			for (const ex of [ -0.55, 0.55 ]) { box(ex + 0.05, 10.5, 1.52, 0.45, 0.45, 0.36, 0.14, 9); }
 		}
 		if (!lite) {
 			box(-3.3, 9.5, 0, 1.1, 1.1, 6.5, 1.1, 2);   // arms, modelled raised; the shader lowers them
@@ -11601,6 +11670,7 @@
 					int pt = int(aPart + 0.5);
 					if (pt == 1 || pt == 5) { vColor.rgb = aSkin; }
 					if (pt == 4) { float hq = fract(aFan.x * 7.31); vColor.rgb = hq > 0.9 ? vec3(0.62, 0.5, 0.3) : hq > 0.8 ? vec3(0.45, 0.45, 0.45) : aSkin * 0.22 + vec3(0.02); }
+					if (pt == 9) { vColor.rgb = vec3(0.05, 0.04, 0.035); }
 					if (pt == 6) { vColor.rgb = vColor.rgb * 0.12 + (fract(aFan.x * 3.7) > 0.5 ? vec3(0.1, 0.12, 0.18) : vec3(0.16, 0.15, 0.13)); }`)
 				.replace("#include <begin_vertex>", `
 					vec3 transformed = vec3(position);

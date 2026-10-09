@@ -73,6 +73,16 @@ await page.keyboard.down("ArrowRight"); await sleep(1200);
 await page.screenshot({ path: `${OUT}/3d-run.png` });
 await page.keyboard.up("ArrowRight");
 check("3D camera renders with the new poses, no errors", cam === "3d" && errs.length === 0, `cam=${cam} ${errs.join(" | ")}`);
+// Faces: every player has a valid look (face cell 0-7, a hair colour, a known style), and it is
+// fixed by name: clearing the cached look rebuilds exactly the same one.
+const looks = await page.evaluate(async () => {
+	const ps = window.__ff.players, before = ps.map(p => JSON.stringify(p.look));
+	for (const p of ps) { p.look = null; }
+	await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));   // the next frame draws them, rebuilding each look
+	return ps.map((p, i) => ({ a: before[i], b: JSON.stringify(p.look), face: p.look ? p.look.face : -1, hair: p.look ? p.look.hair : null, style: p.look ? p.look.style : null }));
+});
+check("every player has a face, hair colour and style", looks.length > 0 && looks.every(l => l.face >= 0 && l.face < 8 && /^#/.test(l.hair || "") && [ "short", "crop", "curly", "afro", "long", "tied", "buzz", "shaved" ].includes(l.style)), JSON.stringify(looks.filter(l => !(l.face >= 0 && l.face < 8 && l.hair)).slice(0, 2)));
+check("a player's look is fixed by name (same after a rebuild)", looks.every(l => l.a === l.b), JSON.stringify(looks.filter(l => l.a !== l.b).slice(0, 1)));
 // Brace and hat-trick captions: the same man scoring again is named in the goal caption.
 const caps = await page.evaluate(() => { const F = window.__ff, out = []; F.autoPilot = false; F.timeLeft = 1e9; for (let k = 0; k < 3; k++) { F.freeze = 0; F.forceGoal(0); const s0 = F.score[0]; for (let i = 0; i < 200 && F.score[0] === s0; i++) { F.step(1); } out.push(F.lastCaption && F.lastCaption.sub); for (let i = 0; i < 3000 && F.state !== "play"; i++) { F.step(1); } } return out; });
 check("same scorer: first goal plain, then Brace, then Hat-trick", caps.length === 3 && !/Brace|Hat-trick/.test(caps[0]) && /Brace/.test(caps[1]) && /Hat-trick/.test(caps[2]), JSON.stringify(caps));

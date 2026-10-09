@@ -8,58 +8,79 @@
 	// Which joint carries which part. Limbs appear twice (left, right); the instance buffers are
 	// sized from this plan, so a pair of limbs always has two slots per figure.
 	const PART_PLAN3 = [
-		[ "torso", "spine" ], [ "shoulders", "spine" ], [ "shorts", "hips" ], [ "neck", "neck" ], [ "head", "head" ], [ "hair", "head" ],
+		[ "torso", "spine" ], [ "shoulders", "spine" ], [ "shorts", "hips" ], [ "neck", "neck" ], [ "head", "head" ], [ "hair", "head" ], [ "ear", "head" ], [ "ear", "head" ], [ "nose", "head" ], [ "tail", "head" ],
 		[ "upperArm", "sh", 0 ], [ "upperArm", "sh", 1 ], [ "foreArm", "el", 0 ], [ "foreArm", "el", 1 ], [ "hand", "ha", 0 ], [ "hand", "ha", 1 ],
 		[ "thigh", "hip", 0 ], [ "thigh", "hip", 1 ], [ "shin", "kn", 0 ], [ "shin", "kn", 1 ], [ "boot", "an", 0 ], [ "boot", "an", 1 ]
 	];
 	const PER_FIG3 = PART_PLAN3.reduce((m, [ n ]) => { m[n] = (m[n] || 0) + 1; return m; }, {});
 	const PATTERN3 = { plain: 0, stripes: 1, hoops: 2, halves: 3, sash: 4 };
-	const HAIR_SCALE3 = { short: [ 1, 1, 1 ], curly: [ 1.14, 1.2, 1.14 ], long: [ 1.06, 1.35, 1.06 ], buzz: [ 0.98, 0.96, 0.98 ], shaved: null };
+	const HAIR_SCALE3 = { short: [ 1, 1, 1 ], crop: [ 1.02, 1.06, 1.02 ], curly: [ 1.14, 1.2, 1.14 ], afro: [ 1.3, 1.3, 1.3 ], long: [ 1.06, 1.12, 1.06 ], tied: [ 1.02, 1.04, 1.02 ], buzz: [ 0.98, 0.96, 0.98 ], shaved: null };
+	// Long hair falls down the back of the head; tied hair is a bun at the crown. One unit sphere, placed per style.
+	const TAIL3 = { long: [ -1.55, 1.45, 0, 0.8, 1.75, 1.6 ], tied: [ -1.95, 3.55, 0, 0.88, 0.85, 0.88 ] };
+	let HM3 = null;   // scratch matrices for the hair, made once three.js is here
 	const BOOTS3 = [ "#15181a", "#f2f2f2", "#15181a", "#2bd1ff", "#ff4f6a", "#15181a", "#f2b52e", "#8cff5a" ];
 	// One face into the atlas: cell (x0, y0), 256 wide (once round the head) by 128 (crown to chin).
 	// The front of the head is the middle of the cell; the eye line sits a little above the equator.
-	function paintFace3D (g, x0, y0, v) {
-		const cx = x0 + 128, ey = y0 + 62, brow = v % 4, mouth = (v >> 1) % 3, beard = v === 3 || v === 7, stubble = v === 2 || v === 5;
-		const ink = "#2a1a12", dark = "rgba(20, 12, 8, 0.55)";
+	// Features are drawn bold so the mipmapped texture still shows eyes and brows at mid distance.
+	// open: the celebrating version of the same face, mouth wide open.
+	function paintFace3D (g, x0, y0, v, open) {
+		const cx = x0 + 128, ey = y0 + 60, brow = v % 4, mouth = (v >> 1) % 3, beard = v === 3 || v === 7, stubble = v === 2 || v === 5;
+		const ink = "#22150e", dark = "rgba(20, 12, 8, 0.6)";
 		g.save();
 		g.clearRect(x0, y0, 256, 128);
-		// A soft shadow under the brow and down the sides of the nose, so the face reads from a distance.
-		g.fillStyle = "rgba(30, 18, 10, 0.16)";
-		g.beginPath(); g.ellipse(cx, ey + 1, 30, 7, 0, 0, Math.PI * 2); g.fill();
-		g.fillStyle = "rgba(30, 18, 10, 0.11)";
-		g.beginPath(); g.moveTo(cx - 1.5, ey + 5); g.lineTo(cx - 4, ey + 18); g.lineTo(cx + 4, ey + 18); g.lineTo(cx + 1.5, ey + 5); g.closePath(); g.fill();
+		g.lineCap = "round";
+		// Shadow under the brow ridge and in the eye sockets, down the sides of the nose, under the cheekbones.
+		g.fillStyle = "rgba(40, 20, 10, 0.2)";
+		for (const sgn of [ -1, 1 ]) { g.beginPath(); g.ellipse(cx + sgn * 16, ey - 1, 13, 8, 0, 0, Math.PI * 2); g.fill(); }
+		g.fillStyle = "rgba(40, 20, 10, 0.12)";
+		for (const sgn of [ -1, 1 ]) { g.beginPath(); g.ellipse(cx + sgn * 34, ey + 22, 9, 14, sgn * 0.3, 0, Math.PI * 2); g.fill(); }
+		g.fillStyle = "rgba(40, 20, 10, 0.16)";
+		g.beginPath(); g.moveTo(cx - 3, ey + 4); g.lineTo(cx - 8, ey + 20); g.lineTo(cx + 8, ey + 20); g.lineTo(cx + 3, ey + 4); g.closePath(); g.fill();
+		// warm cheeks
+		g.fillStyle = "rgba(200, 70, 60, 0.1)";
+		for (const sgn of [ -1, 1 ]) { g.beginPath(); g.ellipse(cx + sgn * 24, ey + 15, 8, 5, 0, 0, Math.PI * 2); g.fill(); }
 		for (const sgn of [ -1, 1 ]) {
-			const x = cx + sgn * 15;
-			// the eye: a white almond, an iris, a pupil and a glint
-			g.fillStyle = "#f6f1ea"; g.beginPath(); g.ellipse(x, ey, 8.5, 5, 0, 0, Math.PI * 2); g.fill();
-			g.fillStyle = v % 3 === 1 ? "#3a5a7a" : v % 3 === 2 ? "#4a6a3a" : "#3a2414"; g.beginPath(); g.arc(x + sgn * 0.5, ey + 0.5, 3.6, 0, Math.PI * 2); g.fill();
-			g.fillStyle = "#120a06"; g.beginPath(); g.arc(x + sgn * 0.5, ey + 0.5, 1.9, 0, Math.PI * 2); g.fill();
-			g.fillStyle = "rgba(255, 255, 255, 0.85)"; g.beginPath(); g.arc(x - 1 + sgn * 0.5, ey - 1, 1, 0, Math.PI * 2); g.fill();
-			// the lid line
-			g.strokeStyle = dark; g.lineWidth = 1.6; g.beginPath(); g.ellipse(x, ey, 8.5, 5, 0, Math.PI, Math.PI * 2); g.stroke();
-			// the brow: flat, arched, heavy or raised
-			g.strokeStyle = ink; g.lineCap = "round"; g.lineWidth = brow === 2 ? 4.2 : 2.8;
+			const x = cx + sgn * 16;
+			// the eye: a white almond, an iris, a pupil and a glint (wider open when celebrating)
+			const eh = open ? 6.6 : 5.6;
+			g.fillStyle = "#f8f4ee"; g.beginPath(); g.ellipse(x, ey, 9.5, eh, 0, 0, Math.PI * 2); g.fill();
+			g.fillStyle = v % 3 === 1 ? "#35577a" : v % 3 === 2 ? "#4a6a36" : "#3a2210"; g.beginPath(); g.arc(x + sgn * 0.5, ey + 0.4, 4.4, 0, Math.PI * 2); g.fill();
+			g.fillStyle = "#0c0604"; g.beginPath(); g.arc(x + sgn * 0.5, ey + 0.4, 2.3, 0, Math.PI * 2); g.fill();
+			g.fillStyle = "rgba(255, 255, 255, 0.9)"; g.beginPath(); g.arc(x - 1.3 + sgn * 0.5, ey - 1.3, 1.2, 0, Math.PI * 2); g.fill();
+			// upper lid and lashes, a fainter lower lid
+			g.strokeStyle = ink; g.lineWidth = 2.4; g.beginPath(); g.ellipse(x, ey, 9.5, eh, 0, Math.PI * 1.05, Math.PI * 1.95); g.stroke();
+			g.strokeStyle = "rgba(40, 20, 10, 0.35)"; g.lineWidth = 1.2; g.beginPath(); g.ellipse(x, ey, 9.5, eh, 0, Math.PI * 0.15, Math.PI * 0.85); g.stroke();
+			// the brow: flat, arched, heavy or angled; raised when celebrating
+			const by = open ? -4 : 0;
+			g.strokeStyle = ink; g.lineWidth = brow === 2 ? 6 : 4.4;
 			g.beginPath();
-			if (brow === 1) { g.moveTo(x - sgn * 9, ey - 9); g.quadraticCurveTo(x, ey - 15, x + sgn * 9, ey - 10); }
-			else if (brow === 3) { g.moveTo(x - sgn * 9, ey - 10); g.lineTo(x + sgn * 9, ey - 13); }
-			else { g.moveTo(x - sgn * 9, ey - 10.5); g.lineTo(x + sgn * 9, ey - 10.5); }
+			if (brow === 1) { g.moveTo(x - sgn * 10, ey - 10 + by); g.quadraticCurveTo(x, ey - 17 + by, x + sgn * 11, ey - 11 + by); }
+			else if (brow === 3) { g.moveTo(x - sgn * 10, ey - 11 + by); g.lineTo(x + sgn * 11, ey - 14 + by); }
+			else { g.moveTo(x - sgn * 10, ey - 12 + by); g.quadraticCurveTo(x, ey - 14 + by, x + sgn * 11, ey - 11.5 + by); }
 			g.stroke();
 		}
-		// the mouth: a straight line, a slight smile or a set jaw
-		g.strokeStyle = "rgba(60, 22, 18, 0.8)"; g.lineWidth = 2.2; g.lineCap = "round"; g.beginPath();
-		if (mouth === 1) { g.moveTo(cx - 9, ey + 26); g.quadraticCurveTo(cx, ey + 31, cx + 9, ey + 26); }
-		else if (mouth === 2) { g.moveTo(cx - 8, ey + 28); g.quadraticCurveTo(cx, ey + 25, cx + 8, ey + 28); }
-		else { g.moveTo(cx - 8, ey + 27); g.lineTo(cx + 8, ey + 27); }
-		g.stroke();
-		// the ears, a shade darker than the skin, out at the sides
-		g.fillStyle = "rgba(60, 30, 15, 0.22)";
-		for (const sgn of [ -1, 1 ]) { g.beginPath(); g.ellipse(cx + sgn * 62, ey + 6, 6, 9, 0, 0, Math.PI * 2); g.fill(); }
-		// stubble or a beard across the jaw
+		// nostrils and the underside of the nose
+		g.fillStyle = "rgba(50, 20, 12, 0.55)";
+		for (const sgn of [ -1, 1 ]) { g.beginPath(); g.ellipse(cx + sgn * 3.6, ey + 19, 2.2, 1.4, 0, 0, Math.PI * 2); g.fill(); }
+		// stubble or a beard across the jaw (under the mouth, so the lips sit on top)
 		if (stubble || beard) {
-			g.fillStyle = beard ? "rgba(28, 18, 12, 0.78)" : "rgba(28, 18, 12, 0.3)";
-			g.beginPath(); g.moveTo(cx - 44, ey + 14); g.quadraticCurveTo(cx - 40, ey + 52, cx, ey + 56); g.quadraticCurveTo(cx + 40, ey + 52, cx + 44, ey + 14);
-			g.quadraticCurveTo(cx + 30, ey + 23, cx + 12, ey + 21); g.quadraticCurveTo(cx, ey + 19, cx - 12, ey + 21); g.quadraticCurveTo(cx - 30, ey + 23, cx - 44, ey + 14); g.closePath(); g.fill();
-			if (beard) { g.fillStyle = "rgba(90, 50, 35, 0.9)"; g.beginPath(); g.ellipse(cx, ey + 27, 7, 2.2, 0, 0, Math.PI * 2); g.fill(); }
+			g.fillStyle = beard ? "rgba(26, 16, 10, 0.85)" : "rgba(26, 16, 10, 0.32)";
+			g.beginPath(); g.moveTo(cx - 46, ey + 12); g.quadraticCurveTo(cx - 42, ey + 54, cx, ey + 60); g.quadraticCurveTo(cx + 42, ey + 54, cx + 46, ey + 12);
+			g.quadraticCurveTo(cx + 30, ey + 24, cx + 12, ey + 22); g.quadraticCurveTo(cx, ey + 20, cx - 12, ey + 22); g.quadraticCurveTo(cx - 30, ey + 24, cx - 46, ey + 12); g.closePath(); g.fill();
+		}
+		// the mouth
+		if (open) {
+			g.fillStyle = "#3a0e0c"; g.beginPath(); g.ellipse(cx, ey + 31, 10, 8, 0, 0, Math.PI * 2); g.fill();
+			g.fillStyle = "#f2ece2"; g.fillRect(cx - 7, ey + 24, 14, 3);
+			g.fillStyle = "#b8524a"; g.beginPath(); g.ellipse(cx, ey + 36, 6, 2.4, 0, 0, Math.PI * 2); g.fill();
+			g.strokeStyle = "rgba(120, 40, 34, 0.9)"; g.lineWidth = 2; g.beginPath(); g.ellipse(cx, ey + 31, 10, 8, 0, 0, Math.PI * 2); g.stroke();
+		} else {
+			g.strokeStyle = "rgba(70, 22, 18, 0.9)"; g.lineWidth = 3; g.beginPath();
+			if (mouth === 1) { g.moveTo(cx - 10, ey + 28); g.quadraticCurveTo(cx, ey + 34, cx + 10, ey + 28); }
+			else if (mouth === 2) { g.moveTo(cx - 9, ey + 30); g.quadraticCurveTo(cx, ey + 27, cx + 9, ey + 30); }
+			else { g.moveTo(cx - 9, ey + 29); g.lineTo(cx + 9, ey + 29); }
+			g.stroke();
+			g.fillStyle = beard ? "rgba(178, 84, 70, 0.85)" : "rgba(160, 60, 50, 0.3)"; g.beginPath(); g.ellipse(cx, ey + 33, 7, 2.6, 0, 0, Math.PI * 2); g.fill();
 		}
 		g.restore();
 	}
@@ -70,7 +91,19 @@
 			shoulders: () => { const g = new T.CapsuleGeometry(1.7, 6.4, 4, 10); g.rotateX(Math.PI / 2); g.translate(0, 8.7, 0); g.scale(0.78, 1, 1); return g; },
 			shorts: () => { const g = new T.CylinderGeometry(3.45, 3.95, 4.6, 12); g.translate(0, -1.9, 0); g.scale(0.78, 1, 1); return g; },
 			neck: () => { const g = new T.CylinderGeometry(0.9, 1.05, 2.2, 8); g.translate(0, 0.8, 0); return g; },
-			head: () => { const g = new T.SphereGeometry(2.15, 14, 10); g.scale(0.96, 1.12, 0.94); g.translate(0.2, 2.25, 0); return g; },
+			head: () => {
+			// A skull that narrows to a jaw and a chin rather than an egg: below the cheekbones the sides
+			// draw in and the back of the head tucks under; the front keeps its line down to the chin.
+			const g = new T.SphereGeometry(2.15, 18, 14), P = g.attributes.position;
+			for (let i = 0; i < P.count; i++) {
+				const x = P.getX(i), y = P.getY(i), z = P.getZ(i), t = clamp(-y / 2.15, 0, 1), u = clamp((y + 0.3) / 1.5, 0, 1);
+				P.setXYZ(i, x * (x < 0 ? 1 - 0.22 * t : 1 + 0.03 * t), y, z * (1 - 0.3 * t * t) * (1 + 0.04 * (1 - u) * (1 - t)));
+			}
+			g.computeVertexNormals(); g.scale(0.96, 1.12, 0.94); g.translate(0.2, 2.25, 0); return g;
+		},
+		ear: () => { const g = new T.SphereGeometry(0.62, 8, 6); g.scale(0.55, 1.05, 0.38); g.translate(0.05, 2.3, 0); return g; },
+		nose: () => { const g = new T.ConeGeometry(0.42, 1.0, 6); g.rotateZ(-0.35); g.scale(0.85, 1, 0.9); g.translate(2.12, 1.86, 0); return g; },
+		tail: () => new T.SphereGeometry(1, 9, 7),
 			hair: () => { const g = new T.SphereGeometry(2.38, 12, 7, 0, Math.PI * 2, 0, 1.55); g.scale(0.96, 1.12, 0.94); g.rotateZ(0.42); g.translate(0.2, 2.25, 0); return g; },   // concentric with the head, tilted: high at the brow, low at the nape
 			upperArm: () => { const g = new T.CapsuleGeometry(0.98, 4.6, 3, 7); g.translate(0, -2.5, 0); return g; },
 			foreArm: () => { const g = new T.CapsuleGeometry(0.8, 4.4, 3, 7); g.translate(0, -2.4, 0); return g; },
@@ -100,18 +133,18 @@
 		// Faces: an atlas of eight, painted once (eyes, brows, a nose, a mouth, stubble or a beard on
 		// some), wrapped round the head sphere with the face at the front. Each figure picks its cell
 		// with an instanced attribute; the painted parts are laid over the skin colour, the rest is skin.
-		const fc = document.createElement("canvas"); fc.width = 1024; fc.height = 256;
+		const fc = document.createElement("canvas"); fc.width = 1024; fc.height = 512;
 		const fg = fc.getContext && fc.getContext("2d");
 		if (fg) {
-			for (let v = 0; v < 8; v++) { paintFace3D(fg, (v % 4) * 256, Math.floor(v / 4) * 128, v); }
+			for (let v = 0; v < 16; v++) { paintFace3D(fg, (v % 4) * 256, Math.floor(v / 4) * 128, v % 8, v >= 8); }
 		}
 		const faceTex = tex3D(fc);
-		faceTex.minFilter = T.LinearFilter; faceTex.magFilter = T.LinearFilter; faceTex.generateMipmaps = false;
+		faceTex.minFilter = T.LinearMipmapLinearFilter; faceTex.magFilter = T.LinearFilter; faceTex.generateMipmaps = true;   // mipmaps: at mid distance the eyes and brows blur to dark marks rather than flicker out
 		const headMat = new T.MeshLambertMaterial({ color: 0xffffff, map: faceTex });
 		headMat.onBeforeCompile = sh => {
 			sh.vertexShader = sh.vertexShader
 				.replace("#include <common>", "#include <common>\nattribute float aFace;")
-				.replace("#include <uv_vertex>", "#include <uv_vertex>\nvMapUv = (uv + vec2(mod(aFace, 4.0), 1.0 - floor(aFace / 4.0))) / vec2(4.0, 2.0);");
+				.replace("#include <uv_vertex>", "#include <uv_vertex>\nvMapUv = (uv + vec2(mod(aFace, 4.0), 3.0 - floor(aFace / 4.0))) / vec2(4.0, 4.0);");
 			sh.fragmentShader = sh.fragmentShader
 				.replace("#include <map_fragment>", "")
 				.replace("#include <color_fragment>", "#include <color_fragment>\nvec4 fx = texture2D(map, vMapUv); diffuseColor.rgb = mix(diffuseColor.rgb, fx.rgb, fx.a);");
@@ -201,7 +234,7 @@
 		const rm = reduceMotion;
 		const spd = Math.hypot(p.vx || 0, p.vy || 0);
 		const a = clamp(p.runAmt || 0, 0, 1), ph = rm ? 0 : p.stride || 0, jump = rm ? 0 : jumpAmt(p);
-		const shuf = clamp(p.shuf || 0, 0, 1), cel = clamp(p.celebA || 0, 0, 1), kneel = clamp(p.kneel || 0, 0, 1), sulk = clamp(p.sulk || 0, 0, 1);
+		const shuf = clamp(p.shuf || 0, 0, 1), cel = r.cel = clamp(p.celebA || 0, 0, 1), kneel = clamp(p.kneel || 0, 0, 1), sulk = clamp(p.sulk || 0, 0, 1);
 		const down = (p.lunge > 0 && players.indexOf(p) === ctrl) || p.slideAI > 0;
 		const fall = p.fall > 0 ? 1 - p.fall / FALL_T : -1, dive = p.dive > 0 ? 1 - p.dive / DIVE_T : -1, thr = p.throwA > 0 ? 1 - p.throwA / THROW_T : -1;
 		const idle = rm ? 0 : p.idlePh || 0, gk = p.role === "gk";
@@ -332,25 +365,33 @@
 		if (F.n >= MAXF3) { return; }
 		F.n++;
 		rig.root.updateMatrixWorld(true);
+		if (!HM3) { HM3 = [ new THREE.Matrix4(), new THREE.Matrix4() ]; }
 		for (const [ name, joint, side ] of PART_PLAN3) {
 			const mesh = F.parts[name], node = side === undefined ? rig[joint] : rig[joint][side];
 			let mtx = node.matrixWorld;
 			if (name === "hair") {
 				const s = HAIR_SCALE3[lk.style] === undefined ? HAIR_SCALE3.short : HAIR_SCALE3[lk.style];
 				if (!s) { continue; }
-				mtx = M.makeScale(s[0], s[1], s[2]).premultiply(node.matrixWorld);
+				// scaled about the middle of the head, so a big afro grows out all round rather than up
+				mtx = M.makeTranslation(0.2, 2.25, 0).multiply(HM3[0].makeScale(s[0], s[1], s[2])).multiply(HM3[1].makeTranslation(-0.2, -2.25, 0)).premultiply(node.matrixWorld);
+			} else if (name === "tail") {
+				const t = TAIL3[lk.style];
+				if (!t) { continue; }
+				mtx = M.makeTranslation(t[0], t[1], t[2]).multiply(HM3[0].makeScale(t[3], t[4], t[5])).premultiply(node.matrixWorld);
+			} else if (name === "ear") {
+				mtx = M.makeTranslation(0.05, 0, F.cnt.ear % 2 ? 1.92 : -1.92).premultiply(node.matrixWorld);
 			} else if (name === "hand" && kit.gloves) { mtx = M.makeScale(1.45, 1.3, 1.5).premultiply(node.matrixWorld); }
 			const k = F.cnt[name]++;
 			if (k >= mesh.instanceMatrix.count) { F.cnt[name]--; continue; }   // never past the buffer
 			mesh.setMatrixAt(k, mtx);
 			const c = name === "torso" || name === "shoulders" || name === "upperArm" || (name === "foreArm" && kit.sleeves) ? kit.shirt
 				: name === "shorts" ? kit.shorts : name === "shin" ? kit.socks : name === "boot" ? kit.boots
-				: name === "hair" ? lk.hair : name === "hand" && kit.gloves ? kit.gloves : lk.skin;
+				: name === "hair" || name === "tail" ? lk.hair : name === "hand" && kit.gloves ? kit.gloves : lk.skin;
 			mesh.setColorAt(k, C.set(c));
 			if (name === "torso") {
 				const g = mesh.geometry, pat = g.attributes.aPat, c2 = g.attributes.aCol2;
 				pat.setX(k, kit.pattern); C.set(kit.second); c2.setXYZ(k, C.r, C.g, C.b);
-			} else if (name === "head") { mesh.geometry.attributes.aFace.setX(k, lk.face || 0); }
+			} else if (name === "head") { mesh.geometry.attributes.aFace.setX(k, ((lk.face || 0) % 8 + 8) % 8 + ((rig.cel || 0) > 0.3 ? 8 : 0)); }   // celebrating: the open-mouthed face
 		}
 		const V = F.V.setFromMatrixPosition(rig.root.matrixWorld), x = V.x, z = V.z, air = Math.max(0, V.y);
 		F.blobs.setMatrixAt(F.blobs.count++, M.compose(V.set(x + 2, 0.2, z + 1.5), F.Q.identity(), F.S.set(11 + air * 0.15, 1, 7 + air * 0.1)));

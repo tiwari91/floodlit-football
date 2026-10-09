@@ -680,10 +680,14 @@
 	const HAIR = [ "#1b1410", "#3b2616", "#6b4424", "#a0703a", "#d8b46a", "#2a2a2a" ];
 	function look (p) {
 		if (!p.look) {
-			// Fixed by name, so a player looks the same every match.
+			// Fixed by name, so a player looks the same every match. hashStr is unsigned: shift with >>>,
+			// or half the squad gets a negative face index (a blank head) and no hair colour.
 			const h = hashStr((p.name || `${p.team}-${p.idx}-${p.num}`) + "look");
-			const style = [ "short", "short", "short", "curly", "long", "buzz", "shaved" ][(h >> 5) % 7];
-			p.look = { skin: SKIN[h % SKIN.length], hair: HAIR[(h >> 2) % HAIR.length], shaved: style === "shaved", style, face: (h >> 9) % 8 };
+			// The broad style is fixed by the hash as before; a second draw splits it (crop or short,
+			// curly or a full afro, long or tied back), so nobody's look changes beyond recognition.
+			const base = [ "short", "short", "short", "curly", "long", "buzz", "shaved" ][(h >>> 5) % 7], alt = (h >>> 13) % 2;
+			const style = base === "short" && alt ? "crop" : base === "curly" && alt ? "afro" : base === "long" && alt ? "tied" : base;
+			p.look = { skin: SKIN[h % SKIN.length], hair: HAIR[(h >>> 2) % HAIR.length], shaved: style === "shaved", style, face: (h >>> 9) % 8 };
 		}
 		return p.look;
 	}
@@ -776,9 +780,10 @@
 		ctx.beginPath(); ctx.arc(hx, hy, 5.4, 0, Math.PI * 2); ctx.fill();
 		if (!lk.shaved) {
 			ctx.fillStyle = lk.hair;
-			const big = lk.style === "curly" ? 6.4 : lk.style === "buzz" ? 5.4 : 5.6, span = lk.style === "buzz" ? 0.3 : lk.style === "curly" ? 0.42 : 0.55;
+			const big = lk.style === "afro" ? 7.2 : lk.style === "curly" ? 6.4 : lk.style === "buzz" ? 5.4 : 5.6, span = lk.style === "buzz" ? 0.3 : lk.style === "curly" ? 0.42 : 0.55;
 			ctx.beginPath(); ctx.arc(hx, hy, big, p.dir + Math.PI * span, p.dir + Math.PI * (2 - span)); ctx.closePath(); ctx.fill();
 			if (lk.style === "long") { ctx.beginPath(); ctx.ellipse(hx - fx * 6, hy - fy * 6, 3.2, 2.4, p.dir, 0, Math.PI * 2); ctx.fill(); }
+			if (lk.style === "tied") { ctx.beginPath(); ctx.arc(hx - fx * 5, hy - fy * 5, 2, 0, Math.PI * 2); ctx.fill(); }
 		}
 		ctx.strokeStyle = "rgba(0, 0, 0, 0.35)";
 		ctx.lineWidth = 1;
