@@ -306,18 +306,59 @@
 			return out;
 		}
 		// Open play: the broadcast camera, FIFA "Tele" style. It sits high in the main stand near
-		// halfway and pans with play (the lens turns; the body only drifts part of the way along the
-		// gantry), leads the ball a little, and closes in a touch when an attack reaches the box.
-		const fx0 = o ? o.x : ball.x, fy0 = o ? o.y : ball.y, vx = o ? o.vx : ball.vx, vy = o ? o.vy : ball.vy;
-		const tx = clamp(fx0 + vx * 16, FW * 0.04, FW * 0.96);
-		const ty = clamp(fy0 + vy * 12, FH * 0.25, FH * 0.75);
-		const inBox = Math.min(fx0, FW - fx0) < FW * 0.2 && fy0 > FH * 0.15 && fy0 < FH * 0.85;
-		const eyeH = FH * 0.6, eyeZ = FH * 1.38;
+		// halfway at a fixed height and pans slowly with the play: it follows a smoothed centre of the
+		// action (ball plus the men around it), ignores small moves inside a dead zone, and glides on a
+		// critically damped spring with speed and acceleration limits, so a touch or a pass never jerks
+		// it. The zoom only changes after an attack has settled near a box, and slowly.
 		out.kind = "follow";
-		out.fov = inBox ? BROADCAST_FOV - 5 : BROADCAST_FOV;
-		out.eye.set(WX(FW / 2 + (tx - FW / 2) * 0.5), eyeH, eyeZ);
-		out.look.set(WX(tx), 0, ty);
+		broadcastCam(out, WX);
 		return out;
+	}
+	// The broadcast camera's own smoothed state (world units, pitch coordinates before the ends swap).
+	const bc = { x: 0, y: 0, vx: 0, vy: 0, tx: 0, ty: 0, bvx: 0, bvy: 0, fov: 36, fv: 0, zoom: false, zt: 0, live: false };
+	function broadcastCam (out, WX) {
+		const o = ball.owner, bx = o ? o.x : ball.x, by = o ? o.y : ball.y;
+		const dt = clamp(frameDt / 1000, 0.001, 0.05);
+		// The play's centre: mostly the ball, partly the four outfield men nearest it.
+		let nx = 0, ny = 0, n = 0;
+		const near = players.filter(p => p.role !== "gk").sort((a, b) => Math.hypot(a.x - bx, a.y - by) - Math.hypot(b.x - bx, b.y - by)).slice(0, 4);
+		for (const p of near) { nx += p.x; ny += p.y; n++; }
+		const cx = n ? bx * 0.65 + nx / n * 0.35 : bx, cy = n ? by * 0.65 + ny / n * 0.35 : by;
+		// A gentle lead from the ball's smoothed velocity (a pass changes it, but only over half a second).
+		const k = 1 - Math.exp(-dt / 0.6);
+		const vx0 = o ? o.vx : ball.vx, vy0 = o ? o.vy : ball.vy;
+		bc.bvx += (vx0 - bc.bvx) * k; bc.bvy += (vy0 - bc.bvy) * k;
+		const fx = clamp(cx + clamp(bc.bvx * 14, -FW * 0.07, FW * 0.07), FW * 0.08, FW * 0.92);
+		const fy = clamp(FH / 2 + (cy - FH / 2) * 0.5, FH * 0.32, FH * 0.68);
+		if (!bc.live || G3.shot !== "follow" || reduceMotion) {
+			bc.live = true; bc.x = bc.tx = fx; bc.y = bc.ty = fy; bc.vx = bc.vy = 0; bc.fv = 0;
+			bc.zoom = false; bc.zt = 0; bc.fov = BROADCAST_FOV;
+		}
+		// Dead zone: the aim point only moves once the play leaves a box around it.
+		const dzx = FW * 0.06, dzy = FH * 0.06;
+		if (fx > bc.tx + dzx) { bc.tx = fx - dzx; } else if (fx < bc.tx - dzx) { bc.tx = fx + dzx; }
+		if (fy > bc.ty + dzy) { bc.ty = fy - dzy; } else if (fy < bc.ty - dzy) { bc.ty = fy + dzy; }
+		// Critically damped spring with a top speed and acceleration, like an operator's fluid head.
+		const w = 1.7, vmax = FW * 0.2, amax = FW * 0.22;
+		const spring = (x, v, t, vm, am) => {
+			const a = clamp(w * w * (t - x) - 2 * w * v, -am, am);
+			const nv = clamp(v + a * dt, -vm, vm);
+			return [ x + nv * dt, nv ];
+		};
+		[ bc.x, bc.vx ] = spring(bc.x, bc.vx, bc.tx, vmax, amax);
+		[ bc.y, bc.vy ] = spring(bc.y, bc.vy, bc.ty, vmax * 0.5, amax * 0.5);
+		// Zoom: in a touch only once an attack has stayed near a box for a while, out again after it
+		// has clearly left (hysteresis), easing over a couple of seconds.
+		const edge = Math.min(bc.x, FW - bc.x);
+		const wantIn = bc.zoom ? edge < FW * 0.3 : edge < FW * 0.22;
+		if (wantIn !== bc.zoom) { bc.zt += dt; if (bc.zt > (bc.zoom ? 1.4 : 2.2)) { bc.zoom = wantIn; bc.zt = 0; } } else { bc.zt = 0; }
+		[ bc.fov, bc.fv ] = spring(bc.fov, bc.fv, bc.zoom ? BROADCAST_FOV - 4 : BROADCAST_FOV, 2.5, 3);
+		// Fixed height and distance, scaled from the pitch but never closer than a mid-sized ground,
+		// so the small-sided pitches are not seen from on top of the touchline (same tilt everywhere).
+		const R = Math.max(FH, 950), eyeH = R * 0.6, eyeZ = FH / 2 + R * 0.88;
+		out.fov = bc.fov;
+		out.eye.set(WX(FW / 2 + (bc.x - FW / 2) * 0.5), eyeH, eyeZ);
+		out.look.set(WX(bc.x), 0, bc.y);
 	}
 	const shotWant = { kind: "", eye: null, look: null };
 	function camera3D () {
@@ -330,9 +371,9 @@
 		// camera's body lags more than its lens, and the zoom eases slowest of all, like an operator's.
 		if (shotWant.kind !== G3.shot) { G3.shot = shotWant.kind; G3.eye.copy(shotWant.eye); G3.look.copy(shotWant.look); G3.fov = fov; }
 		else {
-			const slow = shotWant.kind === "follow";
-			const e = t => (reduceMotion ? 1 : 1 - Math.exp(-frameDt / t));
-			G3.eye.lerp(shotWant.eye, e(slow ? 520 : 240)); G3.look.lerp(shotWant.look, e(slow ? 300 : 240));
+			// The broadcast camera smooths itself (broadcastCam); other shots glide, eased by time.
+			const e = t => (reduceMotion || shotWant.kind === "follow" ? 1 : 1 - Math.exp(-frameDt / t));
+			G3.eye.lerp(shotWant.eye, e(240)); G3.look.lerp(shotWant.look, e(240));
 			G3.fov += (fov - G3.fov) * e(900);
 		}
 		G3.cam.fov = G3.fov; G3.cam.updateProjectionMatrix();
