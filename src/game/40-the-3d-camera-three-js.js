@@ -260,11 +260,9 @@
 			ctx = pg; stands = null;
 			try { drawPitch(true); } finally { ctx = keep; stands = keepStands; }
 			const tex = canvasTex3D(pc);
-			// Dry grass still catches the floodlights a little: a faint, broad sheen (more at night).
-			const sh = cond.wet > 0 ? 0 : cond.ko === "day" ? 0.022 : 0.04;
 			const mat = cond.wet > 0
 				? new THREE.MeshPhongMaterial({ color: 0x000000, emissive: 0xffffff, emissiveMap: tex, specular: new THREE.Color(0.08 + 0.1 * cond.wet, 0.09 + 0.11 * cond.wet, 0.1 + 0.11 * cond.wet), shininess: 34 })
-				: new THREE.MeshPhongMaterial({ color: 0x000000, emissive: 0xffffff, emissiveMap: tex, specular: new THREE.Color(sh, sh * 1.04, sh * 0.92), shininess: 14 });
+				: new THREE.MeshBasicMaterial({ map: tex });
 			const ground = own(new THREE.Mesh(new THREE.PlaneGeometry(WW, WH), mat), true);
 			ground.rotation.x = -Math.PI / 2;
 			ground.position.set(WW / 2 - MX, 0, WH / 2 - MY);
@@ -574,8 +572,7 @@
 		const key1 = new THREE.DirectionalLight(0xfff1d6, (dayLit ? 0.9 : 0.75) * LI); key1.position.set(-FW * 0.2, FH * 1.6, FH * 1.6); key1.target.position.set(FW / 2, 0, FH / 2);
 		const key2 = new THREE.DirectionalLight(0xfff1d6, 0.45 * LI); key2.position.set(FW * 1.2, FH * 1.6, -FH * 0.5); key2.target.position.set(FW / 2, 0, FH / 2);
 		st.add(key1, key1.target, key2, key2.target);
-		// Evening air: at night a faint haze in the floodlights softens the far stands.
-		G3.scene.fog = dayLit ? new THREE.Fog(cond.wet ? 0x8d979e : 0xa9bfd0, FH * 2.6, FH * 7) : new THREE.Fog(cond.wet ? 0x1c2630 : 0x16202a, FH * 1.5, FH * 6.5);
+		G3.scene.fog = new THREE.Fog(dayLit ? (cond.wet ? 0x8d979e : 0xa9bfd0) : 0x070d13, FH * 2.6, FH * 7);
 		G3.stadium = st;
 		G3.scene.add(st);
 	}
