@@ -9059,24 +9059,26 @@
 		ctx.restore();
 	}
 	// Your man's name plate, FIFA style: number and name on a slim dark plate with a kit-colour edge,
-	// his stamina in a thin bar along its foot and, while a pass or shot charges, the power bar on top.
-	// (x, y) is the point just above his head the plate's pointer touches.
+	// his stamina on its own strip under it (a dark track, readable on any grass) and, while a pass or
+	// shot charges, the power bar on top. (x, y) is the point just above his head the pointer touches.
 	function drawPlate (p, x, y) {
 		ctx.save();
 		ctx.font = "700 11px Barlow, Arial, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-		const label = `${p.num} ${p.name}`.toUpperCase(), w = Math.max(60, Math.ceil(ctx.measureText(label).width) + 18), h = 16;
-		const x0 = Math.round(x - w / 2), yb = Math.round(y - 7), y0 = yb - h - 3;
+		const label = `${p.num} ${p.name}`.toUpperCase(), w = Math.max(64, Math.ceil(ctx.measureText(label).width) + 18), h = 16, sh = 7;
+		const x0 = Math.round(x - w / 2), yb = Math.round(y - 7), y0 = yb - h - sh;
 		ctx.fillStyle = "#f2b52e";
 		ctx.beginPath(); ctx.moveTo(x - 5, yb); ctx.lineTo(x + 5, yb); ctx.lineTo(x, yb + 6); ctx.closePath(); ctx.fill();
-		ctx.fillStyle = "rgba(10, 14, 20, 0.8)"; ctx.fillRect(x0, y0, w, h + 3);
-		ctx.fillStyle = (KITS[p.team] || KITS[0]).outfield; ctx.fillRect(x0, y0, 3, h + 3);
+		ctx.fillStyle = "rgba(10, 14, 20, 0.86)"; ctx.fillRect(x0, y0, w, h + sh);
+		ctx.fillStyle = (KITS[p.team] || KITS[0]).outfield; ctx.fillRect(x0, y0, 3, h + sh);
 		ctx.fillStyle = "#f4f6f2"; ctx.fillText(label, x0 + 1.5 + w / 2, y0 + h / 2 + 0.5);
-		const s = clamp((staOf(p) - 0.25) / 0.75, 0, 1);
-		ctx.fillStyle = "rgba(255, 255, 255, 0.14)"; ctx.fillRect(x0 + 3, yb - 3, w - 3, 3);
-		ctx.fillStyle = staOf(p) < TIRED_STA ? "#e2594a" : s < 0.6 ? "#f2b52e" : "#5fd38a"; ctx.fillRect(x0 + 3, yb - 3, (w - 3) * s, 3);
+		// Stamina: 5px on a grey track inside the plate's dark foot, green to amber to red as he tires.
+		const s = clamp((staOf(p) - 0.25) / 0.75, 0, 1), sx = x0 + 5, sw = w - 8, sy = y0 + h;
+		ctx.fillStyle = "rgba(255, 255, 255, 0.24)"; ctx.fillRect(sx, sy, sw, 5);
+		ctx.fillStyle = staOf(p) < TIRED_STA ? "#ff5a4a" : s < 0.6 ? "#f2b52e" : "#5fe08f"; ctx.fillRect(sx, sy, sw * s, 5);
 		if ((charging || passCharge) && ball.owner === p) {
-			const power = chargeOf(charging ? chargeStart : passCharge.start), by = y0 - 9;
-			ctx.fillStyle = "rgba(10, 14, 20, 0.8)"; ctx.fillRect(x0, by - 1, w, 8);
+			const power = chargeOf(charging ? chargeStart : passCharge.start), by = y0 - 10;
+			ctx.fillStyle = "rgba(10, 14, 20, 0.86)"; ctx.fillRect(x0, by - 2, w, 10);
+			ctx.fillStyle = "rgba(255, 255, 255, 0.2)"; ctx.fillRect(x0 + 1, by, w - 2, 6);
 			const g = ctx.createLinearGradient(x0, 0, x0 + w, 0);
 			g.addColorStop(0, "#5fd38a"); g.addColorStop(0.55, "#f2d22e"); g.addColorStop(0.85, "#f28a2e"); g.addColorStop(1, "#e2394a");
 			ctx.fillStyle = g; ctx.fillRect(x0 + 1, by, (w - 2) * power, 6);
