@@ -360,6 +360,23 @@
 		}
 		// Speeding up he leans into it; braking, he sits back (r.acc from the caller, smoothed).
 		if (!rm && acc) { r.spine.rotation.z += clamp(acc * 2.2, -0.16, 0.2); }
+		// Standing, nobody stands to attention: weight on one leg (hips over it, the other knee eased
+		// and that hip dropped, the shoulders tilted back against it), a slight turn, his own elbow bend,
+		// breathing. Run out of legs and he stands bent over with his hands on his knees.
+		const still = rm ? 0 : clamp(1 - a * 5, 0, 1) * (1 - shuf);
+		if (still > 0 && !gk) {
+			const sd = p.build ? p.build.seed : 0.5, side = sd < 0.5 ? 0 : 1, sgn = side ? 1 : -1, free = 1 - side;
+			r.hips.position.z += sgn * 0.55 * still; r.hips.rotation.x -= sgn * 0.06 * still; r.chest.rotation.x += sgn * 0.05 * still;
+			r.kn[free].rotation.z -= 0.32 * still; r.hip[free].rotation.z += 0.1 * still; r.kn[side].rotation.z -= 0.05 * still;
+			r.chest.rotation.y += (sd - 0.5) * 0.4 * still;
+			r.spine.rotation.z += Math.sin(idle * 1.3) * 0.015 * still;
+			for (let i = 0; i < 2; i++) { r.el[i].rotation.z += (0.1 + 0.3 * ((sd * 7.3 + i * 0.31) % 1)) * still; }
+			const w = p.team >= 0 ? clamp((0.6 - staOf(p)) / 0.25, 0, 1) * still : 0;
+			if (w > 0) {
+				r.spine.rotation.z += 0.75 * w; r.hips.position.y -= 1.6 * w; r.neck.rotation.z -= 0.45 * w;
+				for (let i = 0; i < 2; i++) { r.kn[i].rotation.z -= 0.45 * w; r.hip[i].rotation.z += 0.35 * w; r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 0.32, w); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, (i ? 1 : -1) * 0.08, w); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.1, w); }
+			}
+		}
 		r.hips.rotation.x = clamp(turn * 1.4, -0.3, 0.3) * clamp(spd, 0, 1);
 		r.neck.rotation.z = -r.spine.rotation.z * 0.6;
 		if (a < 0.2) { r.chest.rotation.y = Math.sin(idle * 0.5) * 0.05; r.sh[0].rotation.z += Math.sin(idle) * 0.03; r.sh[1].rotation.z -= Math.sin(idle) * 0.03; r.head.rotation.y = Math.sin(idle * 0.37) * 0.25; }
