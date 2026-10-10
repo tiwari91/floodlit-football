@@ -217,7 +217,7 @@
 	function setBig (on) {
 		if (document.body && document.body.classList) { document.body.classList.toggle("big", on); }
 		store.set("ff-big", on ? "1" : "0");
-		$("bigBtn").textContent = on ? "Big pitch: on" : "Big pitch: off";
+		$("bigBtn").textContent = on ? "Big pitch on" : "Big pitch off";
 		$("bigBtn").setAttribute("aria-pressed", String(on));
 		$("menuToggle").textContent = on ? "Show menu" : "Hide menu";
 		$("menuToggle").setAttribute("aria-pressed", String(on));

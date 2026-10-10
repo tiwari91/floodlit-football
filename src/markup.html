@@ -28,7 +28,7 @@
 	<div class="pitchwrap" id="pitchwrap">
 		<canvas id="pitch3d" hidden aria-hidden="true"></canvas>
 		<canvas id="pitch" aria-label="Football pitch"></canvas>
-		<button class="menutoggle" id="menuToggle" type="button" aria-pressed="true">Show menu</button>
+		<button class="menutoggle" id="menuToggle" type="button" aria-pressed="true" title="Show or hide the page menu and settings (F)">Show menu</button>
 		<div class="scorebug" id="scoreBug" aria-hidden="true"><span id="bugHome">You</span><b id="bugScore">0 – 0</b><span id="bugAway">CPU</span><span class="t" id="bugClock">03:00</span><span class="bugbar"><span class="mfill" id="bugFill"></span></span><span class="bugmood" id="bugMood" hidden></span></div>
 		<div class="lower" id="lowerThird" aria-hidden="true" hidden><span class="lt-tag" id="ltTag">Goal</span><span class="lt-main"><b id="ltName"></b><small id="ltSub"></small></span></div>
 		<div class="replaytag" id="replayTag" aria-hidden="true" hidden>Replay<small>any key skips</small></div>
@@ -84,10 +84,10 @@
 
 	<div class="bar" id="bar">
 		<div class="baractions" role="group" aria-label="Match actions">
-			<button id="pauseBtn" type="button">Pause</button>
-			<button id="simBtn" type="button">Simulate match</button>
-			<button id="subsBtn" type="button">Subs</button>
-			<button id="restartBtn" type="button">New match</button>
+			<button id="pauseBtn" type="button" title="Pause or resume the match (P)">Pause</button>
+			<button id="simBtn" type="button" title="Let the computer play out the rest of this match">Simulate match</button>
+			<button id="subsBtn" type="button" title="Make substitutions">Subs</button>
+			<button id="restartBtn" type="button" title="Abandon this match and start again">New match</button>
 			<button id="howtoBtn" type="button" title="How to play (H)">How to play</button>
 			<button id="moreBtn" type="button" aria-expanded="false">More…</button>
 			<span class="note" id="nextNote" hidden>Applies from the next match</span>
@@ -196,7 +196,7 @@
 					<option value="aggressive">Aggressive</option>
 				</select>
 			</label>
-			<button id="camBtn" type="button" aria-pressed="false" title="Switch camera (C): overhead, TV or 3D">Camera: overhead</button>
+			<button id="camBtn" type="button" aria-pressed="false" title="Camera (C): click to cycle overhead, TV and 3D">Camera: overhead</button>
 			<label class="field" for="gfx" title="How much the 3D view draws: crowd density and detail, floodlight shadows, sharpness and smoothing">Graphics
 				<select id="gfx">
 					<option value="low">Low</option>
@@ -204,16 +204,16 @@
 					<option value="high">High</option>
 				</select>
 			</label>
-			<button id="hintsBtn" type="button" aria-pressed="true">Hints on</button>
-			<button id="mapBtn" type="button" aria-pressed="true">Minimap on</button>
-			<button id="bigBtn" type="button" aria-pressed="false">Big pitch: off</button>
+			<button id="hintsBtn" type="button" aria-pressed="true" title="On-screen key hints and coaching tips">Hints on</button>
+			<button id="mapBtn" type="button" aria-pressed="true" title="A small radar of the whole pitch in the corner">Minimap on</button>
+			<button id="bigBtn" type="button" aria-pressed="false" title="Big pitch (F): the ground fills the screen, the menu hides behind Show menu">Big pitch off</button>
 			<button id="contrastBtn" type="button" aria-pressed="false" title="High-contrast kits: the other side plays in white or black, with a dashed ring, so the teams never blur together">Kit contrast off</button>
 			</div>
 			<div class="bargroup" role="group" aria-labelledby="bgSound">
 			<span class="eyebrow" id="bgSound">Sound and rules</span>
-			<button id="soundBtn" type="button" aria-pressed="true">Sound on</button>
-			<button id="musicBtn" type="button" aria-pressed="true">Music on</button>
-			<button id="offsideBtn" type="button" aria-pressed="true">Offside on</button>
+			<button id="soundBtn" type="button" aria-pressed="true" title="All sound: crowd, whistle and effects">Sound on</button>
+			<button id="musicBtn" type="button" aria-pressed="true" title="Club songs and menu music">Music on</button>
+			<button id="offsideBtn" type="button" aria-pressed="true" title="Play the offside rule">Offside on</button>
 			</div>
 		</div>
 	</div>
