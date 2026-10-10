@@ -402,6 +402,26 @@
 			G3.ball.rotateOnWorldAxis(G3.v, spd / br * frameDt / 16.7);
 		}
 		animateNets3D(bx, bz, h * Z3 + br, frameDt / 16.7);
+		// A struck ball leaves a faint trail of ghosts along its last few frames: shots and long balls
+		// only (from 11 units a frame, full by 15), so the pace of a strike reads even from the gantry.
+		{
+			if (G3.trail && G3.trail.scene !== G3.scene) { G3.trail = null; }
+			const T = G3.trail || (G3.trail = { scene: G3.scene, hist: [], ghosts: Array.from({ length: 8 }, () => { const m = new THREE.Mesh(G3.ball.geometry, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false })); m.visible = false; G3.scene.add(m); return m; }) });
+			T.hist.unshift([ bx, h * Z3 + br, bz ]); if (T.hist.length > 12) { T.hist.length = 12; }
+			const pace = reduceMotion || ball.owner ? 0 : clamp((spd - 11) / 4, 0, 1);
+			// Spaced by distance back along its path (not by frames), so the streak looks the same at any frame rate.
+			T.ghosts.forEach((m, i) => {
+				let want = (i + 1) * br * 0.85, at = null;
+				for (let j = 1; j < T.hist.length && !at; j++) {
+					const p0 = T.hist[j - 1], p1 = T.hist[j], seg = Math.hypot(p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]);
+					if (seg > 80) { break; }   // a jump (a reset or a replay cut), not flight
+					if (seg >= want) { const t = want / (seg || 1); at = [ p0[0] + (p1[0] - p0[0]) * t, p0[1] + (p1[1] - p0[1]) * t, p0[2] + (p1[2] - p0[2]) * t ]; } else { want -= seg; }
+				}
+				m.visible = pace > 0 && !!at;
+				if (!m.visible) { return; }
+				m.position.set(at[0], at[1], at[2]); m.scale.setScalar(br / 5 * (0.94 - i * 0.085)); m.material.opacity = pace * 0.36 * (1 - i / 8.5);
+			});
+		}
 		const sh = 1 / (1 + h / 90), bk = br / 5;
 		G3.ballShadow.position.set(bx + 2 * bk + h * 0.06, 0.3, bz + 1.5 * bk + h * 0.04);
 		G3.ballShadow.scale.set((4.5 * sh + 2) * bk, 1, (4.5 * sh + 2) * bk);
