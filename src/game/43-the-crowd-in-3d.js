@@ -373,6 +373,7 @@
 		for (let y = 0; y < h; y += 4) { g.fillRect(0, y, w, 1); }
 		S.tex.needsUpdate = true;
 	}
+	const BALL_R_PER_DIST = 0.003;   // ball radius per unit of camera distance, between the clamps
 	function sync3D () {
 		buildStadium3D();
 		screen3D();
@@ -389,17 +390,21 @@
 		drawFigures3D(WX, WD);
 		animateCrowd3D();
 		// The ball, at its true height, rolling; its shadow stays on the grass.
+		// Near true size close up (a little bigger than a head), growing with the camera's distance so it
+		// never shrinks to a speck from the gantry.
 		const h = Math.max(0, ball.z || 0), bx = WX(ball.x), bz = ball.y;
-		G3.ball.position.set(bx, h * Z3 + 5, bz);
+		const br = G3.ballR = clamp(G3.cam.position.distanceTo(G3.v.set(bx, h * Z3, bz)) * BALL_R_PER_DIST, 2.4, 5);
+		G3.ball.scale.setScalar(br / 5);
+		G3.ball.position.set(bx, h * Z3 + br, bz);
 		const spd = Math.hypot(ball.vx, ball.vy);
 		if (spd > 0.01 && !reduceMotion) {
 			G3.v.set(ball.vy, 0, -(sw ? -ball.vx : ball.vx)).normalize();
-			G3.ball.rotateOnWorldAxis(G3.v, spd / 5 * frameDt / 16.7);
+			G3.ball.rotateOnWorldAxis(G3.v, spd / br * frameDt / 16.7);
 		}
-		animateNets3D(bx, bz, h * Z3 + 5, frameDt / 16.7);
-		const sh = 1 / (1 + h / 90);
-		G3.ballShadow.position.set(bx + 2 + h * 0.06, 0.3, bz + 1.5 + h * 0.04);
-		G3.ballShadow.scale.set(4.5 * sh + 2, 1, 4.5 * sh + 2);
+		animateNets3D(bx, bz, h * Z3 + br, frameDt / 16.7);
+		const sh = 1 / (1 + h / 90), bk = br / 5;
+		G3.ballShadow.position.set(bx + 2 * bk + h * 0.06, 0.3, bz + 1.5 * bk + h * 0.04);
+		G3.ballShadow.scale.set((4.5 * sh + 2) * bk, 1, (4.5 * sh + 2) * bk);
 		G3.ballShadow.material.opacity = 0.3 * sh + 0.08;
 		if (G3.shot.startsWith("replay")) { for (const m of Object.values(G3.marks)) { m.visible = false; } return; }   // a clean picture for the replay
 		// The markers on the grass.
@@ -604,7 +609,7 @@
 		let restore = null;
 		try {
 			if (replayOn()) { restore = applyReplay(); }
-			try { sync3D(); G3.renderer.render(G3.scene, G3.cam); } finally { if (restore) { restore(); } }
+			try { sync3D(); if (window.__ffCam3D) { window.__ffCam3D(G3, THREE); } G3.renderer.render(G3.scene, G3.cam); } finally { if (restore) { restore(); } }
 			hud3D();
 			if (threeToldLoading) { threeToldLoading = false; fx = fx.filter(f => !(f.toast && f.label === "Loading 3D view")); }
 		} catch (e) {

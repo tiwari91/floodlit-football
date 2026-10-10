@@ -69,16 +69,30 @@
 		const dt = frameDt / 16.7;
 		for (const p of players) {
 			if (F.n >= MAXF3) { break; }
-			const rig = F.rigs[F.n], pd = F.prevDir.get(p);
-			const turn = pd === undefined ? 0 : Math.atan2(Math.sin(p.dir - pd), Math.cos(p.dir - pd)) / dt;
-			F.prevDir.set(p, p.dir);
+			const rig = F.rigs[F.n], pd = F.prevDir.get(p), wrapA = a => Math.atan2(Math.sin(a), Math.cos(a));
+			// The body turns, it doesn't snap: the simulation may swing his facing round in one frame, so
+			// the figure eases toward it (a quick exponential, capped near 9 rad/s), with the head and chest
+			// leading the hips (your own man quicker, ~16 rad/s). Straight to it in a replay, with reduced motion, or when he is moved.
+			let ys = F.yawSt.get(p);
+			if (!ys) { ys = { yaw: p.dir, x: p.x, y: p.y }; F.yawSt.set(p, ys); }
+			if (reduceMotion || replayOn() || Math.hypot(p.x - ys.x, p.y - ys.y) > 40) { ys.yaw = p.dir; }
+			else { const mine = players.indexOf(p) === ctrl, cap = (mine ? 0.016 : 0.0095) * frameDt; ys.yaw = wrapA(ys.yaw + clamp(wrapA(p.dir - ys.yaw) * (1 - Math.exp(-frameDt / (mine ? 40 : 65))), -cap, cap)); }   // yours a touch quicker, so control stays crisp
+			ys.x = p.x; ys.y = p.y;
+			// Acceleration along his facing, smoothed, for the lean (none in a replay).
+			const fv = (p.vx || 0) * Math.cos(p.dir) + (p.vy || 0) * Math.sin(p.dir);
+			ys.acc = replayOn() || ys.fv === undefined ? 0 : (ys.acc || 0) + ((fv - ys.fv) / Math.max(dt, 0.25) - (ys.acc || 0)) * (1 - Math.exp(-frameDt / 140));
+			ys.fv = fv; rig.acc = ys.acc;
+			const face = ys.yaw, lead = -clamp(wrapA(p.dir - face), -1.2, 1.2);
+			const turn = pd === undefined ? 0 : wrapA(face - pd) / dt;
+			F.prevDir.set(p, face);
 			const dBall = Math.hypot(ball.x - p.x, ball.y - p.y);
 			const near = p.role === "gk" ? clamp(1 - dBall / (260 * S), 0, 1) : 0;
 			// How far the head turns to follow the ball: the angle from his facing to it, within a
 			// neck's reach, fading out past 420 units, mirrored with the pitch.
-			const relB = Math.atan2(Math.sin(Math.atan2(ball.y - p.y, ball.x - p.x) - p.dir), Math.cos(Math.atan2(ball.y - p.y, ball.x - p.x) - p.dir));
+			const relB = wrapA(Math.atan2(ball.y - p.y, ball.x - p.x) - face);
 			const yaw = -clamp(relB, -0.85, 0.85) * clamp(1 - dBall / (420 * S), 0, 1);
-			pose3D(rig, p, WX(p.x), p.y, WD(p.dir), WX(1) < WX(0) ? -turn : turn, near, WX(1) < WX(0) ? -yaw : yaw);
+			const mir = WX(1) < WX(0) ? -1 : 1;
+			pose3D(rig, p, WX(p.x), p.y, WD(face), mir * turn, near, mir * yaw, mir * lead);
 			rig.root.scale.setScalar(0.95 + 0.1 * build(p).seed);   // tall and short
 			commitFigure3D(rig, look(p), kit3D(p), p.num);
 		}

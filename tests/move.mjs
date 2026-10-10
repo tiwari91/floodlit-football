@@ -92,5 +92,28 @@ check("score bug clock stays mm:ss within the match length", /^\d{2}:\d{2}$/.tes
 // The first-match coach mark showed once (ff-coach stored) and "Got it" dismisses it.
 const coach = await page.evaluate(() => { const el = document.getElementById("coachMark"), stored = localStorage.getItem("ff-coach"); el.hidden = false; document.getElementById("coachClose").click(); return { stored, hidden: el.hidden }; });
 check("first-match coach mark is stored as shown and dismissable", coach.stored === "1" && coach.hidden === true, JSON.stringify(coach));
+// 3D figures turn, they don't snap: the drawn facing never swings faster than ~16 rad/s even when the
+// simulation swings p.dir round in a frame. Every player has his own running style; the ball is near true size close up.
+const feel = await page.evaluate(() => new Promise(res => {
+	const F = window.__ff; for (let i = 0; i < 3000 && F.state !== "play"; i++) { F.step(1); }
+	F.freeze = 0;
+	const prev = new Map(); let max = 0, n = 0, last = performance.now(), snaps = 0;
+	const tick = () => {
+		const now = performance.now(), dts = (now - last) / 1000; last = now;
+		const st = F.G3 && F.G3.fig && F.G3.fig.yawSt;
+		for (const p of F.players) {
+			const y = st && st.get(p) ? st.get(p).yaw : null;
+			if (y !== null && prev.has(p) && dts > 0) { const d = Math.abs(Math.atan2(Math.sin(y - prev.get(p)), Math.cos(y - prev.get(p)))); if (d < 1.5) { max = Math.max(max, d / dts); } else { snaps++; } }
+			if (y !== null) { prev.set(p, y); }
+		}
+		if (++n < 240) { requestAnimationFrame(tick); } else {
+			const arms = new Set(F.players.map(p => p.build && p.build.arm && p.build.arm.toFixed(2)));
+			res({ max: +max.toFixed(1), snaps, styles: arms.size, ballR: F.G3.ballR });
+		}
+	};
+	requestAnimationFrame(tick);
+}));
+check("3D facing turns smoothly (no drawn turn faster than ~17 rad/s)", feel.max > 0 && feel.max <= 17 && feel.snaps <= 2, JSON.stringify(feel));
+check("players run in their own styles, and the 3D ball stays between true size and gantry size", feel.styles >= 8 && feel.ballR >= 2.4 && feel.ballR <= 5, JSON.stringify(feel));
 await browser.close(); server.stop();
 process.exit(done() ? 1 : 0);

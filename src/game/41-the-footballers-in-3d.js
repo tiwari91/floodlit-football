@@ -281,7 +281,7 @@
 		nums.instanceMatrix.setUsage(T.DynamicDrawUsage); nums.setColorAt(0, white); nums.frustumCulled = false; nums.count = 0;
 		G3.scene.add(nums);
 		// A kit-coloured ring at each player's feet (it keeps the sides readable from the gantry) and a soft shadow.
-		const rings = new T.InstancedMesh(G3.geo.ring, new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7, depthWrite: false }), MAXF3);
+		const rings = new T.InstancedMesh(G3.geo.ring, new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, depthWrite: false }), MAXF3);
 		const blobs = new T.InstancedMesh(G3.geo.shadow, new T.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.32, depthWrite: false }), MAXF3);
 		// Under four floodlights a player throws four faint shadows, one away from each (as many as the Graphics setting draws).
 		const longs = new T.InstancedMesh(G3.geo.shadow, new T.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.12, depthWrite: false }), MAXF3 * 4);
@@ -310,7 +310,7 @@
 			const hip = [ node(hips, 0, -1.0, -2.45), node(hips, 0, -1.0, 2.45) ], kn = hip.map(h => node(h, 0, -7.3, 0)), an = kn.map(k => node(k, 0, -6.5, 0));
 			rigs.push({ root, hips, spine, chest, neck, head, sh, el, ha, hip, kn, an });
 		}
-		G3.fig = { parts, nums, rings, blobs, longs, flags, rigs, cnt: {}, n: 0, M: new T.Matrix4(), M2: new T.Matrix4(), C: new T.Color(), V: new T.Vector3(), S: new T.Vector3(), Q: new T.Quaternion(), prevDir: new WeakMap() };
+		G3.fig = { parts, nums, rings, blobs, longs, flags, rigs, cnt: {}, n: 0, M: new T.Matrix4(), M2: new T.Matrix4(), C: new T.Color(), V: new T.Vector3(), S: new T.Vector3(), Q: new T.Quaternion(), prevDir: new WeakMap(), yawSt: new WeakMap() };
 	}
 	// Reset a rig to standing.
 	function resetRig3D (r) {
@@ -324,7 +324,8 @@
 	// A footballer's pose from the simulation: the run (its stride and how hard he is running), the
 	// idle weight shift, the keeper's set, a kick (pass or shot, its backswing from the power), a
 	// throw-in, a header, a slide, the keeper's dive, a fall when fouled, and the celebrations.
-	function pose3D (r, p, x, z, dir, turn, ballNear, ballYaw = 0) {
+	function pose3D (r, p, x, z, dir, turn, ballNear, ballYaw = 0, lead = 0) {
+		const acc = r.acc || 0; r.acc = 0;   // set by the player loop for this frame only
 		resetRig3D(r);
 		const rm = reduceMotion;
 		const spd = Math.hypot(p.vx || 0, p.vy || 0);
@@ -335,18 +336,30 @@
 		const idle = rm ? 0 : p.idlePh || 0, gk = p.role === "gk";
 		let y = 0;
 		// The running cycle: hips swing the thighs, knees fold on the recovery, arms counter-swing.
-		const A = 0.22 + 0.62 * a * (1 - 0.4 * shuf), K = 0.5 + 1.3 * a, armA = (0.25 + 0.65 * a) * (1 - 0.5 * shuf);
+		// Each man runs his own way (gv): arm carriage, elbow bend, bounce, lean and twist.
+		const gv = p.build && p.build.arm !== undefined ? p.build : { arm: 1, elbow: 0, lean: 0, bounce: 1, twist: 1 };
+		const A = 0.22 + 0.62 * a * (1 - 0.4 * shuf), K = 0.5 + 1.3 * a, armA = (0.25 + 0.65 * a) * (1 - 0.5 * shuf) * gv.arm;
 		for (let i = 0; i < 2; i++) {
 			const s = i ? 1 : -1, phi = ph + (i ? Math.PI : 0), sn = Math.sin(phi), cs = Math.cos(phi);
 			const limp = p.injured && i === 0 ? 0.55 : 1;
 			r.hip[i].rotation.z = A * sn * limp;
 			r.kn[i].rotation.z = -(K * clamp(cs, 0, 1) * clamp(a + 0.15, 0, 1) + 0.12 + 0.1 * a) * limp;
 			r.an[i].rotation.z = 0.25 * a * clamp(-sn, 0, 1) - 0.1 * clamp(cs, 0, 1) * a;
-			r.sh[i].rotation.z = -armA * sn; r.sh[i].rotation.x = s * (0.1 + 0.08 * a);
-			r.el[i].rotation.z = 0.45 + 0.95 * a;
+			// the arm drives forward and slightly across, the elbow closing as it comes through
+			r.sh[i].rotation.z = -armA * sn; r.sh[i].rotation.x = s * (0.1 + 0.08 * a - 0.07 * a * clamp(-sn, 0, 1));
+			r.el[i].rotation.z = 0.45 + gv.elbow + 0.85 * a + 0.15 * a * clamp(-sn, 0, 1);
 		}
-		r.hips.position.y = 15.6 - 0.5 * a + Math.abs(Math.cos(ph)) * 0.9 * a + (a < 0.2 ? Math.sin(idle) * 0.12 : 0);
-		r.spine.rotation.z = 0.06 + 0.2 * a * a;
+		r.hips.position.y = 15.6 - 0.5 * a + Math.abs(Math.cos(ph)) * 0.9 * a * gv.bounce + (a < 0.2 ? Math.sin(idle) * 0.12 : 0);
+		r.spine.rotation.z = 0.06 + 0.2 * a * a + gv.lean * a;
+		// The pelvis turns with the leading leg and the shoulders against it; the head stays steady.
+		// A little roll and sideways shift of the hips onto the standing leg.
+		if (!rm && a > 0.05) {
+			const tw = Math.sin(ph) * a * (1 - 0.5 * shuf) * gv.twist;
+			r.hips.rotation.y = -0.14 * tw; r.chest.rotation.y = 0.34 * tw; r.neck.rotation.y = -0.18 * tw;
+			r.hips.rotation.x += 0.05 * Math.cos(ph) * a; r.hips.position.z = 0.35 * Math.cos(ph) * a;
+		}
+		// Speeding up he leans into it; braking, he sits back (r.acc from the caller, smoothed).
+		if (!rm && acc) { r.spine.rotation.z += clamp(acc * 2.2, -0.16, 0.2); }
 		r.hips.rotation.x = clamp(turn * 1.4, -0.3, 0.3) * clamp(spd, 0, 1);
 		r.neck.rotation.z = -r.spine.rotation.z * 0.6;
 		if (a < 0.2) { r.chest.rotation.y = Math.sin(idle * 0.5) * 0.05; r.sh[0].rotation.z += Math.sin(idle) * 0.03; r.sh[1].rotation.z -= Math.sin(idle) * 0.03; r.head.rotation.y = Math.sin(idle * 0.37) * 0.25; }
@@ -358,7 +371,10 @@
 		}
 		// Flat out: leaning further in, the arms pumping higher and tighter.
 		const sp = clamp(p.sprintAmt || 0, 0, 1) * a;
-		if (sp > 0) { r.spine.rotation.z += 0.14 * sp; for (let i = 0; i < 2; i++) { r.el[i].rotation.z += 0.3 * sp; r.sh[i].rotation.z *= 1 + 0.25 * sp; } }
+		if (sp > 0) { r.spine.rotation.z += 0.14 * sp; for (let i = 0; i < 2; i++) { r.el[i].rotation.z += 0.15 * sp; r.sh[i].rotation.z *= 1 + 0.25 * sp; } }
+		// Never a hand up by the face: the elbow stays near a right angle, the upper arm comes
+		// through to about 55 degrees forward and 50 back (the kick, throw and celebrations set their own).
+		for (let i = 0; i < 2; i++) { r.el[i].rotation.z = Math.min(r.el[i].rotation.z, 1.62); r.sh[i].rotation.z = clamp(r.sh[i].rotation.z, -0.95, 0.88); }
 		// Eyes on the ball: the head turns toward it when it is near, and drops to the feet on the ball.
 		if (!rm && ball && fall < 0 && dive < 0 && thr < 0 && cel <= 0 && !down) {
 			if (ball.owner === p) {
@@ -370,6 +386,8 @@
 				r.head.rotation.y += ballYaw;
 			}
 		}
+		// Turning: the head and then the chest come round first, the hips follow.
+		if (!rm && lead && fall < 0 && dive < 0 && !down) { r.chest.rotation.y += lead * 0.35; r.neck.rotation.y += lead * 0.3; }
 		// The keeper on his toes when the ball is near: knees bent, hands ready.
 		if (gk && ballNear > 0 && !down && jump <= 0 && fall < 0 && dive < 0 && !(p.kickA > 0)) {
 			const g = ballNear * (1 - a);
@@ -522,17 +540,22 @@
 		const V = F.V.setFromMatrixPosition(rig.root.matrixWorld), x = V.x, z = V.z, air = Math.max(0, V.y);
 		F.blobs.setMatrixAt(F.blobs.count++, M.compose(V.set(x + 2, 0.2, z + 1.5), F.Q.identity(), F.S.set(11 + air * 0.15, 1, 7 + air * 0.1)));
 		const ns = gfx3().shadows - 1;
-		if (ns > 0 && air < 20) {
+		if (ns > 0 && air < 20 && cond && cond.ko === "day") {
+			// An afternoon game: one sun shadow, the same way for everyone, longer than his blob.
+			const len = 26; F.longs.material.opacity = 0.2;
+			F.longs.setMatrixAt(F.longs.count++, M.compose(V.set(x + 0.55 * len * 0.5, 0.15, z + 0.83 * len * 0.5), F.Q.setFromAxisAngle(F.Y || (F.Y = new THREE.Vector3(0, 1, 0)), -Math.atan2(0.83, 0.55)), F.S.set(len * 0.5, 1, 4.2)));
+		} else if (ns > 0 && air < 20) {
+			F.longs.material.opacity = 0.12;
 			for (let k = 0; k < 4; k++) {
 				if (ns < 4 && k % 2) { continue; }   // Medium: the two lights on one diagonal
 				const lx = k === 0 || k === 3 ? -160 : FW + 160, lz = k < 2 ? -160 : FH + 160;
-				const dx = x - lx, dz = z - lz, d = Math.hypot(dx, dz) || 1, len = clamp(32 * d / 950, 10, 52);
+				const dx = x - lx, dz = z - lz, d = Math.hypot(dx, dz) || 1, len = clamp(28 * d / 950, 9, 36);
 				F.longs.setMatrixAt(F.longs.count++, M.compose(V.set(x + dx / d * len * 0.5, 0.15, z + dz / d * len * 0.5), F.Q.setFromAxisAngle(F.Y || (F.Y = new THREE.Vector3(0, 1, 0)), -Math.atan2(dz, dx)), F.S.set(len * 0.5, 1, 3.4)));
 			}
 		}
 		if (kit.ring) {
 			const r = F.rings.count++;
-			F.rings.setMatrixAt(r, M.compose(V.set(x, 0.25, z), F.Q.identity(), F.S.set(16, 1, 16)));
+			F.rings.setMatrixAt(r, M.compose(V.set(x, 0.25, z), F.Q.identity(), F.S.set(12, 1, 12)));
 			F.rings.setColorAt(r, C.set(kit.ring));
 		}
 		if (num !== null && num !== undefined) {

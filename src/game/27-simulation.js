@@ -30,6 +30,11 @@
 			const h = hashStr(p.name || `${p.team}-${p.idx}-${p.num}`);
 			p.build = { seed: (h % 1000) / 1000, agil: 0.9 + ((h >> 4) % 21) / 100, stride: 0.93 + ((h >> 9) % 15) / 100, left: (h >> 13) % 5 === 0 };
 		}
+		// His running style: how high and wide he carries his arms, how much he bounces, leans and twists.
+		if (p.build.arm === undefined) {
+			const g = hashStr(`${p.name || `${p.team}-${p.idx}-${p.num}`}|gait`), u = k => ((g >>> (k * 5)) % 31) / 30;
+			Object.assign(p.build, { arm: 0.85 + 0.3 * u(0), elbow: -0.12 + 0.3 * u(1), lean: -0.03 + 0.1 * u(2), bounce: 0.8 + 0.4 * u(3), twist: 0.8 + 0.45 * u(4) });
+		}
 		return p.build;
 	}
 
