@@ -11630,7 +11630,14 @@
 		if (sp > 0) { r.spine.rotation.z += 0.14 * sp; for (let i = 0; i < 2; i++) { r.el[i].rotation.z += 0.15 * sp; r.sh[i].rotation.z *= 1 + 0.25 * sp; } }
 		// Never a hand up by the face: the elbow stays near a right angle, the upper arm comes
 		// through to about 55 degrees forward and 50 back (the kick, throw and celebrations set their own).
-		for (let i = 0; i < 2; i++) { r.el[i].rotation.z = Math.min(r.el[i].rotation.z, 1.62); r.sh[i].rotation.z = clamp(r.sh[i].rotation.z, -0.95, 0.88); }
+		// Running, the hand comes through to chest height, not the chin: the upper arm swings forward
+		// less than back (about 0.55 rad against 0.95), and the more it is forward the less the elbow
+		// folds, so the forearm never points at the sky.
+		for (let i = 0; i < 2; i++) {
+			const fw = r.sh[i].rotation.z > 0 ? r.sh[i].rotation.z * 0.62 : r.sh[i].rotation.z;
+			r.sh[i].rotation.z = clamp(fw, -0.95, 0.55);
+			r.el[i].rotation.z = Math.min(r.el[i].rotation.z, 1.55, 1.9 - Math.max(0, r.sh[i].rotation.z));
+		}
 		// Eyes on the ball: the head turns toward it when it is near, and drops to the feet on the ball.
 		if (!rm && ball && fall < 0 && dive < 0 && thr < 0 && cel <= 0 && !down) {
 			if (ball.owner === p) {
