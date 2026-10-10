@@ -9,6 +9,7 @@
 		}
 		if (e.code === "KeyH" || e.key === "?") { if (!e.repeat) { openHowto(); } return; }
 		if (odr) { e.preventDefault(); if (!e.repeat) { endOdr(); } return; }   // any key ends a replay
+		if (state === "play" && !$("bcLineups").hidden) { hideLineups(); }   // you're playing: the line-ups make way
 		if (e.code === "KeyR" && state === "play" && !e.repeat) { e.preventDefault(); startOdr(); return; }
 		if (e.code === "KeyP" || e.code === "Escape") {
 			if (state === "play") { pause(); } else if (state === "paused") { startPlay(); }

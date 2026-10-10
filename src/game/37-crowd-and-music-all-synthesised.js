@@ -598,17 +598,24 @@
 	}
 
 	// Match-wide messages, drawn on the screen rather than the pitch.
+	// A broadcast strip at the top centre, one per message, stacked: dark backing, the message's colour
+	// as an accent bar and the text. Out of the way of play rather than written across the stands.
 	function drawToasts () {
-		ctx.textAlign = "center";
+		ctx.textAlign = "left";
 		ctx.textBaseline = "middle";
-		ctx.font = "900 44px 'Big Shoulders Display', 'Arial Narrow', Arial, sans-serif";
+		ctx.font = "800 19px 'Big Shoulders Display', 'Arial Narrow', Arial, sans-serif";
+		let row = 0;
 		for (const f of fx) {
 			if (!f.toast) { continue; }
-			ctx.globalAlpha = Math.min(1, (1 - f.t / f.life) * 2.5);
-			ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
-			ctx.fillText(f.label.toUpperCase(), SW / 2 + 2, 114);
-			ctx.fillStyle = f.color;
-			ctx.fillText(f.label.toUpperCase(), SW / 2, 110);
+			const txt = f.label.toUpperCase(), tw = ctx.measureText(txt).width, w = tw + 30, h = 28;
+			const k = Math.min(1, (1 - f.t / f.life) * 2.5), slide = reduceMotion ? 0 : Math.max(0, 1 - f.t / 10) * 8;
+			const x = SW / 2 - w / 2, y = 64 + row * 34 - slide;
+			ctx.globalAlpha = k;
+			ctx.fillStyle = "rgba(9, 13, 16, 0.82)";
+			if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(x, y, w, h, 4); ctx.fill(); } else { ctx.fillRect(x, y, w, h); }
+			ctx.fillStyle = f.color; ctx.fillRect(x, y, 4, h);
+			ctx.fillText(txt, x + 18, y + h / 2 + 1);
+			row++;
 		}
 		ctx.globalAlpha = 1;
 	}

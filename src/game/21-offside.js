@@ -39,7 +39,7 @@
 		charging = false;
 		tally.tight++;
 		caption("Tight call", "review", "Checking offside", `${p.name || teamName(p.team)} · ${minuteNow()}'`, p.team);
-		banner.textContent = "Checking…"; banner.className = "banner " + (p.team === 0 ? "home" : "away"); banner.hidden = false;
+		banner.textContent = "Checking…"; banner.className = "banner call " + (p.team === 0 ? "home" : "away"); banner.hidden = false;
 		$("announce").textContent = "A tight call: the officials are checking offside.";
 		if (typeof crowdReact === "function") { crowdReact("near", p.team); }
 	}
@@ -151,7 +151,7 @@
 		awardFreeKick(taker.team, taker, { taker, spot, indirect: true, quiet: true });
 		freeze = 60;
 		banner.textContent = "Offside";
-		banner.className = "banner " + (p.team === 0 ? "away" : "home");
+		banner.className = "banner call " + (p.team === 0 ? "away" : "home");
 		banner.hidden = false;
 		setTimeout(() => { if (banner.textContent === "Offside") { banner.hidden = true; } }, 1100);
 		$("announce").textContent = `Offside against ${p.team === 0 ? "you" : opp.name}. Indirect free kick.`;

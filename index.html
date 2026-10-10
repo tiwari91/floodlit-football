@@ -505,6 +505,8 @@
 	}
 
 	.banner small { display: block; font-size: 0.2em; letter-spacing: 0.14em; font-weight: 700; opacity: 0.9; }
+	/* A referee's call (corner, goal kick, offside): read at a glance, not a headline over the play. */
+	.banner.call { font-size: clamp(30px, 5vw, 58px); top: 26%; letter-spacing: 0.06em; }
 	.banner.note { font-size: clamp(17px, 3.2vw, 32px); letter-spacing: 0.04em; width: min(86%, 760px); text-align: center; line-height: 1.15; }
 	.banner.home { color: var(--amber); }
 	.banner.away { color: var(--opp-text); }
@@ -4626,7 +4628,7 @@
 		charging = false;
 		tally.tight++;
 		caption("Tight call", "review", "Checking offside", `${p.name || teamName(p.team)} · ${minuteNow()}'`, p.team);
-		banner.textContent = "Checking…"; banner.className = "banner " + (p.team === 0 ? "home" : "away"); banner.hidden = false;
+		banner.textContent = "Checking…"; banner.className = "banner call " + (p.team === 0 ? "home" : "away"); banner.hidden = false;
 		$("announce").textContent = "A tight call: the officials are checking offside.";
 		if (typeof crowdReact === "function") { crowdReact("near", p.team); }
 	}
@@ -4738,7 +4740,7 @@
 		awardFreeKick(taker.team, taker, { taker, spot, indirect: true, quiet: true });
 		freeze = 60;
 		banner.textContent = "Offside";
-		banner.className = "banner " + (p.team === 0 ? "away" : "home");
+		banner.className = "banner call " + (p.team === 0 ? "away" : "home");
 		banner.hidden = false;
 		setTimeout(() => { if (banner.textContent === "Offside") { banner.hidden = true; } }, 1100);
 		$("announce").textContent = `Offside against ${p.team === 0 ? "you" : opp.name}. Indirect free kick.`;
@@ -6581,7 +6583,7 @@
 
 	function restartBanner (text, forTeam) {
 		banner.textContent = text;
-		banner.className = "banner " + (forTeam === 0 ? "home" : "away");
+		banner.className = "banner call " + (forTeam === 0 ? "home" : "away");
 		banner.hidden = false;
 		setTimeout(() => { if (banner.textContent === text) { banner.hidden = true; } }, 1000);
 		$("announce").textContent = `${text} to ${forTeam === 0 ? "you" : opp.name}.`;
@@ -9820,17 +9822,24 @@
 	}
 
 	// Match-wide messages, drawn on the screen rather than the pitch.
+	// A broadcast strip at the top centre, one per message, stacked: dark backing, the message's colour
+	// as an accent bar and the text. Out of the way of play rather than written across the stands.
 	function drawToasts () {
-		ctx.textAlign = "center";
+		ctx.textAlign = "left";
 		ctx.textBaseline = "middle";
-		ctx.font = "900 44px 'Big Shoulders Display', 'Arial Narrow', Arial, sans-serif";
+		ctx.font = "800 19px 'Big Shoulders Display', 'Arial Narrow', Arial, sans-serif";
+		let row = 0;
 		for (const f of fx) {
 			if (!f.toast) { continue; }
-			ctx.globalAlpha = Math.min(1, (1 - f.t / f.life) * 2.5);
-			ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
-			ctx.fillText(f.label.toUpperCase(), SW / 2 + 2, 114);
-			ctx.fillStyle = f.color;
-			ctx.fillText(f.label.toUpperCase(), SW / 2, 110);
+			const txt = f.label.toUpperCase(), tw = ctx.measureText(txt).width, w = tw + 30, h = 28;
+			const k = Math.min(1, (1 - f.t / f.life) * 2.5), slide = reduceMotion ? 0 : Math.max(0, 1 - f.t / 10) * 8;
+			const x = SW / 2 - w / 2, y = 64 + row * 34 - slide;
+			ctx.globalAlpha = k;
+			ctx.fillStyle = "rgba(9, 13, 16, 0.82)";
+			if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(x, y, w, h, 4); ctx.fill(); } else { ctx.fillRect(x, y, w, h); }
+			ctx.fillStyle = f.color; ctx.fillRect(x, y, 4, h);
+			ctx.fillText(txt, x + 18, y + h / 2 + 1);
+			row++;
 		}
 		ctx.globalAlpha = 1;
 	}
@@ -12681,7 +12690,7 @@
 		box.hidden = false;
 		box.style.animation = "none"; void box.offsetWidth; box.style.animation = "";
 		clearTimeout(bcLineT);
-		bcLineT = setTimeout(hideLineups, 6000);
+		bcLineT = setTimeout(hideLineups, 4500);
 	}
 	function board (rows, ms) {
 		if (bulkSim || mode === "tutorial") { return; }
@@ -13093,6 +13102,7 @@
 		}
 		if (e.code === "KeyH" || e.key === "?") { if (!e.repeat) { openHowto(); } return; }
 		if (odr) { e.preventDefault(); if (!e.repeat) { endOdr(); } return; }   // any key ends a replay
+		if (state === "play" && !$("bcLineups").hidden) { hideLineups(); }   // you're playing: the line-ups make way
 		if (e.code === "KeyR" && state === "play" && !e.repeat) { e.preventDefault(); startOdr(); return; }
 		if (e.code === "KeyP" || e.code === "Escape") {
 			if (state === "play") { pause(); } else if (state === "paused") { startPlay(); }
@@ -13692,7 +13702,7 @@
 			get autoSwitchMode () { return autoSwitchMode; }, set autoSwitchMode (v) { autoSwitchMode = v; autoSwitchSel.value = v; },
 			get assistMode () { return assistMode; }, setAssist, assistRun, get lastDeal () { return lastDeal; }, valueOf, ovrNow, windowOpen,
 			offerJobs, takeJob, declineJob, get YOU () { return YOU; }, get TEAMS () { return TEAMS; },
-			agentApproaches, agreeApproach, moveAbroad, takeOffer, assistShortlist, assistBuy, scoutShortlist, bestOffer, inheritSetup, keyContracts, contractAlerts, roleOf, slotsFor, renderAssistNote, assistRenewAnyway, retireVeterans, renewDeal, benchReact, get tlc () { return tlc; }, set tlcLast (v) { tlcLast = v; }, divisionName, applyForeignLeague, commitFoul, board, halfTime, get setPiece () { return setPiece; }, simulateMineTest () { simulateMine(); }, ensureClub, validLeague: typeof validLeague === "function" ? validLeague : null, get mode () { return mode; }, finishTutorialTest () { if (!tut) { return false; } tut.step = TUT.length - 1; nextTutStep(); return true; },
+			agentApproaches, agreeApproach, moveAbroad, takeOffer, assistShortlist, assistBuy, scoutShortlist, bestOffer, inheritSetup, keyContracts, contractAlerts, roleOf, slotsFor, renderAssistNote, assistRenewAnyway, retireVeterans, renewDeal, benchReact, get tlc () { return tlc; }, set tlcLast (v) { tlcLast = v; }, divisionName, applyForeignLeague, commitFoul, board, halfTime, toast, get setPiece () { return setPiece; }, simulateMineTest () { simulateMine(); }, ensureClub, validLeague: typeof validLeague === "function" ? validLeague : null, get mode () { return mode; }, finishTutorialTest () { if (!tut) { return false; } tut.step = TUT.length - 1; nextTutStep(); return true; },
 			get autoHold () { return autoHold; }, set autoHold (v) { autoHold = v; },
 			get charging () { return charging; }, get passCharge () { return passCharge; }, get meterRect () { return meterRect; }, get drawMs () { return drawMs; }, get drawn () { return drawn; }, frameDue, get scale () { return scale; }, get kits () { return KITS; }, get stats () { return stats; }, get oppStats () { return oppStats; }, get steerAt () { return steerAt; }, set steerAt (v) { steerAt = v; }, set possTeam (v) { possTeam = v; },
 			set steerSwitchDone (v) { steerSwitchDone = !!v; },

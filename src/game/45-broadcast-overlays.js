@@ -23,7 +23,7 @@
 		box.hidden = false;
 		box.style.animation = "none"; void box.offsetWidth; box.style.animation = "";
 		clearTimeout(bcLineT);
-		bcLineT = setTimeout(hideLineups, 6000);
+		bcLineT = setTimeout(hideLineups, 4500);
 	}
 	function board (rows, ms) {
 		if (bulkSim || mode === "tutorial") { return; }

@@ -484,6 +484,8 @@
 	}
 
 	.banner small { display: block; font-size: 0.2em; letter-spacing: 0.14em; font-weight: 700; opacity: 0.9; }
+	/* A referee's call (corner, goal kick, offside): read at a glance, not a headline over the play. */
+	.banner.call { font-size: clamp(30px, 5vw, 58px); top: 26%; letter-spacing: 0.06em; }
 	.banner.note { font-size: clamp(17px, 3.2vw, 32px); letter-spacing: 0.04em; width: min(86%, 760px); text-align: center; line-height: 1.15; }
 	.banner.home { color: var(--amber); }
 	.banner.away { color: var(--opp-text); }

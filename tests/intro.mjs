@@ -83,6 +83,9 @@ const bulk = await page.evaluate(() => { const F = window.__ff; F.tlcLast = -1e9
 check("a simulated match never shows the touchline cam", bulk === null, JSON.stringify(bulk));
 const nmg = await page.evaluate(() => { const F = window.__ff; F.state === "play" || (F.state = "play"); F.freeze = 0; F.tlcLast = -1e9; F.benchReact("near", { team: 0 }); const had = !!F.tlc; F.forceGoal(0); for (let i = 0; i < 60 && F.state !== "goal"; i++) { F.step(1); } return { had, state: F.state, cleared: F.tlc === null }; });
 check("a near-miss cutaway is cleared when a goal follows", nmg.had ? nmg.state === "goal" && nmg.cleared : true, JSON.stringify(nmg));
+// The kick-off line-ups make way as soon as you press a key in play.
+const lu = await page.evaluate(async () => { const F = window.__ff; for (let i = 0; i < 4000 && F.state !== "play"; i++) { F.step(1); } const box = document.getElementById("bcLineups"); box.hidden = false; window.dispatchEvent(new KeyboardEvent("keydown", { code: "ArrowUp", key: "ArrowUp" })); window.dispatchEvent(new KeyboardEvent("keyup", { code: "ArrowUp", key: "ArrowUp" })); return { state: window.__ff.state, hidden: box.hidden }; });
+check("the kick-off line-ups close on your first key in play", lu.state === "play" && lu.hidden, JSON.stringify(lu));
 // Goal banner clears after about two seconds; the officials' board sits under the canvas tags;
 // the half-time comparison fits without scrolling and its possession bar has width.
 const ov = await page.evaluate(async () => {

@@ -52,7 +52,7 @@
 
 	function restartBanner (text, forTeam) {
 		banner.textContent = text;
-		banner.className = "banner " + (forTeam === 0 ? "home" : "away");
+		banner.className = "banner call " + (forTeam === 0 ? "home" : "away");
 		banner.hidden = false;
 		setTimeout(() => { if (banner.textContent === text) { banner.hidden = true; } }, 1000);
 		$("announce").textContent = `${text} to ${forTeam === 0 ? "you" : opp.name}.`;
