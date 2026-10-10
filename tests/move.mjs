@@ -114,6 +114,16 @@ const feel = await page.evaluate(() => new Promise(res => {
 	requestAnimationFrame(tick);
 }));
 check("3D facing turns smoothly (no drawn turn faster than ~17 rad/s)", feel.max > 0 && feel.max <= 17 && feel.snaps <= 2, JSON.stringify(feel));
+const aim = await page.evaluate(() => new Promise(res => {
+	const F = window.__ff, prevK = new Map(), errs = []; let n = 0;
+	const tick = () => {
+		const st = F.G3.fig.yawSt;
+		for (const p of F.players) { const k = p.kickA || 0, was = prevK.get(p) || 0; prevK.set(p, k); if (k > was && st.get(p)) { const d = p.dir - st.get(p).yaw; errs.push(Math.abs(Math.atan2(Math.sin(d), Math.cos(d)))); } }
+		if (++n < 600) { requestAnimationFrame(tick); } else { errs.sort((a, b) => a - b); res({ kicks: errs.length, med: errs.length ? errs[errs.length >> 1] : 0 }); }
+	};
+	requestAnimationFrame(tick);
+}));
+check("kicking, the drawn body faces where the ball goes (the turn smoothing steps aside)", aim.med < 0.3, JSON.stringify(aim));
 check("players run in their own styles, and the 3D ball stays between true size and gantry size", feel.styles >= 8 && feel.ballR >= 2.4 && feel.ballR <= 5, JSON.stringify(feel));
 await browser.close(); server.stop();
 process.exit(done() ? 1 : 0);

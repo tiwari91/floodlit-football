@@ -423,7 +423,7 @@
 			});
 		}
 		const sh = 1 / (1 + h / 90), bk = br / 5;
-		G3.ballShadow.position.set(bx + 2 * bk + h * 0.06, 0.3, bz + 1.5 * bk + h * 0.04);
+		const [ sux, suz ] = sunDir3D(); G3.ballShadow.position.set(bx + sux * (2.4 * bk + h * 0.07), 0.3, bz + suz * (2.4 * bk + h * 0.07));
 		G3.ballShadow.scale.set((4.5 * sh + 2) * bk, 1, (4.5 * sh + 2) * bk);
 		G3.ballShadow.material.opacity = 0.3 * sh + 0.08;
 		if (G3.shot.startsWith("replay")) { for (const m of Object.values(G3.marks)) { m.visible = false; } return; }   // a clean picture for the replay

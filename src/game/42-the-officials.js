@@ -75,7 +75,9 @@
 			// leading the hips (your own man quicker, ~16 rad/s). Straight to it in a replay, with reduced motion, or when he is moved.
 			let ys = F.yawSt.get(p);
 			if (!ys) { ys = { yaw: p.dir, x: p.x, y: p.y }; F.yawSt.set(p, ys); }
-			if (reduceMotion || replayOn() || Math.hypot(p.x - ys.x, p.y - ys.y) > 40) { ys.yaw = p.dir; }
+			// In an action (a kick, a slide, a header, a dive, a fall, a throw) the body faces where the play goes.
+			const acting = p.kickA > 0 || p.slideAI > 0 || (p.lunge > 0 && players.indexOf(p) === ctrl) || p.dive > 0 || p.fall > 0 || p.throwA > 0 || jumpAmt(p) > 0;
+			if (reduceMotion || replayOn() || acting || Math.hypot(p.x - ys.x, p.y - ys.y) > 40) { ys.yaw = p.dir; }
 			else { const mine = players.indexOf(p) === ctrl, cap = (mine ? 0.016 : 0.0095) * frameDt; ys.yaw = wrapA(ys.yaw + clamp(wrapA(p.dir - ys.yaw) * (1 - Math.exp(-frameDt / (mine ? 40 : 65))), -cap, cap)); }   // yours a touch quicker, so control stays crisp
 			ys.x = p.x; ys.y = p.y;
 			// Acceleration along his facing, smoothed, for the lean (none in a replay).

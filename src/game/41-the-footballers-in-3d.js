@@ -320,6 +320,9 @@
 		for (let i = 0; i < 2; i++) { r.sh[i].rotation.set(0, 0, 0); r.el[i].rotation.set(0, 0, 0); r.ha[i].rotation.set(0, 0, 0); r.hip[i].rotation.set(0, 0, 0); r.kn[i].rotation.set(0, 0, 0); r.an[i].rotation.set(0, 0, 0); }
 		r.root.rotation.set(0, 0, 0); r.root.position.set(0, 0, 0); r.root.scale.setScalar(1);
 	}
+	// Which way shadows fall on the grass: away from the main key light (high over the near stand,
+	// toward the far side of the pitch), as a unit (x, z).
+	const sunDir3D = () => { const dx = FW * 0.7, dz = -FH * 1.1, l = Math.hypot(dx, dz) || 1; return [ dx / l, dz / l ]; };
 	const smooth3 = t => t * t * (3 - 2 * t);
 	const lerp3 = (a, b, t) => a + (b - a) * t;
 	// A footballer's pose from the simulation: the run (its stride and how hard he is running), the
@@ -364,7 +367,8 @@
 		// Standing, nobody stands to attention: weight on one leg (hips over it, the other knee eased
 		// and that hip dropped, the shoulders tilted back against it), a slight turn, his own elbow bend,
 		// breathing. Run out of legs and he stands bent over with his hands on his knees.
-		const still = rm ? 0 : clamp(1 - a * 5, 0, 1) * (1 - shuf);
+		const acting = p.kickA > 0 || thr >= 0 || jump > 0 || down || dive >= 0 || fall >= 0 || cel > 0;
+		const still = rm || acting ? 0 : clamp(1 - a * 5, 0, 1) * (1 - shuf);
 		if (still > 0 && !gk) {
 			const sd = p.build ? p.build.seed : 0.5, side = sd < 0.5 ? 0 : 1, sgn = side ? 1 : -1, free = 1 - side;
 			r.hips.position.z += sgn * 0.55 * still; r.hips.rotation.x -= sgn * 0.06 * still; r.chest.rotation.x += sgn * 0.05 * still;
@@ -372,7 +376,8 @@
 			r.chest.rotation.y += (sd - 0.5) * 0.4 * still;
 			r.spine.rotation.z += Math.sin(idle * 1.3) * 0.015 * still;
 			for (let i = 0; i < 2; i++) { r.el[i].rotation.z += (0.1 + 0.3 * ((sd * 7.3 + i * 0.31) % 1)) * still; }
-			const w = p.team >= 0 ? clamp((0.6 - staOf(p)) / 0.25, 0, 1) * still : 0;
+			const calm = state !== "play" || freeze > 0 || !ball || Math.hypot(ball.x - p.x, ball.y - p.y) > 300;   // never mid-play with the ball near
+			const w = p.team >= 0 && calm ? clamp((0.6 - staOf(p)) / 0.25, 0, 1) * still : 0;
 			if (w > 0) {
 				r.spine.rotation.z += 0.75 * w; r.hips.position.y -= 1.6 * w; r.neck.rotation.z -= 0.45 * w;
 				for (let i = 0; i < 2; i++) { r.kn[i].rotation.z -= 0.45 * w; r.hip[i].rotation.z += 0.35 * w; r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 0.32, w); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, (i ? 1 : -1) * 0.08, w); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.1, w); }
@@ -556,12 +561,13 @@
 			} else if (name === "head") { mesh.geometry.attributes.aFace.setX(k, ((lk.face || 0) % 8 + 8) % 8 + ((rig.cel || 0) > 0.3 ? 8 : 0)); }   // celebrating: the open-mouthed face
 		}
 		const V = F.V.setFromMatrixPosition(rig.root.matrixWorld), x = V.x, z = V.z, air = Math.max(0, V.y);
-		F.blobs.setMatrixAt(F.blobs.count++, M.compose(V.set(x + 2, 0.2, z + 1.5), F.Q.identity(), F.S.set(11 + air * 0.15, 1, 7 + air * 0.1)));
+		const [ sux, suz ] = sunDir3D();
+		F.blobs.setMatrixAt(F.blobs.count++, M.compose(V.set(x + sux * 2.4, 0.2, z + suz * 2.4), F.Q.identity(), F.S.set(11 + air * 0.15, 1, 7 + air * 0.1)));
 		const ns = gfx3().shadows - 1;
 		if (ns > 0 && air < 20 && cond && cond.ko === "day") {
 			// An afternoon game: one sun shadow, the same way for everyone, longer than his blob.
-			const len = 26; F.longs.material.opacity = 0.2;
-			F.longs.setMatrixAt(F.longs.count++, M.compose(V.set(x + 0.55 * len * 0.5, 0.15, z + 0.83 * len * 0.5), F.Q.setFromAxisAngle(F.Y || (F.Y = new THREE.Vector3(0, 1, 0)), -Math.atan2(0.83, 0.55)), F.S.set(len * 0.5, 1, 4.2)));
+			const len = 26, [ ux, uz ] = sunDir3D(); F.longs.material.opacity = 0.2;
+			F.longs.setMatrixAt(F.longs.count++, M.compose(V.set(x + ux * len * 0.5, 0.15, z + uz * len * 0.5), F.Q.setFromAxisAngle(F.Y || (F.Y = new THREE.Vector3(0, 1, 0)), -Math.atan2(uz, ux)), F.S.set(len * 0.5, 1, 4.2)));
 		} else if (ns > 0 && air < 20) {
 			F.longs.material.opacity = 0.12;
 			for (let k = 0; k < 4; k++) {
