@@ -86,5 +86,8 @@ check("a player's look is fixed by name (same after a rebuild)", looks.every(l =
 // Brace and hat-trick captions: the same man scoring again is named in the goal caption.
 const caps = await page.evaluate(() => { const F = window.__ff, out = []; F.autoPilot = false; F.timeLeft = 1e9; for (let k = 0; k < 3; k++) { F.freeze = 0; F.forceGoal(0); const s0 = F.score[0]; for (let i = 0; i < 200 && F.score[0] === s0; i++) { F.step(1); } out.push(F.lastCaption && F.lastCaption.sub); for (let i = 0; i < 3000 && F.state !== "play"; i++) { F.step(1); } } return out; });
 check("same scorer: first goal plain, then Brace, then Hat-trick", caps.length === 3 && !/Brace|Hat-trick/.test(caps[0]) && /Brace/.test(caps[1]) && /Hat-trick/.test(caps[2]), JSON.stringify(caps));
+// The score bug clock is always a sane mm:ss, even with the test-sized timeLeft above (once read "16666666:36").
+const clk = await page.evaluate(() => { const F = window.__ff; F.forceGoal(0); for (let i = 0; i < 5; i++) { F.step(1); } return { shown: document.getElementById("clock").textContent, f: [ F.fmtClock(1e9, 180), F.fmtClock(NaN, 180), F.fmtClock(-5, 180), F.fmtClock(95.2, 180), F.fmtClock(1e12) ] }; });
+check("score bug clock stays mm:ss within the match length", /^\d{2}:\d{2}$/.test(clk.shown) && clk.f.join() === "03:00,00:00,00:00,01:36,99:59", JSON.stringify(clk));
 await browser.close(); server.stop();
 process.exit(done() ? 1 : 0);

@@ -40,7 +40,7 @@
 		freeze = 0;
 		if (saved && Array.isArray(saved.score) && typeof saved.timeLeft === "number" && saved.timeLeft > 0) {
 			score = saved.score.slice(0, 2).map(Number);
-			timeLeft = saved.timeLeft;
+			timeLeft = Math.min(saved.timeLeft, matchLen);
 			freeze = KICKOFF_FREEZE;
 			state = "paused";
 			showOverlay("Paused", "Your match is where you left it.", "Resume");
@@ -97,6 +97,7 @@
 			olaTest () { crowdMood.olaT = 15; crowdMood.olaLast = performance.now(); },
 			raiseFlagTest (kind) { raiseFlag(ball.x, kind === "offside" ? "off" : "out"); flagCall.t = 600; },
 			step (n = 1) { for (let i = 0; i < n; i++) { snapshotPrev(); update(); } },
+			fmtClock,
 			key (code, on) { if (on) { keys.add(code); } else { keys.delete(code); } },
 			press (code) { window.dispatchEvent(new KeyboardEvent("keydown", { code })); },
 			release (code) { window.dispatchEvent(new KeyboardEvent("keyup", { code })); },

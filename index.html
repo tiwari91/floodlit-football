@@ -2352,7 +2352,13 @@
 		lastMood = "";
 		lastHud = "";
 	}
-
+	// The match clock as mm:ss, always sane: NaN, negative or test-sized values never reach the score bug.
+	function fmtClock (secs, cap) {
+		let t = Math.ceil(Number(secs));
+		if (!Number.isFinite(t) || t < 0) { t = 0; }
+		t = Math.min(t, Number.isFinite(cap) && cap > 0 ? Math.ceil(cap) : 5999);
+		return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+	}
 	/* ---------- league ---------- */
 	function roundRobin (ids) {
 		const a = ids.slice(), n = a.length, rounds = [];
@@ -7792,8 +7798,7 @@
 		if (Array.isArray(v.subs)) { for (const [ i, n ] of v.subs) { const p = find(0, i), pl = subPool().find(q => q.name === n); if (p && pl) { makeSub(p, pl, true); } } }
 		kickoff(lastConceded);
 		state = "paused";
-		const t = Math.ceil(timeLeft);
-		showOverlay("Welcome back", `Your match is where you left it: ${leftIsYou ? score[0] : score[1]}–${leftIsYou ? score[1] : score[0]}, ${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")} to play.`, "Resume");
+		showOverlay("Welcome back", `Your match is where you left it: ${leftIsYou ? score[0] : score[1]}–${leftIsYou ? score[1] : score[0]}, ${fmtClock(timeLeft, matchLen).replace(/^0(?=\d:)/, "")} to play.`, "Resume");
 		pauseBtn.textContent = "Resume";
 		lastHud = "";
 		return true;
@@ -8119,8 +8124,7 @@
 		const cooling = !!p && p.lungeCd > 0;
 		if (cooling !== lastCooling) { lastCooling = cooling; padTackle.classList.toggle("cooling", cooling); }
 
-		const t = Math.ceil(timeLeft);
-		const clock = shoot ? `C ${Math.min(shoot.n + 1, shoot.total)}/${shoot.total}` : `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+		const clock = shoot ? `C ${Math.min(shoot.n + 1, shoot.total)}/${shoot.total}` : fmtClock(timeLeft, matchLen);
 		const narrow = window.innerWidth <= 640;
 		const key = `${score[0]}|${score[1]}|${clock}|${narrow}`;
 		if (key === lastHud) { return; }
@@ -13558,7 +13562,7 @@
 		freeze = 0;
 		if (saved && Array.isArray(saved.score) && typeof saved.timeLeft === "number" && saved.timeLeft > 0) {
 			score = saved.score.slice(0, 2).map(Number);
-			timeLeft = saved.timeLeft;
+			timeLeft = Math.min(saved.timeLeft, matchLen);
 			freeze = KICKOFF_FREEZE;
 			state = "paused";
 			showOverlay("Paused", "Your match is where you left it.", "Resume");
@@ -13615,6 +13619,7 @@
 			olaTest () { crowdMood.olaT = 15; crowdMood.olaLast = performance.now(); },
 			raiseFlagTest (kind) { raiseFlag(ball.x, kind === "offside" ? "off" : "out"); flagCall.t = 600; },
 			step (n = 1) { for (let i = 0; i < n; i++) { snapshotPrev(); update(); } },
+			fmtClock,
 			key (code, on) { if (on) { keys.add(code); } else { keys.delete(code); } },
 			press (code) { window.dispatchEvent(new KeyboardEvent("keydown", { code })); },
 			release (code) { window.dispatchEvent(new KeyboardEvent("keyup", { code })); },

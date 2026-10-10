@@ -59,4 +59,10 @@
 		lastMood = "";
 		lastHud = "";
 	}
-
+	// The match clock as mm:ss, always sane: NaN, negative or test-sized values never reach the score bug.
+	function fmtClock (secs, cap) {
+		let t = Math.ceil(Number(secs));
+		if (!Number.isFinite(t) || t < 0) { t = 0; }
+		t = Math.min(t, Number.isFinite(cap) && cap > 0 ? Math.ceil(cap) : 5999);
+		return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+	}

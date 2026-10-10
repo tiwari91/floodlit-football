@@ -40,8 +40,7 @@
 		if (Array.isArray(v.subs)) { for (const [ i, n ] of v.subs) { const p = find(0, i), pl = subPool().find(q => q.name === n); if (p && pl) { makeSub(p, pl, true); } } }
 		kickoff(lastConceded);
 		state = "paused";
-		const t = Math.ceil(timeLeft);
-		showOverlay("Welcome back", `Your match is where you left it: ${leftIsYou ? score[0] : score[1]}–${leftIsYou ? score[1] : score[0]}, ${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")} to play.`, "Resume");
+		showOverlay("Welcome back", `Your match is where you left it: ${leftIsYou ? score[0] : score[1]}–${leftIsYou ? score[1] : score[0]}, ${fmtClock(timeLeft, matchLen).replace(/^0(?=\d:)/, "")} to play.`, "Resume");
 		pauseBtn.textContent = "Resume";
 		lastHud = "";
 		return true;
@@ -367,8 +366,7 @@
 		const cooling = !!p && p.lungeCd > 0;
 		if (cooling !== lastCooling) { lastCooling = cooling; padTackle.classList.toggle("cooling", cooling); }
 
-		const t = Math.ceil(timeLeft);
-		const clock = shoot ? `C ${Math.min(shoot.n + 1, shoot.total)}/${shoot.total}` : `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+		const clock = shoot ? `C ${Math.min(shoot.n + 1, shoot.total)}/${shoot.total}` : fmtClock(timeLeft, matchLen);
 		const narrow = window.innerWidth <= 640;
 		const key = `${score[0]}|${score[1]}|${clock}|${narrow}`;
 		if (key === lastHud) { return; }
