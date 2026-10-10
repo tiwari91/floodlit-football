@@ -89,5 +89,8 @@ check("same scorer: first goal plain, then Brace, then Hat-trick", caps.length =
 // The score bug clock is always a sane mm:ss, even with the test-sized timeLeft above (once read "16666666:36").
 const clk = await page.evaluate(() => { const F = window.__ff; F.forceGoal(0); for (let i = 0; i < 5; i++) { F.step(1); } return { shown: document.getElementById("clock").textContent, f: [ F.fmtClock(1e9, 180), F.fmtClock(NaN, 180), F.fmtClock(-5, 180), F.fmtClock(95.2, 180), F.fmtClock(1e12) ] }; });
 check("score bug clock stays mm:ss within the match length", /^\d{2}:\d{2}$/.test(clk.shown) && clk.f.join() === "03:00,00:00,00:00,01:36,99:59", JSON.stringify(clk));
+// The first-match coach mark showed once (ff-coach stored) and "Got it" dismisses it.
+const coach = await page.evaluate(() => { const el = document.getElementById("coachMark"), stored = localStorage.getItem("ff-coach"); el.hidden = false; document.getElementById("coachClose").click(); return { stored, hidden: el.hidden }; });
+check("first-match coach mark is stored as shown and dismissable", coach.stored === "1" && coach.hidden === true, JSON.stringify(coach));
 await browser.close(); server.stop();
 process.exit(done() ? 1 : 0);

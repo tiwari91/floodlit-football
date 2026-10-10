@@ -46,6 +46,19 @@
 		return true;
 	}
 
+	// The first match's coach mark: the three keys that matter, shown once (ff-coach), on a keyboard only.
+	let coachTimer = 0;
+	function hideCoachMark () { const el = $("coachMark"); if (el) { el.hidden = true; } clearTimeout(coachTimer); }
+	function showCoachMark () {
+		const el = $("coachMark");
+		let touch = false; try { touch = window.matchMedia("(pointer: coarse)").matches; } catch (e) { touch = false; }
+		if (!el || touch || store.get("ff-coach") === "1") { return; }
+		store.set("ff-coach", "1");
+		el.hidden = false;
+		coachTimer = setTimeout(hideCoachMark, 15000);
+	}
+	$("coachClose").addEventListener("click", e => { hideCoachMark(); e.currentTarget.blur(); canvas.focus?.(); });
+	window.addEventListener("keydown", e => { if ((e.code === "KeyD" || e.code === "KeyS") && !$("coachMark").hidden) { clearTimeout(coachTimer); coachTimer = setTimeout(hideCoachMark, 1200); } });
 	function startPlay () {
 		ensureAudio();
 		if (audio && audio.state === "suspended") { audio.resume(); }
@@ -60,7 +73,7 @@
 			freeze = KICKOFF_FREEZE;
 			if (mode === "corners") { startShootout(); return; }
 			showLineups();
-			if (mode !== "tutorial") { store.set("ff-played", String(playedCount() + 1)); }
+			if (mode !== "tutorial") { store.set("ff-played", String(playedCount() + 1)); showCoachMark(); }
 		}
 		if (state === "half") { toast("Second half: teams change ends", "#eef6ea"); }
 		if ((state === "intro" || state === "full" || state === "half") && mode !== "tutorial") { introSweep = { on: true }; }

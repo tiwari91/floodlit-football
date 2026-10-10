@@ -1124,3 +1124,15 @@
 	@media (prefers-reduced-motion: reduce) {
 		.banner { animation: none; }
 	}
+
+/* First-match coach mark: one line over the pitch, shown once, gone on a click, a shot or a pass. */
+.coachmark {
+	position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); z-index: 4;
+	display: flex; align-items: center; gap: 14px; padding: 10px 10px 10px 16px;
+	background: rgba(10, 14, 20, 0.9); border: 1px solid rgba(242, 181, 46, 0.55); border-radius: 6px;
+	box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4); color: #f4f6f2; font: 600 15px Barlow, Arial, sans-serif;
+	white-space: nowrap; pointer-events: none;
+}
+.coachmark[hidden] { display: none; }
+.coachmark kbd { display: inline-block; min-width: 20px; padding: 1px 6px; margin: 0 2px; border-radius: 3px; background: #f4f6f2; color: #10161c; font: 700 13px Barlow, Arial, sans-serif; text-align: center; }
+.coachmark button { pointer-events: auto; padding: 5px 12px; font-size: 13px; }
