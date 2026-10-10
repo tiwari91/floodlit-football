@@ -29,6 +29,9 @@
 		if (bulkSim || mode === "tutorial") { return; }
 		const b = $("bcBoard");
 		b.replaceChildren(...rows.map(([ lbl, cls, txt ]) => { const r = el("div", "row"); r.append(el("span", "led " + cls, txt), el("span", "lbl", lbl)); return r; }));
+		// Under the canvas's weather and tactic tags (they end 88 view units down), in CSS pixels.
+		const ch = canvas.getBoundingClientRect().height;
+		b.style.top = ch && SH ? `${Math.round(96 * ch / SH)}px` : "";
 		b.hidden = false;
 		b.style.animation = "none"; void b.offsetWidth; b.style.animation = "";
 		clearTimeout(bcBoardT);

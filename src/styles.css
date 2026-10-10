@@ -138,7 +138,7 @@
 	.bc-col li { display: flex; gap: 8px; white-space: nowrap; overflow: hidden; }
 	.bc-col li b { flex: 0 0 20px; text-align: right; color: var(--muted); }
 	.bc-col li span { overflow: hidden; text-overflow: ellipsis; }
-	.bc-board { position: absolute; top: 84px; right: 10px; z-index: 3; pointer-events: none; display: grid; gap: 3px; padding: 6px 8px; border-radius: 6px; background: #121614;
+	.bc-board { position: absolute; top: 96px; right: 10px; z-index: 3; pointer-events: none; display: grid; gap: 3px; padding: 6px 8px; border-radius: 6px; background: #121614;
 		border: 2px solid #2b322e; font-family: var(--display); filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.5)); animation: ltIn 0.35s ease-out; }
 	.bc-board .row { display: flex; align-items: center; gap: 8px; }
 	.bc-board .lbl { font-size: 10px; font-weight: 800; letter-spacing: 0.12em; color: #9aa69f; text-transform: uppercase; }
@@ -161,7 +161,7 @@
 		.bc-team { font-size: 13px; }
 		.bc-col { padding: 6px 8px 8px; }
 		.bc-col ol { font-size: 11px; line-height: 1.25; }
-		.bc-board { top: 90px; }
+		.bc-board { top: 96px; }
 		.bc-board .led { font-size: 24px; min-width: 38px; }
 		.bc-tk-tag { font-size: 10px; padding: 0 6px; }
 	}
@@ -436,15 +436,15 @@
 	.cmp-head { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: baseline; padding-bottom: 4px; border-bottom: 1px solid var(--rule); font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
 	.cmp-head .you { text-align: left; color: var(--amber); }
 	.cmp-head .them { text-align: right; color: var(--opp-text); }
-	.cmp-row { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: center; }
-	.cmp-row b { font-family: var(--display); font-weight: 800; font-size: 20px; line-height: 1.2; color: var(--text); font-variant-numeric: tabular-nums; text-align: left; opacity: 0.8; }
-	.cmp-row b.them { text-align: right; }
-	.cmp-row b.lead { opacity: 1; color: var(--chalk); }
-	.cmp-row span { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
-	.cmp-row.poss b { font-size: 24px; }
+	.stats.cmp .cmp-row { display: grid; justify-items: stretch; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: center; }
+	.stats.cmp .cmp-row b { font-family: var(--display); font-weight: 800; font-size: 20px; line-height: 1.2; color: var(--text); font-variant-numeric: tabular-nums; text-align: left; opacity: 0.8; }
+	.stats.cmp .cmp-row b.them { text-align: right; }
+	.stats.cmp .cmp-row b.lead { opacity: 1; color: var(--chalk); }
+	.stats.cmp .cmp-row span { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+	.stats.cmp .cmp-row.poss b { font-size: 24px; }
 	.cmp-bar { grid-column: 1 / -1; display: block; height: 6px; margin-bottom: 4px; border-radius: 3px; background: var(--opp); overflow: hidden; }
 	.cmp-bar em { display: block; height: 100%; background: var(--amber); border-radius: 3px 0 0 3px; }
-	@media (max-height: 560px), (max-width: 440px) { .cmp-row b { font-size: 17px; } .cmp-row.poss b { font-size: 20px; } .cmp-row span { font-size: 10px; } }
+	@media (max-height: 560px), (max-width: 440px) { .stats.cmp .cmp-row b { font-size: 17px; } .stats.cmp .cmp-row.poss b { font-size: 20px; } .stats.cmp .cmp-row span { font-size: 10px; } }
 
 	.stats b {
 		font-family: var(--display);
@@ -492,6 +492,9 @@
 		from { transform: translate(-50%, -50%) scale(0.6); opacity: 0; }
 		to { transform: translate(-50%, -50%) scale(1); opacity: 1; }
 	}
+	/* A goal banner pops, holds, then clears so the celebration underneath can be seen. */
+	.banner.goal { animation: pop 0.5s ease-out, bannerout 0.5s ease-in 1.9s forwards; }
+	@keyframes bannerout { to { transform: translate(-50%, -80%) scale(0.85); opacity: 0; } }
 
 	/* Mode switch: the page's first decision. */
 	.modes {
@@ -1123,6 +1126,8 @@
 
 	@media (prefers-reduced-motion: reduce) {
 		.banner { animation: none; }
+		.banner.goal { animation: bannerhide 0s linear 2.4s forwards; }
+		@keyframes bannerhide { to { opacity: 0; } }
 	}
 
 /* First-match coach mark: one line over the pitch, shown once, gone on a click, a shot or a pass. */
@@ -1133,6 +1138,6 @@
 	box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4); color: #f4f6f2; font: 600 15px Barlow, Arial, sans-serif;
 	white-space: nowrap; pointer-events: none;
 }
-.coachmark[hidden] { display: none; }
+.coachmark[hidden], .pitchwrap:has(.overlay:not([hidden])) .coachmark { display: none; }
 .coachmark kbd { display: inline-block; min-width: 20px; padding: 1px 6px; margin: 0 2px; border-radius: 3px; background: #f4f6f2; color: #10161c; font: 700 13px Barlow, Arial, sans-serif; text-align: center; }
 .coachmark button { pointer-events: auto; padding: 5px 12px; font-size: 13px; }

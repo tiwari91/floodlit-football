@@ -83,6 +83,34 @@ const bulk = await page.evaluate(() => { const F = window.__ff; F.tlcLast = -1e9
 check("a simulated match never shows the touchline cam", bulk === null, JSON.stringify(bulk));
 const nmg = await page.evaluate(() => { const F = window.__ff; F.state === "play" || (F.state = "play"); F.freeze = 0; F.tlcLast = -1e9; F.benchReact("near", { team: 0 }); const had = !!F.tlc; F.forceGoal(0); for (let i = 0; i < 60 && F.state !== "goal"; i++) { F.step(1); } return { had, state: F.state, cleared: F.tlc === null }; });
 check("a near-miss cutaway is cleared when a goal follows", nmg.had ? nmg.state === "goal" && nmg.cleared : true, JSON.stringify(nmg));
+// Goal banner clears after about two seconds; the officials' board sits under the canvas tags;
+// the half-time comparison fits without scrolling and its possession bar has width.
+const ov = await page.evaluate(async () => {
+	const F = window.__ff, wait = ms => new Promise(r => setTimeout(r, ms)), bn = document.getElementById("banner");
+	F.state === "play" || (F.state = "play"); F.freeze = 0; F.forceGoal(1);
+	for (let i = 0; i < 60 && F.state !== "goal"; i++) { F.step(1); }
+	const cls = bn.className;
+	await wait(400);
+	const early = +getComputedStyle(bn).opacity;
+	await wait(2300);
+	const gone = bn.hidden || +getComputedStyle(bn).opacity < 0.05;
+	F.board([ [ "Added time", "add", "+3" ] ], 3000);
+	const cv = document.querySelector(".pitchwrap canvas").getBoundingClientRect(), bd = document.getElementById("bcBoard").getBoundingClientRect();
+	const tagBottom = 88 * cv.height / (document.querySelector(".pitchwrap canvas").height / F.scale);
+	return { cls, early, gone, boardTop: bd.top - cv.top, tagBottom };
+});
+check("a goal banner shows, then clears within ~2.7 s so the celebration is visible", /\bgoal\b/.test(ov.cls) && ov.early > 0.5 && ov.gone, JSON.stringify(ov));
+check("the officials' board sits below the weather and tactic tags", ov.boardTop >= ov.tagBottom, JSON.stringify(ov));
+const ht = await page.evaluate(async () => {
+	const F = window.__ff; F.halfTime(); await new Promise(r => setTimeout(r, 600));
+	const cb = document.querySelector(".overlay:not([hidden]) .card-body"), bar = document.querySelector(".cmp-bar"), b = document.querySelector(".cmp-row b");
+	const rows = [ ...document.querySelectorAll(".cmp-row") ].map(r => r.getBoundingClientRect()), cbr = cb.getBoundingClientRect();
+	const cm = document.getElementById("coachMark"); cm.hidden = false;
+	const coachOver = getComputedStyle(cm).display !== "none"; cm.hidden = true;
+	return { coachOver, numPx: parseFloat(getComputedStyle(b).fontSize), barW: bar ? bar.getBoundingClientRect().width : 0, lastRowIn: rows.length ? rows[rows.length - 1].bottom <= cbr.bottom + 1 : false, n: rows.length };
+});
+check("the first-match coach mark never covers a card's buttons", !ht.coachOver, JSON.stringify(ht));
+check("half-time stats: numbers at the table's size, a visible possession bar, every row in view", ht.numPx <= 24 && ht.barW > 100 && ht.lastRowIn, JSON.stringify(ht));
 await ctx.close();
 
 check("no console errors", errs.length === 0, errs.join(" | "));

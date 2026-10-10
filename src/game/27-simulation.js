@@ -754,7 +754,7 @@
 			const by = ball.lastBy, own = by && by.team !== scorer, who = own ? by : hero;
 			caption(own ? "Own goal" : "Goal", "goal", (who && who.name) || (scorer === 0 ? "You" : opp.short), `${own ? "Own goal" : ball.headed ? "Header" : scorer === 0 ? "You" : opp.short} · ${minuteNow()}'${(() => { const n = scorer === 0 && !own && who && who.name ? matchGoals.filter(g => g === who.name).length : 0; return n === 2 ? " · Brace" : n === 3 ? " · Hat-trick" : n > 3 ? ` · ${n} goals` : ""; })()}`, own ? by.team : scorer);
 		}
-		banner.className = "banner " + (scorer === 0 ? "home" : "away");
+		banner.className = "banner goal " + (scorer === 0 ? "home" : "away");
 		banner.hidden = false;
 		$("announce").textContent = `${scorer === 0 ? "Goal for you" : `Goal for ${opp.name}`}. ${score[0]} to ${score[1]}.`;
 		sfx("whistle");
