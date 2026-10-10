@@ -218,7 +218,8 @@
 					else if (vPat > 1.5 && vPat < 2.5) { km = step(0.0, sin(vKp.y * 1.7)); }
 					else if (vPat > 2.5 && vPat < 3.5) { km = step(0.0, vKp.z); }
 					else if (vPat > 3.5) { km = 1.0 - step(1.5, abs(vKp.y - 4.7 + vKp.z * 0.95)); }
-					diffuseColor.rgb = mix(diffuseColor.rgb, vCol2, km);`);
+					diffuseColor.rgb = mix(diffuseColor.rgb, vCol2, km);
+					diffuseColor.rgb *= 0.8 + 0.2 * smoothstep(-0.6, 6.8, vKp.y);   // cloth in shade toward the hem, under the chest`);
 		};
 		shirtMat.customProgramCacheKey = () => "ff-shirt";
 		// Faces: an atlas of eight, painted once (eyes, brows, a nose, a mouth, stubble or a beard on
