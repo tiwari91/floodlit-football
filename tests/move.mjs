@@ -103,6 +103,8 @@ const feel = await page.evaluate(() => new Promise(res => {
 		const st = F.G3 && F.G3.fig && F.G3.fig.yawSt;
 		for (const p of F.players) {
 			const y = st && st.get(p) ? st.get(p).yaw : null;
+			const acting = p.kickA > 0 || p.slideAI > 0 || p.lunge > 0 || p.dive > 0 || p.fall > 0 || p.throwA > 0 || (p.z || 0) > 0 || p.jump > 0;   // actions snap to the play on purpose
+			if (acting) { prev.delete(p); continue; }
 			if (y !== null && prev.has(p) && dts > 0) { const d = Math.abs(Math.atan2(Math.sin(y - prev.get(p)), Math.cos(y - prev.get(p)))); if (d < 1.5) { max = Math.max(max, d / dts); } else { snaps++; } }
 			if (y !== null) { prev.set(p, y); }
 		}
@@ -118,7 +120,7 @@ const aim = await page.evaluate(() => new Promise(res => {
 	const F = window.__ff, prevK = new Map(), errs = []; let n = 0;
 	const tick = () => {
 		const st = F.G3.fig.yawSt;
-		for (const p of F.players) { const k = p.kickA || 0, was = prevK.get(p) || 0; prevK.set(p, k); if (k > was && st.get(p)) { const d = p.dir - st.get(p).yaw; errs.push(Math.abs(Math.atan2(Math.sin(d), Math.cos(d)))); } }
+		for (const p of F.players) { const k = p.kickA || 0, was = prevK.get(p) || 0; prevK.set(p, k); if (k > 0 && was > 0 && st.get(p)) { const d = p.dir - st.get(p).yaw; errs.push(Math.abs(Math.atan2(Math.sin(d), Math.cos(d)))); } }
 		if (++n < 600) { requestAnimationFrame(tick); } else { errs.sort((a, b) => a - b); res({ kicks: errs.length, med: errs.length ? errs[errs.length >> 1] : 0 }); }
 	};
 	requestAnimationFrame(tick);
