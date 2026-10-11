@@ -127,5 +127,14 @@ const aim = await page.evaluate(() => new Promise(res => {
 }));
 check("kicking, the drawn body faces where the ball goes (the turn smoothing steps aside)", aim.med < 0.3, JSON.stringify(aim));
 check("players run in their own styles, and the 3D ball stays between true size and gantry size", feel.styles >= 8 && feel.ballR >= 2.4 && feel.ballR <= 5, JSON.stringify(feel));
+// Matchday dressing: the home ends get a banner and waving flags; a home goal throws ticker tape.
+const dress = await page.evaluate(async () => {
+	const F = window.__ff, G = F.G3; const flags = G.endFlags ? G.endFlags.length : 0, banners = G.endBanners ? G.endBanners.length : 0;
+	const a0 = G.endFlags && G.endFlags[0] ? G.endFlags[0].cloth.geometry.attributes.position.array.at(-1) : 0;
+	await new Promise(r => setTimeout(r, 300));
+	const a1 = G.endFlags && G.endFlags[0] ? G.endFlags[0].cloth.geometry.attributes.position.array.at(-1) : 0;
+	return { flags, banners, waves: a0 !== a1, drawMs: +F.drawMs.toFixed(2) };
+});
+check("home ends dressed: banners and big flags that wave", dress.banners >= 1 && dress.flags >= 3 && dress.waves, JSON.stringify(dress));
 await browser.close(); server.stop();
 process.exit(done() ? 1 : 0);

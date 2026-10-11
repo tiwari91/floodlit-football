@@ -165,6 +165,7 @@
 		const rnd = () => (h = (h * 48271) % 2147483647) / 2147483647;
 		const lists = { full: [], lite: [], near: [], hi: [], nearHi: [] };
 		const fill = clamp(gs.fill * GQ.fill, 0.2, 1);
+		const endRows = [ [], [] ];
 		B.rows.forEach((row, i) => {
 			const dS = row.d + row.rd * 0.66, ring = B.ring(dS), y = row.h + 1.5;
 			for (let j = 0; j < B.N; j++) {
@@ -183,6 +184,10 @@
 						: end ? (q < 0.88 ? (i % 2 ? homeC2 : homeC) : neutrals[Math.floor(rnd() * neutrals.length)])
 						: q < 0.55 ? homeC : q < 0.65 ? homeC2 : neutrals[Math.floor(rnd() * neutrals.length)];
 					const side = away ? 0 : color === homeC || color === homeC2 ? 1 : 0.5;
+					if (end) {   // the home ends' extents, for their banners and big flags
+						const e = endRows[x < FW / 2 ? 0 : 1], r = e[i] || (e[i] = { x: 0, y, zMin: 1e9, zMax: -1e9, n: 0 });
+						r.x += x; r.n++; r.zMin = Math.min(r.zMin, z); r.zMax = Math.max(r.zMax, z);
+					}
 					const fan = { x, y, z, ry: Math.atan2(-nx, -nz) + (rnd() - 0.5) * 0.3, side, phase: rnd(), stand: end ? 0.75 + rnd() * 0.25 : rnd(), flag: rnd() < (end ? 0.2 : away ? 0.14 : 0.1) ? 1 : 0, skin: skins[Math.floor(rnd() * skins.length)], color, scale: 1.5 + rnd() * 0.2, wide: 0.88 + rnd() * 0.26, tall: 0.9 + rnd() * 0.2 };
 					lists[nearSide ? (i < GQ.nearHiRows ? "nearHi" : "near") : i < GQ.hiRows && !away ? "hi" : i >= GQ.liteRow ? "lite" : "full"].push(fan);
 				}
@@ -209,6 +214,105 @@
 		};
 		G3.crowd = { full: make(lists.full, "full"), lite: make(lists.lite, "lite"), near: make(lists.near, "full"), hi: make(lists.hi, "hi"), nearHi: make(lists.nearHi, "hi") };
 		G3.crowd.count = Object.values(lists).reduce((n, l) => n + l.length, 0);
+		dressEnds3D(st, endRows, homeC, homeC2);
+	}
+	// The home ends on a matchday: a supporters' banner with the club's name along the front, big flags
+	// on poles waving over the middle rows, and ticker tape thrown when the home side scores.
+	function dressEnds3D (st, endRows, c1, c2) {
+		const T = THREE;
+		G3.endFlags = null; G3.tape = null; G3.endBanners = null;
+		const ends = endRows.map(rows => rows.filter(Boolean).filter(r => r.n > 4)).filter(rows => rows.length >= 2);
+		if (!ends.length) { return; }
+		const club = (leagueMatch ? (leagueMatch.home ? YOU : TEAMS[leagueMatch.opp]) : YOU) || {};
+		const ink = lum(c1) < 0.45 ? "#ffffff" : "#0b0f12";
+		// The banner: one cloth texture, the club's name between stripes in its colours.
+		const bc = document.createElement("canvas"); bc.width = 1024; bc.height = 64;
+		const bg = bc.getContext && bc.getContext("2d");
+		if (bg && bg.fillText) {
+			bg.fillStyle = c1; bg.fillRect(0, 0, 1024, 64);
+			bg.fillStyle = c2; bg.fillRect(0, 0, 1024, 7); bg.fillRect(0, 57, 1024, 7);
+			bg.font = "900 40px 'Big Shoulders Display', 'Arial Narrow', Arial, sans-serif"; bg.textAlign = "center"; bg.textBaseline = "middle"; bg.fillStyle = ink;
+			bg.fillText(`${String(club.name || "HOME").toUpperCase()}  ·  ALWAYS WITH YOU`, 512, 34);
+		}
+		const bannerMat = new T.MeshLambertMaterial({ map: canvasTex3D(bc), side: T.DoubleSide });
+		// The big flags: halves in the two club colours.
+		const fc = document.createElement("canvas"); fc.width = 64; fc.height = 32;
+		const fg = fc.getContext && fc.getContext("2d");
+		if (fg) { fg.fillStyle = c1; fg.fillRect(0, 0, 64, 32); fg.fillStyle = c2; fg.fillRect(0, 11, 64, 10); }
+		const flagMat = new T.MeshLambertMaterial({ map: canvasTex3D(fc), side: T.DoubleSide });
+		const poleMat = new T.MeshLambertMaterial({ color: 0x2a2d31 });
+		const flags = [], banners = [];
+		let first = true;
+		for (const rows of ends) {
+			// The banner is draped over the front rows, above the advertising boards (16 high), facing the pitch.
+			const front = rows.find(r => r.y > 20) || rows[Math.min(2, rows.length - 1)], mid = rows[Math.min(rows.length - 1, Math.floor(rows.length * 0.55))];
+			const r0 = rows[0], fx = r0.x / r0.n, toPitch = fx < FW / 2 ? 1 : -1, span = front.zMax - front.zMin, bw = span * 0.72, bh = Math.min(26, bw / 20);   // held up at the very front, clear of every fan
+			const banner = new T.Mesh(new T.PlaneGeometry(bw, bh), bannerMat);
+			banner.userData.ownGeo = true; banner.userData.ownMat = first; first = false;
+			banner.rotation.y = toPitch > 0 ? Math.PI / 2 : -Math.PI / 2;
+			banner.position.set(fx + toPitch * 2, 16 + bh / 2 + 2, (front.zMin + front.zMax) / 2);
+			st.add(banner); banners.push({ mesh: banner, x: banner.position.x, toPitch });
+			const mx = mid.x / mid.n;
+			for (let k = 0; k < 3; k++) {
+				const z = mid.zMin + (mid.zMax - mid.zMin) * (0.22 + 0.28 * k), base = mid.y + 2;
+				const pole = new T.Mesh(G3.geo.box, poleMat); pole.scale.set(0.6, 30, 0.6); pole.position.set(mx, base + 15, z); st.add(pole);
+				const geo = new T.PlaneGeometry(26, 15, 10, 4); geo.translate(13, 0, 0);
+				const cloth = new T.Mesh(geo, flagMat); cloth.userData.ownGeo = true;
+				cloth.position.set(mx, base + 22, z); cloth.rotation.y = toPitch > 0 ? -Math.PI / 2 : Math.PI / 2;   // flying along the stand, face to the pitch
+				st.add(cloth);
+				flags.push({ cloth, ry: cloth.rotation.y, rest: Float32Array.from(geo.attributes.position.array), ph: k * 1.7 + (toPitch > 0 ? 0 : 0.9) });
+			}
+		}
+		const holder = new T.Object3D(); holder.userData.ownMat = true; holder.material = flagMat; st.add(holder);   // dispose the shared materials with the stadium
+		const holder2 = new T.Object3D(); holder2.userData.ownMat = true; holder2.material = poleMat; st.add(holder2);
+		G3.endFlags = flags; G3.endBanners = banners;
+		// Ticker tape: one points cloud per stadium, launched from the home ends when the home side scores.
+		const NT = 1400, pos = new Float32Array(NT * 3), col = new Float32Array(NT * 3), C1 = new T.Color(c1), C2 = new T.Color(c2), W = new T.Color("#ffffff");
+		for (let i = 0; i < NT; i++) { const c = i % 3 === 0 ? C1 : i % 3 === 1 ? C2 : W; col.set([ c.r, c.g, c.b ], i * 3); pos[i * 3 + 1] = -500; }
+		const tg = new T.BufferGeometry(); tg.setAttribute("position", new T.BufferAttribute(pos, 3)); tg.setAttribute("color", new T.BufferAttribute(col, 3));
+		const tape = new T.Points(tg, new T.PointsMaterial({ size: 5, vertexColors: true, sizeAttenuation: true, transparent: true, opacity: 0.95, depthWrite: false }));
+		tape.userData.ownGeo = true; tape.userData.ownMat = true; tape.frustumCulled = false; tape.visible = false;
+		st.add(tape);
+		G3.tape = { pts: tape, vel: new Float32Array(NT * 3), t: 0, ends: ends.map(rows => { const r = rows[Math.floor(rows.length * 0.4)]; return { x: r.x / r.n, y: r.y, z0: r.zMin, z1: r.zMax, dir: r.x / r.n < FW / 2 ? 1 : -1 }; }) };
+	}
+	// Each frame: the flags wave (harder when the home end is up), the ticker tape flutters down.
+	function animateEnds3D (k) {
+		const now = performance.now() / 1000, m = crowdMood;
+		// A camera behind a banner (in that end, for a replay) would see its back: hide it then.
+		if (G3.endBanners && G3.cam) { for (const b of G3.endBanners) { b.mesh.visible = (G3.cam.position.x - b.x) * b.toPitch > 0; } }
+		if (G3.endFlags && !reduceMotion) {
+			const amp = 1.2 + 2.2 * clamp(m.excite + Math.max(0, m.home), 0, 1.5);
+			for (const f of G3.endFlags) {
+				const p = f.cloth.geometry.attributes.position, a = p.array, r = f.rest;
+				for (let v = 0; v < a.length; v += 3) { const u = r[v] / 26; a[v + 2] = Math.sin(now * 3.1 + f.ph - r[v] * 0.32) * amp * u + Math.sin(now * 1.7 + r[v + 1] * 0.2) * 0.6 * u; }
+				p.needsUpdate = true;
+				f.cloth.rotation.z = Math.sin(now * 0.9 + f.ph) * 0.06; f.cloth.rotation.y = f.ry + Math.sin(now * 0.7 + f.ph * 2) * 0.35;   // swung round the pole
+			}
+		}
+		const tp = G3.tape;
+		if (!tp || !(tp.t > 0)) { return; }
+		tp.t -= k;
+		const a = tp.pts.geometry.attributes.position.array, vel = tp.vel;
+		for (let i = 0; i < a.length; i += 3) {
+			vel[i + 1] = Math.max(vel[i + 1] - 60 * k, -9);
+			a[i] += (vel[i] + Math.sin(now * 4 + i) * 6) * k; a[i + 1] += vel[i + 1] * k; a[i + 2] += (vel[i + 2] + Math.cos(now * 3.3 + i) * 6) * k;
+			if (a[i + 1] < 0.3) { a[i + 1] = 0.3; vel[i] = vel[i + 2] = 0; }
+		}
+		tp.pts.geometry.attributes.position.needsUpdate = true;
+		tp.pts.material.opacity = clamp(tp.t / 1.5, 0, 0.95);
+		if (tp.t <= 0) { tp.pts.visible = false; }
+	}
+	function throwTape3D () {
+		const tp = G3.tape;
+		if (!tp || reduceMotion || bulkSim) { return; }
+		const a = tp.pts.geometry.attributes.position.array, vel = tp.vel, n = a.length / 3;
+		for (let i = 0; i < n; i++) {
+			const e = tp.ends[i % tp.ends.length], r = Math.random;
+			a[i * 3] = e.x + (r() - 0.5) * 20; a[i * 3 + 1] = e.y + 4 + r() * 10; a[i * 3 + 2] = e.z0 + (e.z1 - e.z0) * r();
+			vel[i * 3] = e.dir * (12 + r() * 30); vel[i * 3 + 1] = 25 + r() * 45; vel[i * 3 + 2] = (r() - 0.5) * 20;
+		}
+		tp.pts.geometry.attributes.position.needsUpdate = true;
+		tp.pts.visible = true; tp.t = 7;
 	}
 	// The stands' moods: excitement follows the match's heat; goals, chances and fouls give jolts that fade.
 	function animateCrowd3D () {
@@ -227,6 +331,7 @@
 		if (m.olaT > 0) { m.olaT -= k; m.olaA = (m.olaA || 0) + k * 0.95; }
 		m.ola = (m.ola || 0) + ((m.olaT > 1.2 ? 1 : 0) - (m.ola || 0)) * Math.min(1, k * 1.6);
 		CROWD_U.uOla.value = reduceMotion ? 0 : m.ola;
+		animateEnds3D(k);
 		CROWD_U.uOlaA.value = m.olaA || 0;
 		const mid = CROWD_U.uMid.value; mid[0] = FW / 2; mid[1] = FH / 2; mid[2] = FW / 2 + 160; mid[3] = FH / 2 + 160;
 	}
@@ -241,7 +346,7 @@
 		const m = crowdMood, homeFans = homeSide;
 		if (kind === "goal") {
 			if (data) { staffReact("goal", { team: data.scorer }); }
-			if (data && data.scorer === homeFans) { m.home = 1; m.away = -1; m.wave = 1; } else { m.away = 1; m.home = -1; }
+			if (data && data.scorer === homeFans) { m.home = 1; m.away = -1; m.wave = 1; throwTape3D(); } else { m.away = 1; m.home = -1; }
 			m.ooh = 0;
 		} else if (kind === "near" || kind === "ooh") { m.ooh = 1; m.excite = Math.min(1, m.excite + 0.35); }
 		else if (kind === "roar") { if (!(data > 0.8)) { m.home = Math.max(m.home, 0.5 * (data || 0.5)); } }
