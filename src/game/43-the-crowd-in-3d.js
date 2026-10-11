@@ -392,6 +392,14 @@
 		if (replayOn()) { return replayShot(out); }
 		const sw = endsSwapped(), WX = x => (sw ? FW - x : x);
 		const o = ball.owner;
+		const boss = state === "goal" ? bossRun3D() : null;
+		if (boss) {
+			// The manager's run: cut to him from the pitch, low, with the near stand behind him.
+			out.kind = "boss";
+			out.eye.set(boss.x - (boss.vx || 0) * 18 + (boss.vx >= 0 ? -38 : 38), 24, boss.y - 92);
+			out.look.set(boss.x + (boss.vx || 0) * 8, 15, boss.y);
+			return out;
+		}
 		if (celebTracking()) {
 			// The celebration: a low camera out on the pitch, tracking the scorer with the fans behind him.
 			const h = celeb.hero, nearSide = h.y > FH / 2;
@@ -486,7 +494,7 @@
 		camera3D();
 		// The broadcast camera sits in the near stand, so that side of the ground (its seats, fans, roof
 		// and lights) is only drawn when the camera is out in front of it, looking back.
-		const showNear = G3.eye.z < FH + F_SIDE3 - 2 || G3.shot === "intro" || G3.shot.startsWith("replay");
+		const showNear = G3.eye.z < FH + F_SIDE3 - 2 || G3.shot === "intro" || G3.shot === "boss" || G3.shot.startsWith("replay");
 		G3.showNear = showNear;
 		if (G3.nearRoof) { for (const o of G3.nearRoof) { o.visible = showNear; } }
 		if (G3.nearStand) { G3.nearStand.visible = showNear; }

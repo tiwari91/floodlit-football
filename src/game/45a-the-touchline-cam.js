@@ -186,7 +186,12 @@
 	// A gesture for a while: "up" (arms raised), "head" (hands on head), "clap", "protest", "point".
 	function staffReact (kind, o = {}) {
 		const now = performance.now(), set = (t, g, ms) => { if (t === 0 || t === 1) { staff3[t].g = g; staff3[t].t = now + ms; } };
-		if (kind === "goal") { set(o.team, "up", 4200); set(1 - o.team, "head", 3200); staff3[o.team].up = now + 4200; }
+		if (kind === "goal") {
+			set(o.team, "up", 4200); set(1 - o.team, "head", 3200); staff3[o.team].up = now + 4200;
+			// Now and then the manager loses it, Mourinho at Old Trafford: out of his area and away down
+			// the touchline at full tilt, fists going, sliding on his knees at the end of it.
+			if ((o.force || Math.random() < 0.3) && !reduceMotion && !bulkSim) { staff3[o.team].sprint = { t0: now, dir: 0 }; staff3[o.team].g = ""; }
+		}
 		else if (kind === "near") { set(o.team, Math.random() < 0.6 ? "head" : "clap", 2200); }
 		else if (kind === "foul") { set(o.fouled, "protest", 2400); }
 	}
@@ -196,6 +201,11 @@
 		if (kind === "coach") { const c = kit.second && kit.second !== kit.outfield ? kit.second : "#1f2a36"; return { shirt: c, shorts: c, socks: c, second: kit.outfield, pattern: 0, ink: kit.outfield, gloves: null, sleeves: true, boots: "#15181a", ring: null }; }
 		const bib = t === 0 ? "#d6f03c" : "#ff7a1f";   // the substitutes' bibs over the kit
 		return { shirt: bib, shorts: kit.second || "#1f2a36", socks: kit.outfield, second: bib, pattern: 0, ink: bib, gloves: null, sleeves: true, boots: BOOTS3[t % BOOTS3.length], ring: null };
+	}
+	// The manager mid-run, for the broadcast to cut to: his spot, while the run is on.
+	function bossRun3D () {
+		for (const sf of staff3) { if (sf.sprint) { const se = (performance.now() - sf.sprint.t0) / 1000; if (se > 0.4 && se < 4.6) { return sf.mgr; } } }
+		return null;
 	}
 	function staff3D (WX) {
 		const F = G3.fig;
@@ -209,17 +219,40 @@
 			// The manager: paces his technical area a little with the play, and watches the ball.
 			const m = sf.mgr;
 			if (!m.x) { m.x = cx; m.y = FH + 13; }
-			const tx = cx + clamp((bx - cx) * 0.06, -dw * 0.3, dw * 0.3), d = tx - m.x;
-			m.vx += ((Math.abs(d) > 6 ? Math.sign(d) * Math.min(0.9, Math.abs(d) / 25) : 0) - m.vx) * Math.min(1, 0.06 * dt);
-			m.x += m.vx * dt; m.y = FH + 13;
+			const sp = sf.sprint, se = sp ? (now - sp.t0) / 1000 : 0;
+			if (sp && (se > 9 || state === "play" && se > 2 && !(now < sf.up))) { sf.sprint = null; }
+			if (sf.sprint) {
+				// The run: away from the dugout towards the end his side scored at, on the touchline itself.
+				if (!sp.dir) { sp.dir = bx > cx ? 1 : -1; }
+				const run = se < 3.4, slide = se >= 3.4 && se < 4.4;
+				const want = run ? sp.dir * Math.min(2.7, se * 4) : 0;
+				m.vx += (want - m.vx) * Math.min(1, (run ? 0.16 : slide ? 0.05 : 0.2) * dt);
+				m.x = clamp(m.x + m.vx * dt, -40, FW + 40);
+				m.y += ((run || slide ? FH + 3 : FH + 13) - m.y) * Math.min(1, 0.08 * dt);   // over the line on to the grass
+				m.kneel = slide ? Math.min(1, (m.kneel || 0) + 0.12 * dt) : Math.max(0, (m.kneel || 0) - 0.05 * dt);
+				m.celebA = run || slide ? 1 : Math.max(0, (m.celebA || 0) - 0.02 * dt);
+			} else {
+				const tx = cx + clamp((bx - cx) * 0.06, -dw * 0.3, dw * 0.3), d = tx - m.x, far = Math.abs(d) > dw * 0.6;
+				m.vx += ((Math.abs(d) > 6 ? Math.sign(d) * Math.min(far ? 1.6 : 0.9, Math.abs(d) / 25) : 0) - m.vx) * Math.min(1, 0.06 * dt);   // jogs back sheepishly after a run
+				m.x += m.vx * dt; m.y += (FH + 13 - m.y) * Math.min(1, 0.06 * dt);
+				m.kneel = Math.max(0, (m.kneel || 0) - 0.05 * dt); m.celebA = Math.max(0, (m.celebA || 0) - 0.05 * dt);
+			}
 			m.runAmt += (Math.min(1, Math.abs(m.vx) / 2.6) - m.runAmt) * Math.min(1, 0.1 * dt);
 			m.stride += Math.PI * 2 * (0.95 + 0.5 * Math.abs(m.vx)) / 60 * clamp(Math.abs(m.vx) / 0.4, 0, 1) * dt; m.idlePh += 0.028 * dt;
-			m.dir = Math.atan2(by - m.y, bx - m.x);
+			m.dir = sf.sprint && Math.abs(m.vx) > 0.4 ? (m.vx > 0 ? 0 : Math.PI) : Math.atan2(by - m.y, bx - m.x);
 			if (F.n < MAXF3) {
 				const r = F.rigs[F.n];
 				pose3D(r, m, m.x, m.y, m.dir, 0, 0);
 				const ph = rm ? 0 : m.idlePh, g = sf.g;
-				if (g === "up") { const b = rm ? 0 : Math.sin(ph * 6) * 0.15; for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = -0.3; r.sh[i].rotation.x = (i ? 1 : -1) * (2.55 + b); r.el[i].rotation.z = 0.25; } r.neck.rotation.z = -0.35; }
+				if (sf.sprint && (m.celebA || 0) > 0.3) {
+					// Fists pumping as he runs, both arms flung up on his knees.
+					const pump = rm ? 0.5 : Math.abs(Math.sin(ph * 9)), kn = m.kneel || 0;
+					for (let i = 0; i < 2; i++) {
+						const k = i ? pump : 1 - pump;
+						r.sh[i].rotation.z = lerp3(-1.3 - 1.1 * k, -0.4, kn); r.sh[i].rotation.x = (i ? 1 : -1) * lerp3(0.35, 2.4, kn); r.el[i].rotation.z = lerp3(1.6 - 0.9 * k, 0.3, kn);
+					}
+					r.neck.rotation.z = -0.4; r.spine.rotation.z = lerp3(r.spine.rotation.z, -0.35, kn);
+				} else if (g === "up") { const b = rm ? 0 : Math.sin(ph * 6) * 0.15; for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = -0.3; r.sh[i].rotation.x = (i ? 1 : -1) * (2.55 + b); r.el[i].rotation.z = 0.25; } r.neck.rotation.z = -0.35; }
 				else if (g === "head") { for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = -2.3; r.sh[i].rotation.x = (i ? 1 : -1) * 0.95; r.el[i].rotation.z = 2.25; } r.spine.rotation.z = 0.2; r.neck.rotation.z = 0.35; }
 				else if (g === "clap") { const c = rm ? 0.5 : Math.abs(Math.sin(ph * 14)); for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = -1.15; r.sh[i].rotation.x = (i ? 1 : -1) * (0.05 + 0.25 * c); r.el[i].rotation.z = 1.1; } }
 				else if (g === "protest") { const c = rm ? 0 : Math.sin(ph * 5) * 0.15; for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = -0.75 + c; r.sh[i].rotation.x = (i ? 1 : -1) * 0.95; r.el[i].rotation.z = 0.55; } r.neck.rotation.z = -0.15; }

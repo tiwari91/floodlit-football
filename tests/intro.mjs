@@ -114,6 +114,23 @@ const ht = await page.evaluate(async () => {
 });
 check("the first-match coach mark never covers a card's buttons", !ht.coachOver, JSON.stringify(ht));
 check("half-time stats: numbers at the table's size, a visible possession bar, every row in view", ht.numPx <= 24 && ht.barW > 100 && ht.lastRowIn, JSON.stringify(ht));
+// The manager's touchline run (forced here; it happens on about three goals in ten): he leaves his
+// area, runs down the touchline, the broadcast cuts to him, then back to the scorer.
+const run = await page.evaluate(async () => {
+	const F = window.__ff, wait = ms => new Promise(r => setTimeout(r, ms));
+	if (F.state !== "play") { document.getElementById("ovButton").click(); await wait(300); }
+	for (let i = 0; i < 4000 && F.state !== "play"; i++) { F.step(1); }
+	if (F.camMode !== undefined && F.camMode !== "3d") { return { skip: F.camMode }; }
+	F.freeze = 0; F.forceGoal(0);
+	for (let i = 0; i < 80 && F.state !== "goal"; i++) { F.step(1); }
+	const m = F.staff3[0].mgr, x0 = m.x;
+	F.staff3[0].sprint = { t0: performance.now(), dir: 0 }; F.staff3[0].up = performance.now() + 6000;
+	await wait(1500);
+	const shot = F.G3.shot, moved = Math.abs(m.x - x0);
+	await wait(3600);
+	return { shot, moved: Math.round(moved), kneel: +(m.kneel || 0).toFixed(2) };
+});
+check("a goal can send the manager down the touchline, and the broadcast cuts to him", run.skip !== undefined || (run.shot === "boss" && run.moved > 60), JSON.stringify(run));
 await ctx.close();
 
 check("no console errors", errs.length === 0, errs.join(" | "));
