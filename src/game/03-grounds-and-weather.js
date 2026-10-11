@@ -11,7 +11,11 @@
 		clear: { label: "Clear", wet: 0, speed: 1, grip: 1, handling: 1 },
 		rain: { label: "Rain", wet: 1, speed: 0.98, grip: 0.86, handling: 0.88 },
 		heavy: { label: "Heavy rain", wet: 2, speed: 0.96, grip: 0.76, handling: 0.78 },
-		windy: { label: "Windy", wet: 0, speed: 1, grip: 1, handling: 1, gust: 34 }
+		windy: { label: "Windy", wet: 0, speed: 1, grip: 1, handling: 1, gust: 34 },
+		// Snow: a slow, low-bouncing ball (an orange one, to see it), poor footing, keepers who spill.
+		snow: { label: "Snow", wet: 0, snow: 1, speed: 0.95, grip: 0.8, handling: 0.84 },
+		// Heat: a hard, quick pitch under a hazy sky.
+		hot: { label: "Heat", wet: 0, heat: 1, speed: 1.01, grip: 1, handling: 1 }
 	};
 	// Wind: km/h and the way it blows, as an angle in pitch coordinates (0 blows towards the goal
 	// on the right, the one you attack first). It pushes the ball only while it is in the air.
@@ -20,14 +24,14 @@
 	function makeConditions (surfaceKey, weatherKey, wind, ko) {
 		const sf = SURFACES[surfaceKey] || SURFACES.grass, w = WEATHER[weatherKey] || WEATHER.clear;
 		// Standing water holds the ball up on every surface, and mud most of all.
-		const roll = Math.min(0.992, Math.max(0.968, sf.roll - (surfaceKey === "mud" ? 0.003 : 0.0016) * w.wet));   // runs at load, before clamp exists
+		const roll = Math.min(0.992, Math.max(0.966, sf.roll - (surfaceKey === "mud" ? 0.003 : 0.0016) * w.wet - 0.0026 * (w.snow || 0)));   // runs at load, before clamp exists
 		const wd = wind && Number.isFinite(wind.s) ? wind : { s: w.gust || 0, a: w.gust ? (Math.random() < 0.5 ? 0 : Math.PI) + (Math.random() - 0.5) * 0.8 : 0 };
 		const ws = Math.round(Math.min(50, Math.max(0, wd.s))), wa = Number.isFinite(wd.a) ? wd.a : 0, wk = 0.0006 * ws * (S || 1.7);
 		return {
 			wind: { s: ws, a: wa, ax: Math.cos(wa) * wk, ay: Math.sin(wa) * wk }, ko: ko === "day" ? "day" : "night",
 			surfaceKey: SURFACES[surfaceKey] ? surfaceKey : "grass", weatherKey: WEATHER[weatherKey] ? weatherKey : "clear",
-			roll, speed: sf.speed * w.speed, grip: sf.grip * w.grip, bounce: sf.bounce * (1 - 0.15 * w.wet),
-			land: sf.land * (1 - 0.06 * w.wet), handling: w.handling, wet: w.wet,
+			roll, speed: sf.speed * w.speed, grip: sf.grip * w.grip, bounce: sf.bounce * (1 - 0.15 * w.wet) * (w.snow ? 0.8 : 1),
+			land: sf.land * (1 - 0.06 * w.wet), handling: w.handling, wet: w.wet, snow: w.snow || 0, heat: w.heat || 0,
 			// Passes are hit harder on a slow pitch and softer on a quick one, but not all the way.
 			passComp: Math.pow((1 - roll) / 0.015, 0.8),
 			label: `${w.wet || ws < 20 ? (weatherKey === "windy" ? "Clear" : w.label) : "Windy"} · ${sf.label}`
@@ -35,7 +39,7 @@
 	}
 	// The kick-off card's line on the conditions: the time, the rain, the wind and which way it blows for you.
 	function conditionsText () {
-		const w = cond.wind, rain = cond.wet === 2 ? "heavy rain (the ball holds up in the puddles and keepers spill more)" : cond.wet ? "rain (a slower, skiddy ball and keepers who spill more)" : "dry";
+		const w = cond.wind, rain = cond.snow ? "snow (a slow, dead ball, an orange one, poor footing and keepers who spill more)" : cond.heat ? "heat haze (a hard, quick pitch)" : cond.wet === 2 ? "heavy rain (the ball holds up in the puddles and keepers spill more)" : cond.wet ? "rain (a slower, skiddy ball and keepers who spill more)" : "dry";
 		let wind = "";
 		if (w.s >= 6) {
 			const along = Math.cos(w.a);
@@ -51,15 +55,15 @@
 	// chance of rain and of heavy rain in that stretch and out of it, how windy it is, and the share of
 	// night kick-offs in and out of it (hot countries play in the evening).
 	const CLIMATES = {
-		home: { rounds: [ 9, 25 ], rain: [ 0.8, 0.27 ], heavy: [ 0.3, 0.07 ], wind: 1, night: [ 0.65, 0.35 ] },
-		maritime: { wet: [ 0.2, 0.7 ], rain: [ 0.75, 0.32 ], heavy: [ 0.24, 0.07 ], wind: 1.25, night: [ 0.65, 0.35 ] },
-		continental: { wet: [ 0.3, 0.6 ], rain: [ 0.55, 0.3 ], heavy: [ 0.16, 0.1 ], wind: 0.9, night: [ 0.55, 0.35 ] },
-		med: { wet: [ 0.3, 0.6 ], rain: [ 0.38, 0.07 ], heavy: [ 0.1, 0.02 ], wind: 0.75, night: [ 0.6, 0.85 ] },
-		arid: { wet: [ 0.4, 0.55 ], rain: [ 0.14, 0.03 ], heavy: [ 0.05, 0.01 ], wind: 0.9, night: [ 0.8, 0.85 ] },
-		tropical: { wet: [ 0.35, 0.8 ], rain: [ 0.6, 0.15 ], heavy: [ 0.38, 0.07 ], wind: 0.7, night: [ 0.75, 0.7 ] },
-		pampas: { wet: [ 0.6, 0.9 ], rain: [ 0.35, 0.2 ], heavy: [ 0.12, 0.05 ], wind: 1.35, night: [ 0.65, 0.55 ] },
-		monsoon: { wet: [ 0.4, 0.65 ], rain: [ 0.7, 0.2 ], heavy: [ 0.4, 0.05 ], wind: 1.1, night: [ 0.75, 0.45 ] },
-		sunny: { wet: [ 0.45, 0.65 ], rain: [ 0.25, 0.1 ], heavy: [ 0.1, 0.03 ], wind: 1.05, night: [ 0.55, 0.65 ] }
+		home: { rounds: [ 9, 25 ], rain: [ 0.8, 0.27 ], heavy: [ 0.3, 0.07 ], wind: 1, night: [ 0.65, 0.35 ], snow: 0.08 },
+		maritime: { wet: [ 0.2, 0.7 ], rain: [ 0.75, 0.32 ], heavy: [ 0.24, 0.07 ], wind: 1.25, night: [ 0.65, 0.35 ], snow: 0.1 },
+		continental: { wet: [ 0.3, 0.6 ], rain: [ 0.55, 0.3 ], heavy: [ 0.16, 0.1 ], wind: 0.9, night: [ 0.55, 0.35 ], snow: 0.5 },
+		med: { wet: [ 0.3, 0.6 ], rain: [ 0.38, 0.07 ], heavy: [ 0.1, 0.02 ], wind: 0.75, night: [ 0.6, 0.85 ], heat: 0.4 },
+		arid: { wet: [ 0.4, 0.55 ], rain: [ 0.14, 0.03 ], heavy: [ 0.05, 0.01 ], wind: 0.9, night: [ 0.8, 0.85 ], heat: 0.6 },
+		tropical: { wet: [ 0.35, 0.8 ], rain: [ 0.6, 0.15 ], heavy: [ 0.38, 0.07 ], wind: 0.7, night: [ 0.75, 0.7 ], heat: 0.5 },
+		pampas: { wet: [ 0.6, 0.9 ], rain: [ 0.35, 0.2 ], heavy: [ 0.12, 0.05 ], wind: 1.35, night: [ 0.65, 0.55 ], heat: 0.2 },
+		monsoon: { wet: [ 0.4, 0.65 ], rain: [ 0.7, 0.2 ], heavy: [ 0.4, 0.05 ], wind: 1.1, night: [ 0.75, 0.45 ], heat: 0.25 },
+		sunny: { wet: [ 0.45, 0.65 ], rain: [ 0.25, 0.1 ], heavy: [ 0.1, 0.03 ], wind: 1.05, night: [ 0.55, 0.65 ], heat: 0.45 }
 	};
 	const CLIMATE_OF = {
 		NED: "maritime", BEL: "maritime", DEN: "maritime", FRA: "maritime",
@@ -71,6 +75,7 @@
 	};
 	const climateOf = nat => CLIMATES[CLIMATE_OF[nat]] || CLIMATES.home;
 	const inWet = (c, r, n) => (c.rounds ? r >= c.rounds[0] && r <= c.rounds[1] : r / Math.max(1, n) >= c.wet[0] && r / Math.max(1, n) <= c.wet[1]);
+	const deepWinter = (c, r, n) => { const [ a, b ] = c.rounds ? [ c.rounds[0] / n, c.rounds[1] / n ] : c.wet, f = r / Math.max(1, n); return f >= a + (b - a) * 0.3 && f <= b - (b - a) * 0.2; };
 	// Wind and kick-off time for each matchday: the rainy stretch is windier and more of it is played at night.
 	function genWind (n, nat) {
 		const c = climateOf(nat);
@@ -85,8 +90,11 @@
 	function genForecast (n, nat) {
 		const c = climateOf(nat);
 		return Array.from({ length: n }, (_, r) => {
-			const x = Math.random(), i = inWet(c, r, n) ? 0 : 1;
-			return x < c.heavy[i] ? "heavy" : x < c.rain[i] ? "rain" : "clear";
+			const x = Math.random(), i = inWet(c, r, n) ? 0 : 1, w = x < c.heavy[i] ? "heavy" : x < c.rain[i] ? "rain" : "clear";
+			// In the depth of a cold country's winter some of it falls as snow; a dry spell in a hot one bakes.
+			const y = Math.random();
+			if (c.snow && deepWinter(c, r, n) && y < c.snow) { return "snow"; }
+			return c.heat && w === "clear" && i === 1 && y < c.heat ? "hot" : w;
 		});
 	}
 	// A league's calendar of weather for its country, from matchday `from` on (the days played stay).

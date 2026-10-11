@@ -655,6 +655,8 @@
 	.forecast li .fc-ko { font-size: 12px; line-height: 1; color: var(--text); letter-spacing: 0.02em; }
 	.forecast li.fc-rain { background: #1a2a36; color: #9fc2e3; }
 	.forecast li.fc-heavy { background: #20344a; color: #c4dcf3; }
+	.forecast li.fc-snow { background: #3a4550; color: #f2f6fa; }
+	.forecast li.fc-hot { background: #4a3218; color: #ffd08a; }
 	.forecast li.now { outline: 2px solid var(--amber); outline-offset: -1px; }
 	.forecast li.past { opacity: 0.45; }
 	.lg-round ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
@@ -1335,6 +1337,8 @@
 					<option value="rain">Rain</option>
 					<option value="heavy">Heavy rain</option>
 					<option value="windy">Windy</option>
+					<option value="snow">Snow</option>
+					<option value="hot">Heat</option>
 				</select>
 			</label>
 			<label class="field" for="ground" id="groundField">Ground
@@ -1784,7 +1788,11 @@
 		clear: { label: "Clear", wet: 0, speed: 1, grip: 1, handling: 1 },
 		rain: { label: "Rain", wet: 1, speed: 0.98, grip: 0.86, handling: 0.88 },
 		heavy: { label: "Heavy rain", wet: 2, speed: 0.96, grip: 0.76, handling: 0.78 },
-		windy: { label: "Windy", wet: 0, speed: 1, grip: 1, handling: 1, gust: 34 }
+		windy: { label: "Windy", wet: 0, speed: 1, grip: 1, handling: 1, gust: 34 },
+		// Snow: a slow, low-bouncing ball (an orange one, to see it), poor footing, keepers who spill.
+		snow: { label: "Snow", wet: 0, snow: 1, speed: 0.95, grip: 0.8, handling: 0.84 },
+		// Heat: a hard, quick pitch under a hazy sky.
+		hot: { label: "Heat", wet: 0, heat: 1, speed: 1.01, grip: 1, handling: 1 }
 	};
 	// Wind: km/h and the way it blows, as an angle in pitch coordinates (0 blows towards the goal
 	// on the right, the one you attack first). It pushes the ball only while it is in the air.
@@ -1793,14 +1801,14 @@
 	function makeConditions (surfaceKey, weatherKey, wind, ko) {
 		const sf = SURFACES[surfaceKey] || SURFACES.grass, w = WEATHER[weatherKey] || WEATHER.clear;
 		// Standing water holds the ball up on every surface, and mud most of all.
-		const roll = Math.min(0.992, Math.max(0.968, sf.roll - (surfaceKey === "mud" ? 0.003 : 0.0016) * w.wet));   // runs at load, before clamp exists
+		const roll = Math.min(0.992, Math.max(0.966, sf.roll - (surfaceKey === "mud" ? 0.003 : 0.0016) * w.wet - 0.0026 * (w.snow || 0)));   // runs at load, before clamp exists
 		const wd = wind && Number.isFinite(wind.s) ? wind : { s: w.gust || 0, a: w.gust ? (Math.random() < 0.5 ? 0 : Math.PI) + (Math.random() - 0.5) * 0.8 : 0 };
 		const ws = Math.round(Math.min(50, Math.max(0, wd.s))), wa = Number.isFinite(wd.a) ? wd.a : 0, wk = 0.0006 * ws * (S || 1.7);
 		return {
 			wind: { s: ws, a: wa, ax: Math.cos(wa) * wk, ay: Math.sin(wa) * wk }, ko: ko === "day" ? "day" : "night",
 			surfaceKey: SURFACES[surfaceKey] ? surfaceKey : "grass", weatherKey: WEATHER[weatherKey] ? weatherKey : "clear",
-			roll, speed: sf.speed * w.speed, grip: sf.grip * w.grip, bounce: sf.bounce * (1 - 0.15 * w.wet),
-			land: sf.land * (1 - 0.06 * w.wet), handling: w.handling, wet: w.wet,
+			roll, speed: sf.speed * w.speed, grip: sf.grip * w.grip, bounce: sf.bounce * (1 - 0.15 * w.wet) * (w.snow ? 0.8 : 1),
+			land: sf.land * (1 - 0.06 * w.wet), handling: w.handling, wet: w.wet, snow: w.snow || 0, heat: w.heat || 0,
 			// Passes are hit harder on a slow pitch and softer on a quick one, but not all the way.
 			passComp: Math.pow((1 - roll) / 0.015, 0.8),
 			label: `${w.wet || ws < 20 ? (weatherKey === "windy" ? "Clear" : w.label) : "Windy"} · ${sf.label}`
@@ -1808,7 +1816,7 @@
 	}
 	// The kick-off card's line on the conditions: the time, the rain, the wind and which way it blows for you.
 	function conditionsText () {
-		const w = cond.wind, rain = cond.wet === 2 ? "heavy rain (the ball holds up in the puddles and keepers spill more)" : cond.wet ? "rain (a slower, skiddy ball and keepers who spill more)" : "dry";
+		const w = cond.wind, rain = cond.snow ? "snow (a slow, dead ball, an orange one, poor footing and keepers who spill more)" : cond.heat ? "heat haze (a hard, quick pitch)" : cond.wet === 2 ? "heavy rain (the ball holds up in the puddles and keepers spill more)" : cond.wet ? "rain (a slower, skiddy ball and keepers who spill more)" : "dry";
 		let wind = "";
 		if (w.s >= 6) {
 			const along = Math.cos(w.a);
@@ -1824,15 +1832,15 @@
 	// chance of rain and of heavy rain in that stretch and out of it, how windy it is, and the share of
 	// night kick-offs in and out of it (hot countries play in the evening).
 	const CLIMATES = {
-		home: { rounds: [ 9, 25 ], rain: [ 0.8, 0.27 ], heavy: [ 0.3, 0.07 ], wind: 1, night: [ 0.65, 0.35 ] },
-		maritime: { wet: [ 0.2, 0.7 ], rain: [ 0.75, 0.32 ], heavy: [ 0.24, 0.07 ], wind: 1.25, night: [ 0.65, 0.35 ] },
-		continental: { wet: [ 0.3, 0.6 ], rain: [ 0.55, 0.3 ], heavy: [ 0.16, 0.1 ], wind: 0.9, night: [ 0.55, 0.35 ] },
-		med: { wet: [ 0.3, 0.6 ], rain: [ 0.38, 0.07 ], heavy: [ 0.1, 0.02 ], wind: 0.75, night: [ 0.6, 0.85 ] },
-		arid: { wet: [ 0.4, 0.55 ], rain: [ 0.14, 0.03 ], heavy: [ 0.05, 0.01 ], wind: 0.9, night: [ 0.8, 0.85 ] },
-		tropical: { wet: [ 0.35, 0.8 ], rain: [ 0.6, 0.15 ], heavy: [ 0.38, 0.07 ], wind: 0.7, night: [ 0.75, 0.7 ] },
-		pampas: { wet: [ 0.6, 0.9 ], rain: [ 0.35, 0.2 ], heavy: [ 0.12, 0.05 ], wind: 1.35, night: [ 0.65, 0.55 ] },
-		monsoon: { wet: [ 0.4, 0.65 ], rain: [ 0.7, 0.2 ], heavy: [ 0.4, 0.05 ], wind: 1.1, night: [ 0.75, 0.45 ] },
-		sunny: { wet: [ 0.45, 0.65 ], rain: [ 0.25, 0.1 ], heavy: [ 0.1, 0.03 ], wind: 1.05, night: [ 0.55, 0.65 ] }
+		home: { rounds: [ 9, 25 ], rain: [ 0.8, 0.27 ], heavy: [ 0.3, 0.07 ], wind: 1, night: [ 0.65, 0.35 ], snow: 0.08 },
+		maritime: { wet: [ 0.2, 0.7 ], rain: [ 0.75, 0.32 ], heavy: [ 0.24, 0.07 ], wind: 1.25, night: [ 0.65, 0.35 ], snow: 0.1 },
+		continental: { wet: [ 0.3, 0.6 ], rain: [ 0.55, 0.3 ], heavy: [ 0.16, 0.1 ], wind: 0.9, night: [ 0.55, 0.35 ], snow: 0.5 },
+		med: { wet: [ 0.3, 0.6 ], rain: [ 0.38, 0.07 ], heavy: [ 0.1, 0.02 ], wind: 0.75, night: [ 0.6, 0.85 ], heat: 0.4 },
+		arid: { wet: [ 0.4, 0.55 ], rain: [ 0.14, 0.03 ], heavy: [ 0.05, 0.01 ], wind: 0.9, night: [ 0.8, 0.85 ], heat: 0.6 },
+		tropical: { wet: [ 0.35, 0.8 ], rain: [ 0.6, 0.15 ], heavy: [ 0.38, 0.07 ], wind: 0.7, night: [ 0.75, 0.7 ], heat: 0.5 },
+		pampas: { wet: [ 0.6, 0.9 ], rain: [ 0.35, 0.2 ], heavy: [ 0.12, 0.05 ], wind: 1.35, night: [ 0.65, 0.55 ], heat: 0.2 },
+		monsoon: { wet: [ 0.4, 0.65 ], rain: [ 0.7, 0.2 ], heavy: [ 0.4, 0.05 ], wind: 1.1, night: [ 0.75, 0.45 ], heat: 0.25 },
+		sunny: { wet: [ 0.45, 0.65 ], rain: [ 0.25, 0.1 ], heavy: [ 0.1, 0.03 ], wind: 1.05, night: [ 0.55, 0.65 ], heat: 0.45 }
 	};
 	const CLIMATE_OF = {
 		NED: "maritime", BEL: "maritime", DEN: "maritime", FRA: "maritime",
@@ -1844,6 +1852,7 @@
 	};
 	const climateOf = nat => CLIMATES[CLIMATE_OF[nat]] || CLIMATES.home;
 	const inWet = (c, r, n) => (c.rounds ? r >= c.rounds[0] && r <= c.rounds[1] : r / Math.max(1, n) >= c.wet[0] && r / Math.max(1, n) <= c.wet[1]);
+	const deepWinter = (c, r, n) => { const [ a, b ] = c.rounds ? [ c.rounds[0] / n, c.rounds[1] / n ] : c.wet, f = r / Math.max(1, n); return f >= a + (b - a) * 0.3 && f <= b - (b - a) * 0.2; };
 	// Wind and kick-off time for each matchday: the rainy stretch is windier and more of it is played at night.
 	function genWind (n, nat) {
 		const c = climateOf(nat);
@@ -1858,8 +1867,11 @@
 	function genForecast (n, nat) {
 		const c = climateOf(nat);
 		return Array.from({ length: n }, (_, r) => {
-			const x = Math.random(), i = inWet(c, r, n) ? 0 : 1;
-			return x < c.heavy[i] ? "heavy" : x < c.rain[i] ? "rain" : "clear";
+			const x = Math.random(), i = inWet(c, r, n) ? 0 : 1, w = x < c.heavy[i] ? "heavy" : x < c.rain[i] ? "rain" : "clear";
+			// In the depth of a cold country's winter some of it falls as snow; a dry spell in a hot one bakes.
+			const y = Math.random();
+			if (c.snow && deepWinter(c, r, n) && y < c.snow) { return "snow"; }
+			return c.heat && w === "clear" && i === 1 && y < c.heat ? "hot" : w;
 		});
 	}
 	// A league's calendar of weather for its country, from matchday `from` on (the days played stay).
@@ -2807,7 +2819,7 @@
 			if (r < league.round || r >= league.round + 10) { return; }
 			const li = el("li", `fc-${w}${r === league.round ? " now" : ""}${r < league.round ? " past" : ""}${inWet(climateOf(league.ident && league.ident.country), r, league.fixtures.length) ? " wet-season" : ""}`);
 			const wn = league.wind[r], ko = league.ko[r];
-			li.append(el("b", "", String(r + 1)), el("span", "", w === "clear" ? "Dry" : w === "rain" ? "Rain" : "Heavy"), el("span", "fc-ko", `${ko === "day" ? "☀" : "☾"}${wn.s >= 20 ? "≈" : ""}`));
+			li.append(el("b", "", String(r + 1)), el("span", "", w === "clear" ? "Dry" : w === "rain" ? "Rain" : w === "snow" ? "Snow" : w === "hot" ? "Hot" : "Heavy"), el("span", "fc-ko", `${ko === "day" ? "☀" : "☾"}${wn.s >= 20 ? "≈" : ""}`));
 			li.title = `Matchday ${r + 1}: ${WEATHER[w].label}, wind ${wn.s} km/h, ${ko === "day" ? "afternoon" : "night"} kick-off`;
 			ol.append(li);
 		});
@@ -7583,7 +7595,7 @@
 		homeSide = !leagueMatch || leagueMatch.home ? 0 : 1;
 		cond = leagueMatch
 			? makeConditions((leagueMatch.home ? YOU : TEAMS[leagueMatch.opp]).surface, league.weather[leagueMatch.round], league.wind[leagueMatch.round], league.ko[leagueMatch.round])
-			: makeConditions(groundSel.value, weatherSel.value, null, "night");
+			: makeConditions(groundSel.value, weatherSel.value, null, weatherSel.value === "hot" ? "day" : "night");   // the heat is an afternoon game
 		// Home advantage: the visitors play a little below their rating.
 		// Home advantage: the visitors play a little below their rating.
 		oppStrength = leagueMatch ? getStr(leagueMatch.opp) + (leagueMatch.home ? -0.3 : 0.3) : { easy: 2, normal: 3, hard: 4.5 }[diffSel.value] || 3;
@@ -8381,6 +8393,14 @@
 					g.fillStyle = gr; g.fillRect(ox, oy, FW, FH);
 				}
 			}
+			// Snow: a white dusting that the players have scuffed green, deeper by the touchlines.
+			if (cond.snow) { snowOnPitch(g, ox, oy, r); }
+			// Heat: grass baked a little straw-coloured, palest where the sun sits all afternoon.
+			if (cond.heat) {
+				const gr = g.createLinearGradient(0, oy, 0, oy + FH);
+				gr.addColorStop(0, "rgba(214, 196, 110, 0.07)"); gr.addColorStop(1, "rgba(214, 196, 110, 0.15)");
+				g.fillStyle = gr; g.fillRect(ox, oy, FW, FH);
+			}
 		} else if (cond.surfaceKey === "mud") {
 			const a = 0.42 + 0.14 * cond.wet;
 			for (const [ px, py, rad ] of [ [ ox + 70 * S, oy + FH / 2, 150 * GH ], [ ox + FW - 70 * S, oy + FH / 2, 150 * GH ], [ ox + FW / 2, oy + FH / 2, 120 * S ] ]) {
@@ -8391,9 +8411,25 @@
 		}
 		g.restore();
 	}
+	function snowOnPitch (g, ox, oy, r) {
+		g.fillStyle = "rgba(236, 242, 248, 0.32)"; g.fillRect(ox, oy, FW, FH);
+		for (let i = 0; i < 2600; i++) {
+			const x = ox + r() * FW, y = oy + r() * FH, rad = 1 + r() * 3.5;
+			g.fillStyle = `rgba(248, 251, 255, ${0.25 + r() * 0.35})`; g.beginPath(); g.arc(x, y, rad, 0, Math.PI * 2); g.fill();
+		}
+		for (const [ y0, y1 ] of [ [ oy, oy + 70 * S ], [ oy + FH, oy + FH - 70 * S ] ]) {
+			const gr = g.createLinearGradient(0, y0, 0, y1);
+			gr.addColorStop(0, "rgba(246, 249, 252, 0.6)"); gr.addColorStop(1, "rgba(246, 249, 252, 0)");
+			g.fillStyle = gr; g.fillRect(ox, Math.min(y0, y1), FW, Math.abs(y1 - y0));
+		}
+		// The middle, where the play is, worn back to the grass.
+		const gr = g.createRadialGradient(ox + FW / 2, oy + FH / 2, 10, ox + FW / 2, oy + FH / 2, FW * 0.5);
+		gr.addColorStop(0, "rgba(40, 92, 40, 0.22)"); gr.addColorStop(1, "rgba(40, 92, 40, 0)");
+		g.fillStyle = gr; g.fillRect(ox, oy, FW, FH);
+	}
 	let grassC = null, grassKey = "";
 	function grassCanvas () {
-		const key = `${FW}x${FH}|${cond.surfaceKey}|${cond.wet}|${gstyle ? gstyle.mow + gstyle.concrete : ""}`;
+		const key = `${FW}x${FH}|${cond.surfaceKey}|${cond.wet}|${cond.snow}${cond.heat}|${gstyle ? gstyle.mow + gstyle.concrete : ""}`;
 		if (grassKey === key) { return grassC; }
 		grassKey = key; grassC = null;
 		try {
@@ -9213,7 +9249,7 @@
 		const sh = 1 / (1 + h / 90);
 		ctx.fillStyle = `rgba(0, 0, 0, ${0.35 * sh + 0.1})`;
 		ctx.beginPath(); ctx.ellipse(X + 2.5 + h * 0.05, GY + 4, 6 * sh + 2, 3.5 * sh + 1, 0, 0, Math.PI * 2); ctx.fill();
-		ctx.fillStyle = "#fbfdf9";
+		ctx.fillStyle = cond.snow ? "#ff7d22" : "#fbfdf9";   // an orange ball in the snow
 		ctx.beginPath(); ctx.arc(X, Y, r, 0, Math.PI * 2); ctx.fill();
 		ctx.strokeStyle = "rgba(0, 0, 0, 0.35)";
 		ctx.lineWidth = 1;
@@ -9263,8 +9299,23 @@
 				ctx.moveTo(d.x, d.y); ctx.lineTo(d.x + d.v * 0.18, d.y - d.v);
 			}
 			ctx.stroke();
+		} else if (cond.snow) {
+			// Flakes drift down and sway; the near ones are bigger and quicker.
+			ctx.fillStyle = "rgba(220, 228, 236, 0.08)"; ctx.fillRect(0, 0, SW, SH);
+			const want = reduceMotion ? 0 : 140;
+			while (drops.length < want) { const k = Math.random(); drops.push({ x: Math.random() * SW, y: Math.random() * SH, v: 0.8 + k * 2.2, s: 1 + k * 2.4, p: Math.random() * 6.3 }); }
+			ctx.fillStyle = "rgba(250, 252, 255, 0.8)";
+			ctx.beginPath();
+			for (const d of drops) {
+				d.p += 0.03; d.y += d.v; d.x += Math.sin(d.p) * 0.6 - 0.25;
+				if (d.y > SH) { d.y = -6; d.x = Math.random() * (SW + 40); }
+				ctx.moveTo(d.x + d.s, d.y); ctx.arc(d.x, d.y, d.s, 0, Math.PI * 2);
+			}
+			ctx.fill();
 		} else {
 			drops = [];
+			// A hot afternoon: a warm haze over everything.
+			if (cond.heat && cond.ko === "day") { ctx.fillStyle = "rgba(255, 214, 150, 0.07)"; ctx.fillRect(0, 0, SW, SH); }
 		}
 		ctx.font = "700 11px Barlow, Arial, sans-serif";
 		ctx.textAlign = "left";
@@ -10227,7 +10278,7 @@
 		const onTier = u => [ -14 - u * standD, u * standH ];   // u: 0 at the front, 1 at the back
 		const back = tvProj(xl, ...onTier(1)), front = tvProj(xl, ...onTier(0));
 		const sky = ctx.createLinearGradient(0, 0, 0, back ? back.y : VH * 0.3);
-		if (cond.ko === "day") { sky.addColorStop(0, cond.wet ? "#59636d" : "#4f7aa6"); sky.addColorStop(1, cond.wet ? "#9aa3aa" : "#b9cddd"); } else { sky.addColorStop(0, "#020408"); sky.addColorStop(1, "#0f1920"); }
+		if (cond.ko === "day") { sky.addColorStop(0, cond.snow ? "#7a838b" : cond.wet ? "#59636d" : cond.heat ? "#3d7cbc" : "#4f7aa6"); sky.addColorStop(1, cond.snow ? "#d0d5d9" : cond.wet ? "#9aa3aa" : cond.heat ? "#eadcc0" : "#b9cddd"); } else { sky.addColorStop(0, "#020408"); sky.addColorStop(1, "#0f1920"); }
 		ctx.fillStyle = sky; ctx.fillRect(0, 0, VW, VH);
 		if (stands && back && front) {
 			const img = standTop(), rows = 40, rh = img.height / rows;
@@ -10626,7 +10677,7 @@
 			ctx.beginPath(); ctx.moveTo(q.x - dx * 2.2, q.y - dy * 2.2); ctx.lineTo(q.x, q.y); ctx.stroke();
 			ctx.lineCap = "butt";
 		}
-		ctx.fillStyle = "#ffffff";
+		ctx.fillStyle = cond.snow ? "#ff7d22" : "#ffffff";
 		ctx.beginPath(); ctx.arc(q.x, q.y, r, 0, Math.PI * 2); ctx.fill();
 		// Two dark panels on a band that rolls over the ball's face along its direction of travel.
 		if (mv > 0.25) { tvBallAng = Math.atan2(dy, dx); }   // the way it is rolling, as seen from the stand
@@ -11219,7 +11270,7 @@
 		if (sg) {
 			const grad = sg.createLinearGradient(0, 0, 0, 128);
 			const day = cond.ko === "day";
-			const stops = day ? (cond.wet ? [ "#454f58", "#6b7680", "#a2abb2" ] : [ "#2f639a", "#6e9cc6", "#c3d6e4" ]) : [ "#010206", "#060b11", "#121d26" ];
+			const stops = day ? (cond.snow ? [ "#6f7880", "#a0a8ae", "#d6dadd" ] : cond.wet ? [ "#454f58", "#6b7680", "#a2abb2" ] : cond.heat ? [ "#2a6fb4", "#86b3d6", "#eadbbd" ] : [ "#2f639a", "#6e9cc6", "#c3d6e4" ]) : [ "#010206", "#060b11", "#121d26" ];
 			grad.addColorStop(0, stops[0]); grad.addColorStop(0.55, stops[1]); grad.addColorStop(1, stops[2]);
 			sg.fillStyle = grad; sg.fillRect(0, 0, 2, 128);
 			const sky = new THREE.Mesh(new THREE.SphereGeometry(FH * 9, 24, 12, 0, Math.PI * 2, 0, Math.PI * 0.52), new THREE.MeshBasicMaterial({ map: tex3D(sc), side: THREE.BackSide, fog: false }));
@@ -11242,7 +11293,7 @@
 		const key1 = new THREE.DirectionalLight(0xfff1d6, (dayLit ? 0.9 : 0.75) * LI); key1.position.set(-FW * 0.2, FH * 1.6, FH * 1.6); key1.target.position.set(FW / 2, 0, FH / 2);
 		const key2 = new THREE.DirectionalLight(0xfff1d6, 0.45 * LI); key2.position.set(FW * 1.2, FH * 1.6, -FH * 0.5); key2.target.position.set(FW / 2, 0, FH / 2);
 		st.add(key1, key1.target, key2, key2.target);
-		G3.scene.fog = new THREE.Fog(dayLit ? (cond.wet ? 0x8d979e : 0xa9bfd0) : 0x070d13, FH * 2.6, FH * 7);
+		G3.scene.fog = cond.snow ? new THREE.Fog(dayLit ? 0xc4cbd0 : 0x2a3036, FH * 1.6, FH * 5) : new THREE.Fog(dayLit ? (cond.wet ? 0x8d979e : cond.heat ? 0xd9ccb0 : 0xa9bfd0) : 0x070d13, FH * (cond.heat ? 2 : 2.6), FH * 7);   // snow and haze close in
 		G3.stadium = st;
 		G3.scene.add(st);
 	}
@@ -11924,12 +11975,12 @@
 		r.root.rotation.y = -dir;
 	}
 	// What a figure wears. Keepers in their own colour with gloves and long sleeves.
-	// Long sleeves: most players pull them on in the rain, a few at night, nobody on a dry afternoon.
+	// Long sleeves: everyone in the snow, most players in the rain, a few at night, nobody on a dry afternoon or in the heat.
 	// Each player's own choice (from his build), so it is the same every match in those conditions.
 	function longSleeves3D (p) {
 		if (!cond || p.team < 0 || p.role === "staff") { return false; }
 		const h = build(p).seed;
-		return cond.wet >= 1 ? h < 0.8 : cond.ko !== "day" ? h < 0.3 : false;
+		return cond.snow ? true : cond.heat ? false : cond.wet >= 1 ? h < 0.8 : cond.ko !== "day" ? h < 0.3 : false;
 	}
 	function kit3D (p) {
 		const kit = KITS[p.team] || KITS[0], gk = p.role === "gk";
@@ -12688,6 +12739,7 @@
 		const br = G3.ballR = clamp(G3.cam.position.distanceTo(G3.v.set(bx, h * Z3, bz)) * BALL_R_PER_DIST, 2.4, 5);
 		G3.ball.scale.setScalar(br / 5);
 		G3.ball.position.set(bx, h * Z3 + br, bz);
+		if (G3.ball.material.color) { G3.ball.material.color.setHex(cond.snow ? 0xff8a30 : 0xffffff); }   // an orange ball in the snow
 		const spd = Math.hypot(ball.vx, ball.vy);
 		if (spd > 0.01 && !reduceMotion) {
 			G3.v.set(ball.vy, 0, -(sw ? -ball.vx : ball.vx)).normalize();

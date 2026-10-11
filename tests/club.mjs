@@ -280,16 +280,20 @@ check("over thirty summers nobody plays past 37, no keeper past 39", ages.worstO
 // hot countries play more at night, and the home league is as before.
 const clim = await page.evaluate(() => {
 	const F = window.__ff, out = {};
-	for (const nat of [ undefined, "ESP", "MAR", "NGA", "NED", "MEX" ]) {
-		let rain = 0, heavy = 0, night = 0, wind = 0, n = 0;
+	for (const nat of [ undefined, "ESP", "MAR", "NGA", "NED", "MEX", "SWE" ]) {
+		let rain = 0, heavy = 0, night = 0, wind = 0, n = 0, snow = 0, hot = 0;
 		for (let i = 0; i < 60; i++) {
 			const c = F.climateTest(38, nat);
-			for (let r = 0; r < 38; r++) { n++; rain += c.weather[r] !== "clear"; heavy += c.weather[r] === "heavy"; night += c.ko[r] === "night"; wind += c.wind[r].s; }
+			for (let r = 0; r < 38; r++) { n++; rain += c.weather[r] === "rain" || c.weather[r] === "heavy"; heavy += c.weather[r] === "heavy"; snow += c.weather[r] === "snow"; hot += c.weather[r] === "hot"; night += c.ko[r] === "night"; wind += c.wind[r].s; }
 		}
-		out[nat || "home"] = { rain: +(rain / n).toFixed(2), heavy: +(heavy / n).toFixed(2), night: +(night / n).toFixed(2), wind: +(wind / n).toFixed(1) };
+		out[nat || "home"] = { rain: +(rain / n).toFixed(2), heavy: +(heavy / n).toFixed(2), night: +(night / n).toFixed(2), wind: +(wind / n).toFixed(1), snow: +(snow / n).toFixed(3), hot: +(hot / n).toFixed(2) };
 	}
+	out.options = [ ...document.querySelectorAll("#weather option") ].map(o => o.value);
 	return out;
 });
+check("snow in a Swedish winter and now and then at home, never in Spain; heat in Morocco, never at home; both in the friendly picker",
+	clim.SWE.snow > 0.05 && clim.home.snow > 0.005 && clim.home.snow < 0.04 && clim.ESP.snow === 0 && clim.MAR.hot > 0.3 && clim.home.hot === 0 && clim.options.includes("snow") && clim.options.includes("hot"),
+	JSON.stringify(clim));
 check("weather by country: Spain and Morocco drier, Nigeria stormier, the Dutch windier, hot countries at night",
 	clim.ESP.rain < clim.home.rain * 0.6 && clim.MAR.rain < 0.12 && clim.NGA.heavy > clim.home.heavy && clim.NED.wind > clim.home.wind * 1.1 && clim.MEX.night > clim.home.night + 0.2 && Math.abs(clim.home.rain - 0.5) < 0.12,
 	JSON.stringify(clim));

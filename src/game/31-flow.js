@@ -6,7 +6,7 @@
 		homeSide = !leagueMatch || leagueMatch.home ? 0 : 1;
 		cond = leagueMatch
 			? makeConditions((leagueMatch.home ? YOU : TEAMS[leagueMatch.opp]).surface, league.weather[leagueMatch.round], league.wind[leagueMatch.round], league.ko[leagueMatch.round])
-			: makeConditions(groundSel.value, weatherSel.value, null, "night");
+			: makeConditions(groundSel.value, weatherSel.value, null, weatherSel.value === "hot" ? "day" : "night");   // the heat is an afternoon game
 		// Home advantage: the visitors play a little below their rating.
 		// Home advantage: the visitors play a little below their rating.
 		oppStrength = leagueMatch ? getStr(leagueMatch.opp) + (leagueMatch.home ? -0.3 : 0.3) : { easy: 2, normal: 3, hard: 4.5 }[diffSel.value] || 3;

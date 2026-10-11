@@ -105,7 +105,7 @@
 		const onTier = u => [ -14 - u * standD, u * standH ];   // u: 0 at the front, 1 at the back
 		const back = tvProj(xl, ...onTier(1)), front = tvProj(xl, ...onTier(0));
 		const sky = ctx.createLinearGradient(0, 0, 0, back ? back.y : VH * 0.3);
-		if (cond.ko === "day") { sky.addColorStop(0, cond.wet ? "#59636d" : "#4f7aa6"); sky.addColorStop(1, cond.wet ? "#9aa3aa" : "#b9cddd"); } else { sky.addColorStop(0, "#020408"); sky.addColorStop(1, "#0f1920"); }
+		if (cond.ko === "day") { sky.addColorStop(0, cond.snow ? "#7a838b" : cond.wet ? "#59636d" : cond.heat ? "#3d7cbc" : "#4f7aa6"); sky.addColorStop(1, cond.snow ? "#d0d5d9" : cond.wet ? "#9aa3aa" : cond.heat ? "#eadcc0" : "#b9cddd"); } else { sky.addColorStop(0, "#020408"); sky.addColorStop(1, "#0f1920"); }
 		ctx.fillStyle = sky; ctx.fillRect(0, 0, VW, VH);
 		if (stands && back && front) {
 			const img = standTop(), rows = 40, rh = img.height / rows;
@@ -504,7 +504,7 @@
 			ctx.beginPath(); ctx.moveTo(q.x - dx * 2.2, q.y - dy * 2.2); ctx.lineTo(q.x, q.y); ctx.stroke();
 			ctx.lineCap = "butt";
 		}
-		ctx.fillStyle = "#ffffff";
+		ctx.fillStyle = cond.snow ? "#ff7d22" : "#ffffff";
 		ctx.beginPath(); ctx.arc(q.x, q.y, r, 0, Math.PI * 2); ctx.fill();
 		// Two dark panels on a band that rolls over the ball's face along its direction of travel.
 		if (mv > 0.25) { tvBallAng = Math.atan2(dy, dx); }   // the way it is rolling, as seen from the stand

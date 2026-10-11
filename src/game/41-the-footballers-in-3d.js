@@ -605,12 +605,12 @@
 		r.root.rotation.y = -dir;
 	}
 	// What a figure wears. Keepers in their own colour with gloves and long sleeves.
-	// Long sleeves: most players pull them on in the rain, a few at night, nobody on a dry afternoon.
+	// Long sleeves: everyone in the snow, most players in the rain, a few at night, nobody on a dry afternoon or in the heat.
 	// Each player's own choice (from his build), so it is the same every match in those conditions.
 	function longSleeves3D (p) {
 		if (!cond || p.team < 0 || p.role === "staff") { return false; }
 		const h = build(p).seed;
-		return cond.wet >= 1 ? h < 0.8 : cond.ko !== "day" ? h < 0.3 : false;
+		return cond.snow ? true : cond.heat ? false : cond.wet >= 1 ? h < 0.8 : cond.ko !== "day" ? h < 0.3 : false;
 	}
 	function kit3D (p) {
 		const kit = KITS[p.team] || KITS[0], gk = p.role === "gk";

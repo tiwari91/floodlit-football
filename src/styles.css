@@ -634,6 +634,8 @@
 	.forecast li .fc-ko { font-size: 12px; line-height: 1; color: var(--text); letter-spacing: 0.02em; }
 	.forecast li.fc-rain { background: #1a2a36; color: #9fc2e3; }
 	.forecast li.fc-heavy { background: #20344a; color: #c4dcf3; }
+	.forecast li.fc-snow { background: #3a4550; color: #f2f6fa; }
+	.forecast li.fc-hot { background: #4a3218; color: #ffd08a; }
 	.forecast li.now { outline: 2px solid var(--amber); outline-offset: -1px; }
 	.forecast li.past { opacity: 0.45; }
 	.lg-round ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }

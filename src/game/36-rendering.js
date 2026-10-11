@@ -115,6 +115,14 @@
 					g.fillStyle = gr; g.fillRect(ox, oy, FW, FH);
 				}
 			}
+			// Snow: a white dusting that the players have scuffed green, deeper by the touchlines.
+			if (cond.snow) { snowOnPitch(g, ox, oy, r); }
+			// Heat: grass baked a little straw-coloured, palest where the sun sits all afternoon.
+			if (cond.heat) {
+				const gr = g.createLinearGradient(0, oy, 0, oy + FH);
+				gr.addColorStop(0, "rgba(214, 196, 110, 0.07)"); gr.addColorStop(1, "rgba(214, 196, 110, 0.15)");
+				g.fillStyle = gr; g.fillRect(ox, oy, FW, FH);
+			}
 		} else if (cond.surfaceKey === "mud") {
 			const a = 0.42 + 0.14 * cond.wet;
 			for (const [ px, py, rad ] of [ [ ox + 70 * S, oy + FH / 2, 150 * GH ], [ ox + FW - 70 * S, oy + FH / 2, 150 * GH ], [ ox + FW / 2, oy + FH / 2, 120 * S ] ]) {
@@ -125,9 +133,25 @@
 		}
 		g.restore();
 	}
+	function snowOnPitch (g, ox, oy, r) {
+		g.fillStyle = "rgba(236, 242, 248, 0.32)"; g.fillRect(ox, oy, FW, FH);
+		for (let i = 0; i < 2600; i++) {
+			const x = ox + r() * FW, y = oy + r() * FH, rad = 1 + r() * 3.5;
+			g.fillStyle = `rgba(248, 251, 255, ${0.25 + r() * 0.35})`; g.beginPath(); g.arc(x, y, rad, 0, Math.PI * 2); g.fill();
+		}
+		for (const [ y0, y1 ] of [ [ oy, oy + 70 * S ], [ oy + FH, oy + FH - 70 * S ] ]) {
+			const gr = g.createLinearGradient(0, y0, 0, y1);
+			gr.addColorStop(0, "rgba(246, 249, 252, 0.6)"); gr.addColorStop(1, "rgba(246, 249, 252, 0)");
+			g.fillStyle = gr; g.fillRect(ox, Math.min(y0, y1), FW, Math.abs(y1 - y0));
+		}
+		// The middle, where the play is, worn back to the grass.
+		const gr = g.createRadialGradient(ox + FW / 2, oy + FH / 2, 10, ox + FW / 2, oy + FH / 2, FW * 0.5);
+		gr.addColorStop(0, "rgba(40, 92, 40, 0.22)"); gr.addColorStop(1, "rgba(40, 92, 40, 0)");
+		g.fillStyle = gr; g.fillRect(ox, oy, FW, FH);
+	}
 	let grassC = null, grassKey = "";
 	function grassCanvas () {
-		const key = `${FW}x${FH}|${cond.surfaceKey}|${cond.wet}|${gstyle ? gstyle.mow + gstyle.concrete : ""}`;
+		const key = `${FW}x${FH}|${cond.surfaceKey}|${cond.wet}|${cond.snow}${cond.heat}|${gstyle ? gstyle.mow + gstyle.concrete : ""}`;
 		if (grassKey === key) { return grassC; }
 		grassKey = key; grassC = null;
 		try {
@@ -947,7 +971,7 @@
 		const sh = 1 / (1 + h / 90);
 		ctx.fillStyle = `rgba(0, 0, 0, ${0.35 * sh + 0.1})`;
 		ctx.beginPath(); ctx.ellipse(X + 2.5 + h * 0.05, GY + 4, 6 * sh + 2, 3.5 * sh + 1, 0, 0, Math.PI * 2); ctx.fill();
-		ctx.fillStyle = "#fbfdf9";
+		ctx.fillStyle = cond.snow ? "#ff7d22" : "#fbfdf9";   // an orange ball in the snow
 		ctx.beginPath(); ctx.arc(X, Y, r, 0, Math.PI * 2); ctx.fill();
 		ctx.strokeStyle = "rgba(0, 0, 0, 0.35)";
 		ctx.lineWidth = 1;
@@ -997,8 +1021,23 @@
 				ctx.moveTo(d.x, d.y); ctx.lineTo(d.x + d.v * 0.18, d.y - d.v);
 			}
 			ctx.stroke();
+		} else if (cond.snow) {
+			// Flakes drift down and sway; the near ones are bigger and quicker.
+			ctx.fillStyle = "rgba(220, 228, 236, 0.08)"; ctx.fillRect(0, 0, SW, SH);
+			const want = reduceMotion ? 0 : 140;
+			while (drops.length < want) { const k = Math.random(); drops.push({ x: Math.random() * SW, y: Math.random() * SH, v: 0.8 + k * 2.2, s: 1 + k * 2.4, p: Math.random() * 6.3 }); }
+			ctx.fillStyle = "rgba(250, 252, 255, 0.8)";
+			ctx.beginPath();
+			for (const d of drops) {
+				d.p += 0.03; d.y += d.v; d.x += Math.sin(d.p) * 0.6 - 0.25;
+				if (d.y > SH) { d.y = -6; d.x = Math.random() * (SW + 40); }
+				ctx.moveTo(d.x + d.s, d.y); ctx.arc(d.x, d.y, d.s, 0, Math.PI * 2);
+			}
+			ctx.fill();
 		} else {
 			drops = [];
+			// A hot afternoon: a warm haze over everything.
+			if (cond.heat && cond.ko === "day") { ctx.fillStyle = "rgba(255, 214, 150, 0.07)"; ctx.fillRect(0, 0, SW, SH); }
 		}
 		ctx.font = "700 11px Barlow, Arial, sans-serif";
 		ctx.textAlign = "left";

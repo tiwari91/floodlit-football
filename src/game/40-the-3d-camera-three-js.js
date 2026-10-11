@@ -552,7 +552,7 @@
 		if (sg) {
 			const grad = sg.createLinearGradient(0, 0, 0, 128);
 			const day = cond.ko === "day";
-			const stops = day ? (cond.wet ? [ "#454f58", "#6b7680", "#a2abb2" ] : [ "#2f639a", "#6e9cc6", "#c3d6e4" ]) : [ "#010206", "#060b11", "#121d26" ];
+			const stops = day ? (cond.snow ? [ "#6f7880", "#a0a8ae", "#d6dadd" ] : cond.wet ? [ "#454f58", "#6b7680", "#a2abb2" ] : cond.heat ? [ "#2a6fb4", "#86b3d6", "#eadbbd" ] : [ "#2f639a", "#6e9cc6", "#c3d6e4" ]) : [ "#010206", "#060b11", "#121d26" ];
 			grad.addColorStop(0, stops[0]); grad.addColorStop(0.55, stops[1]); grad.addColorStop(1, stops[2]);
 			sg.fillStyle = grad; sg.fillRect(0, 0, 2, 128);
 			const sky = new THREE.Mesh(new THREE.SphereGeometry(FH * 9, 24, 12, 0, Math.PI * 2, 0, Math.PI * 0.52), new THREE.MeshBasicMaterial({ map: tex3D(sc), side: THREE.BackSide, fog: false }));
@@ -575,7 +575,7 @@
 		const key1 = new THREE.DirectionalLight(0xfff1d6, (dayLit ? 0.9 : 0.75) * LI); key1.position.set(-FW * 0.2, FH * 1.6, FH * 1.6); key1.target.position.set(FW / 2, 0, FH / 2);
 		const key2 = new THREE.DirectionalLight(0xfff1d6, 0.45 * LI); key2.position.set(FW * 1.2, FH * 1.6, -FH * 0.5); key2.target.position.set(FW / 2, 0, FH / 2);
 		st.add(key1, key1.target, key2, key2.target);
-		G3.scene.fog = new THREE.Fog(dayLit ? (cond.wet ? 0x8d979e : 0xa9bfd0) : 0x070d13, FH * 2.6, FH * 7);
+		G3.scene.fog = cond.snow ? new THREE.Fog(dayLit ? 0xc4cbd0 : 0x2a3036, FH * 1.6, FH * 5) : new THREE.Fog(dayLit ? (cond.wet ? 0x8d979e : cond.heat ? 0xd9ccb0 : 0xa9bfd0) : 0x070d13, FH * (cond.heat ? 2 : 2.6), FH * 7);   // snow and haze close in
 		G3.stadium = st;
 		G3.scene.add(st);
 	}

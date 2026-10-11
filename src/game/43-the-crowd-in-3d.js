@@ -509,6 +509,7 @@
 		const br = G3.ballR = clamp(G3.cam.position.distanceTo(G3.v.set(bx, h * Z3, bz)) * BALL_R_PER_DIST, 2.4, 5);
 		G3.ball.scale.setScalar(br / 5);
 		G3.ball.position.set(bx, h * Z3 + br, bz);
+		if (G3.ball.material.color) { G3.ball.material.color.setHex(cond.snow ? 0xff8a30 : 0xffffff); }   // an orange ball in the snow
 		const spd = Math.hypot(ball.vx, ball.vy);
 		if (spd > 0.01 && !reduceMotion) {
 			G3.v.set(ball.vy, 0, -(sw ? -ball.vx : ball.vx)).normalize();
