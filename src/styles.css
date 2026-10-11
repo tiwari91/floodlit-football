@@ -486,7 +486,8 @@
 	.banner small { display: block; font-size: 0.2em; letter-spacing: 0.14em; font-weight: 700; opacity: 0.9; }
 	/* A referee's call (corner, goal kick, offside): read at a glance, not a headline over the play. */
 	.banner.call { font-size: clamp(30px, 5vw, 58px); top: 26%; letter-spacing: 0.06em; }
-	.banner.note { font-size: clamp(17px, 3.2vw, 32px); letter-spacing: 0.04em; width: min(86%, 760px); text-align: center; line-height: 1.15; }
+	/* A foul note (who was booked, who is hurt): a compact strip near the top, not a headline over play. */
+	.banner.note { font-size: clamp(14px, 1.5vw, 18px); font-weight: 700; letter-spacing: 0.03em; text-transform: none; width: auto; max-width: min(80%, 640px); top: 26%; text-align: center; line-height: 1.3; padding: 7px 14px; background: rgba(9, 13, 16, 0.84); border-left: 4px solid currentColor; border-radius: 4px; text-shadow: none; }
 	.banner.home { color: var(--amber); }
 	.banner.away { color: var(--opp-text); }
 

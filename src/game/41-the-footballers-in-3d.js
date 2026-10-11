@@ -349,9 +349,15 @@
 			r.hip[i].rotation.z = A * sn * limp;
 			r.kn[i].rotation.z = -(K * clamp(cs, 0, 1) * clamp(a + 0.15, 0, 1) + 0.12 + 0.1 * a) * limp;
 			r.an[i].rotation.z = 0.25 * a * clamp(-sn, 0, 1) - 0.1 * clamp(cs, 0, 1) * a;
-			// the arm drives forward and slightly across, the elbow closing as it comes through
-			r.sh[i].rotation.z = -armA * sn; r.sh[i].rotation.x = s * (0.1 + 0.08 * a - 0.07 * a * clamp(-sn, 0, 1));
-			r.el[i].rotation.z = 0.45 + gv.elbow + 0.85 * a + 0.15 * a * clamp(-sn, 0, 1);
+			// The arm: the upper arm swings further back than forward, and the forearm is steered to an angle
+			// (from hanging straight down) rather than the elbow to a fixed bend, so the hand comes through
+			// from beside the hip (about 0.95 rad) to chest height in front (about 1.85) with the elbow near
+			// a right angle, never reaching out straight or trailing behind the body.
+			const sw = -sn, run = clamp((a - 0.12) / 0.35, 0, 1);
+			r.sh[i].rotation.z = armA * (sw > 0 ? 0.62 * sw : 0.85 * sw);
+			r.sh[i].rotation.x = s * (0.1 + 0.08 * a - 0.07 * a * clamp(sw, 0, 1));
+			const fore = 0.95 + 0.9 * (sw + 1) / 2 + gv.elbow * 0.5;
+			r.el[i].rotation.z = lerp3(0.45 + gv.elbow + 0.5 * a, clamp(fore - r.sh[i].rotation.z, 1.0, 1.75), run);
 		}
 		r.hips.position.y = 15.6 - 0.5 * a + Math.abs(Math.cos(ph)) * 0.9 * a * gv.bounce + (a < 0.2 ? Math.sin(idle) * 0.12 : 0);
 		r.spine.rotation.z = 0.06 + 0.2 * a * a + gv.lean * a;
@@ -401,9 +407,8 @@
 		// less than back (about 0.55 rad against 0.95), and the more it is forward the less the elbow
 		// folds, so the forearm never points at the sky.
 		for (let i = 0; i < 2; i++) {
-			const fw = r.sh[i].rotation.z > 0 ? r.sh[i].rotation.z * 0.62 : r.sh[i].rotation.z;
-			r.sh[i].rotation.z = clamp(fw, -0.95, 0.55);
-			r.el[i].rotation.z = Math.min(r.el[i].rotation.z, 1.55, 1.9 - Math.max(0, r.sh[i].rotation.z));
+			r.sh[i].rotation.z = clamp(r.sh[i].rotation.z, -0.95, 0.62);
+			r.el[i].rotation.z = Math.min(r.el[i].rotation.z, 1.8, 2.0 - Math.max(0, r.sh[i].rotation.z));
 		}
 		// Eyes on the ball: the head turns toward it when it is near, and drops to the feet on the ball.
 		if (!rm && ball && fall < 0 && dive < 0 && thr < 0 && cel <= 0 && !down) {
