@@ -135,6 +135,14 @@ const dress = await page.evaluate(async () => {
 	const a1 = G.endFlags && G.endFlags[0] ? G.endFlags[0].cloth.geometry.attributes.position.array.at(-1) : 0;
 	return { flags, banners, waves: a0 !== a1, drawMs: +F.drawMs.toFixed(2) };
 });
+const tired = await page.evaluate(() => new Promise(res => {
+	const F = window.__ff; for (let i = 0; i < 3000 && F.state !== "play"; i++) { F.step(1); } F.freeze = 0;
+	const keep = F.players.map(p => p.sta); for (const p of F.players) { p.sta = 0.3; }
+	let n = 0, bent = 0;
+	const tick = () => { F.players.forEach((p, i) => { const r = F.G3.fig.rigs[i]; if (r && F.state === "play" && F.freeze <= 0 && r.spine.rotation.z > 0.55) { bent++; } }); if (++n < 90) { requestAnimationFrame(tick); } else { F.players.forEach((p, i) => { p.sta = keep[i]; }); res({ bent }); } };
+	requestAnimationFrame(tick);
+}));
+check("exhausted players stay upright in open play (no bending over mid-match)", tired.bent === 0, JSON.stringify(tired));
 check("home ends dressed: banners and big flags that wave", dress.banners >= 1 && dress.flags >= 3 && dress.waves, JSON.stringify(dress));
 await browser.close(); server.stop();
 process.exit(done() ? 1 : 0);

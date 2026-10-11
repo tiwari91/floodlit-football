@@ -382,11 +382,11 @@
 			r.chest.rotation.y += (sd - 0.5) * 0.4 * still;
 			r.spine.rotation.z += Math.sin(idle * 1.3) * 0.015 * still;
 			for (let i = 0; i < 2; i++) { r.el[i].rotation.z += (0.1 + 0.3 * ((sd * 7.3 + i * 0.31) % 1)) * still; }
-			const calm = state !== "play" || freeze > 0 || !ball || Math.hypot(ball.x - p.x, ball.y - p.y) > 300;   // never mid-play with the ball near
+			const calm = state !== "play" || freeze > 0;   // only at a stoppage: in open play a tired man stays upright
 			const w = p.team >= 0 && calm ? clamp((0.6 - staOf(p)) / 0.25, 0, 1) * still : 0;
 			if (w > 0) {
-				r.spine.rotation.z += 0.75 * w; r.hips.position.y -= 1.6 * w; r.neck.rotation.z -= 0.45 * w;
-				for (let i = 0; i < 2; i++) { r.kn[i].rotation.z -= 0.45 * w; r.hip[i].rotation.z += 0.35 * w; r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 0.32, w); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, (i ? 1 : -1) * 0.08, w); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.1, w); }
+				r.spine.rotation.z += 0.5 * w; r.hips.position.y -= 1.1 * w; r.neck.rotation.z -= 0.35 * w;
+				for (let i = 0; i < 2; i++) { r.kn[i].rotation.z -= 0.3 * w; r.hip[i].rotation.z += 0.25 * w; r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 0.32, w); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, (i ? 1 : -1) * 0.08, w); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.1, w); }
 			}
 		}
 		r.hips.rotation.x = clamp(turn * 1.4, -0.3, 0.3) * clamp(spd, 0, 1);
