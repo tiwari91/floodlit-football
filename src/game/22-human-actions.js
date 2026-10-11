@@ -48,9 +48,17 @@
 		if (lead) {
 			// Through ball: into the space ahead of the teammate, toward goal.
 			// Charged: a soft one is played to feet-ish, a driven one well into the space.
-			const tx = clamp(m.x + (passPow < 0 ? 130 : 80 + passPow * 100), 40, FW - 40), ty = m.y;
+			// Into his path: where his run is going, else the space between him and goal.
+			const [ lx, ly ] = m.run ? [ m.run.x, m.run.y ] : leadPoint(p, m), lk = passPow < 0 ? 1 : 0.6 + passPow * 0.6;
+			let ox = (lx - m.x) * lk, oy = (ly - m.y) * lk;
+			const ol = Math.hypot(ox, oy), cap = 170 * Math.sqrt(S);
+			if (ol > cap) { ox *= cap / ol; oy *= cap / ol; }   // a few strides ahead of him, not half the pitch
+			const tx = clamp(m.x + ox, 40, FW - 40), ty = clamp(m.y + oy, 30, FH - 30);
 			const je = passErr(p);
-			kick(p, tx + (Math.random() * 2 - 1) * je, ty + (Math.random() * 2 - 1) * je, clamp((Math.hypot(tx - ball.x, ty - ball.y) / 55 + 2) * cond.passComp * passMul(), 6, 19));
+			// Weighted to arrive with the runner: enough to roll the distance and still be moving (about 4.5)
+			// when he gets there, never so soft a defender can step across it.
+			const dd = Math.hypot(tx - ball.x, ty - ball.y);
+			kick(p, tx + (Math.random() * 2 - 1) * je, ty + (Math.random() * 2 - 1) * je, clamp((dd * (1 - cond.roll) * 1.1 + 4.5) * passMul(), 8, 16));
 		} else {
 			passTo(p, m);
 		}
@@ -120,6 +128,28 @@
 		handOff(m, 170);
 	}
 
+	// Who a through ball is for: a teammate ahead of you, onside, best of all one already making a
+	// run in behind or round the outside, with space to run into and no opponent in the lane to it.
+	// Roughly the way you face counts, but far less than for a pass to feet. Nobody ahead: the
+	// ordinary pass target.
+	function throughTarget (p) {
+		const line = offsideOn() ? offsideLine(0) : Infinity;
+		let best = null, bs = -Infinity;
+		for (const m of outfield(0)) {
+			if (m === p || m.x < p.x + 25 * Math.sqrt(S)) { continue; }
+			if (offsideOn() && isOffside(m, line)) { continue; }
+			const a = Math.atan2(m.y - p.y, m.x - p.x), face = Math.cos(a - p.dir);
+			if (face < -0.3) { continue; }
+			const [ lx, ly ] = leadPoint(p, m), d = Math.hypot(m.x - p.x, m.y - p.y);
+			if (d > 480 * Math.sqrt(S)) { continue; }   // further than that is a long ball (Q)
+			const space = Math.min(...players.filter(q => q.team === 1).map(q => Math.hypot(q.x - lx, q.y - ly)));
+			const s = (m.run ? (m.run.kind === "behind" ? 1.3 : 0.8) : 0) + (m.role === "fwd" ? 0.5 : m.role === "mid" ? 0.2 : -0.4)
+				+ clamp(space / 140, 0, 1.2) - laneBlockers(p, { x: lx, y: ly }) * 1.5 - laneBlockers(p, m) * 0.5 + face * 0.6 + (m.x - p.x) / 900 + clamp(Math.hypot(m.vx, m.vy) / 3, 0, 0.4);
+			if (s > bs) { bs = s; best = m; }
+		}
+		return best || passTarget(p);
+	}
+
 	function humanThrough () {
 		const p = human();
 		if (ball.owner !== p) { return; }
@@ -129,7 +159,7 @@
 			takeSetPiece(p, false, "through");
 			return;
 		}
-		const m = passTarget(p);
+		const m = throughTarget(p);
 		if (m) { startPass(p, m, true); }
 	}
 

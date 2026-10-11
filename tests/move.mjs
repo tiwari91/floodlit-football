@@ -143,6 +143,26 @@ const tired = await page.evaluate(() => new Promise(res => {
 	requestAnimationFrame(tick);
 }));
 check("exhausted players stay upright in open play (no bending over mid-match)", tired.bent === 0, JSON.stringify(tired));
+// Through balls (W) go forward to a teammate ahead of you, preferring runners, and you take control of him.
+const tb = await page.evaluate(() => {
+	const F = window.__ff, out = { n: 0, ahead: 0, ctrl: 0, withAhead: 0 };
+	for (let t = 0; t < 40 && out.n < 15; t++) {
+		for (let i = 0; i < 4000 && F.state !== "play"; i++) { F.step(1); }
+		F.freeze = 0; F.timeLeft = 1e9;
+		const me = F.human();
+		F.ball.owner = me; F.ball.z = 0; F.possTeam = 0; me.dir = 0;
+		for (let i = 0; i < 60; i++) { F.step(1); }
+		if (F.ball.owner !== me || F.state !== "play") { continue; }
+		const anyAhead = F.players.some(q => q.team === 0 && q.role !== "gk" && q !== me && q.x > me.x + 60 && Math.hypot(q.x - me.x, q.y - me.y) < 450);
+		F.press("KeyW"); F.step(1); F.release("KeyW");
+		const tgt = F.players[F.ctrl];
+		if (tgt === me) { continue; }
+		out.n++; if (anyAhead) { out.withAhead++; if (tgt.x > me.x) { out.ahead++; } }
+		if (F.receiver === tgt) { out.ctrl++; }
+	}
+	return out;
+});
+check("through balls go forward to a runner when one is ahead, and control follows the ball", tb.n >= 8 && tb.ahead >= tb.withAhead * 0.8 && tb.ctrl === tb.n, JSON.stringify(tb));
 check("home ends dressed: banners and big flags that wave", dress.banners >= 1 && dress.flags >= 3 && dress.waves, JSON.stringify(dress));
 await browser.close(); server.stop();
 process.exit(done() ? 1 : 0);

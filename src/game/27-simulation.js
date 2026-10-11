@@ -239,7 +239,9 @@
 		// or it dies; auto-switch stays off meanwhile.
 		if (receiver) {
 			receiveTimer--;
-			if (ball.owner || receiveTimer <= 0 || Math.hypot(ball.vx, ball.vy) < 1) { receiver = null; }
+			// A pass that has died stays his to fetch while he is the nearest of yours to it.
+			const dead = Math.hypot(ball.vx, ball.vy) < 1, nearest = dead && outfield(0).every(q => q === receiver || dist(q, ball) > dist(receiver, ball));
+			if (ball.owner || receiveTimer <= 0 || (dead && !nearest)) { receiver = null; }
 		}
 		// Once your keeper has played it, control leaves him at once: you never run him out of goal by accident.
 		if (human().role === "gk" && ball.owner !== human() && !receiver) {
