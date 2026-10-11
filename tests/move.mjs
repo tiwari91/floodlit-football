@@ -163,6 +163,24 @@ const tb = await page.evaluate(() => {
 	return out;
 });
 check("through balls go forward to a runner when one is ahead, and control follows the ball", tb.n >= 8 && tb.ahead >= tb.withAhead * 0.8 && tb.ctrl === tb.n, JSON.stringify(tb));
+// A loose ball arriving at one of your players far from your man: control goes to him as it gets there.
+const arrive = await page.evaluate(() => {
+	const F = window.__ff, out = { n: 0, ok: 0 };
+	for (let t = 0; t < 8; t++) {
+		for (let i = 0; i < 4000 && F.state !== "play"; i++) { F.step(1); }
+		F.freeze = 0; F.timeLeft = 1e9; F.autoSwitchMode = "assisted";
+		const me = F.human(), mates = F.outfield(0).filter(q => q !== me), m = mates[t % mates.length];
+		for (const q of F.players) { if (q !== m) { q.x = q.team === 0 ? 60 : F.FW - 60; q.y = 40 + F.players.indexOf(q) * 20; q.vx = q.vy = 0; } }
+		me.x = F.FW * 0.2; me.y = F.FH * 0.9;
+		m.x = F.FW * 0.55; m.y = F.FH * 0.4; m.vx = m.vy = 0;
+		F.ball.owner = null; F.ball.z = 0; F.ball.x = m.x - 160; F.ball.y = m.y; F.ball.vx = 5; F.ball.vy = 0;
+		let got = false;
+		for (let i = 0; i < 60; i++) { F.step(1); if (F.players[F.ctrl] === m) { got = true; break; } }
+		out.n++; if (got) { out.ok++; }
+	}
+	return out;
+});
+check("a loose ball arriving at a teammate hands you control of him", arrive.ok >= arrive.n - 1, JSON.stringify(arrive));
 check("home ends dressed: banners and big flags that wave", dress.banners >= 1 && dress.flags >= 3 && dress.waves, JSON.stringify(dress));
 await browser.close(); server.stop();
 process.exit(done() ? 1 : 0);

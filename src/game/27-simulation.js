@@ -248,6 +248,17 @@
 			const b = bestDefender(human());
 			if (b) { ctrl = players.indexOf(b); switchCd = 20; autoHold = AUTO_HOLD; lastSwitchKind = "gk"; }
 		}
+		// A loose ball arriving at one of yours: you get him (the same "near" switch as in switchToNearest, but
+		// also during a switch cooldown or a manual hold, which is when it used to be missed), so you're the one who takes the touch. He has
+		// to be the nearest player of either side to it, close to it (within a couple of strides), and
+		// clearly nearer than the man you have. Not with Auto switch on Manual only, and not a ball overhead.
+		if (!ball.owner && !receiver && autoSwitchMode !== "manual" && (ball.z || 0) < 30 && freeze <= 0 && !setPiece) {
+			const me = human(), near = outfield(0).reduce((a, q) => (dist(q, ball) < dist(a, ball) ? q : a), me);
+			const reach = 55 * Math.sqrt(S), dn = dist(near, ball);
+			if (near !== me && dn < reach && dn + 25 < dist(me, ball) && players.every(q => q.team === 0 || dist(q, ball) > dn - 4)) {
+				ctrl = players.indexOf(near); switchCd = 20; autoHold = AUTO_HOLD; manualLock = 0; lastSwitchKind = "near"; flashPlayer(near);
+			}
+		}
 		if (!receiver && !(ball.owner && ball.owner.team === 0) && switchCd <= 0 && manualLock <= 0) { switchToNearest(false); }
 
 		// Nobody presses a keeper holding the ball: both sides drop back into shape.
