@@ -357,8 +357,9 @@
 					Ln.push(...top, ...tip, ...top, ...at(j, (rIn + rOut) / 2, 0, (hIn + hOut) / 2 + 1));
 				}
 			}
-			// The ground's name along the far roof's front edge.
-			G3.signAt = { y: hIn - 4.5, z: -F_SIDE3 - rIn - 0.6 };
+			// The ground's name hung on the far roof's front edge, just in front of it (pitch side) so the
+			// edge never cuts through the lettering.
+			G3.signAt = { y: hIn - 6, z: -F_SIDE3 - rIn + 1.2 };
 		} else {
 			G3.signAt = { y: P.top + 20, z: -F_SIDE3 - P.back + 2 };
 		}

@@ -90,9 +90,9 @@ check("the kick-off line-ups close on your first key in play", lu.state === "pla
 // the half-time comparison fits without scrolling and its possession bar has width.
 const ov = await page.evaluate(async () => {
 	const F = window.__ff, wait = ms => new Promise(r => setTimeout(r, ms)), bn = document.getElementById("banner");
-	F.state === "play" || (F.state = "play"); F.freeze = 0; F.forceGoal(1);
+	F.state === "play" || (F.state = "play"); F.freeze = 0; document.getElementById("bcLineups").hidden = false; document.getElementById("coachMark").hidden = false; F.forceGoal(1);
 	for (let i = 0; i < 60 && F.state !== "goal"; i++) { F.step(1); }
-	const cls = bn.className;
+	const cls = bn.className, clear = document.getElementById("bcLineups").hidden && document.getElementById("coachMark").hidden;
 	await wait(400);
 	const early = +getComputedStyle(bn).opacity;
 	await wait(2300);
@@ -100,9 +100,9 @@ const ov = await page.evaluate(async () => {
 	F.board([ [ "Added time", "add", "+3" ] ], 3000);
 	const cv = document.querySelector(".pitchwrap canvas").getBoundingClientRect(), bd = document.getElementById("bcBoard").getBoundingClientRect();
 	const tagBottom = 88 * cv.height / (document.querySelector(".pitchwrap canvas").height / F.scale);
-	return { cls, early, gone, boardTop: bd.top - cv.top, tagBottom };
+	return { cls, clear, early, gone, boardTop: bd.top - cv.top, tagBottom };
 });
-check("a goal banner shows, then clears within ~2.7 s so the celebration is visible", /\bgoal\b/.test(ov.cls) && ov.early > 0.5 && ov.gone, JSON.stringify(ov));
+check("a goal banner shows alone (no line-ups or tip over it), then clears within ~2.7 s", /\bgoal\b/.test(ov.cls) && ov.clear && ov.early > 0.5 && ov.gone, JSON.stringify(ov));
 check("the officials' board sits below the weather and tactic tags", ov.boardTop >= ov.tagBottom, JSON.stringify(ov));
 const ht = await page.evaluate(async () => {
 	const F = window.__ff; F.halfTime(); await new Promise(r => setTimeout(r, 600));
