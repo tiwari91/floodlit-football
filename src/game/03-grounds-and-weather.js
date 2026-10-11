@@ -46,24 +46,54 @@
 	}
 	cond = makeConditions("grass", "clear");
 
-	// League forecast. Matchdays 10 to 26 are the rainy season (autumn into winter).
-	const isRainy = r => r >= 9 && r <= 25;
-	// Wind and kick-off time for each matchday: winter is windier and more of it is played at night.
-	function genWind (n) {
+	// League forecast, by the country the league is in. Each climate names the rainy stretch of the
+	// season (matchdays 10 to 26 at home, autumn into winter; elsewhere a share of the season), the
+	// chance of rain and of heavy rain in that stretch and out of it, how windy it is, and the share of
+	// night kick-offs in and out of it (hot countries play in the evening).
+	const CLIMATES = {
+		home: { rounds: [ 9, 25 ], rain: [ 0.8, 0.27 ], heavy: [ 0.3, 0.07 ], wind: 1, night: [ 0.65, 0.35 ] },
+		maritime: { wet: [ 0.2, 0.7 ], rain: [ 0.75, 0.32 ], heavy: [ 0.24, 0.07 ], wind: 1.25, night: [ 0.65, 0.35 ] },
+		continental: { wet: [ 0.3, 0.6 ], rain: [ 0.55, 0.3 ], heavy: [ 0.16, 0.1 ], wind: 0.9, night: [ 0.55, 0.35 ] },
+		med: { wet: [ 0.3, 0.6 ], rain: [ 0.38, 0.07 ], heavy: [ 0.1, 0.02 ], wind: 0.75, night: [ 0.6, 0.85 ] },
+		arid: { wet: [ 0.4, 0.55 ], rain: [ 0.14, 0.03 ], heavy: [ 0.05, 0.01 ], wind: 0.9, night: [ 0.8, 0.85 ] },
+		tropical: { wet: [ 0.35, 0.8 ], rain: [ 0.6, 0.15 ], heavy: [ 0.38, 0.07 ], wind: 0.7, night: [ 0.75, 0.7 ] },
+		pampas: { wet: [ 0.6, 0.9 ], rain: [ 0.35, 0.2 ], heavy: [ 0.12, 0.05 ], wind: 1.35, night: [ 0.65, 0.55 ] },
+		monsoon: { wet: [ 0.4, 0.65 ], rain: [ 0.7, 0.2 ], heavy: [ 0.4, 0.05 ], wind: 1.1, night: [ 0.75, 0.45 ] },
+		sunny: { wet: [ 0.45, 0.65 ], rain: [ 0.25, 0.1 ], heavy: [ 0.1, 0.03 ], wind: 1.05, night: [ 0.55, 0.65 ] }
+	};
+	const CLIMATE_OF = {
+		NED: "maritime", BEL: "maritime", DEN: "maritime", FRA: "maritime",
+		GER: "continental", POL: "continental", SRB: "continental", CRO: "continental", SWE: "continental",
+		ESP: "med", ITA: "med", POR: "med", CHI: "med",
+		MAR: "arid", MEX: "arid", USA: "sunny", AUS: "sunny",
+		BRA: "tropical", COL: "tropical", NGA: "tropical", GHA: "tropical", SEN: "tropical", CIV: "tropical", CMR: "tropical",
+		ARG: "pampas", URU: "pampas", JPN: "monsoon", KOR: "monsoon"
+	};
+	const climateOf = nat => CLIMATES[CLIMATE_OF[nat]] || CLIMATES.home;
+	const inWet = (c, r, n) => (c.rounds ? r >= c.rounds[0] && r <= c.rounds[1] : r / Math.max(1, n) >= c.wet[0] && r / Math.max(1, n) <= c.wet[1]);
+	// Wind and kick-off time for each matchday: the rainy stretch is windier and more of it is played at night.
+	function genWind (n, nat) {
+		const c = climateOf(nat);
 		return Array.from({ length: n }, (_, r) => {
-			const x = Math.random(), wet = isRainy(r);
+			const x = Math.random(), wet = inWet(c, r, n);
 			const s = x < (wet ? 0.35 : 0.55) ? Math.random() * 9 : x < (wet ? 0.8 : 0.9) ? 10 + Math.random() * 14 : 24 + Math.random() * 18;
-			return { s: Math.round(s), a: Math.round(Math.random() * 628) / 100 };
+			return { s: Math.round(Math.min(45, s * c.wind)), a: Math.round(Math.random() * 628) / 100 };
 		});
 	}
-	const genKickoff = n => Array.from({ length: n }, (_, r) => (Math.random() < (isRainy(r) ? 0.65 : 0.35) ? "night" : "day"));
+	const genKickoff = (n, nat) => { const c = climateOf(nat); return Array.from({ length: n }, (_, r) => (Math.random() < c.night[inWet(c, r, n) ? 0 : 1] ? "night" : "day")); };
 	const koLabel = k => (k === "day" ? "3pm" : "7.45pm");
-	function genForecast (n) {
+	function genForecast (n, nat) {
+		const c = climateOf(nat);
 		return Array.from({ length: n }, (_, r) => {
-			const x = Math.random();
-			if (isRainy(r)) { return x < 0.3 ? "heavy" : x < 0.8 ? "rain" : "clear"; }
-			return x < 0.07 ? "heavy" : x < 0.27 ? "rain" : "clear";
+			const x = Math.random(), i = inWet(c, r, n) ? 0 : 1;
+			return x < c.heavy[i] ? "heavy" : x < c.rain[i] ? "rain" : "clear";
 		});
+	}
+	// A league's calendar of weather for its country, from matchday `from` on (the days played stay).
+	function forecastLeague (lg, from = 0) {
+		const n = lg.fixtures.length, nat = lg.ident && lg.ident.country;
+		const keep = (old, fresh) => (Array.isArray(old) && old.length === n ? old.slice(0, from).concat(fresh.slice(from)) : fresh);
+		lg.weather = keep(lg.weather, genForecast(n, nat)); lg.wind = keep(lg.wind, genWind(n, nat)); lg.ko = keep(lg.ko, genKickoff(n, nat));
 	}
 
 	const stars = v => { const n = Math.max(0, Math.min(5, Math.round(v))); return "★".repeat(n) + "☆".repeat(5 - n); };

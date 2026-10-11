@@ -85,9 +85,9 @@
 		if (lg.cpuIn && typeof lg.cpuIn === "object") { for (const ins of Object.values(lg.cpuIn)) { if (Array.isArray(ins)) { for (const d of ins) { if (d && d.pl) { capRating(d.pl); } } } } }
 		ensureCoaching(lg.club, lg);
 		if (!Array.isArray(lg.clubStr) || lg.clubStr.length !== TEAMS.length) { lg.clubStr = TEAMS.map(t => t.str); }
-		if (!Array.isArray(lg.weather) || lg.weather.length !== lg.fixtures.length) { lg.weather = genForecast(lg.fixtures.length); }
-		if (!Array.isArray(lg.wind) || lg.wind.length !== lg.fixtures.length || !lg.wind.every(w => w && Number.isFinite(w.s) && Number.isFinite(w.a))) { lg.wind = genWind(lg.fixtures.length); }
-		if (!Array.isArray(lg.ko) || lg.ko.length !== lg.fixtures.length) { lg.ko = genKickoff(lg.fixtures.length); }
+		if (!Array.isArray(lg.weather) || lg.weather.length !== lg.fixtures.length) { lg.weather = genForecast(lg.fixtures.length, lg.ident && lg.ident.country); }
+		if (!Array.isArray(lg.wind) || lg.wind.length !== lg.fixtures.length || !lg.wind.every(w => w && Number.isFinite(w.s) && Number.isFinite(w.a))) { lg.wind = genWind(lg.fixtures.length, lg.ident && lg.ident.country); }
+		if (!Array.isArray(lg.ko) || lg.ko.length !== lg.fixtures.length) { lg.ko = genKickoff(lg.fixtures.length, lg.ident && lg.ident.country); }
 		return lg;
 	}
 

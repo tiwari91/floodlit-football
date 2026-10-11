@@ -146,7 +146,7 @@
 		// The next ten matchdays.
 		league.weather.forEach((w, r) => {
 			if (r < league.round || r >= league.round + 10) { return; }
-			const li = el("li", `fc-${w}${r === league.round ? " now" : ""}${r < league.round ? " past" : ""}${isRainy(r) ? " wet-season" : ""}`);
+			const li = el("li", `fc-${w}${r === league.round ? " now" : ""}${r < league.round ? " past" : ""}${inWet(climateOf(league.ident && league.ident.country), r, league.fixtures.length) ? " wet-season" : ""}`);
 			const wn = league.wind[r], ko = league.ko[r];
 			li.append(el("b", "", String(r + 1)), el("span", "", w === "clear" ? "Dry" : w === "rain" ? "Rain" : "Heavy"), el("span", "fc-ko", `${ko === "day" ? "☀" : "☾"}${wn.s >= 20 ? "≈" : ""}`));
 			li.title = `Matchday ${r + 1}: ${WEATHER[w].label}, wind ${wn.s} km/h, ${ko === "day" ? "afternoon" : "night"} kick-off`;

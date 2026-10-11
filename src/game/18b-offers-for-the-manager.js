@@ -121,6 +121,7 @@
 		league.career = career;
 		rememberIdentity(league);
 		league.ident.country = FOREIGN[offer.nat] ? offer.nat : undefined;
+		forecastLeague(league);   // that country's weather
 		league.news = `${league.news || ""} A new country: you are the manager of ${YOU.name} in ${country}.`.trim();
 		lastDeal = `You are the new manager of ${YOU.name} in ${country}: a fresh league, ${money(offer.budget)} to spend.`;
 		saveLeague();

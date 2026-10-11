@@ -63,9 +63,9 @@
 			clubStr,
 			ident: prev && prev.ident ? prev.ident : undefined,
 			paid: false,
-			weather: genForecast(fixtures.length),
-			wind: genWind(fixtures.length),
-			ko: genKickoff(fixtures.length),
+			weather: genForecast(fixtures.length, prev && prev.ident && prev.ident.country),
+			wind: genWind(fixtures.length, prev && prev.ident && prev.ident.country),
+			ko: genKickoff(fixtures.length, prev && prev.ident && prev.ident.country),
 			news: [
 				youDown ? "You finished in the relegation zone. The board kept you up but halved the budget." : "",
 				promoted.length ? `Promoted: ${promoted.map(i => TEAMS[i].name).join(", ")}.` : "",

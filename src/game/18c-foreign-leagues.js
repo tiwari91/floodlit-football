@@ -72,6 +72,7 @@
 		if (!nat || !applyForeignLeague(nat)) { return false; }
 		rememberIdentity(lg);
 		lg.ident.country = nat;
+		if (Array.isArray(lg.fixtures)) { forecastLeague(lg, lg.round || 0); }   // its weather from the next matchday
 		lg.news = `${lg.news || ""} Your league is now the ${FOREIGN[nat][0]} in ${NATIONS[nat] ? NATIONS[nat][0] : nat}.`.trim();
 		return true;
 	}

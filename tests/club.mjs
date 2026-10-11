@@ -276,6 +276,24 @@ const loaded = await (async () => {
 check("a saved league with a 52-year-old loads cleanly: he and the 50-year-old retire, the news says so", loaded.max <= 39 && /Retired: .*\(52\).*\(50\)|Retired: .*\(50\).*\(52\)/.test(loaded.news) && loaded.xi === 11, JSON.stringify(loaded));
 check("over thirty summers nobody plays past 37, no keeper past 39", ages.worstOut <= 37 && ages.worstGk <= 39, JSON.stringify(ages));
 
+// Weather follows the country: Spain and Morocco drier than home, the tropics wetter and stormier,
+// hot countries play more at night, and the home league is as before.
+const clim = await page.evaluate(() => {
+	const F = window.__ff, out = {};
+	for (const nat of [ undefined, "ESP", "MAR", "NGA", "NED", "MEX" ]) {
+		let rain = 0, heavy = 0, night = 0, wind = 0, n = 0;
+		for (let i = 0; i < 60; i++) {
+			const c = F.climateTest(38, nat);
+			for (let r = 0; r < 38; r++) { n++; rain += c.weather[r] !== "clear"; heavy += c.weather[r] === "heavy"; night += c.ko[r] === "night"; wind += c.wind[r].s; }
+		}
+		out[nat || "home"] = { rain: +(rain / n).toFixed(2), heavy: +(heavy / n).toFixed(2), night: +(night / n).toFixed(2), wind: +(wind / n).toFixed(1) };
+	}
+	return out;
+});
+check("weather by country: Spain and Morocco drier, Nigeria stormier, the Dutch windier, hot countries at night",
+	clim.ESP.rain < clim.home.rain * 0.6 && clim.MAR.rain < 0.12 && clim.NGA.heavy > clim.home.heavy && clim.NED.wind > clim.home.wind * 1.1 && clim.MEX.night > clim.home.night + 0.2 && Math.abs(clim.home.rain - 0.5) < 0.12,
+	JSON.stringify(clim));
+
 check("no console errors", errs.length === 0, errs.join(" | "));
 await browser.close(); server.stop();
 process.exit(done() ? 1 : 0);
