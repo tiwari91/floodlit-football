@@ -65,7 +65,14 @@
 	function drawFigures3D (WX, WD) {
 		const F = G3.fig;
 		for (const k in F.parts) { F.cnt[k] = 0; }
-		F.n = 0; F.nums.count = 0; F.rings.count = 0; F.blobs.count = 0; F.longs.count = 0;
+		F.n = 0; F.nums.count = 0; if (F.chest) { F.chest.count = 0; }
+		// Repaint the chest prints when the kits or the clubs change.
+		const ck = `${KITS[0].outfield}${KITS[0].second}${KITS[0].ink}|${KITS[1].outfield}${KITS[1].second}${KITS[1].ink}|${YOU.name}|${opp && opp.name}`;
+		if (F.chest && F.chestKey !== ck) {
+			F.chestKey = ck;
+			const g = F.chestCv.getContext && F.chestCv.getContext("2d");
+			if (g) { paintChest3D(g, 0, KITS[0], YOU); paintChest3D(g, 1, KITS[1], opp); F.chestTex.needsUpdate = true; }
+		} F.rings.count = 0; F.blobs.count = 0; F.longs.count = 0;
 		const dt = frameDt / 16.7;
 		for (const p of players) {
 			if (F.n >= MAXF3) { break; }
@@ -126,5 +133,6 @@
 		const tg = F.parts.torso.geometry;
 		tg.attributes.aPat.needsUpdate = true; tg.attributes.aCol2.needsUpdate = true;
 		for (const m of [ F.nums, F.rings, F.blobs, F.longs ]) { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) { m.instanceColor.needsUpdate = true; } }
+		if (F.chest) { F.chest.instanceMatrix.needsUpdate = true; F.chest.geometry.attributes.aRow.needsUpdate = true; }
 		F.nums.geometry.attributes.aCell.needsUpdate = true;
 	}

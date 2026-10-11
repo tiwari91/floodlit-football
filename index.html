@@ -11436,6 +11436,35 @@
 		const w = a[1] + (b[1] - a[1]) * t, db = a[3] + (b[3] - a[3]) * t, q = clamp(Math.abs(z) / w, 0, 0.999);
 		return db * Math.pow(1 - Math.pow(q, TORSO_EX3), 1 / TORSO_EX3);
 	}
+	// How far the front of the shirt is from the spine at height y, across at z.
+	function frontDepth3D (y, z) {
+		let i = 0;
+		while (i < TORSO3.length - 2 && TORSO3[i + 1][0] < y) { i++; }
+		const a = TORSO3[i], b = TORSO3[i + 1], t = clamp((y - a[0]) / (b[0] - a[0]), 0, 1);
+		const w = a[1] + (b[1] - a[1]) * t, df = a[2] + (b[2] - a[2]) * t, q = clamp(Math.abs(z) / w, 0, 0.999);
+		return df * Math.pow(1 - Math.pow(q, TORSO_EX3), 1 / TORSO_EX3);
+	}
+	// The front of the shirt: the club's crest on the left breast, a kit maker's mark on the right and a
+	// shirt sponsor across the chest, all invented. One atlas row per side, repainted when the kits change.
+	const SPONSORS3 = [ "NORTHLINE", "KESTREL AIR", "VOLTA", "BRIGHTWATER", "ORBITEL", "HALCYON", "TERRAFOLD", "MERIDIAN", "AXIOM BANK", "SUNVALE", "CORAL TELECOM", "FENWAY TYRES" ];
+	function paintChest3D (g, row, kit, club) {
+		const y0 = row * 128, ink = kit.ink || "#ffffff", w = 512;
+		g.clearRect(0, y0, w, 128);
+		const name = (club && club.name) || "Club", h = [ ...name ].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) % 2147483647, 7);
+		// the crest (on the wearer's left, so the viewer's right): a shield in the trim colour with the initial
+		const cx = w * 0.7, cy = y0 + 34, sc = 1.35;
+		g.beginPath(); g.moveTo(cx - 15 * sc, cy - 18 * sc); g.lineTo(cx + 15 * sc, cy - 18 * sc); g.lineTo(cx + 15 * sc, cy + 2 * sc); g.quadraticCurveTo(cx + 13 * sc, cy + 16 * sc, cx, cy + 22 * sc); g.quadraticCurveTo(cx - 13 * sc, cy + 16 * sc, cx - 15 * sc, cy + 2 * sc); g.closePath();
+		g.fillStyle = kit.second && kit.second !== kit.outfield ? kit.second : ink; g.fill();
+		g.lineWidth = 3; g.strokeStyle = ink; g.stroke();
+		g.fillStyle = kit.outfield; g.font = "900 32px 'Big Shoulders Display', 'Arial Narrow', Arial, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle";
+		g.fillText(name.charAt(0).toUpperCase(), cx, cy + 1);
+		// the maker's mark: a small swoosh-like chevron (no real brand)
+		g.strokeStyle = ink; g.lineWidth = 6; g.lineCap = "round";
+		g.beginPath(); g.moveTo(w * 0.25, cy - 2); g.lineTo(w * 0.29, cy + 9); g.lineTo(w * 0.37, cy - 11); g.stroke();
+		// the sponsor across the chest
+		g.fillStyle = ink; g.font = "900 62px 'Barlow', 'Helvetica Neue', Arial, sans-serif"; g.textBaseline = "middle";
+		g.fillText(SPONSORS3[h % SPONSORS3.length], w / 2, y0 + 98, w * 0.94);
+	}
 	function initFigures3D () {
 		const T = THREE;
 		const defs = {
@@ -11583,6 +11612,23 @@
 		const nums = new T.InstancedMesh(ng, numMat, MAXF3);
 		nums.instanceMatrix.setUsage(T.DynamicDrawUsage); nums.setColorAt(0, white); nums.frustumCulled = false; nums.count = 0;
 		G3.scene.add(nums);
+		// The chest print, curved onto the front of the shirt like the number on the back.
+		const cc = document.createElement("canvas"); cc.width = 512; cc.height = 256;
+		const chestTex = tex3D(cc);
+		const chestMat = new T.MeshLambertMaterial({ map: chestTex, transparent: true, alphaTest: 0.3, polygonOffset: true, polygonOffsetFactor: -2 });
+		chestMat.onBeforeCompile = sh => {
+			sh.vertexShader = sh.vertexShader
+				.replace("#include <common>", "#include <common>\nattribute float aRow;")
+				.replace("#include <uv_vertex>", "#include <uv_vertex>\nvMapUv = vec2(uv.x, (uv.y + 1.0 - aRow) * 0.5);");
+		};
+		chestMat.customProgramCacheKey = () => "ff-chest";
+		const cg = new T.PlaneGeometry(5.6, 2.8, 8, 4).rotateY(Math.PI / 2).translate(0, 6.1, 0), CP = cg.attributes.position;
+		for (let i = 0; i < CP.count; i++) { CP.setX(i, frontDepth3D(CP.getY(i), CP.getZ(i)) + 0.06); }
+		cg.computeVertexNormals();
+		cg.setAttribute("aRow", new T.InstancedBufferAttribute(new Float32Array(MAXF3), 1).setUsage(T.DynamicDrawUsage));
+		const chest = new T.InstancedMesh(cg, chestMat, MAXF3);
+		chest.instanceMatrix.setUsage(T.DynamicDrawUsage); chest.frustumCulled = false; chest.count = 0;
+		G3.scene.add(chest);
 		// A kit-coloured ring at each player's feet (it keeps the sides readable from the gantry) and a soft shadow.
 		const rings = new T.InstancedMesh(G3.geo.ring, new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, depthWrite: false }), MAXF3);
 		const blobs = new T.InstancedMesh(G3.geo.shadow, new T.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.32, depthWrite: false }), MAXF3);
@@ -11613,7 +11659,7 @@
 			const hip = [ node(hips, 0, -1.0, -2.45), node(hips, 0, -1.0, 2.45) ], kn = hip.map(h => node(h, 0, -7.3, 0)), an = kn.map(k => node(k, 0, -6.5, 0));
 			rigs.push({ root, hips, spine, chest, neck, head, sh, el, ha, hip, kn, an });
 		}
-		G3.fig = { parts, nums, rings, blobs, longs, flags, rigs, cnt: {}, n: 0, M: new T.Matrix4(), M2: new T.Matrix4(), C: new T.Color(), V: new T.Vector3(), S: new T.Vector3(), Q: new T.Quaternion(), prevDir: new WeakMap(), yawSt: new WeakMap() };
+		G3.fig = { parts, nums, chest, chestCv: cc, chestTex, chestKey: '', rings, blobs, longs, flags, rigs, cnt: {}, n: 0, M: new T.Matrix4(), M2: new T.Matrix4(), C: new T.Color(), V: new T.Vector3(), S: new T.Vector3(), Q: new T.Quaternion(), prevDir: new WeakMap(), yawSt: new WeakMap() };
 	}
 	// Reset a rig to standing.
 	function resetRig3D (r) {
@@ -11833,7 +11879,7 @@
 		return {
 			shirt, shorts, socks: gk ? "#1f2a36" : shirt, second: kit.second || shirt, pattern: gk ? 0 : PATTERN3[kit.pattern] || 0,
 			ink: gk ? "#0e1a24" : kit.ink || "#ffffff", gloves: gk ? (lum(shirt) > 0.5 ? "#15181a" : "#f2f2f2") : null, sleeves: gk,
-			boots: BOOTS3[(p.num || 0) % BOOTS3.length], ring: shirt
+			boots: BOOTS3[(p.num || 0) % BOOTS3.length], ring: shirt, team: p.team, gk
 		};
 	}
 	// The trim (collar, cuffs, sock tops): the kit's second colour, or its number colour on a plain kit.
@@ -11901,6 +11947,11 @@
 			F.nums.setMatrixAt(n, rig.spine.matrixWorld);
 			F.nums.setColorAt(n, C.set(kit.ink));
 			F.nums.geometry.attributes.aCell.setX(n, clamp(Math.round(num), 0, 99));
+			if (F.chest && !kit.gk && (kit.team === 0 || kit.team === 1)) {
+				const c = F.chest.count++;
+				F.chest.setMatrixAt(c, rig.spine.matrixWorld);
+				F.chest.geometry.attributes.aRow.setX(c, kit.team);
+			}
 		}
 	}
 	/* ---------- the officials ----------
@@ -11970,7 +12021,14 @@
 	function drawFigures3D (WX, WD) {
 		const F = G3.fig;
 		for (const k in F.parts) { F.cnt[k] = 0; }
-		F.n = 0; F.nums.count = 0; F.rings.count = 0; F.blobs.count = 0; F.longs.count = 0;
+		F.n = 0; F.nums.count = 0; if (F.chest) { F.chest.count = 0; }
+		// Repaint the chest prints when the kits or the clubs change.
+		const ck = `${KITS[0].outfield}${KITS[0].second}${KITS[0].ink}|${KITS[1].outfield}${KITS[1].second}${KITS[1].ink}|${YOU.name}|${opp && opp.name}`;
+		if (F.chest && F.chestKey !== ck) {
+			F.chestKey = ck;
+			const g = F.chestCv.getContext && F.chestCv.getContext("2d");
+			if (g) { paintChest3D(g, 0, KITS[0], YOU); paintChest3D(g, 1, KITS[1], opp); F.chestTex.needsUpdate = true; }
+		} F.rings.count = 0; F.blobs.count = 0; F.longs.count = 0;
 		const dt = frameDt / 16.7;
 		for (const p of players) {
 			if (F.n >= MAXF3) { break; }
@@ -12031,6 +12089,7 @@
 		const tg = F.parts.torso.geometry;
 		tg.attributes.aPat.needsUpdate = true; tg.attributes.aCol2.needsUpdate = true;
 		for (const m of [ F.nums, F.rings, F.blobs, F.longs ]) { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) { m.instanceColor.needsUpdate = true; } }
+		if (F.chest) { F.chest.instanceMatrix.needsUpdate = true; F.chest.geometry.attributes.aRow.needsUpdate = true; }
 		F.nums.geometry.attributes.aCell.needsUpdate = true;
 	}
 	/* ---------- the crowd in 3D ----------
