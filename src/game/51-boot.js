@@ -62,7 +62,7 @@
 			get state () { return state; }, get frame () { return frame; }, get ctrl () { return ctrl; }, get players () { return players; },
 			get ball () { return ball; }, get score () { return score; }, get possFrames () { return possFrames; }, get possTeam () { return possTeam; },
 			get goalTimer () { return goalTimer; }, get timeLeft () { return timeLeft; }, get freeze () { return freeze; }, get FW () { return FW; }, get FH () { return FH; },
-			get manualLock () { return manualLock; }, get receiver () { return receiver; }, get celeb () { return typeof celeb === "undefined" ? null : celeb; },
+			get manualLock () { return manualLock; }, get receiver () { return receiver; }, get cond () { return cond; }, get celeb () { return typeof celeb === "undefined" ? null : celeb; },
 			get autoSwitchMode () { return autoSwitchMode; }, set autoSwitchMode (v) { autoSwitchMode = v; autoSwitchSel.value = v; },
 			get assistMode () { return assistMode; }, setAssist, assistRun, get lastDeal () { return lastDeal; }, valueOf, ovrNow, windowOpen,
 			offerJobs, takeJob, declineJob, get YOU () { return YOU; }, get TEAMS () { return TEAMS; },

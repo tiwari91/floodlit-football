@@ -65,6 +65,12 @@
 	function drawFigures3D (WX, WD) {
 		const F = G3.fig;
 		for (const k in F.parts) { F.cnt[k] = 0; }
+		// Each side's captain: chosen once per match (the best passer and defender together), and if he goes
+		// off the armband passes to the next in line.
+		if (!F.capt || F.captFor !== players || F.capt.some((c, t) => c && !players.includes(c))) {
+			F.captFor = players;
+			F.capt = [ 0, 1 ].map(t => outfield(t).reduce((a, q) => (!a || A(q, "pas") + A(q, "def") > A(a, "pas") + A(a, "def") ? q : a), null));
+		}
 		F.n = 0; F.nums.count = 0; if (F.chest) { F.chest.count = 0; } if (F.names) { F.names.count = 0; }
 		// Repaint the chest prints when the kits or the clubs change.
 		const ck = `${KITS[0].outfield}${KITS[0].second}${KITS[0].ink}|${KITS[1].outfield}${KITS[1].second}${KITS[1].ink}|${YOU.name}|${opp && opp.name}`;

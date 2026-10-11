@@ -10,7 +10,7 @@
 	// sized from this plan, so a pair of limbs always has two slots per figure.
 	const PART_PLAN3 = [
 		[ "torso", "spine" ], [ "collar", "spine" ], [ "shorts", "hips" ], [ "neck", "neck" ], [ "head", "head" ], [ "hair", "head" ], [ "ear", "head" ], [ "ear", "head" ], [ "nose", "head" ], [ "tail", "head" ],
-		[ "sleeve", "sh", 0 ], [ "sleeve", "sh", 1 ], [ "cuff", "sh", 0 ], [ "cuff", "sh", 1 ],
+		[ "sleeve", "sh", 0 ], [ "sleeve", "sh", 1 ], [ "cuff", "sh", 0 ], [ "cuff", "sh", 1 ], [ "armband", "sh", 0 ],
 		[ "upperArm", "sh", 0 ], [ "upperArm", "sh", 1 ], [ "foreArm", "el", 0 ], [ "foreArm", "el", 1 ], [ "hand", "ha", 0 ], [ "hand", "ha", 1 ],
 		[ "shortLeg", "hip", 0 ], [ "shortLeg", "hip", 1 ], [ "thigh", "hip", 0 ], [ "thigh", "hip", 1 ], [ "knee", "kn", 0 ], [ "knee", "kn", 1 ],
 		[ "shin", "kn", 0 ], [ "shin", "kn", 1 ], [ "band", "kn", 0 ], [ "band", "kn", 1 ],
@@ -204,6 +204,8 @@
 			hair: () => { const g = new T.SphereGeometry(2.38, 12, 7, 0, Math.PI * 2, 0, 1.55); g.scale(0.96, 1.12, 0.94); g.rotateZ(0.42); g.translate(0.2, 2.25, 0); return g; },   // concentric with the head, tilted: high at the brow, low at the nape
 			// Short sleeves over the shoulder (a rounded cap, the deltoid under it) ending in a cuff.
 			sleeve: () => loft3D([ [ 1.45, 0.35, 0.35, 0.35 ], [ 1.2, 0.95, 0.95, 0.95 ], [ 0.7, 1.24, 1.22, 1.22 ], [ -0.4, 1.3, 1.28, 1.28 ], [ -1.9, 1.22, 1.2, 1.2 ], [ -2.35, 1.18, 1.16, 1.16 ], [ -2.4, 0.85, 0.85, 0.85 ] ], 10, 2.0),   // a fitted sleeve, not a pad
+			// The captain's armband on the left upper arm, just below the sleeve.
+			armband: () => loft3D([ [ -2.75, 1.12, 1.16, 1.14 ], [ -2.8, 1.17, 1.21, 1.19 ], [ -3.65, 1.12, 1.16, 1.12 ], [ -3.7, 1.06, 1.1, 1.06 ] ], 12, 2.0),
 			cuff: () => loft3D([ [ -2.05, 1.23, 1.21, 1.21 ], [ -2.4, 1.23, 1.21, 1.21 ], [ -2.45, 0.92, 0.92, 0.92 ] ], 10, 2.0),
 			upperArm: () => loft3D([ [ 0.5, 0.75, 0.75, 0.75 ], [ 0, 1.02, 1.0, 1.0 ], [ -1.6, 1.0, 1.1, 0.98 ], [ -3.1, 0.9, 1.06, 0.92 ], [ -4.7, 0.78, 0.8, 0.8 ], [ -5.6, 0.72, 0.72, 0.76 ], [ -6.0, 0.4, 0.4, 0.45 ] ], 9, 2.0),
 			foreArm: () => loft3D([ [ 0.4, 0.55, 0.55, 0.6 ], [ 0, 0.84, 0.82, 0.88 ], [ -1.1, 0.96, 0.92, 0.98 ], [ -2.6, 0.8, 0.76, 0.78 ], [ -4.2, 0.6, 0.5, 0.52 ], [ -4.9, 0.54, 0.46, 0.46 ], [ -5.2, 0.32, 0.3, 0.3 ] ], 9, 2.0),   // muscle below the elbow, a slimmer wrist; a little shorter
@@ -603,12 +605,20 @@
 		r.root.rotation.y = -dir;
 	}
 	// What a figure wears. Keepers in their own colour with gloves and long sleeves.
+	// Long sleeves: most players pull them on in the rain, a few at night, nobody on a dry afternoon.
+	// Each player's own choice (from his build), so it is the same every match in those conditions.
+	function longSleeves3D (p) {
+		if (!cond || p.team < 0 || p.role === "staff") { return false; }
+		const h = build(p).seed;
+		return cond.wet >= 1 ? h < 0.8 : cond.ko !== "day" ? h < 0.3 : false;
+	}
 	function kit3D (p) {
 		const kit = KITS[p.team] || KITS[0], gk = p.role === "gk";
 		const shirt = gk ? kit.gk : kit.outfield, shorts = gk ? "#1f2a36" : kit.second || "#1f2a36";
 		return {
 			shirt, shorts, socks: gk ? "#1f2a36" : shirt, second: kit.second || shirt, pattern: gk ? 0 : PATTERN3[kit.pattern] || 0,
-			ink: gk ? "#0e1a24" : kit.ink || "#ffffff", gloves: gk ? (lum(shirt) > 0.5 ? "#15181a" : "#f2f2f2") : null, sleeves: gk,
+			ink: gk ? "#0e1a24" : kit.ink || "#ffffff", gloves: gk ? (lum(shirt) > 0.5 ? "#15181a" : "#f2f2f2") : null, sleeves: gk || longSleeves3D(p),
+			captain: !!(G3.fig && G3.fig.capt && G3.fig.capt[p.team] === p),
 			boots: BOOTS3[(p.num || 0) % BOOTS3.length], ring: shirt, team: p.team, gk, name: p.name || ""
 		};
 	}
@@ -636,10 +646,12 @@
 			} else if (name === "ear") {
 				mtx = M.makeTranslation(0.05, 0, F.cnt.ear % 2 ? 1.92 : -1.92).premultiply(node.matrixWorld);
 			} else if (name === "hand" && kit.gloves) { mtx = M.makeScale(1.45, 1.3, 1.5).premultiply(node.matrixWorld); }
+			if (name === "cuff" && kit.sleeves) { continue; }   // long sleeves have no cuff at the biceps
+			if (name === "armband" && !kit.captain) { continue; }
 			const k = F.cnt[name]++;
 			if (k >= mesh.instanceMatrix.count) { F.cnt[name]--; continue; }   // never past the buffer
 			mesh.setMatrixAt(k, mtx);
-			if (name === "cuff" && kit.sleeves) { continue; }   // a keeper's long sleeves have no cuff at the biceps
+			if (name === "armband") { mesh.setColorAt(k, C.set(deltaE(kit.shirt, "#f4f1e6") < 25 ? "#1d2330" : "#f4f1e6")); continue; }   // white, or dark on a white shirt
 			const c = name === "torso" || name === "sleeve" || ((name === "upperArm" || name === "foreArm") && kit.sleeves) ? kit.shirt
 				: name === "collar" || name === "cuff" || name === "band" ? trim3D(kit) : name === "sole" ? (lum(kit.boots) > 0.5 ? "#26292c" : "#e4e6e8")
 				: name === "shorts" || name === "shortLeg" ? kit.shorts : name === "shin" ? kit.socks : name === "boot" ? kit.boots
