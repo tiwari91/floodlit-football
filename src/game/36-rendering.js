@@ -310,13 +310,13 @@
 			// The ground's name, picked out across the main stand.
 			const ground = (leagueMatch ? (leagueMatch.home ? YOU : TEAMS[leagueMatch.opp]).ground : YOU.ground).toUpperCase();
 			gt.save && gt.save();
-			gt.globalAlpha = 0.55;
+			gt.globalAlpha = 1;   // a solid sign board on the stand, not lettering washed over the crowd
 			gt.fillStyle = "#0d1612";
 			gt.font = "900 30px 'Big Shoulders Display', 'Arial Narrow', Arial, sans-serif";
 			gt.textAlign = "center"; gt.textBaseline = "middle";
 			const tw = gt.measureText ? gt.measureText(ground).width : 200;
 			gt.fillRect(WW / 2 - (Number(tw) || 200) / 2 - 14, 8, (Number(tw) || 200) + 28, 34);
-			gt.globalAlpha = 0.9;
+			gt.fillStyle = "#f2b52e"; gt.fillRect(WW / 2 - (Number(tw) || 200) / 2 - 14, 40, (Number(tw) || 200) + 28, 2);   // a trim along its foot
 			gt.fillStyle = "#eef2ec";
 			gt.fillText(ground, WW / 2, 26);
 			gt.restore && gt.restore();

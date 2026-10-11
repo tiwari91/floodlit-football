@@ -280,7 +280,15 @@
 		const armPts = i => {
 			const f = ph + i * Math.PI;
 			let ua = jump > 0 ? Math.PI * (0.55 + 0.3 * jump) + (i ? 0.25 : -0.1) : -(0.1 + a * 0.75 * (1 - 0.5 * shuf)) * Math.sin(f) + shuf * 0.25, eb = jump > 0 ? 0.3 : 0.25 + a * 1.25;
-			if (!jump && !ks) { eb = 0.25 + a * (0.55 + 0.75 * Math.abs(Math.sin(f))); }   // the elbow bends most at the ends of the swing, so the forearm never lies across his chest
+			// Running, as in 3D: the upper arm swings further back than forward, and the forearm is steered
+			// from beside the hip (0.95 rad from hanging) to chest height in front (1.85), elbow near a right
+			// angle, so a hand never comes up by the face or trails out behind him.
+			if (!jump && !ks) {
+				const sw = Math.sin(f) * -1, armA = (0.1 + a * 0.75 * (1 - 0.5 * shuf)), run = clamp((a - 0.12) / 0.35, 0, 1);
+				const ua2 = armA * (sw > 0 ? 0.62 : 0.85) * sw + shuf * 0.25, fore = 0.95 + 0.9 * (sw + 1) / 2;
+				ua = ua * (1 - run) + ua2 * run;
+				eb = (0.25 + a * 0.5) * (1 - run) + clamp(fore - ua2, 1.0, 1.75) * run;
+			}
 			if (ks) { ua = i === 0 ? -0.6 : 0.9; eb = 0.5; }   // arms out for balance as he strikes it
 			if (down) { ua = i === 0 ? -1.15 : 1.75; eb = i === 0 ? 0.15 : -0.35; }   // one hand back on the grass, the other up for balance
 			if (cel > 0) { ua = ua * (1 - cel) + (i ? 1.9 : 1.5) * cel; eb = eb * (1 - cel) + 0.15 * cel; }   // arms out wide
