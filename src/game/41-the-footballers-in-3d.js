@@ -34,29 +34,33 @@
 		g.clearRect(x0, y0, 256, 128);
 		g.lineCap = "round";
 		// Shadow under the brow ridge and in the eye sockets, down the sides of the nose, under the cheekbones.
-		g.fillStyle = "rgba(40, 20, 10, 0.2)";
-		for (const sgn of [ -1, 1 ]) { g.beginPath(); g.ellipse(cx + sgn * 16, ey - 1, 13, 8, 0, 0, Math.PI * 2); g.fill(); }
+		g.fillStyle = "rgba(40, 20, 10, 0.26)";
+		for (const sgn of [ -1, 1 ]) { g.beginPath(); g.ellipse(cx + sgn * 16, ey - 2, 13, 8.5, 0, 0, Math.PI * 2); g.fill(); }
 		g.fillStyle = "rgba(40, 20, 10, 0.12)";
 		for (const sgn of [ -1, 1 ]) { g.beginPath(); g.ellipse(cx + sgn * 34, ey + 22, 9, 14, sgn * 0.3, 0, Math.PI * 2); g.fill(); }
 		g.fillStyle = "rgba(40, 20, 10, 0.16)";
 		g.beginPath(); g.moveTo(cx - 3, ey + 4); g.lineTo(cx - 8, ey + 20); g.lineTo(cx + 8, ey + 20); g.lineTo(cx + 3, ey + 4); g.closePath(); g.fill();
 		// warm cheeks
-		g.fillStyle = "rgba(200, 70, 60, 0.1)";
-		for (const sgn of [ -1, 1 ]) { g.beginPath(); g.ellipse(cx + sgn * 24, ey + 15, 8, 5, 0, 0, Math.PI * 2); g.fill(); }
+		g.fillStyle = "rgba(150, 60, 45, 0.035)";   // the faintest warmth on the cheeks, never a painted spot
+		for (const sgn of [ -1, 1 ]) { g.beginPath(); g.ellipse(cx + sgn * 24, ey + 15, 9, 6, 0, 0, Math.PI * 2); g.fill(); }
 		for (const sgn of [ -1, 1 ]) {
 			const x = cx + sgn * 16;
-			// the eye: a white almond, an iris, a pupil and a glint (wider open when celebrating)
-			const eh = open ? 6.6 : 5.6;
-			g.fillStyle = "#f8f4ee"; g.beginPath(); g.ellipse(x, ey, 9.5, eh, 0, 0, Math.PI * 2); g.fill();
-			g.fillStyle = v % 3 === 1 ? "#35577a" : v % 3 === 2 ? "#4a6a36" : "#3a2210"; g.beginPath(); g.arc(x + sgn * 0.5, ey + 0.4, 4.4, 0, Math.PI * 2); g.fill();
-			g.fillStyle = "#0c0604"; g.beginPath(); g.arc(x + sgn * 0.5, ey + 0.4, 2.3, 0, Math.PI * 2); g.fill();
-			g.fillStyle = "rgba(255, 255, 255, 0.9)"; g.beginPath(); g.arc(x - 1.3 + sgn * 0.5, ey - 1.3, 1.2, 0, Math.PI * 2); g.fill();
-			// upper lid and lashes, a fainter lower lid
-			g.strokeStyle = ink; g.lineWidth = 2.4; g.beginPath(); g.ellipse(x, ey, 9.5, eh, 0, Math.PI * 1.05, Math.PI * 1.95); g.stroke();
-			g.strokeStyle = "rgba(40, 20, 10, 0.35)"; g.lineWidth = 1.2; g.beginPath(); g.ellipse(x, ey, 9.5, eh, 0, Math.PI * 0.15, Math.PI * 0.85); g.stroke();
+			// The eye, life-size rather than a cartoon's: a narrow almond of off-white mostly covered by the
+			// upper lid, a small iris and pupil half under it, a soft lid shadow, a faint lower lid, no big glint.
+			const eh = open ? 4.4 : 3.5, ew = 7.2;
+			g.save(); g.beginPath(); g.ellipse(x, ey, ew, eh, 0, 0, Math.PI * 2); g.clip();
+			g.fillStyle = "#e6dfd4"; g.fillRect(x - ew, ey - eh, ew * 2, eh * 2);
+			g.fillStyle = v % 3 === 1 ? "#3d5a74" : v % 3 === 2 ? "#4f6340" : "#3b2414"; g.beginPath(); g.arc(x + sgn * 0.4, ey + 0.6, 3.3, 0, Math.PI * 2); g.fill();
+			g.fillStyle = "#0c0604"; g.beginPath(); g.arc(x + sgn * 0.4, ey + 0.6, 1.5, 0, Math.PI * 2); g.fill();
+			g.fillStyle = "rgba(30, 14, 6, 0.45)"; g.fillRect(x - ew, ey - eh, ew * 2, eh * 0.75);   // the lid's shadow over the top of the eye
+			g.restore();
+			g.fillStyle = "rgba(255, 255, 255, 0.55)"; g.beginPath(); g.arc(x - 1 + sgn * 0.4, ey - 0.4, 0.6, 0, Math.PI * 2); g.fill();
+			g.strokeStyle = "rgba(34, 21, 14, 0.85)"; g.lineWidth = 1.6; g.beginPath(); g.ellipse(x, ey, ew, eh, 0, Math.PI * 1.08, Math.PI * 1.92); g.stroke();
+			g.strokeStyle = "rgba(60, 30, 18, 0.22)"; g.lineWidth = 1.4; g.beginPath(); g.ellipse(x, ey - 1.5, ew + 1, eh + 2.5, 0, Math.PI * 1.15, Math.PI * 1.85); g.stroke();   // the lid crease
+			g.strokeStyle = "rgba(40, 20, 10, 0.22)"; g.lineWidth = 1; g.beginPath(); g.ellipse(x, ey, ew, eh, 0, Math.PI * 0.2, Math.PI * 0.8); g.stroke();
 			// the brow: flat, arched, heavy or angled; raised when celebrating
 			const by = open ? -4 : 0;
-			g.strokeStyle = ink; g.lineWidth = brow === 2 ? 6 : 4.4;
+			g.strokeStyle = "rgba(34, 21, 14, 0.82)"; g.lineWidth = brow === 2 ? 4.4 : 3.2;
 			g.beginPath();
 			if (brow === 1) { g.moveTo(x - sgn * 10, ey - 10 + by); g.quadraticCurveTo(x, ey - 17 + by, x + sgn * 11, ey - 11 + by); }
 			else if (brow === 3) { g.moveTo(x - sgn * 10, ey - 11 + by); g.lineTo(x + sgn * 11, ey - 14 + by); }
@@ -79,12 +83,12 @@
 			g.fillStyle = "#b8524a"; g.beginPath(); g.ellipse(cx, ey + 36, 6, 2.4, 0, 0, Math.PI * 2); g.fill();
 			g.strokeStyle = "rgba(120, 40, 34, 0.9)"; g.lineWidth = 2; g.beginPath(); g.ellipse(cx, ey + 31, 10, 8, 0, 0, Math.PI * 2); g.stroke();
 		} else {
-			g.strokeStyle = "rgba(70, 22, 18, 0.9)"; g.lineWidth = 3; g.beginPath();
+			g.strokeStyle = "rgba(70, 26, 20, 0.6)"; g.lineWidth = 2; g.beginPath();
 			if (mouth === 1) { g.moveTo(cx - 10, ey + 28); g.quadraticCurveTo(cx, ey + 34, cx + 10, ey + 28); }
 			else if (mouth === 2) { g.moveTo(cx - 9, ey + 30); g.quadraticCurveTo(cx, ey + 27, cx + 9, ey + 30); }
 			else { g.moveTo(cx - 9, ey + 29); g.lineTo(cx + 9, ey + 29); }
 			g.stroke();
-			g.fillStyle = beard ? "rgba(178, 84, 70, 0.85)" : "rgba(160, 60, 50, 0.3)"; g.beginPath(); g.ellipse(cx, ey + 33, 7, 2.6, 0, 0, Math.PI * 2); g.fill();
+			g.fillStyle = beard ? "rgba(150, 76, 64, 0.75)" : "rgba(70, 30, 24, 0.16)"; g.beginPath(); g.ellipse(cx, ey + 32.5, 7.5, 2.2, 0, 0, Math.PI * 2); g.fill();   // the lower lip as a shade, not a dot
 		}
 		g.restore();
 	}
@@ -175,11 +179,22 @@
 			upperArm: () => loft3D([ [ 0.5, 0.75, 0.75, 0.75 ], [ 0, 1.02, 1.0, 1.0 ], [ -1.6, 1.0, 1.1, 0.98 ], [ -3.1, 0.9, 1.06, 0.92 ], [ -4.7, 0.78, 0.8, 0.8 ], [ -5.6, 0.72, 0.72, 0.76 ], [ -6.0, 0.4, 0.4, 0.45 ] ], 9, 2.0),
 			foreArm: () => loft3D([ [ 0.4, 0.5, 0.5, 0.55 ], [ 0, 0.76, 0.76, 0.8 ], [ -1.2, 0.86, 0.84, 0.9 ], [ -2.8, 0.72, 0.7, 0.72 ], [ -4.4, 0.56, 0.48, 0.5 ], [ -5.2, 0.52, 0.46, 0.46 ], [ -5.5, 0.3, 0.3, 0.3 ] ], 9, 2.0),
 			// A flat hand with the fingers together and a thumb in front.
+			// A relaxed hand, half closed: the palm with a wrist and knuckles, four fingers curled forward in
+			// two bends (shorter at the little finger), and a thumb along the side of the index finger.
 			hand: () => {
-				const palm = loft3D([ [ 0.2, 0.3, 0.42, 0.42 ], [ -0.35, 0.36, 0.58, 0.56 ], [ -1.2, 0.34, 0.6, 0.56 ], [ -1.9, 0.3, 0.52, 0.5 ], [ -2.3, 0.2, 0.36, 0.36 ], [ -2.45, 0.08, 0.15, 0.15 ] ], 8, 2.2);
-				const th = loft3D([ [ 0.1, 0.2, 0.2, 0.2 ], [ -0.2, 0.22, 0.24, 0.24 ], [ -0.9, 0.18, 0.2, 0.2 ], [ -1.15, 0.08, 0.08, 0.08 ] ], 6, 2);
-				th.rotateZ(0.45); th.translate(0.42, -0.45, 0.14);
-				return merge3D([ palm, th ]);
+				const palm = loft3D([ [ 0.3, 0.36, 0.4, 0.4 ], [ -0.1, 0.42, 0.5, 0.48 ], [ -0.8, 0.52, 0.55, 0.5 ], [ -1.35, 0.58, 0.52, 0.48 ], [ -1.55, 0.52, 0.46, 0.42 ] ], 10, 2.4);
+				const parts = [ palm ];
+				[ [ 0.36, 1.0 ], [ 0.12, 1.06 ], [ -0.12, 1.0 ], [ -0.36, 0.86 ] ].forEach(([ z, k ]) => {
+					const f1 = loft3D([ [ 0, 0.13, 0.15, 0.14 ], [ -0.55 * k, 0.12, 0.14, 0.13 ], [ -0.62 * k, 0.1, 0.12, 0.1 ] ], 6, 2);
+					f1.rotateZ(-0.7); f1.translate(0, -1.45, z);
+					const f2 = loft3D([ [ 0, 0.12, 0.13, 0.12 ], [ -0.5 * k, 0.1, 0.11, 0.1 ], [ -0.58 * k, 0.05, 0.06, 0.05 ] ], 6, 2);
+					f2.rotateZ(-1.5); f2.translate(-0.36 * k, -1.62 - 0.2 * k, z);
+					parts.push(f1, f2);
+				});
+				const th = loft3D([ [ 0.1, 0.17, 0.18, 0.18 ], [ -0.35, 0.18, 0.2, 0.2 ], [ -0.85, 0.14, 0.16, 0.15 ], [ -0.98, 0.06, 0.07, 0.07 ] ], 6, 2);
+				th.rotateZ(-0.45); th.rotateX(-0.35); th.translate(-0.3, -0.55, 0.42);
+				parts.push(th);
+				return merge3D(parts);
 			},
 			thigh: () => loft3D([ [ 0.9, 1.4, 1.4, 1.5 ], [ -0.6, 1.68, 1.72, 1.66 ], [ -2.6, 1.6, 1.82, 1.58 ], [ -4.6, 1.38, 1.6, 1.36 ], [ -6.3, 1.12, 1.24, 1.08 ], [ -7.2, 1.06, 1.18, 1.0 ], [ -7.8, 0.82, 0.86, 0.82 ], [ -8.0, 0.5, 0.5, 0.5 ] ], 10, 2.0),
 			knee: () => { const g = new T.SphereGeometry(1.0, 9, 7); g.scale(1.08, 1.0, 1.02); g.translate(0.08, -0.15, 0); return g; },

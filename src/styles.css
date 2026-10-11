@@ -437,11 +437,11 @@
 	.cmp-head .you { text-align: left; color: var(--amber); }
 	.cmp-head .them { text-align: right; color: var(--opp-text); }
 	.stats.cmp .cmp-row { display: grid; justify-items: stretch; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: center; }
-	.stats.cmp .cmp-row b { font-family: var(--display); font-weight: 800; font-size: 20px; line-height: 1.2; color: var(--text); font-variant-numeric: tabular-nums; text-align: left; opacity: 0.8; }
+	.stats.cmp .cmp-row b { font-family: var(--display); font-weight: 800; font-size: 18px; line-height: 1.1; color: var(--text); font-variant-numeric: tabular-nums; text-align: left; opacity: 0.8; }
 	.stats.cmp .cmp-row b.them { text-align: right; }
 	.stats.cmp .cmp-row b.lead { opacity: 1; color: var(--chalk); }
 	.stats.cmp .cmp-row span { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
-	.stats.cmp .cmp-row.poss b { font-size: 24px; }
+	.stats.cmp .cmp-row.poss b { font-size: 22px; }
 	.cmp-bar { grid-column: 1 / -1; display: block; height: 6px; margin-bottom: 4px; border-radius: 3px; background: var(--opp); overflow: hidden; }
 	.cmp-bar em { display: block; height: 100%; background: var(--amber); border-radius: 3px 0 0 3px; }
 	@media (max-height: 560px), (max-width: 440px) { .stats.cmp .cmp-row b { font-size: 17px; } .stats.cmp .cmp-row.poss b { font-size: 20px; } .stats.cmp .cmp-row span { font-size: 10px; } }

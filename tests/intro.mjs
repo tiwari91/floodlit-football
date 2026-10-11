@@ -105,7 +105,7 @@ const ov = await page.evaluate(async () => {
 check("a goal banner shows alone (no line-ups or tip over it), then clears within ~2.7 s", /\bgoal\b/.test(ov.cls) && ov.clear && ov.early > 0.5 && ov.gone, JSON.stringify(ov));
 check("the officials' board sits below the weather and tactic tags", ov.boardTop >= ov.tagBottom, JSON.stringify(ov));
 const ht = await page.evaluate(async () => {
-	const F = window.__ff; F.halfTime(); await new Promise(r => setTimeout(r, 600));
+	const F = window.__ff; F.oppStats.cards = (F.oppStats.cards || 0) + 1; F.halfTime();   // with the Cards row: the longest table await new Promise(r => setTimeout(r, 600));
 	const cb = document.querySelector(".overlay:not([hidden]) .card-body"), bar = document.querySelector(".cmp-bar"), b = document.querySelector(".cmp-row b");
 	const rows = [ ...document.querySelectorAll(".cmp-row") ].map(r => r.getBoundingClientRect()), cbr = cb.getBoundingClientRect();
 	const cm = document.getElementById("coachMark"); cm.hidden = false;
