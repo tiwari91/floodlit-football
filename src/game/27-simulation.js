@@ -35,6 +35,8 @@
 			const g = hashStr(`${p.name || `${p.team}-${p.idx}-${p.num}`}|gait`), u = k => ((g >>> (k * 5)) % 31) / 30;
 			Object.assign(p.build, { arm: 0.85 + 0.3 * u(0), elbow: -0.12 + 0.3 * u(1), lean: -0.03 + 0.1 * u(2), bounce: 0.8 + 0.4 * u(3), twist: 0.8 + 0.45 * u(4) });
 		}
+		// His frame: broad or slight.
+		if (p.build.girth === undefined) { p.build.girth = 0.95 + 0.1 * (hashStr(`${p.name || `${p.team}-${p.idx}-${p.num}`}|frame`) % 101) / 100; }
 		return p.build;
 	}
 

@@ -108,7 +108,7 @@
 			const yaw = -clamp(relB, -0.85, 0.85) * clamp(1 - dBall / (420 * S), 0, 1);
 			const mir = WX(1) < WX(0) ? -1 : 1;
 			pose3D(rig, p, WX(p.x), p.y, WD(face), mir * turn, near, mir * yaw, mir * lead);
-			rig.root.scale.setScalar(0.95 + 0.1 * build(p).seed);   // tall and short
+			{ const bd = build(p), ht = 0.95 + 0.1 * bd.seed + (p.role === "gk" ? 0.03 : 0), gth = p.team >= 0 ? bd.girth : 1; rig.root.scale.set(ht * gth, ht, ht * gth); }   // tall and short, broad and slight
 			commitFigure3D(rig, look(p), kit3D(p), p.num);
 		}
 		if (state === "play" || state === "goal" || state === "half" || state === "paused") { updateOfficials3(state === "play" || state === "goal" ? dt : 0); }

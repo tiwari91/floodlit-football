@@ -138,7 +138,7 @@
 	const TORSO3 = [
 		[ -0.75, 3.12, 2.08, 2.0 ], [ -0.45, 3.1, 2.06, 1.98 ], [ -0.4, 3.0, 1.98, 1.9 ], [ 1.2, 2.95, 1.95, 1.88 ], [ 3.0, 3.2, 2.08, 2.0 ],
 		[ 4.8, 3.66, 2.36, 2.1 ], [ 6.3, 4.02, 2.56, 2.24 ], [ 7.6, 4.26, 2.42, 2.36 ], [ 8.3, 4.24, 2.16, 2.24 ],
-		[ 8.9, 3.78, 1.9, 2.04 ], [ 9.45, 2.85, 1.66, 1.8 ], [ 9.85, 1.95, 1.42, 1.52 ], [ 10.05, 1.6, 1.3, 1.4 ]   // the trapezius slopes from the neck down to the shoulder
+		[ 8.9, 4.0, 1.96, 2.08 ], [ 9.45, 3.05, 1.7, 1.84 ], [ 9.85, 1.95, 1.42, 1.52 ], [ 10.05, 1.6, 1.3, 1.4 ]   // the trapezius slopes from the neck down to the shoulder
 	];
 	const TORSO_EX3 = 2.5;
 	// How far the back of the shirt is from the spine at height y, across at z.
@@ -201,13 +201,13 @@
 		ear: () => { const g = new T.SphereGeometry(0.62, 8, 6); g.scale(0.55, 1.05, 0.38); g.translate(0.05, 2.3, 0); return g; },
 		nose: () => { const g = new T.ConeGeometry(0.42, 1.0, 6); g.rotateZ(-0.35); g.scale(0.85, 1, 0.9); g.translate(2.12, 1.86, 0); return g; },
 		tail: () => new T.SphereGeometry(1, 9, 7),
-			hair: () => { const g = new T.SphereGeometry(2.38, 12, 7, 0, Math.PI * 2, 0, 1.55); g.scale(0.96, 1.12, 0.94); g.rotateZ(0.42); g.translate(0.2, 2.25, 0); return g; },   // concentric with the head, tilted: high at the brow, low at the nape
+			hair: () => { const g = new T.SphereGeometry(2.27, 14, 8, 0, Math.PI * 2, 0, 1.5); g.scale(0.97, 1.12, 0.95); g.rotateZ(0.46); g.translate(0.2, 2.3, 0); return g; },   // close to the skull (a crop, not a helmet), tilted: high at the brow, low at the nape
 			// Short sleeves over the shoulder (a rounded cap, the deltoid under it) ending in a cuff.
-			sleeve: () => loft3D([ [ 1.45, 0.35, 0.35, 0.35 ], [ 1.2, 0.95, 0.95, 0.95 ], [ 0.7, 1.24, 1.22, 1.22 ], [ -0.4, 1.3, 1.28, 1.28 ], [ -1.9, 1.22, 1.2, 1.2 ], [ -2.35, 1.18, 1.16, 1.16 ], [ -2.4, 0.85, 0.85, 0.85 ] ], 10, 2.0),   // a fitted sleeve, not a pad
+			sleeve: () => loft3D([ [ 0.5, 0.3, 0.3, 0.3 ], [ 0.36, 0.9, 0.92, 0.92 ], [ 0.0, 1.2, 1.2, 1.2 ], [ -0.5, 1.28, 1.27, 1.27 ], [ -1.9, 1.22, 1.2, 1.2 ], [ -2.35, 1.18, 1.16, 1.16 ], [ -2.4, 0.85, 0.85, 0.85 ] ], 10, 2.0),   // a fitted sleeve: the cap no higher than the shoulder line, so no pads
 			// The captain's armband on the left upper arm, just below the sleeve.
 			armband: () => loft3D([ [ -2.75, 1.12, 1.16, 1.14 ], [ -2.8, 1.17, 1.21, 1.19 ], [ -3.65, 1.12, 1.16, 1.12 ], [ -3.7, 1.06, 1.1, 1.06 ] ], 12, 2.0),
 			cuff: () => loft3D([ [ -2.05, 1.23, 1.21, 1.21 ], [ -2.4, 1.23, 1.21, 1.21 ], [ -2.45, 0.92, 0.92, 0.92 ] ], 10, 2.0),
-			upperArm: () => loft3D([ [ 0.5, 0.75, 0.75, 0.75 ], [ 0, 1.02, 1.0, 1.0 ], [ -1.6, 1.0, 1.1, 0.98 ], [ -3.1, 0.9, 1.06, 0.92 ], [ -4.7, 0.78, 0.8, 0.8 ], [ -5.6, 0.72, 0.72, 0.76 ], [ -6.0, 0.4, 0.4, 0.45 ] ], 9, 2.0),
+			upperArm: () => loft3D([ [ 0.25, 0.7, 0.7, 0.7 ], [ -0.1, 1.02, 1.0, 1.0 ], [ -1.6, 1.0, 1.1, 0.98 ], [ -3.1, 0.9, 1.06, 0.92 ], [ -4.7, 0.78, 0.8, 0.8 ], [ -5.6, 0.72, 0.72, 0.76 ], [ -6.0, 0.4, 0.4, 0.45 ] ], 9, 2.0),
 			foreArm: () => loft3D([ [ 0.4, 0.55, 0.55, 0.6 ], [ 0, 0.84, 0.82, 0.88 ], [ -1.1, 0.96, 0.92, 0.98 ], [ -2.6, 0.8, 0.76, 0.78 ], [ -4.2, 0.6, 0.5, 0.52 ], [ -4.9, 0.54, 0.46, 0.46 ], [ -5.2, 0.32, 0.3, 0.3 ] ], 9, 2.0),   // muscle below the elbow, a slimmer wrist; a little shorter
 			// A flat hand with the fingers together and a thumb in front.
 			// A relaxed hand, half closed: the palm with a wrist and knuckles, four fingers curled forward in
@@ -461,7 +461,7 @@
 			r.kn[free].rotation.z -= 0.32 * still; r.hip[free].rotation.z += 0.1 * still; r.kn[side].rotation.z -= 0.05 * still;
 			r.chest.rotation.y += (sd - 0.5) * 0.4 * still;
 			r.spine.rotation.z += Math.sin(idle * 1.3) * 0.015 * still;
-			for (let i = 0; i < 2; i++) { r.el[i].rotation.z += (0.1 + 0.3 * ((sd * 7.3 + i * 0.31) % 1)) * still; }
+			for (let i = 0; i < 2; i++) { r.el[i].rotation.z += (0.1 + 0.3 * ((sd * 7.3 + i * 0.31) % 1)) * still; r.sh[i].rotation.x += (i ? 1 : -1) * 0.1 * still; }   // arms eased away from the sides
 			const calm = state !== "play" || freeze > 0;   // only at a stoppage: in open play a tired man stays upright
 			const w = p.team >= 0 && calm ? clamp((0.6 - staOf(p)) / 0.25, 0, 1) * still : 0;
 			if (w > 0) {
