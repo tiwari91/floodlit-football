@@ -325,6 +325,23 @@
 		const nums = new T.InstancedMesh(ng, numMat, MAXF3);
 		nums.instanceMatrix.setUsage(T.DynamicDrawUsage); nums.setColorAt(0, white); nums.frustumCulled = false; nums.count = 0;
 		G3.scene.add(nums);
+		// Names across the shoulders, above the number: one atlas cell per figure, repainted when the names change.
+		const nmc = document.createElement("canvas"); nmc.width = 1024; nmc.height = 512;
+		const nameTex = tex3D(nmc);
+		const nameMat = new T.MeshLambertMaterial({ map: nameTex, transparent: true, alphaTest: 0.3, polygonOffset: true, polygonOffsetFactor: -2 });
+		nameMat.onBeforeCompile = sh => {
+			sh.vertexShader = sh.vertexShader
+				.replace("#include <common>", "#include <common>\nattribute float aCell;")
+				.replace("#include <uv_vertex>", "#include <uv_vertex>\nvMapUv = (uv + vec2(mod(aCell, 4.0), 7.0 - floor(aCell / 4.0))) / vec2(4.0, 8.0);");
+		};
+		nameMat.customProgramCacheKey = () => "ff-name";
+		const nmg = new T.PlaneGeometry(4.6, 1.15, 8, 1).rotateY(-Math.PI / 2).translate(0, 8.35, 0), MP = nmg.attributes.position;
+		for (let i = 0; i < MP.count; i++) { MP.setX(i, -backDepth3D(MP.getY(i), MP.getZ(i)) - 0.06); }
+		nmg.computeVertexNormals();
+		nmg.setAttribute("aCell", new T.InstancedBufferAttribute(new Float32Array(MAXF3), 1).setUsage(T.DynamicDrawUsage));
+		const names = new T.InstancedMesh(nmg, nameMat, MAXF3);
+		names.instanceMatrix.setUsage(T.DynamicDrawUsage); names.frustumCulled = false; names.count = 0;
+		G3.scene.add(names);
 		// The chest print, curved onto the front of the shirt like the number on the back.
 		const cc = document.createElement("canvas"); cc.width = 512; cc.height = 256;
 		const chestTex = tex3D(cc);
@@ -372,7 +389,7 @@
 			const hip = [ node(hips, 0, -1.0, -2.45), node(hips, 0, -1.0, 2.45) ], kn = hip.map(h => node(h, 0, -7.3, 0)), an = kn.map(k => node(k, 0, -6.5, 0));
 			rigs.push({ root, hips, spine, chest, neck, head, sh, el, ha, hip, kn, an });
 		}
-		G3.fig = { parts, nums, chest, chestCv: cc, chestTex, chestKey: '', rings, blobs, longs, flags, rigs, cnt: {}, n: 0, M: new T.Matrix4(), M2: new T.Matrix4(), C: new T.Color(), V: new T.Vector3(), S: new T.Vector3(), Q: new T.Quaternion(), prevDir: new WeakMap(), yawSt: new WeakMap() };
+		G3.fig = { parts, nums, chest, chestCv: cc, chestTex, chestKey: '', names, nameCv: nmc, nameTex, nameKeys: [], rings, blobs, longs, flags, rigs, cnt: {}, n: 0, M: new T.Matrix4(), M2: new T.Matrix4(), C: new T.Color(), V: new T.Vector3(), S: new T.Vector3(), Q: new T.Quaternion(), prevDir: new WeakMap(), yawSt: new WeakMap() };
 	}
 	// Reset a rig to standing.
 	function resetRig3D (r) {
@@ -592,7 +609,7 @@
 		return {
 			shirt, shorts, socks: gk ? "#1f2a36" : shirt, second: kit.second || shirt, pattern: gk ? 0 : PATTERN3[kit.pattern] || 0,
 			ink: gk ? "#0e1a24" : kit.ink || "#ffffff", gloves: gk ? (lum(shirt) > 0.5 ? "#15181a" : "#f2f2f2") : null, sleeves: gk,
-			boots: BOOTS3[(p.num || 0) % BOOTS3.length], ring: shirt, team: p.team, gk
+			boots: BOOTS3[(p.num || 0) % BOOTS3.length], ring: shirt, team: p.team, gk, name: p.name || ""
 		};
 	}
 	// The trim (collar, cuffs, sock tops): the kit's second colour, or its number colour on a plain kit.
@@ -660,6 +677,23 @@
 			F.nums.setMatrixAt(n, rig.spine.matrixWorld);
 			F.nums.setColorAt(n, C.set(kit.ink));
 			F.nums.geometry.attributes.aCell.setX(n, clamp(Math.round(num), 0, 99));
+			if (F.names && kit.name && F.names.count < 32) {
+				// The surname in the number's colour, in this figure's own cell (repainted only when it changes).
+				const k = F.names.count++, label = `${kit.name.replace(/^.*?\.\s*/, "").toUpperCase()}|${kit.ink}`;
+				if (F.nameKeys[k] !== label) {
+					F.nameKeys[k] = label;
+					const g = F.nameCv.getContext && F.nameCv.getContext("2d");
+					if (g) {
+						const x0 = (k % 4) * 256, y0 = Math.floor(k / 4) * 64;
+						g.clearRect(x0, y0, 256, 64);
+						g.fillStyle = kit.ink; g.font = "800 40px 'Barlow', 'Helvetica Neue', Arial, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle";
+						g.fillText(label.split("|")[0], x0 + 128, y0 + 34, 240);
+						F.nameTex.needsUpdate = true;
+					}
+				}
+				F.names.setMatrixAt(k, rig.spine.matrixWorld);
+				F.names.geometry.attributes.aCell.setX(k, k);
+			}
 			if (F.chest && !kit.gk && (kit.team === 0 || kit.team === 1)) {
 				const c = F.chest.count++;
 				F.chest.setMatrixAt(c, rig.spine.matrixWorld);

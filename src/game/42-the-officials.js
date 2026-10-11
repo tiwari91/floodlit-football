@@ -65,7 +65,7 @@
 	function drawFigures3D (WX, WD) {
 		const F = G3.fig;
 		for (const k in F.parts) { F.cnt[k] = 0; }
-		F.n = 0; F.nums.count = 0; if (F.chest) { F.chest.count = 0; }
+		F.n = 0; F.nums.count = 0; if (F.chest) { F.chest.count = 0; } if (F.names) { F.names.count = 0; }
 		// Repaint the chest prints when the kits or the clubs change.
 		const ck = `${KITS[0].outfield}${KITS[0].second}${KITS[0].ink}|${KITS[1].outfield}${KITS[1].second}${KITS[1].ink}|${YOU.name}|${opp && opp.name}`;
 		if (F.chest && F.chestKey !== ck) {
@@ -134,5 +134,6 @@
 		tg.attributes.aPat.needsUpdate = true; tg.attributes.aCol2.needsUpdate = true;
 		for (const m of [ F.nums, F.rings, F.blobs, F.longs ]) { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) { m.instanceColor.needsUpdate = true; } }
 		if (F.chest) { F.chest.instanceMatrix.needsUpdate = true; F.chest.geometry.attributes.aRow.needsUpdate = true; }
+		if (F.names) { F.names.instanceMatrix.needsUpdate = true; F.names.geometry.attributes.aCell.needsUpdate = true; }
 		F.nums.geometry.attributes.aCell.needsUpdate = true;
 	}
