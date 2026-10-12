@@ -38,7 +38,7 @@
 		g.filter = "blur(3px)";
 		g.fillStyle = "rgba(40, 20, 10, 0.2)";
 		for (const sgn of [ -1, 1 ]) { g.beginPath(); g.ellipse(cx + sgn * 16, ey - 2, 13, 8.5, 0, 0, Math.PI * 2); g.fill(); }
-		g.fillStyle = "rgba(40, 20, 10, 0.12)";
+		g.fillStyle = "rgba(40, 20, 10, 0.05)";   // faint: the modelled hollow and the light do most of it
 		for (const sgn of [ -1, 1 ]) { g.beginPath(); g.ellipse(cx + sgn * 34, ey + 22, 9, 14, sgn * 0.3, 0, Math.PI * 2); g.fill(); }
 		// warm cheeks
 		g.fillStyle = "rgba(150, 60, 45, 0.035)";   // the faintest warmth on the cheeks, never a painted spot
@@ -73,11 +73,25 @@
 		for (const sgn of [ -1, 1 ]) { g.beginPath(); g.ellipse(cx + sgn * 3.8, ey + 20, 1.8, 1.1, 0, 0, Math.PI * 2); g.fill(); }
 		g.filter = "none";
 		// stubble or a beard across the jaw (under the mouth, so the lips sit on top)
+		// Worked out per pixel rather than as a blurred shape: the density rises over 10px below the cheek
+		// line (low under the nose, high at the sides) and runs up into the sideburn by the ear, so there
+		// is no edge on the cheek, and it never depends on canvas blur support.
 		if (stubble || beard) {
-			g.fillStyle = beard ? "rgba(26, 16, 10, 0.72)" : "rgba(26, 16, 10, 0.18)"; g.filter = beard ? "blur(2.5px)" : "blur(5px)";   // stubble a shadow on the jaw, never a painted patch
-			g.beginPath(); g.moveTo(cx - 46, ey + 12); g.quadraticCurveTo(cx - 42, ey + 54, cx, ey + 60); g.quadraticCurveTo(cx + 42, ey + 54, cx + 46, ey + 12);
-			g.quadraticCurveTo(cx + 30, ey + 24, cx + 12, ey + 22); g.quadraticCurveTo(cx, ey + 20, cx - 12, ey + 22); g.quadraticCurveTo(cx - 30, ey + 24, cx - 46, ey + 12); g.closePath(); g.fill();
-			g.filter = "none";
+			const bc = document.createElement("canvas"); bc.width = 256; bc.height = 128;
+			const bg = bc.getContext("2d"), im = bg.createImageData(256, 128), A = beard ? 0.74 : 0.2, ey0 = ey - y0;
+			for (let py = 0; py < 128; py++) {
+				for (let px = 0; px < 256; px++) {
+					const u = Math.abs(px - 128) / 56, dy = py - ey0;
+					const top = 22 - 11 * u * u - 14 * Math.max(0, (u - 0.72) / 0.28) ** 2;   // under the nose, along the cheek, up to the sideburn
+					const ramp = Math.min(1, Math.max(0, (dy - top) / (beard ? 9 : 13)));
+					const side = 1 - Math.min(1, Math.max(0, (u - 0.92) / 0.16));
+					const lip = beard ? 1 : 1 - 0.6 * Math.exp(-(((px - 128) / 9) ** 2) - ((dy - 31) / 4) ** 2);   // stubble thins on the lip itself
+					const n = 0.82 + 0.18 * ((Math.sin(px * 12.9898 + py * 78.233) * 43758.5453) % 1 + 1) % 1;
+					const a = A * ramp * ramp * (3 - 2 * ramp) * side * lip * n;
+					const o = (py * 256 + px) * 4; im.data[o] = 26; im.data[o + 1] = 16; im.data[o + 2] = 10; im.data[o + 3] = Math.round(255 * a);
+				}
+			}
+			bg.putImageData(im, 0, 0); g.drawImage(bc, x0, y0);
 		}
 		// the mouth
 		if (open) {
@@ -226,6 +240,23 @@
 		}
 		g.setAttribute("aDir", new THREE.BufferAttribute(dir, 3));
 		g.computeVertexNormals();
+		return weldNormals3D(g);
+	}
+	// A sphere repeats its vertices down the UV seam and at the poles; average the normals of vertices that
+	// share a position, so the shading (and the hair lifted along the normal) has no crease down the back.
+	function weldNormals3D (g) {
+		const P = g.attributes.position, N = g.attributes.normal, groups = new Map();
+		for (let i = 0; i < P.count; i++) {
+			const k = `${Math.round(P.getX(i) * 1e4)},${Math.round(P.getY(i) * 1e4)},${Math.round(P.getZ(i) * 1e4)}`;
+			(groups.get(k) || groups.set(k, []).get(k)).push(i);
+		}
+		for (const ids of groups.values()) {
+			if (ids.length < 2) { continue; }
+			let x = 0, y = 0, z = 0;
+			for (const i of ids) { x += N.getX(i); y += N.getY(i); z += N.getZ(i); }
+			const n = Math.hypot(x, y, z) || 1;
+			for (const i of ids) { N.setXYZ(i, x / n, y / n, z / n); }
+		}
 		return g;
 	}
 	// The ear: on the side of the head, its top level with the brows and its lobe with the nose.
@@ -246,6 +277,33 @@
 	// Painted face detail fades out by distance: near, the eyes, brows and mouth; far (the gantry camera,
 	// where a face is a few pixels), only the modelled shape, the skin and the hair.
 	const FACE_FADE3 = [ 150, 340 ];
+	// Close-up light on skin and hair, after three.js's Lambert lighting: the flat ambient fill eases off on
+	// surfaces facing down (under the brow, nose and chin), a warm band where the key light turns to shadow,
+	// a rim of floodlight on the edge turned to the light, and a faint sheen. All of it fades out by
+	// distance, so the broadcast camera sees the figures as before. k: [ fill, warmth, rim, sheen ].
+	const SKIN_LIGHT3 = [ 1, 1, 1, 1 ], HAIR_LIGHT3 = [ 0.6, 0, 0.7, 0.5 ];
+	function skinLight3D (fs, k) {
+		return fs.replace("#include <aomap_fragment>", `#include <aomap_fragment>
+			{
+				vec3 sN = normalize(normal), sV = normalize(vViewPosition);
+				float sNear = 1.0 - smoothstep(160.0, 560.0, length(vViewPosition));
+				float sUp = dot(sN, normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz));
+				reflectedLight.indirectDiffuse *= 1.0 - ${(0.16 * k[0]).toFixed(3)} * sNear - ${(0.3 * k[0]).toFixed(3)} * sNear * (1.0 - smoothstep(-0.7, 0.5, sUp));
+				reflectedLight.directDiffuse *= 1.0 + ${(0.3 * k[0]).toFixed(3)} * sNear;   // the key light carries more of the shape
+				vec3 sKey = vec3(0.0); float sSheen = 0.0;
+				#if NUM_DIR_LIGHTS > 0
+				for (int i = 0; i < NUM_DIR_LIGHTS; i++) {
+					vec3 L = directionalLights[i].direction; float nl = dot(sN, L);
+					sKey += directionalLights[i].color * smoothstep(-0.3, 0.45, nl);
+					sSheen += pow(max(dot(sN, normalize(L + sV)), 0.0), 16.0) * max(nl, 0.0) * dot(directionalLights[i].color, vec3(0.3, 0.59, 0.11));
+					reflectedLight.directDiffuse += directionalLights[i].color * diffuseColor.rgb * vec3(0.045, 0.014, 0.0) * ${k[1].toFixed(2)} * exp(-nl * nl / 0.06) * sNear;
+				}
+				#endif
+				float sRim = pow(1.0 - clamp(dot(sN, sV), 0.0, 1.0), 3.0);
+				reflectedLight.directDiffuse += sKey * mix(diffuseColor.rgb, vec3(1.0), 0.4) * sRim * ${(0.26 * k[2]).toFixed(3)} * sNear;
+				reflectedLight.directDiffuse += vec3(1.0, 0.95, 0.88) * sSheen * ${(0.045 * k[3]).toFixed(4)} * sNear;
+			}`);
+	}
 	function initFigures3D () {
 		const T = THREE;
 		const defs = {
@@ -347,7 +405,8 @@
 			sh.fragmentShader = sh.fragmentShader
 				.replace("#include <common>", "#include <common>\nvarying float vFaceD; varying float vFaceI;")
 				.replace("#include <map_fragment>", "")
-				.replace("#include <color_fragment>", `#include <color_fragment>\nvec4 fx = vFaceI < -0.5 ? vec4(0.0) : texture2D(map, vMapUv); diffuseColor.rgb = mix(diffuseColor.rgb, fx.rgb, fx.a * (1.0 - smoothstep(${FACE_FADE3[0].toFixed(1)}, ${FACE_FADE3[1].toFixed(1)}, vFaceD)));`);
+				.replace("#include <color_fragment>", `#include <color_fragment>\nvec4 fx = vFaceI < -0.5 ? vec4(0.0) : texture2D(map, vMapUv); float fxL = dot(fx.rgb - diffuseColor.rgb, vec3(0.3, 0.59, 0.11)); diffuseColor.rgb = mix(diffuseColor.rgb, fx.rgb, fx.a * (1.0 - smoothstep(mix(${FACE_FADE3[0].toFixed(1)}, 70.0, smoothstep(0.0, 0.08, fxL)), mix(${FACE_FADE3[1].toFixed(1)}, 190.0, smoothstep(0.0, 0.08, fxL)), vFaceD)));`);   // anything lighter than the skin (the whites of the eyes, teeth) goes first, before it reads as a pale dot
+			sh.fragmentShader = skinLight3D(sh.fragmentShader, SKIN_LIGHT3);
 		};
 		headMat.customProgramCacheKey = () => "ff-face";
 		// The hair: the skull's surface lifted along its normal by the style's thickness (aHairA: over the top,
@@ -381,8 +440,13 @@
 					if (vCov < 0.035 * (ffHash(vHd * 140.0) - 0.35)) { discard; }   // a soft, slightly ragged hairline cut per pixel, never a triangle's edge
 					diffuseColor.rgb *= 0.84 + 0.16 * ffHash(vHd * vec3(70.0, 90.0, 70.0));
 					diffuseColor.rgb *= 0.86 + 0.14 * smoothstep(0.0, 0.12, vCov);   // thinner, darker at the line`);
+			sh.fragmentShader = skinLight3D(sh.fragmentShader, HAIR_LIGHT3);
 		};
 		hairMat.customProgramCacheKey = () => "ff-hair";
+		// The neck, ears and nose take the head's light, so there is no seam where they meet it.
+		const skinMat = new T.MeshLambertMaterial({ color: 0xffffff });
+		skinMat.onBeforeCompile = sh => { sh.fragmentShader = skinLight3D(sh.fragmentShader, SKIN_LIGHT3); };
+		skinMat.customProgramCacheKey = () => "ff-skin";
 		const parts = {}, white = new T.Color(1, 1, 1);
 		for (const name of Object.keys(defs)) {
 			const geo = defs[name], cap = MAXF3 * PER_FIG3[name];
@@ -394,7 +458,7 @@
 			const ia = (n, k) => g.setAttribute(n, new T.InstancedBufferAttribute(new Float32Array(cap * k), k).setUsage(T.DynamicDrawUsage));
 			if (name === "head") { ia("aFace", 1); ia("aJaw", 1); }
 			if (name === "hair") { ia("aHairA", 4); ia("aHairB", 1); ia("aJaw", 1); }
-			const m = new T.InstancedMesh(g, name === "torso" ? shirtMat : name === "head" ? headMat : name === "hair" ? hairMat : plain, cap);
+			const m = new T.InstancedMesh(g, name === "torso" ? shirtMat : name === "head" ? headMat : name === "hair" ? hairMat : name === "neck" || name === "ear" || name === "nose" ? skinMat : plain, cap);
 			m.instanceMatrix.setUsage(T.DynamicDrawUsage);
 			m.setColorAt(0, white);   // so the colour buffer exists before the first frame
 			m.frustumCulled = false; m.count = 0;
