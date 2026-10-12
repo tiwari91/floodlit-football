@@ -83,7 +83,8 @@
 				if (c) { F.capt[1] = c; }
 			}
 		}
-		F.n = 0; F.rigOf = new Map(); F.nums.count = 0;   // rigOf: which figure each drawn player got this frame (off-screen players get none) if (F.chest) { F.chest.count = 0; } if (F.names) { F.names.count = 0; }
+		// rigOf: which figure each drawn player got this frame (off-screen players get none)
+		F.n = 0; F.rigOf = new Map(); F.nums.count = 0; if (F.chest) { F.chest.count = 0; } if (F.names) { F.names.count = 0; }
 		// Repaint the chest prints when the kits or the clubs change.
 		const ck = `${KITS[0].outfield}${KITS[0].second}${KITS[0].ink}|${KITS[1].outfield}${KITS[1].second}${KITS[1].ink}|${YOU.name}|${opp && opp.name}`;
 		if (F.chest && F.chestKey !== ck) {

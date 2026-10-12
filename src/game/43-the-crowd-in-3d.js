@@ -545,7 +545,7 @@
 		if (G3.shot.startsWith("replay")) { for (const m of Object.values(G3.marks)) { m.visible = false; } return; }   // a clean picture for the replay
 		// The markers on the grass.
 		const mk = G3.marks, me = human(), playing = state === "play" && freeze <= 0;
-		const isHuman = me && state !== "intro";
+		const isHuman = me && state !== "intro" && G3.shot !== "intro";   // not during the kick-off sweep from over the ground
 		for (const m of Object.values(mk)) { m.visible = false; }
 		if (isHuman) {
 			const x = WX(me.x), z = me.y;
@@ -620,7 +620,7 @@
 			}
 			if (p.injured) { ctx.fillStyle = "#ffffff"; ctx.fillRect(q.x - 13, q.y - 10, 7, 7); ctx.fillStyle = "#d8343f"; ctx.fillRect(q.x - 10.5, q.y - 9, 2, 5); ctx.fillRect(q.x - 12, q.y - 7.5, 5, 2); }
 		}
-		if (me && state !== "intro") {
+		if (me && state !== "intro" && G3.shot !== "intro") {
 			const foot = proj3D(me.x, me.y, 0), top = proj3D(me.x, me.y, 56);
 			if (foot) {
 				drawSprintBar(me, foot.x, foot.y + Math.max(5, 7 * foot.k), Math.max(22, 30 * foot.k));
