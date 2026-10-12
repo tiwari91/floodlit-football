@@ -181,6 +181,40 @@ const arrive = await page.evaluate(() => {
 	return out;
 });
 check("a loose ball arriving at a teammate hands you control of him", arrive.ok >= arrive.n - 1, JSON.stringify(arrive));
+// Running arms swing from straight down, not from the leaning torso: the upper arm never trails far behind.
+const swing = await page.evaluate(async () => {
+	const F = window.__ff, G3 = F.G3, out = [];
+	for (let i = 0; i < 4000 && F.state !== "play"; i++) { F.step(1); }
+	for (let k = 0; k < 40; k++) {
+		await new Promise(r => setTimeout(r, 40));
+		F.players.forEach((p, i) => {
+			const r = G3.fig && G3.fig.rigs[i];
+			if (!r || p.role === "gk" || Math.hypot(p.vx || 0, p.vy || 0) < 1.2) { return; }
+			const o = r.root.getWorldPosition(r.root.position.clone()), fwd = r.root.localToWorld(r.root.position.clone().set(1, 0, 0)).sub(o).normalize();
+			for (let j = 0; j < 2; j++) {
+				const ua = r.el[j].getWorldPosition(r.el[j].position.clone()).sub(r.sh[j].getWorldPosition(r.sh[j].position.clone()));
+				out.push(Math.atan2(-ua.dot(fwd), -ua.y));
+			}
+		});
+	}
+	out.sort((a, b) => a - b);
+	return { n: out.length, p98: +(out[Math.floor(out.length * 0.98)] || 0).toFixed(2) };
+});
+check("running, the upper arm stays within about 25 degrees behind vertical (no hands off the back)", swing.n > 100 && swing.p98 < 0.45, JSON.stringify(swing));
+// A goal huddle: team-mates' hands go forward round the scorer, never behind their own backs.
+const huddle = await page.evaluate(async () => {
+	const F = window.__ff, G3 = F.G3;
+	F.state === "play" || (F.state = "play"); F.freeze = 0; F.forceGoal(0);
+	for (let i = 0; i < 60 && F.state !== "goal"; i++) { F.step(1); }
+	let h = null;
+	for (let i = 0; i < 1500 && F.state === "goal" && !h; i++) { F.step(1); h = F.players.find(p => (p.hug || 0) > 0.5) || null; }
+	if (!h) { return { hug: false }; }
+	await new Promise(r => setTimeout(r, 120));
+	const r = G3.fig.rigs[F.players.indexOf(h)], o = r.chest.getWorldPosition(r.chest.position.clone()), root = r.root.getWorldPosition(r.root.position.clone());
+	const fwd = r.root.localToWorld(r.root.position.clone().set(1, 0, 0)).sub(root).normalize();
+	return { hug: true, fwd: [ 0, 1 ].map(j => +r.ha[j].getWorldPosition(r.ha[j].position.clone()).sub(o).dot(fwd).toFixed(1)) };
+});
+check("in a goal huddle the hugging players' hands are in front of them", !huddle.hug || huddle.fwd.every(v => v > 2), JSON.stringify(huddle));
 check("home ends dressed: banners and big flags that wave", dress.banners >= 1 && dress.flags >= 3 && dress.waves, JSON.stringify(dress));
 await browser.close(); server.stop();
 process.exit(done() ? 1 : 0);

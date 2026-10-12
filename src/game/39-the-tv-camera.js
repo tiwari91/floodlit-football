@@ -285,7 +285,7 @@
 			// angle, so a hand never comes up by the face or trails out behind him.
 			if (!jump && !ks) {
 				const sw = Math.sin(f) * -1, armA = (0.1 + a * 0.75 * (1 - 0.5 * shuf)), run = clamp((a - 0.12) / 0.35, 0, 1);
-				const ua2 = armA * (sw > 0 ? 0.62 : 0.85) * sw + shuf * 0.25, fore = 0.95 + 0.9 * (sw + 1) / 2;
+				const ua2 = armA * (sw > 0 ? 0.62 : 0.65) * sw + shuf * 0.25, fore = 0.95 + 0.9 * (sw + 1) / 2;
 				ua = ua * (1 - run) + ua2 * run;
 				eb = (0.25 + a * 0.5) * (1 - run) + clamp(fore - ua2, 1.0, 1.75) * run;
 			}
