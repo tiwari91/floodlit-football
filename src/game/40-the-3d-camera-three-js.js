@@ -111,7 +111,7 @@
 				pass: flat3D(g.ring, amber, 0.95), me: flat3D(g.ring, amber, 0.95), meFill: flat3D(g.disc, amber, 0.2), arrow: flat3D(g.arrow, amber, 1),
 				cone: new THREE.Mesh(g.cone, mat3D("#f2b52e", false)), offside: flat3D(g.box, 0xde4f5a, 0.55), fk: flat3D(g.ring, 0xffffff, 0.55),
 				wall: flat3D(g.box, 0xffffff, 0.8), keeper: flat3D(g.ring, 0xffffff, 0.28), tut: flat3D(g.ring, amber, 0.9), tutFill: flat3D(g.disc, amber, 0.25),
-				next: flat3D(g.ring, 0xffffff, 0.7)
+				next: flat3D(g.ring, 0xffffff, 0.42)
 			};
 			mk.arrow.material.side = THREE.DoubleSide;
 			for (const m of Object.values(mk)) { m.visible = false; G3.scene.add(m); }
@@ -411,7 +411,6 @@
 		} else {
 			G3.signAt = { y: P.top + 20, z: -F_SIDE3 - P.back + 2 };
 		}
-		G3.standTop = P.top + (gs.roof ? 40 : 14);   // above this the camera looks down on the near stand, not out of it
 		// A roof mast: a three-legged steel lattice tapering up from the ground (chords, rings and zig-zag
 		// bracing), capped with a head plate and a warning lamp, rather than a bare pole. A plain tapered
 		// column at Low graphics.

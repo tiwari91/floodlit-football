@@ -11105,7 +11105,7 @@
 				pass: flat3D(g.ring, amber, 0.95), me: flat3D(g.ring, amber, 0.95), meFill: flat3D(g.disc, amber, 0.2), arrow: flat3D(g.arrow, amber, 1),
 				cone: new THREE.Mesh(g.cone, mat3D("#f2b52e", false)), offside: flat3D(g.box, 0xde4f5a, 0.55), fk: flat3D(g.ring, 0xffffff, 0.55),
 				wall: flat3D(g.box, 0xffffff, 0.8), keeper: flat3D(g.ring, 0xffffff, 0.28), tut: flat3D(g.ring, amber, 0.9), tutFill: flat3D(g.disc, amber, 0.25),
-				next: flat3D(g.ring, 0xffffff, 0.7)
+				next: flat3D(g.ring, 0xffffff, 0.42)
 			};
 			mk.arrow.material.side = THREE.DoubleSide;
 			for (const m of Object.values(mk)) { m.visible = false; G3.scene.add(m); }
@@ -11405,7 +11405,6 @@
 		} else {
 			G3.signAt = { y: P.top + 20, z: -F_SIDE3 - P.back + 2 };
 		}
-		G3.standTop = P.top + (gs.roof ? 40 : 14);   // above this the camera looks down on the near stand, not out of it
 		// A roof mast: a three-legged steel lattice tapering up from the ground (chords, rings and zig-zag
 		// bracing), capped with a head plate and a warning lamp, rather than a bare pole. A plain tapered
 		// column at Low graphics.
@@ -12259,7 +12258,7 @@
 		chest.instanceMatrix.setUsage(T.DynamicDrawUsage); chest.frustumCulled = false; chest.count = 0;
 		G3.scene.add(chest);
 		// A kit-coloured ring at each player's feet (it keeps the sides readable from the gantry) and a soft shadow.
-		const rings = new T.InstancedMesh(G3.geo.ring, new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, depthWrite: false }), MAXF3);
+		const rings = new T.InstancedMesh(G3.geo.ring, new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.36, depthWrite: false }), MAXF3);   // the side's ring under each man: a hint, not a halo
 		const blobs = new T.InstancedMesh(G3.geo.shadow, new T.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.32, depthWrite: false }), MAXF3);
 		// Under four floodlights a player throws four faint shadows, one away from each (as many as the Graphics setting draws).
 		const longs = new T.InstancedMesh(G3.geo.shadow, new T.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.12, depthWrite: false }), MAXF3 * 4);
@@ -13390,9 +13389,7 @@
 		camera3D();
 		// The broadcast camera sits in the near stand, so that side of the ground (its seats, fans, roof
 		// and lights) is only drawn when the camera is out in front of it, looking back.
-		// High over the ground (the kick-off and half-time sweeps) he looks down on that stand too: without it
-		// the pitch's ground plane showed through as a green wedge where the near stand should be.
-		const showNear = G3.eye.z < FH + F_SIDE3 - 2 || G3.eye.y > (G3.standTop || 1e9) + 30 || G3.shot === "intro" || G3.shot === "boss" || G3.shot.startsWith("replay");
+		const showNear = G3.eye.z < FH + F_SIDE3 - 2 || G3.shot === "intro" || G3.shot === "wide" || G3.shot === "boss" || G3.shot.startsWith("replay");
 		G3.showNear = showNear;
 		if (G3.nearRoof) { for (const o of G3.nearRoof) { o.visible = showNear; } }
 		if (G3.nearStand) { G3.nearStand.visible = showNear; }

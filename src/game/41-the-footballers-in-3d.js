@@ -528,7 +528,7 @@
 		chest.instanceMatrix.setUsage(T.DynamicDrawUsage); chest.frustumCulled = false; chest.count = 0;
 		G3.scene.add(chest);
 		// A kit-coloured ring at each player's feet (it keeps the sides readable from the gantry) and a soft shadow.
-		const rings = new T.InstancedMesh(G3.geo.ring, new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, depthWrite: false }), MAXF3);
+		const rings = new T.InstancedMesh(G3.geo.ring, new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.36, depthWrite: false }), MAXF3);   // the side's ring under each man: a hint, not a halo
 		const blobs = new T.InstancedMesh(G3.geo.shadow, new T.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.32, depthWrite: false }), MAXF3);
 		// Under four floodlights a player throws four faint shadows, one away from each (as many as the Graphics setting draws).
 		const longs = new T.InstancedMesh(G3.geo.shadow, new T.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.12, depthWrite: false }), MAXF3 * 4);
