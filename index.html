@@ -11382,7 +11382,30 @@
 			// The back wall and its parapet, down to the ground: open underneath, the sweeps over the ground
 			// saw through under the stand to the pitch painting as a green wedge.
 			strip(T, j, P.back, lastRow.h, P.back, P.top + 12, conc);
-			strip(T, j, P.back, -0.5, P.back, lastRow.h + 0.5, shade(gs.concrete, 0.7));
+			const clad = cond.ko === "day" ? [ 0.36, 0.37, 0.39 ] : shade(gs.concrete, 1.15);   // the cladding outside: grey by day, dark by night
+			strip(T, j, P.back, -0.5, P.back, lastRow.h + 0.5, clad);
+			// Its outside, seen in the sweeps and the wide shots: a rib at each bay, a concourse band of
+			// openings (lit warm by night), and a stair tower every few bays on the long sides.
+			{
+				const a0 = at(j, P.back, 0, 0), a1 = at(j, P.back, 1, 0), ry = Math.atan2(-(a1[2] - a0[2]), a1[0] - a0[0]), L = segLen(j, P.back);
+				const ribC = clad.map(v => v * 1.25), night = cond.ko !== "day", TLo = isNear(j) ? nearLamp : lamp;
+				const rb = at(j, P.back + 1.2, 0, 0); accBox3(T, rb[0], (P.top + 12) / 2, rb[2], 3.2, P.top + 12, 2.4, ribC, ry);
+				const hb = Math.max(8, lastRow.h * 0.42), n = Math.floor(L / 24);
+				const band = at(j, P.back + 0.5, 0.5, 0); accBox3(T, band[0], hb + 6.5, band[2], L, 1.6, 1.2, ribC, ry);   // the concourse floor's edge
+				for (let k = 0; k < n; k++) {
+					const o = at(j, P.back + 0.35, (k + 0.5) / n, 0);
+					accBox3(night ? TLo : T, o[0], hb, o[2], 11, 8, 0.6, night ? [ 1.05, 0.8, 0.48 ] : [ 0.07, 0.08, 0.09 ], ry);
+				}
+				for (const u of !longSide(j) || L < 110 ? [] : L > 500 ? [ 0.22, 0.78 ] : [ 0.5 ]) {
+					const tw = at(j, P.back + 9, u, 0), th = P.top + 4, tc = clad.map(v => v * 0.82);
+					accBox3(T, tw[0], th / 2, tw[2], 30, th, 18, tc, ry);
+					accBox3(T, tw[0], th + 1, tw[2], 33, 2, 21, ribC, ry);   // its cap
+					for (let k = 0; k < 4; k++) {   // the stair windows, one per landing, up the outer face
+						const sw = at(j, P.back + 18.4, u, 0);
+						accBox3(night ? TLo : T, sw[0] + (k % 2 ? 6 : -6) * Math.cos(ry), th * (0.18 + 0.2 * k), sw[2] - (k % 2 ? 6 : -6) * Math.sin(ry), 5, 6, 0.6, night ? [ 0.95, 0.85, 0.65 ] : [ 0.07, 0.08, 0.09 ], ry);
+					}
+				}
+			}
 			strip(T, j, P.back - 3, P.top + 12, P.back, P.top + 12, shade(conc, 1.2));
 		}
 		// The roof: a ring round the whole bowl, or over the two long sides, on masts with stays; the
