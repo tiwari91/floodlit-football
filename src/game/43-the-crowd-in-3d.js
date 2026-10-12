@@ -599,6 +599,7 @@
 		if (G3.v.z > 1 || G3.v.z < -1) { return null; }
 		return { x: (G3.v.x + 1) / 2 * VW, y: (1 - G3.v.y) / 2 * VH, k: VH / (2 * d * Math.tan(G3.cam.fov * Math.PI / 360)) };
 	}
+	const plate3 = { ctrl: -1, at: 0 }, PLATE_FULL3 = 90;
 	// The HUD over the 3D picture: everything the 2D cameras write in words and marks.
 	function hud3D () {
 		ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -638,7 +639,12 @@
 					ctx.beginPath(); ctx.ellipse(foot.x, foot.y, r, r * 0.42, 0, -Math.PI / 2, -Math.PI / 2 + c * Math.PI * 2); ctx.stroke();
 				}
 			}
-			if (top && me.name) { drawPlate(me, top.x, top.y); ctx.textAlign = "center"; ctx.textBaseline = "middle"; }
+			// His surname for a second and a half after you take him over, then only his number and stamina, so the
+			// plate stops covering the men around him; the full name is back while he is tired or you are
+			// charging a pass or shot. The marker cone already points at him, so the plate has no pointer.
+			if (ctrl !== plate3.ctrl) { plate3.ctrl = ctrl; plate3.at = frame; }
+			const compact = frame - plate3.at > PLATE_FULL3 && !charging && !passCharge && staOf(me) >= TIRED_STA;
+			if (top && me.name) { drawPlate(me, top.x, top.y, compact, false); ctx.textAlign = "center"; ctx.textBaseline = "middle"; }
 		}
 		if (playing && me && ball.owner === me) {
 			const m = strikerTarget(me), q = m && proj3D(m.x, m.y, 44);

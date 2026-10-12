@@ -9412,13 +9412,15 @@
 	// Your man's name plate, FIFA style: number and name on a slim dark plate with a kit-colour edge,
 	// his stamina on its own strip under it (a dark track, readable on any grass) and, while a pass or
 	// shot charges, the power bar on top. (x, y) is the point just above his head the pointer touches.
-	function drawPlate (p, x, y) {
+	// compact: just his number over the stamina bar (the 3D view, once he has been yours a couple of
+	// seconds); pointer: false where something else already points at him (the 3D marker cone).
+	function drawPlate (p, x, y, compact = false, pointer = true) {
 		ctx.save();
 		ctx.font = "700 11px Barlow, Arial, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-		const label = `${p.num} ${p.name}`.toUpperCase(), w = Math.max(64, Math.ceil(ctx.measureText(label).width) + 18), h = 16, sh = 7;
+		const label = compact ? String(p.num) : `${p.num} ${pointer ? p.name : String(p.name).split(" ").pop()}`.toUpperCase(), w = Math.max(compact ? 30 : pointer ? 64 : 44, Math.ceil(ctx.measureText(label).width) + 18), h = 16, sh = 7;
 		const x0 = Math.round(x - w / 2), yb = Math.round(y - 7), y0 = yb - h - sh;
 		ctx.fillStyle = "#f2b52e";
-		ctx.beginPath(); ctx.moveTo(x - 5, yb); ctx.lineTo(x + 5, yb); ctx.lineTo(x, yb + 6); ctx.closePath(); ctx.fill();
+		if (pointer) { ctx.beginPath(); ctx.moveTo(x - 5, yb); ctx.lineTo(x + 5, yb); ctx.lineTo(x, yb + 6); ctx.closePath(); ctx.fill(); }
 		ctx.fillStyle = "rgba(10, 14, 20, 0.86)"; ctx.fillRect(x0, y0, w, h + sh);
 		ctx.fillStyle = (KITS[p.team] || KITS[0]).outfield; ctx.fillRect(x0, y0, 3, h + sh);
 		ctx.fillStyle = "#f4f6f2"; ctx.fillText(label, x0 + 1.5 + w / 2, y0 + h / 2 + 0.5);
@@ -12229,11 +12231,16 @@
 			// from beside the hip (about 0.95 rad) to chest height in front (about 1.85) with the elbow near
 			// a right angle, never reaching out straight or trailing behind the body.
 			const sw = -sn, run = clamp((a - 0.12) / 0.35, 0, 1);
-			r.sh[i].rotation.z = armA * (sw > 0 ? 0.62 * sw : 0.65 * sw);
-			// Sideways (OUT3): the arms hang a little away from the sides, coming in a touch as they swing forward.
-			r.sh[i].rotation.x = OUT3(i) * (0.12 + 0.05 * a - 0.12 * a * clamp(sw, 0, 1));
-			const fore = 0.95 + 0.9 * (sw + 1) / 2 + gv.elbow * 0.5;
-			r.el[i].rotation.z = lerp3(0.45 + gv.elbow + 0.5 * a, clamp(fore - r.sh[i].rotation.z, 1.0, 1.75), run);
+			// Measured on the rig (hand against shoulder, in his own frame, running at 0.8): the front hand
+			// comes up to the lower chest about 6.5 ahead and a little in toward the middle; the back hand is
+			// by the hip, level with the shoulder line, while the upper arm stays within 25 degrees of
+			// vertical behind. The forearm hangs nearer straight down behind (about 0.45 rad) and comes up
+			// toward the horizontal in front (about 1.6), so neither hand is held out in front the whole way round.
+			r.sh[i].rotation.z = armA * (sw > 0 ? 0.48 * sw : 0.5 * sw);
+			// Sideways (OUT3): the arms hang a little away from the sides, coming in as they swing forward.
+			r.sh[i].rotation.x = OUT3(i) * (0.12 + 0.05 * a - 0.2 * a * clamp(sw, 0, 1));
+			const fore = 0.42 + 1.18 * (sw + 1) / 2 + gv.elbow * 0.5;
+			r.el[i].rotation.z = lerp3(0.45 + gv.elbow + 0.5 * a, clamp(fore - r.sh[i].rotation.z, 0.75, 1.75), run);
 		}
 		r.hips.position.y = 15.6 - 0.5 * a + Math.abs(Math.cos(ph)) * 0.9 * a * gv.bounce + (a < 0.2 ? Math.sin(idle) * 0.12 : 0);
 		r.spine.rotation.z = -(0.06 + 0.2 * a * a + gv.lean * a);   // measured on the rig: -z on the spine leans him forward (forward is +x, the toe and the nose)
@@ -12288,7 +12295,7 @@
 		const lean = rm || acting ? 0 : clamp(-r.spine.rotation.z, 0, 0.5) * clamp((a - 0.12) / 0.35, 0, 1);   // a forward lean (-z) swings the arms back with the chest: add it back
 		// The arm swing's centre is carried a little forward as he leans into his running (0.22 rad), so the
 		// backswing stays within about 25 degrees behind vertical.
-		const carry = rm || acting ? 0 : 0.22 * clamp((a - 0.12) / 0.35, 0, 1);
+		const carry = rm || acting ? 0 : 0.05 * clamp((a - 0.12) / 0.35, 0, 1);
 		for (let i = 0; i < 2; i++) {
 			r.sh[i].rotation.z = clamp(r.sh[i].rotation.z + lean + carry, -0.95 + lean, 0.62 + lean + carry);
 			r.el[i].rotation.z = Math.min(r.el[i].rotation.z, 1.8, 2.0 - Math.max(0, r.sh[i].rotation.z - lean));
@@ -13373,6 +13380,7 @@
 		if (G3.v.z > 1 || G3.v.z < -1) { return null; }
 		return { x: (G3.v.x + 1) / 2 * VW, y: (1 - G3.v.y) / 2 * VH, k: VH / (2 * d * Math.tan(G3.cam.fov * Math.PI / 360)) };
 	}
+	const plate3 = { ctrl: -1, at: 0 }, PLATE_FULL3 = 90;
 	// The HUD over the 3D picture: everything the 2D cameras write in words and marks.
 	function hud3D () {
 		ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -13412,7 +13420,12 @@
 					ctx.beginPath(); ctx.ellipse(foot.x, foot.y, r, r * 0.42, 0, -Math.PI / 2, -Math.PI / 2 + c * Math.PI * 2); ctx.stroke();
 				}
 			}
-			if (top && me.name) { drawPlate(me, top.x, top.y); ctx.textAlign = "center"; ctx.textBaseline = "middle"; }
+			// His surname for a second and a half after you take him over, then only his number and stamina, so the
+			// plate stops covering the men around him; the full name is back while he is tired or you are
+			// charging a pass or shot. The marker cone already points at him, so the plate has no pointer.
+			if (ctrl !== plate3.ctrl) { plate3.ctrl = ctrl; plate3.at = frame; }
+			const compact = frame - plate3.at > PLATE_FULL3 && !charging && !passCharge && staOf(me) >= TIRED_STA;
+			if (top && me.name) { drawPlate(me, top.x, top.y, compact, false); ctx.textAlign = "center"; ctx.textBaseline = "middle"; }
 		}
 		if (playing && me && ball.owner === me) {
 			const m = strikerTarget(me), q = m && proj3D(m.x, m.y, 44);

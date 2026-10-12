@@ -598,11 +598,16 @@
 			// from beside the hip (about 0.95 rad) to chest height in front (about 1.85) with the elbow near
 			// a right angle, never reaching out straight or trailing behind the body.
 			const sw = -sn, run = clamp((a - 0.12) / 0.35, 0, 1);
-			r.sh[i].rotation.z = armA * (sw > 0 ? 0.62 * sw : 0.65 * sw);
-			// Sideways (OUT3): the arms hang a little away from the sides, coming in a touch as they swing forward.
-			r.sh[i].rotation.x = OUT3(i) * (0.12 + 0.05 * a - 0.12 * a * clamp(sw, 0, 1));
-			const fore = 0.95 + 0.9 * (sw + 1) / 2 + gv.elbow * 0.5;
-			r.el[i].rotation.z = lerp3(0.45 + gv.elbow + 0.5 * a, clamp(fore - r.sh[i].rotation.z, 1.0, 1.75), run);
+			// Measured on the rig (hand against shoulder, in his own frame, running at 0.8): the front hand
+			// comes up to the lower chest about 6.5 ahead and a little in toward the middle; the back hand is
+			// by the hip, level with the shoulder line, while the upper arm stays within 25 degrees of
+			// vertical behind. The forearm hangs nearer straight down behind (about 0.45 rad) and comes up
+			// toward the horizontal in front (about 1.6), so neither hand is held out in front the whole way round.
+			r.sh[i].rotation.z = armA * (sw > 0 ? 0.48 * sw : 0.5 * sw);
+			// Sideways (OUT3): the arms hang a little away from the sides, coming in as they swing forward.
+			r.sh[i].rotation.x = OUT3(i) * (0.12 + 0.05 * a - 0.2 * a * clamp(sw, 0, 1));
+			const fore = 0.42 + 1.18 * (sw + 1) / 2 + gv.elbow * 0.5;
+			r.el[i].rotation.z = lerp3(0.45 + gv.elbow + 0.5 * a, clamp(fore - r.sh[i].rotation.z, 0.75, 1.75), run);
 		}
 		r.hips.position.y = 15.6 - 0.5 * a + Math.abs(Math.cos(ph)) * 0.9 * a * gv.bounce + (a < 0.2 ? Math.sin(idle) * 0.12 : 0);
 		r.spine.rotation.z = -(0.06 + 0.2 * a * a + gv.lean * a);   // measured on the rig: -z on the spine leans him forward (forward is +x, the toe and the nose)
@@ -657,7 +662,7 @@
 		const lean = rm || acting ? 0 : clamp(-r.spine.rotation.z, 0, 0.5) * clamp((a - 0.12) / 0.35, 0, 1);   // a forward lean (-z) swings the arms back with the chest: add it back
 		// The arm swing's centre is carried a little forward as he leans into his running (0.22 rad), so the
 		// backswing stays within about 25 degrees behind vertical.
-		const carry = rm || acting ? 0 : 0.22 * clamp((a - 0.12) / 0.35, 0, 1);
+		const carry = rm || acting ? 0 : 0.05 * clamp((a - 0.12) / 0.35, 0, 1);
 		for (let i = 0; i < 2; i++) {
 			r.sh[i].rotation.z = clamp(r.sh[i].rotation.z + lean + carry, -0.95 + lean, 0.62 + lean + carry);
 			r.el[i].rotation.z = Math.min(r.el[i].rotation.z, 1.8, 2.0 - Math.max(0, r.sh[i].rotation.z - lean));
