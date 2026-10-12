@@ -466,6 +466,7 @@
 			}
 			if (taker && taker.role === "gk" && speed > 11) {
 				ooh(); ev3d("save", taker.team); crowdReact("save", taker.team); benchReact("near", { team: taker.team });
+				if (ball.lastBy && ball.lastBy.team !== taker.team) { moment("save", ball.lastBy, { keeper: taker, shooter: ball.lastBy }); }
 				// Not every save sticks: a hard shot or a wet ball can be spilled back into play.
 				if (Math.random() < 0.1 + (speed > 14 ? 0.06 : 0) + 0.7 * (1 - cond.handling)) { spill(taker, cond.wet ? "Spilled" : "Parried"); return; }
 			}
@@ -511,6 +512,7 @@
 				swing(q.team, 0.08);
 				if (isHuman) { burst(q.x, q.y, "Won it"); sfx("tackle"); stats.tackles++; } else if (q.team === 1) { oppStats.tackles++; } else { stats.aiTackles = (stats.aiTackles || 0) + 1; }
 				crowdReact("tackle", q.team);
+				if (sliding || rel(q.team, q.x) < FW / 3) { moment("tackle", q); }   // a slide, or last-ditch in his own third
 				break;
 			}
 		}

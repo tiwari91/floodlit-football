@@ -217,6 +217,7 @@
 		stats.shots++;
 		tally.shots[0]++;
 		if (shotInRange(p)) { crowdReact("chance", 0); }
+		if (Math.abs(attackX(0) - p.x) > FW * 0.27) { moment("rocket", p); }
 		// Aim assist: keyboard facing only has 8 directions, so a shot taken
 		// roughly toward goal bends onto target. Lean up or down picks the corner;
 		// more power means closer to the post (and a little more risk).
@@ -282,6 +283,7 @@
 					sfx("tackle");
 					stats.tackles++;
 					crowdReact("tackle", 0);
+					if (rel(0, p.x) < FW / 3) { moment("tackle", p); }
 				} else if (Math.random() < 0.1) {
 					commitFoul(p, o, false);
 				} else {

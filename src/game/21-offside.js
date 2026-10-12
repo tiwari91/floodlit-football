@@ -274,6 +274,7 @@
 		if (p.team === 1) { oppStats.shots++; }
 		tally.shots[p.team]++;
 		crowdReact("chance", p.team);
+		if (Math.abs(attackX(p.team) - p.x) > FW * 0.27) { moment("rocket", p); }   // a go from distance
 		const gx = p.team === 0 ? FW + 20 : -20;
 		kick(p, gx, aimY, 9.5 + power01 * 8.5);
 		ball.shot = true;

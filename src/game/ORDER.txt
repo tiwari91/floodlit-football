@@ -38,6 +38,7 @@
 35-a-match-in-progress-survives-a-refresh.js
 36-rendering.js
 37-crowd-and-music-all-synthesised.js
+37a-commentary.js
 38-camera.js
 39-the-tv-camera.js
 40-the-3d-camera-three-js.js

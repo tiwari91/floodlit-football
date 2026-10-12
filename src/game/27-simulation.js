@@ -19,6 +19,8 @@
 			p.idlePh = (p.idlePh || g.seed * 6.28) + 0.028;
 			if (p.kickA > 0) { p.kickA--; }
 			if (p.plant > 0) { p.plant--; }
+			if (p.headHands > 0) { p.headHands--; }
+			if (p.fistPump > 0) { p.fistPump--; }
 		}
 	}
 

@@ -509,6 +509,22 @@
 				r.head.rotation.y += ballYaw;
 			}
 		}
+		// Reactions (set by moment()): hands on his head after a near miss, a fist pumped after a big
+		// tackle. The angles are measured on the rig: shoulder forward 2.3 and out 0.8, elbow 1.9 puts
+		// the hand on the crown.
+		if (!rm && !acting && cel <= 0 && !down) {
+			const hh = p.headHands > 0 ? clamp(p.headHands / 20, 0, 1) * clamp((95 - p.headHands) / 8, 0, 1) : 0;
+			if (hh > 0) {
+				for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 2.3, hh); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, OUT3(i) * 0.8, hh); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 1.9, hh); }
+				r.neck.rotation.z -= 0.25 * hh;   // and he looks up at the sky
+			}
+			const fp = p.fistPump > 0 ? clamp(p.fistPump / 12, 0, 1) * clamp((55 - p.fistPump) / 6, 0, 1) : 0;
+			if (fp > 0) {
+				const i = 1, pump = 0.25 * Math.sin((50 - p.fistPump) * 0.45);
+				r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 0.55 + pump, fp); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, OUT3(i) * 0.25, fp); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 2.25, fp);
+				r.chest.rotation.y -= 0.12 * fp;
+			}
+		}
 		// Turning: the head and then the chest come round first, the hips follow.
 		if (!rm && lead && fall < 0 && dive < 0 && !down) { r.chest.rotation.y += lead * 0.35; r.neck.rotation.y += lead * 0.3; }
 		// The keeper on his toes when the ball is near: knees bent, hands ready.

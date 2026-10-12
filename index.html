@@ -140,6 +140,22 @@
 	.lower .lt-main b { font-size: 21px; font-weight: 800; letter-spacing: 0.04em; line-height: 1.05; overflow: hidden; text-overflow: ellipsis; }
 	.lower .lt-main small { font-family: var(--body, inherit); font-size: 12px; font-weight: 700; letter-spacing: 0.08em; color: #44514b; }
 	.pitchwrap:has(.overlay:not([hidden])) .lower { display: none; }
+	/* The commentator: one line at the big moments, bottom centre, between the captions and the touchline cam. */
+	.comm {
+		position: absolute; left: 50%; bottom: 16px; z-index: 3; transform: translateX(-50%); max-width: min(46%, 520px);
+		display: flex; align-items: center; gap: 9px; padding: 6px 14px 6px 10px; border-radius: 999px;
+		background: rgba(10, 14, 18, 0.78); border-left: 4px solid var(--comm-kit, #f2b52e); color: #eef4ee;
+		font: italic 600 14px/1.25 var(--body, system-ui, sans-serif); pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+		box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+	}
+	.comm[hidden] { display: none; }
+	.comm #commText { overflow: hidden; text-overflow: ellipsis; }
+	.comm.in { animation: commIn 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); }
+	@keyframes commIn { from { transform: translate(-50%, 10px); opacity: 0; } to { transform: translateX(-50%); opacity: 1; } }
+	.comm-mic { flex: none; width: 8px; height: 8px; border-radius: 50%; background: #e2463f; box-shadow: 0 0 0 3px rgba(226, 70, 63, 0.25); }
+	.pitchwrap:has(.overlay:not([hidden])) .comm, .pitchwrap:has(.lower:not([hidden])) .comm { display: none; }
+	@media (prefers-reduced-motion: reduce) { .comm.in { animation: none; } }
+	@media (pointer: coarse), (max-width: 640px) { .comm { bottom: 8px; max-width: 76%; font-size: 12px; padding: 5px 11px 5px 8px; } }
 	@media (pointer: coarse), (max-width: 640px) {
 		.lower { top: 50px; bottom: auto; left: 10px; }
 		.lower .lt-tag { font-size: 12px; padding: 0 9px; }
@@ -1202,6 +1218,7 @@
 		<button class="menutoggle" id="menuToggle" type="button" aria-pressed="true" title="Show or hide the page menu and settings (F)">Show menu</button>
 		<div class="scorebug" id="scoreBug" aria-hidden="true"><span id="bugHome">You</span><b id="bugScore">0 – 0</b><span id="bugAway">CPU</span><span class="t" id="bugClock">03:00</span><span class="bugbar"><span class="mfill" id="bugFill"></span></span><span class="bugmood" id="bugMood" hidden></span></div>
 		<div class="lower" id="lowerThird" aria-hidden="true" hidden><span class="lt-tag" id="ltTag">Goal</span><span class="lt-main"><b id="ltName"></b><small id="ltSub"></small></span></div>
+		<div class="comm" id="commLine" aria-live="polite" hidden><span class="comm-mic" aria-hidden="true"></span><span id="commText"></span></div>
 		<div class="replaytag" id="replayTag" aria-hidden="true" hidden>Replay<small>any key skips</small></div>
 		<div class="bc-ticker" id="bcTicker" aria-hidden="true" hidden><span class="bc-tk-tag">Around the league</span><span class="bc-tk-run"><span id="bcTickerText"></span></span></div>
 		<div class="bc-board" id="bcBoard" aria-hidden="true" hidden></div>
@@ -4908,6 +4925,7 @@
 		if (p.team === 1) { oppStats.shots++; }
 		tally.shots[p.team]++;
 		crowdReact("chance", p.team);
+		if (Math.abs(attackX(p.team) - p.x) > FW * 0.27) { moment("rocket", p); }   // a go from distance
 		const gx = p.team === 0 ? FW + 20 : -20;
 		kick(p, gx, aimY, 9.5 + power01 * 8.5);
 		ball.shot = true;
@@ -5134,6 +5152,7 @@
 		stats.shots++;
 		tally.shots[0]++;
 		if (shotInRange(p)) { crowdReact("chance", 0); }
+		if (Math.abs(attackX(0) - p.x) > FW * 0.27) { moment("rocket", p); }
 		// Aim assist: keyboard facing only has 8 directions, so a shot taken
 		// roughly toward goal bends onto target. Lean up or down picks the corner;
 		// more power means closer to the post (and a little more risk).
@@ -5199,6 +5218,7 @@
 					sfx("tackle");
 					stats.tackles++;
 					crowdReact("tackle", 0);
+					if (rel(0, p.x) < FW / 3) { moment("tackle", p); }
 				} else if (Math.random() < 0.1) {
 					commitFoul(p, o, false);
 				} else {
@@ -5793,6 +5813,8 @@
 			p.idlePh = (p.idlePh || g.seed * 6.28) + 0.028;
 			if (p.kickA > 0) { p.kickA--; }
 			if (p.plant > 0) { p.plant--; }
+			if (p.headHands > 0) { p.headHands--; }
+			if (p.fistPump > 0) { p.fistPump--; }
 		}
 	}
 
@@ -6667,7 +6689,7 @@
 		if (shoot) { shootEnd(ball.shot ? "Off target" : "Out of play"); return; }
 		const defTeam = leftEnd ? 0 : 1;   // you defend the left goal
 		raiseFlag(ball.x, "out");
-		if (ball.shot && frame - (ball.kickedAt || -999) < 120 && Math.abs(ball.y - FH / 2) < FMT.goal / 2 + 70 * GH && (ball.z || 0) < 95) { ooh(); ev3d("near"); if (ball.lastBy) { crowdReact("near", ball.lastBy.team); benchReact("near", { team: ball.lastBy.team }); } }
+		if (ball.shot && frame - (ball.kickedAt || -999) < 120 && Math.abs(ball.y - FH / 2) < FMT.goal / 2 + 70 * GH && (ball.z || 0) < 95) { ooh(); ev3d("near"); if (ball.lastBy) { crowdReact("near", ball.lastBy.team); benchReact("near", { team: ball.lastBy.team }); moment((ball.z || 0) > 40 ? "over" : "near", ball.lastBy); } }
 		else if (ball.shot && frame - (ball.kickedAt || -999) < 150 && ball.lastBy) { if (ball.lastBy.team === homeSide) { groan(); } crowdReact("miss", ball.lastBy.team); }   // a clear miss
 		if (lastTouch === defTeam) { awardCorner(1 - defTeam, leftEnd, ball.y < FH / 2); } else { awardGoalKick(defTeam, leftEnd); }
 	}
@@ -7309,6 +7331,7 @@
 			}
 			if (taker && taker.role === "gk" && speed > 11) {
 				ooh(); ev3d("save", taker.team); crowdReact("save", taker.team); benchReact("near", { team: taker.team });
+				if (ball.lastBy && ball.lastBy.team !== taker.team) { moment("save", ball.lastBy, { keeper: taker, shooter: ball.lastBy }); }
 				// Not every save sticks: a hard shot or a wet ball can be spilled back into play.
 				if (Math.random() < 0.1 + (speed > 14 ? 0.06 : 0) + 0.7 * (1 - cond.handling)) { spill(taker, cond.wet ? "Spilled" : "Parried"); return; }
 			}
@@ -7354,6 +7377,7 @@
 				swing(q.team, 0.08);
 				if (isHuman) { burst(q.x, q.y, "Won it"); sfx("tackle"); stats.tackles++; } else if (q.team === 1) { oppStats.tackles++; } else { stats.aiTackles = (stats.aiTackles || 0) + 1; }
 				crowdReact("tackle", q.team);
+				if (sliding || rel(q.team, q.x) < FW / 3) { moment("tackle", q); }   // a slide, or last-ditch in his own third
 				break;
 			}
 		}
@@ -8241,6 +8265,7 @@
 		if (bulkSim || mode === "tutorial") { return; }
 		const el = $("lowerThird");
 		if (!el) { return; }
+		hideCommentary();   // the caption takes the screen
 		$("ltTag").textContent = tag; $("ltTag").className = "lt-tag " + kind;
 		$("ltName").textContent = name; $("ltSub").textContent = sub;
 		el.style.setProperty("--lt-kit", (KITS[t] || KITS[0]).outfield);
@@ -10063,6 +10088,44 @@
 		ctx.restore();
 	}
 
+	/* ---------- the big moments ----------
+	   A near miss, a save, a big tackle or a shot from distance: one call, moment(kind, p, o), and
+	   everything that should react does. The commentator gets a line (bottom centre, one at a time,
+	   never over a goal, card or substitution caption), the player reacts (hands on his head after
+	   a near miss, a fist pumped after a big tackle) and the home end lifts or groans. */
+	const COMM = {
+		near: [ "{n} drags it just wide!", "Inches wide from {n}!", "So close! {n} will be kicking himself", "Whistles past the post! {n} so nearly had it", "Off target, but only just, from {n}" ],
+		over: [ "{n} gets under it and it flies over", "Just over the bar from {n}!", "{n} leans back and it clears the crossbar", "High and handsome from {n}, but over" ],
+		save: [ "What a save from {k}!", "{k} gets down well to keep out {n}", "{k} stands tall and denies {n}", "Strong hands from {k}", "{n} thought that was in, but {k} says no" ],
+		tackle: [ "Superb tackle from {n}!", "{n} slides in and takes the ball clean", "Timed to perfection by {n}", "Brilliant defending from {n}", "{n} wins it back, and the crowd loves it" ],
+		rocket: [ "{n} lets fly from distance!", "Have a go! {n} tries his luck from range", "{n} unleashes one from way out" ]
+	};
+	let commAt = -1e9, commRecent = [], commTimer = 0, lastCommentary = null;
+	const shortName = p => (p && (p.name || `No. ${p.num}`)) || "";
+	function commentary (kind, vars, t) {
+		if (bulkSim || mode === "tutorial" || shoot || replayOn() || (state !== "play" && state !== "goal")) { return false; }
+		const pool = COMM[kind], el = $("commLine"), lt = $("lowerThird"), now = performance.now();
+		if (!pool || !el || now - commAt < 6500 || (lt && !lt.hidden)) { return false; }   // one at a time; captions come first
+		const fresh = pool.filter(s => !commRecent.includes(s)), line = fresh[Math.floor(Math.random() * fresh.length)] || pool[0];
+		commRecent = [ line, ...commRecent ].slice(0, 6);
+		const text = line.replace(/\{(\w)\}/g, (_, k) => vars[k] || "");
+		$("commText").textContent = text;
+		el.style.setProperty("--comm-kit", (KITS[t] || KITS[0]).outfield);
+		el.hidden = false; el.classList.remove("in"); void el.offsetWidth; el.classList.add("in");
+		commAt = now; lastCommentary = { kind, text, at: now };
+		clearTimeout(commTimer);
+		commTimer = setTimeout(() => { el.hidden = true; }, 4200);
+		return true;
+	}
+	const hideCommentary = () => { const el = $("commLine"); if (el) { el.hidden = true; } clearTimeout(commTimer); };
+	function moment (kind, p, o = {}) {
+		if (bulkSim || !p) { return; }
+		commentary(kind, { n: shortName(p), k: shortName(o.keeper) }, p.team);
+		// The player's own reaction, played out by the 3D figure (and decayed in the player tick).
+		if (kind === "near" || kind === "over") { p.headHands = 90; }
+		if (kind === "save" && o.shooter === p) { p.headHands = 70; }
+		if (kind === "tackle") { p.fistPump = 50; crowdMood.excite = Math.min(1, crowdMood.excite + 0.2); if (p.team === homeSide) { crowdMood.home = Math.max(crowdMood.home, 0.6); } }
+	}
 	/* ---------- camera ---------- */
 	let camX = 0, camY = 0;
 	// Like the TV cutting to the touchline: before kick-off, at the breaks and once a
@@ -11879,6 +11942,22 @@
 				if (tap > 0) { const kf = build(p).left ? 0 : 1; r.an[kf].rotation.z -= 0.4 * tap; r.kn[kf].rotation.z += 0.15 * tap; }
 			} else {
 				r.head.rotation.y += ballYaw;
+			}
+		}
+		// Reactions (set by moment()): hands on his head after a near miss, a fist pumped after a big
+		// tackle. The angles are measured on the rig: shoulder forward 2.3 and out 0.8, elbow 1.9 puts
+		// the hand on the crown.
+		if (!rm && !acting && cel <= 0 && !down) {
+			const hh = p.headHands > 0 ? clamp(p.headHands / 20, 0, 1) * clamp((95 - p.headHands) / 8, 0, 1) : 0;
+			if (hh > 0) {
+				for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 2.3, hh); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, OUT3(i) * 0.8, hh); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 1.9, hh); }
+				r.neck.rotation.z -= 0.25 * hh;   // and he looks up at the sky
+			}
+			const fp = p.fistPump > 0 ? clamp(p.fistPump / 12, 0, 1) * clamp((55 - p.fistPump) / 6, 0, 1) : 0;
+			if (fp > 0) {
+				const i = 1, pump = 0.25 * Math.sin((50 - p.fistPump) * 0.45);
+				r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 0.55 + pump, fp); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, OUT3(i) * 0.25, fp); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 2.25, fp);
+				r.chest.rotation.y -= 0.12 * fp;
 			}
 		}
 		// Turning: the head and then the chest come round first, the hips follow.
@@ -14187,7 +14266,7 @@
 				passTo(c, f);
 				return f;
 			},
-			get restartWalk () { return restartWalk; }, get review () { return review; }, get cpuSubs () { return cpuSubs; }, get surge () { return surge; }, get pressI () { return press; }, formBonus, get lastRatings () { return lastRatings; }, get stretcher () { return stretcher; }, injureTest (t, serious) { const v = outfield(t).find(p => !p.injured); const o = outfield(1 - t)[0]; if (v && o) { tackling[1 - t] = "hard"; const r = Math.random; Math.random = () => 0.01; try { commitFoul(o, v, true); } finally { Math.random = r; } } return v; }, staOf, get offside () { return offside; }, get deadBall () { return deadBall; }, get tally () { return tally; }, get freezeKind () { return freezeKind; }, fkDist () { return fkDist(); }, simExtra () { return { tally, poss: possFrames.slice() }; }, get setPieceKind () { return setPiece ? setPiece.kind : null; }, get gfxLevel () { return gfxLevel; }, setGfx, get musicBar () { return music ? music.bar : -1; }, get audioState () { return audio ? audio.state : "none"; }, get replayOn () { return replayOn(); }, get replay () { return replay; }, get recFrames () { return rec.n; }, REPLAY_AT, REPLAY_FR, GOAL_CELEB, get lastCaption () { return lastCaption; }, caption, get camMode () { return camMode; }, get crowdMood () { return crowdMood; }, get frameDt () { return frameDt; }, get crowdBed () { return crowd; }, get soundOn () { return soundOn; },
+			get restartWalk () { return restartWalk; }, get review () { return review; }, get cpuSubs () { return cpuSubs; }, get surge () { return surge; }, get pressI () { return press; }, formBonus, get lastRatings () { return lastRatings; }, get stretcher () { return stretcher; }, injureTest (t, serious) { const v = outfield(t).find(p => !p.injured); const o = outfield(1 - t)[0]; if (v && o) { tackling[1 - t] = "hard"; const r = Math.random; Math.random = () => 0.01; try { commitFoul(o, v, true); } finally { Math.random = r; } } return v; }, staOf, get offside () { return offside; }, get deadBall () { return deadBall; }, get tally () { return tally; }, get freezeKind () { return freezeKind; }, fkDist () { return fkDist(); }, simExtra () { return { tally, poss: possFrames.slice() }; }, get setPieceKind () { return setPiece ? setPiece.kind : null; }, get gfxLevel () { return gfxLevel; }, setGfx, get musicBar () { return music ? music.bar : -1; }, get audioState () { return audio ? audio.state : "none"; }, get replayOn () { return replayOn(); }, get replay () { return replay; }, get recFrames () { return rec.n; }, REPLAY_AT, REPLAY_FR, GOAL_CELEB, get lastCaption () { return lastCaption; }, get lastCommentary () { return lastCommentary; }, moment, commReset () { commAt = -1e9; commRecent = []; }, caption, get camMode () { return camMode; }, get crowdMood () { return crowdMood; }, get frameDt () { return frameDt; }, get crowdBed () { return crowd; }, get soundOn () { return soundOn; },
 			human, switchScore, outfield, dist, get cond () { return cond; }, clubSong, isDerby, celebrateTrophy, get fireworks () { return fireworks; }, goalSongTest (id) { const s = goalSong(id); playGoalSong(id); return s; }, chantTest (away) { ensureAudio(); chant(1, !!away); }, stepBallTest () { stepBall(); }, climateTest (n, nat) { return { weather: genForecast(n, nat), wind: genWind(n, nat), ko: genKickoff(n, nat) }; }, rematchTest () { clearLive(); state = "intro"; newMatch(); showIntro(); renderLeague(); },
 			get officials () { return officials3; }, get flagCall () { return flagCall; }, refKit, deltaE,
 			proj (x, y, z) { return G3.cam ? proj3D(x, y, z) : null; }, get viewScale () { return scale; },

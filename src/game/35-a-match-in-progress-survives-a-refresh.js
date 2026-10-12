@@ -363,6 +363,7 @@
 		if (bulkSim || mode === "tutorial") { return; }
 		const el = $("lowerThird");
 		if (!el) { return; }
+		hideCommentary();   // the caption takes the screen
 		$("ltTag").textContent = tag; $("ltTag").className = "lt-tag " + kind;
 		$("ltName").textContent = name; $("ltSub").textContent = sub;
 		el.style.setProperty("--lt-kit", (KITS[t] || KITS[0]).outfield);
