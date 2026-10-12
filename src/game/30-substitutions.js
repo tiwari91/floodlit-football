@@ -443,7 +443,7 @@
 				// A ball just struck is past the man closing the kicker down before he can react:
 				// pressing you forces a pass, it doesn't win it off your boot.
 				if (!isGk && p.team !== lastTouch && speed < 11 && frame - (ball.kickedAt || -99) < 7) { continue; }
-				if (ball.z > (isGk ? 45 : isReceiver && ball.vz < 0 && !ball.shot && ball.lastBy && ball.lastBy.team === p.team ? 34 : 16)) { continue; }   // over their head (the man it's meant for can chest a dropping ball down)
+				if (ball.z > (isGk ? 45 : (isReceiver || ball.meetChest) && ball.vz < 0 && !ball.shot && ball.lastBy && ball.lastBy.team === p.team ? 34 : 16)) { continue; }   // over their head (the man it's meant for can chest a dropping ball down)
 				// The intended receiver always controls a firm pass.
 				if (speed > 11 && !isReceiver) {
 					// Your keeper holds most of what he reaches; theirs is set by the opponent level.

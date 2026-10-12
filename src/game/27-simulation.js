@@ -352,7 +352,7 @@
 
 			// The receiver runs onto the pass by itself; the arrows take over on the first touch.
 			if (p === receiver && !ball.owner) {
-				const [ tx, ty ] = ball.z > 0 ? [ ball.landX, ball.landY ] : interceptPoint(p);
+				const [ tx, ty ] = ball.z > 0 ? meetPoint() : interceptPoint(p);
 				const [ dvx, dvy ] = steer(p, tx, ty, BASE_SPD * 1.08);
 				movePlayer(p, dvx, dvy, cond.grip, ACC_YOU);
 				p.dir = Math.atan2(ball.y - p.y, ball.x - p.x);
@@ -467,8 +467,8 @@
 			} else if (airMen.has(p)) {
 				target = airMen.get(p); setRole = true;
 			} else if (p === chaser1 || (autoPilot && players.indexOf(p) === ctrl && !(ball.owner && ball.owner.team === 0))) {
-				// Read a ball in the air: run to where it will come down.
-				target = ball.z > 0 ? [ ball.landX, ball.landY ] : [ ball.x + ball.vx * 6, ball.y + ball.vy * 6 ];
+				// Read a ball in the air: run to where it will come down (his own side's pass: perhaps to meet it at chest height).
+				target = ball.z > 0 ? (lastTouch === p.team ? meetPoint() : [ ball.landX, ball.landY ]) : [ ball.x + ball.vx * 6, ball.y + ball.vy * 6 ];
 			} else if (p === cover1) {
 				const own = { x: FW, y: FH / 2 };
 				const k = press[1] === "high" ? 0.12 : press[1] === "low" ? 0.45 : 0.3;

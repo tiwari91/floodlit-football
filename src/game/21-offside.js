@@ -221,6 +221,7 @@
 		ball.landX = clamp(tx, 12, FW - 12);
 		ball.landY = clamp(ty, 12, FH - 12);
 		ball.landT = T;
+		ball.meetChest = Math.random() < 0.55; ball.chestX = null;
 		if (Math.abs(p.y - FH / 2) > FH * 0.2 && rel(p.team, p.x) > FW * 0.62) { tally.crosses[p.team]++; }
 	}
 	// Swing: a sideways push off the line at the strike, and a steady pull back that brings the
@@ -237,15 +238,20 @@
 	}
 	// Where (and in how many frames) a ball in the air comes down, flown forward exactly as stepBall flies it.
 	function predictLanding () {
-		let x = ball.x, y = ball.y, z = ball.z, vx = ball.vx, vy = ball.vy, vz = ball.vz, ct = ball.curlT || 0, k = 0;
+		let x = ball.x, y = ball.y, z = ball.z, vx = ball.vx, vy = ball.vy, vz = ball.vz, ct = ball.curlT || 0, k = 0, chest = null;
 		while (k < 160 && (z > 0 || vz > 0)) {
 			x += vx; y += vy; z += vz; vz -= GRAV + (ball.dipG || 0);
+			if (!chest && vz < 0 && z <= 30) { chest = [ x, y, k ]; }   // where it drops through chest height
 			if (ct > 0) { vx += ball.cax; vy += ball.cay; ct--; }
 			if (cond.wind.s) { const h = Math.min(1, Math.max(0, z) / 30); vx += cond.wind.ax * h; vy += cond.wind.ay * h; }
 			vx *= AIR_DRAG; vy *= AIR_DRAG; k++;
 		}
 		ball.landX = clamp(x, 12, FW - 12); ball.landY = clamp(y, 12, FH - 12); ball.landT = k;
+		if (chest) { ball.chestX = clamp(chest[0], 12, FW - 12); ball.chestY = clamp(chest[1], 12, FH - 12); } else { ball.chestX = ball.chestY = null; }
 	}
+	// Where the man a lofted ball is meant for goes to meet it: the landing spot, or (meetChest, about half
+	// of them) the point where it drops through chest height, to take it on the chest or the thigh.
+	const meetPoint = () => (ball.meetChest && ball.chestX !== null && ball.chestX !== undefined ? [ ball.chestX, ball.chestY ] : [ ball.landX, ball.landY ]);
 	// A chip: up and over a keeper off his line, dropping under the bar.
 	function chipShot (p) {
 		const goalX = attackX(p.team), gx = goalX + (goalX === FW ? 20 : -20), sho = A(p, "sho");
