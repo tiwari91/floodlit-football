@@ -11222,7 +11222,13 @@
 			ground.position.set(WW / 2 - MX, 0, WH / 2 - MY);
 			st.add(ground);
 		}
-		const apron = new THREE.Mesh(new THREE.PlaneGeometry(WW * 4, WH * 4), mat3D(cond.surfaceKey === "turf" ? "#13311f" : "#0f2416", false));
+		// The land round the stadium, seen past the far stand from the gantry: by night near black; by day
+		// muted grass and fields that fade into the haze toward the horizon (the fog does the fading), and the
+		// clear colour behind everything is the haze too, so there is never a black void under a day sky.
+		const dayLand = cond.ko === "day";
+		const landCol = !dayLand ? (cond.surfaceKey === "turf" ? "#13311f" : "#0f2416") : cond.snow ? "#c3c9cc" : cond.wet ? "#3f5843" : cond.heat ? "#6f6c4e" : "#4a6542";
+		if (G3.renderer) { G3.renderer.setClearColor(dayLand ? (cond.snow ? 0xc4cbd0 : cond.wet ? 0x8d979e : cond.heat ? 0xd9ccb0 : 0xa9bfd0) : 0x070c12, 1); }
+		const apron = new THREE.Mesh(new THREE.PlaneGeometry(WW * (dayLand ? 14 : 4), WH * (dayLand ? 14 : 4)), mat3D(landCol, false));
 		apron.rotation.x = -Math.PI / 2; apron.position.set(FW / 2, -0.6, FH / 2);
 		st.add(own(apron));
 		// 2. The stadium.
@@ -11385,11 +11391,19 @@
 			st.add(scr);
 			G3.screen = { cv: scv, tex, key: "" };
 		}
-		// Mountains behind the far stand at some grounds, black against the night sky.
+		// Mountains behind the far stand at some grounds: black against the night sky; by day, blue-grey with
+		// distance (the far ridge paler, the near one greener and darker), greyer in rain, pale in snow,
+		// a warm haze in the heat. Never a black wall under an afternoon sky.
 		if (gs.mountains || gs.arch === "monterrey") {
 			let mh = 4242;
 			const mr = () => (mh = (mh * 48271) % 2147483647) / 2147483647;
-			for (const [ z, k, col ] of [ [ -FH * 3.6, 1, [ 0.05, 0.07, 0.1 ] ], [ -FH * 2.7, 0.62, [ 0.035, 0.05, 0.07 ] ] ]) {
+			const lit = cond.ko === "day";
+			const cols = !lit ? [ [ 0.05, 0.07, 0.1 ], [ 0.035, 0.05, 0.07 ] ]
+				: cond.snow ? [ [ 0.72, 0.75, 0.78 ], [ 0.55, 0.59, 0.62 ] ]
+				: cond.wet ? [ [ 0.48, 0.53, 0.57 ], [ 0.34, 0.39, 0.41 ] ]
+				: cond.heat ? [ [ 0.7, 0.66, 0.58 ], [ 0.5, 0.49, 0.41 ] ]
+				: [ [ 0.55, 0.64, 0.72 ], [ 0.36, 0.46, 0.45 ] ];
+			for (const [ z, k, col ] of [ [ -FH * 3.6, 1, cols[0] ], [ -FH * 2.7, 0.62, cols[1] ] ]) {
 				const x0 = -FW * 2, x1 = FW * 3, n = 48;
 				let prev = null;
 				for (let i = 0; i <= n; i++) {
