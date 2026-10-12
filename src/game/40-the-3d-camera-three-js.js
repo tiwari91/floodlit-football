@@ -416,6 +416,25 @@
 				const T = isNear(j) ? near : main, TL = isNear(j) ? nearLamp : lamp, G = isNear(j) ? nearGlow : glow, Ln = isNear(j) ? nearLines : lines;
 				strip(T, j, rIn, hIn, rOut, hOut, under);
 				strip(T, j, rIn, hIn - 10, rIn, hIn + 1.5, roofC);
+				// The roof's build: standing-seam sheeting (raised ribs down the slope), a gutter and fascia
+				// along the back edge, and under it steel trusses from the front edge to the back wall, one
+				// to a bay, each a top and bottom chord with zig-zag web.
+				{
+					const L = segLen(j, rIn), nr = Math.max(2, Math.round(L / 9)), seam = [ 0.3, 0.32, 0.35 ], steel = [ 0.26, 0.27, 0.3 ];
+					for (let k = 0; k <= nr; k++) { const u = k / nr; accBeam3(T, at(j, rIn, u, hIn + 0.5), at(j, rOut, u, hOut + 0.5), 0.45, seam); }
+					accBeam3(T, at(j, rOut + 1, 0, hOut - 0.5), at(j, rOut + 1, 1, hOut - 0.5), 2.2, [ 0.2, 0.21, 0.23 ]);   // the gutter
+					accBeam3(T, at(j, rOut + 0.3, 0, hOut - 3), at(j, rOut + 0.3, 1, hOut - 3), 1.2, [ 0.32, 0.33, 0.36 ]);   // the fascia under it
+					if (Q.lattice) {
+						const nt = Math.max(1, Math.round(L / 60));
+						for (let k = 0; k <= nt; k++) {
+							const u = k / nt, depth = 7, segs = 6;
+							const top = f => { const d = rIn + (rOut - rIn) * f; return at(j, d, u, hIn + (hOut - hIn) * f - 0.6); };
+							const bot = f => { const d = rIn + 3 + (rOut - rIn - 3) * f; const p0 = at(j, d, u, hIn + (hOut - hIn) * f - 0.6 - depth * Math.sin(Math.PI * Math.min(1, 0.15 + f))); return p0; };
+							accBeam3(T, bot(0), bot(1), 0.7, steel);
+							for (let q = 0; q < segs; q++) { accBeam3(T, top(q / segs), bot((q + 1) / segs), 0.45, steel); accBeam3(T, bot((q + 1) / segs), top((q + 1) / segs), 0.45, steel); }
+						}
+					}
+				}
 				if (roofLights) {
 					strip(TL, j, rIn + 1, hIn - 10.4, rIn + 4.5, hIn - 10.4, [ 1.25, 1.18, 1.0 ]);
 					const L = segLen(j, rIn), n = Math.max(1, Math.round(L / 120));
