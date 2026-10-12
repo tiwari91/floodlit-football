@@ -340,14 +340,14 @@
 		const headMat = new T.MeshLambertMaterial({ color: 0xffffff, map: faceTex });
 		headMat.onBeforeCompile = sh => {
 			sh.vertexShader = sh.vertexShader
-				.replace("#include <common>", "#include <common>\nattribute float aFace; attribute float aJaw; varying float vFaceD;")
-				.replace("#include <uv_vertex>", "#include <uv_vertex>\nvMapUv = (uv + vec2(mod(aFace, 4.0), 3.0 - floor(aFace / 4.0))) / vec2(4.0, 4.0);")
+				.replace("#include <common>", "#include <common>\nattribute float aFace; attribute float aJaw; varying float vFaceD; varying float vFaceI;")
+				.replace("#include <uv_vertex>", "#include <uv_vertex>\nvMapUv = (uv + vec2(mod(max(aFace, 0.0), 4.0), 3.0 - floor(max(aFace, 0.0) / 4.0))) / vec2(4.0, 4.0); vFaceI = aFace;")
 				.replace("#include <begin_vertex>", "#include <begin_vertex>\ntransformed.z *= mix(1.0, aJaw, pow(clamp((2.25 - transformed.y) / 2.4, 0.0, 1.0), 2.0));")
 				.replace("#include <project_vertex>", "#include <project_vertex>\nvFaceD = -mvPosition.z;");
 			sh.fragmentShader = sh.fragmentShader
-				.replace("#include <common>", "#include <common>\nvarying float vFaceD;")
+				.replace("#include <common>", "#include <common>\nvarying float vFaceD; varying float vFaceI;")
 				.replace("#include <map_fragment>", "")
-				.replace("#include <color_fragment>", `#include <color_fragment>\nvec4 fx = texture2D(map, vMapUv); diffuseColor.rgb = mix(diffuseColor.rgb, fx.rgb, fx.a * (1.0 - smoothstep(${FACE_FADE3[0].toFixed(1)}, ${FACE_FADE3[1].toFixed(1)}, vFaceD)));`);
+				.replace("#include <color_fragment>", `#include <color_fragment>\nvec4 fx = vFaceI < -0.5 ? vec4(0.0) : texture2D(map, vMapUv); diffuseColor.rgb = mix(diffuseColor.rgb, fx.rgb, fx.a * (1.0 - smoothstep(${FACE_FADE3[0].toFixed(1)}, ${FACE_FADE3[1].toFixed(1)}, vFaceD)));`);
 		};
 		headMat.customProgramCacheKey = () => "ff-face";
 		// The hair: the skull's surface lifted along its normal by the style's thickness (aHairA: over the top,
@@ -717,7 +717,7 @@
 		// A throw-in: ball over the head, arching back, then whipping forward.
 		if (thr >= 0) {
 			const back = thr < 0.35 ? thr / 0.35 : 1 - (thr - 0.35) / 0.65, fwd = thr > 0.35 ? 1 : 0;
-			for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = -2.6 + 1.2 * (1 - back) * fwd; r.sh[i].rotation.x = (i ? 1 : -1) * 0.2; r.el[i].rotation.z = 1.5 * back; }
+			for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = 2.75 - 1.3 * (1 - back) * fwd; r.sh[i].rotation.x = OUT3(i) * 0.12; r.el[i].rotation.z = 1.45 * back + 0.1; }   // up over his head (forward through to overhead), the ball behind it, then whipped forward; past horizontal OUT3 brings the hands in, to the ball
 			r.spine.rotation.z = 0.35 * back - 0.25 * (1 - back) * fwd;
 			r.hip[1].rotation.z = 0.3; r.kn[1].rotation.z = -0.3; r.hip[0].rotation.z = -0.3;
 		}
@@ -764,16 +764,16 @@
 		} else if (cel > 0 && fall < 0 && ck === 3) {
 			// The fist pump: one bent arm driven down hard, again and again, leaning back and roaring.
 			const pump = rm ? 0.5 : Math.pow(0.5 + 0.5 * Math.sin(idle * 7), 2), w = cel;
-			r.sh[1].rotation.z = lerp3(r.sh[1].rotation.z, -1.5 + 1.0 * pump, w); r.sh[1].rotation.x = lerp3(r.sh[1].rotation.x, 0.35, w); r.el[1].rotation.z = lerp3(r.el[1].rotation.z, 1.9 - 0.4 * pump, w);
-			r.sh[0].rotation.z = lerp3(r.sh[0].rotation.z, -0.2, w); r.sh[0].rotation.x = lerp3(r.sh[0].rotation.x, -0.55, w); r.el[0].rotation.z = lerp3(r.el[0].rotation.z, 1.5, w);
+			r.sh[1].rotation.z = lerp3(r.sh[1].rotation.z, 1.5 - 1.0 * pump, w); r.sh[1].rotation.x = lerp3(r.sh[1].rotation.x, OUT3(1) * 0.2, w); r.el[1].rotation.z = lerp3(r.el[1].rotation.z, 1.9 - 0.4 * pump, w);   // the fist up by his face, driven down to his chest
+			r.sh[0].rotation.z = lerp3(r.sh[0].rotation.z, 0.2, w); r.sh[0].rotation.x = lerp3(r.sh[0].rotation.x, OUT3(0) * 0.2, w); r.el[0].rotation.z = lerp3(r.el[0].rotation.z, 1.5, w);
 			r.spine.rotation.z = lerp3(r.spine.rotation.z, 0.18 - 0.12 * pump, w); r.neck.rotation.z = lerp3(r.neck.rotation.z, 0.45, w);
 			for (let i = 0; i < 2; i++) { r.hip[i].rotation.x = (i ? 1 : -1) * 0.12 * w; r.kn[i].rotation.z -= 0.25 * w * pump; }
 			r.hips.position.y -= 0.8 * w * pump;
 		} else if (cel > 0 && fall < 0 && ck === 4) {
 			// Kissing the badge: the shirt pulled up to the lips, the other arm pointing to the fans.
 			const w = cel, pt = rm ? 0 : Math.sin(idle * 2) * 0.12;
-			r.sh[0].rotation.z = lerp3(r.sh[0].rotation.z, -1.25, w); r.sh[0].rotation.x = lerp3(r.sh[0].rotation.x, 0.35, w); r.el[0].rotation.z = lerp3(r.el[0].rotation.z, 2.3, w);
-			r.sh[1].rotation.z = lerp3(r.sh[1].rotation.z, -2.55 + pt, w); r.sh[1].rotation.x = lerp3(r.sh[1].rotation.x, 0.45, w); r.el[1].rotation.z = lerp3(r.el[1].rotation.z, 0.1, w);
+			r.sh[0].rotation.z = lerp3(r.sh[0].rotation.z, 0.55, w); r.sh[0].rotation.x = lerp3(r.sh[0].rotation.x, -OUT3(0) * 0.3, w); r.el[0].rotation.z = lerp3(r.el[0].rotation.z, 2.35, w);   // the shirt (badge) up to his lips
+			r.sh[1].rotation.z = lerp3(r.sh[1].rotation.z, 2.3 + pt, w); r.sh[1].rotation.x = lerp3(r.sh[1].rotation.x, -OUT3(1) * 0.3, w); r.el[1].rotation.z = lerp3(r.el[1].rotation.z, 0.1, w);   // the other arm up, pointing to the fans
 			r.neck.rotation.z = lerp3(r.neck.rotation.z, -0.3, w); r.spine.rotation.z = lerp3(r.spine.rotation.z, -0.08, w);
 		} else if (cel > 0 && fall < 0 && ck === 6) {
 			// The shirt pulled up over his head: both hands up at the crown holding it, elbows high and wide.
@@ -785,7 +785,7 @@
 		} else if (cel > 0 && fall < 0 && ck === 5) {
 			// A brace or a hat-trick: both arms straight up, pointing to the sky, head back.
 			const w = cel, pt = rm ? 0 : Math.sin(idle * 1.5) * 0.06;
-			for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 2.85 + pt * (i ? 1 : -1), w); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, OUT3(i) * 0.3, w); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.15, w); }   // forward through to overhead, a little out
+			for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 2.85 + pt * (i ? 1 : -1), w); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, -OUT3(i) * 0.32, w); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.15, w); }   // forward through to overhead, a little out (past horizontal, -OUT3 is out)
 			r.neck.rotation.z = lerp3(r.neck.rotation.z, 0.5, w); r.spine.rotation.z = lerp3(r.spine.rotation.z, 0.12, w);
 		} else if (hug > 0.02 && fall < 0) {
 			// The hug: arms forward and round him, leaning in, a little bounce.
@@ -797,7 +797,7 @@
 			// Team-mates near him hold celebA at 0.7: that must still be arms up, not arms stuck out level at the
 			// shoulders, so the weight reaches 1 by then (the in-between only shows for a moment as they rise).
 			const w = clamp(cel * 1.5, 0, 1) * (1 - 0.4 * kneel), wave = Math.sin(idle * 3 + x * 0.01) * 0.25 * cel;
-			for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, -0.45 + wave * (i ? -1 : 1), w); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, OUT3(i) * (2.35 + 0.5 * kneel), w); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.3, w); }   // arms up and out wide, not crossed
+			for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 0.15 + wave * (i ? -1 : 1), w); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, OUT3(i) * (2.35 + 0.5 * kneel), w); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.3, w); }   // arms up and out wide, not crossed
 			r.neck.rotation.z = lerp3(r.neck.rotation.z, 0.35 * cel, cel);
 		}
 		if (kneel > 0) {
@@ -834,6 +834,8 @@
 	// The trim (collar, cuffs, sock tops): the kit's second colour, or its number colour on a plain kit.
 	const trim3D = kit => (kit.second && kit.second !== kit.shirt ? kit.second : kit.ink || kit.shirt);
 	// Commit one posed rig to the instanced parts.
+	// Which cell of the face atlas: his own face, open-mouthed when celebrating; -1 (none) with his shirt over his head.
+	const faceCell3D = (lk, rig) => (rig.shirtHead ? -1 : ((lk.face || 0) % 8 + 8) % 8 + ((rig.cel || 0) > 0.3 ? 8 : 0));
 	function commitFigure3D (rig, lk, kit, num) {
 		const F = G3.fig, M = F.M, C = F.C;
 		if (F.n >= MAXF3) { return; }
@@ -874,7 +876,7 @@
 			if (name === "torso") {
 				const g = mesh.geometry, pat = g.attributes.aPat, c2 = g.attributes.aCol2;
 				pat.setX(k, kit.pattern); C.set(kit.second); c2.setXYZ(k, C.r, C.g, C.b);
-			} else if (name === "head") { const ga = mesh.geometry.attributes; ga.aFace.setX(k, ((lk.face || 0) % 8 + 8) % 8 + ((rig.cel || 0) > 0.3 ? 8 : 0)); ga.aJaw.setX(k, lk.shape[3]); }
+			} else if (name === "head") { const ga = mesh.geometry.attributes; ga.aFace.setX(k, faceCell3D(lk, rig)); ga.aJaw.setX(k, lk.shape[3]); }
 			else if (name === "hair") { const ga = mesh.geometry.attributes, hs = HAIR_STYLES3[hairStyle]; ga.aHairA.setXYZW(k, hs[0], hs[1], hs[2], hs[3]); ga.aHairB.setX(k, hs[4]); ga.aJaw.setX(k, lk.shape[3]); }   // celebrating: the open-mouthed face
 		}
 		const V = F.V.setFromMatrixPosition(rig.root.matrixWorld), x = V.x, z = V.z, air = Math.max(0, V.y);

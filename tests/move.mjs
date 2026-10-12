@@ -541,6 +541,30 @@ const mates = await page.evaluate(() => {
 	return { handAboveShoulder: out };
 });
 check("goal huddle: team-mates' arms are up (hands above the shoulders), not stuck out level", mates.handAboveShoulder.every(v => v > 4), JSON.stringify(mates));
+// Raised arms, measured (past horizontal the sideways sign reverses): each pose's hands where they belong.
+const raised = await page.evaluate(() => {
+	const F = window.__ff, W = n => n.getWorldPosition(n.position.clone()), p = F.outfield(0)[2], keep = { celebA: p.celebA, celebK: p.celebK, throwA: p.throwA };
+	const calm = () => Object.assign(p, { kickA: 0, lunge: 0, slideAI: 0, fall: 0, celebA: 0, celebK: 0, jump: 0, throwA: 0, dive: 0, headHands: 0, fistPump: 0, kneel: 0, hug: 0, sulk: 0, plant: 0, recv: 0, recvK: null, vx: 0, vy: 0, runAmt: 0 });
+	const M = r => { const inv = r.root.matrixWorld.clone().invert(), L = n => W(n).applyMatrix4(inv), hd = L(r.head), ch = L(r.chest);
+		const arm = k => { const sg = Math.sign(L(r.sh[k]).z) || 1, h = L(r.ha[k]), sh = L(r.sh[k]); return { hx: +(h.x - ch.x).toFixed(1), hy: +(h.y - hd.y).toFixed(1), hout: +(h.z * sg - Math.abs(sh.z)).toFixed(1) }; };
+		return { a: [ arm(0), arm(1) ], hd: +L(r.ha[0]).distanceTo(L(r.ha[1])).toFixed(1) }; };
+	const o = {}, owner = F.ball.owner; F.ball.owner = null;
+	calm(); p.celebA = 1; p.celebK = 5; o.sky = M(F.poseProbe(p, 30));
+	calm(); p.celebA = 1; o.up = M(F.poseProbe(p, 30));
+	calm(); p.celebA = 1; p.celebK = 3; p.idlePh = 0.2; o.fist = M(F.poseProbe(p, 30));
+	calm(); p.celebA = 1; p.celebK = 4; o.badge = M(F.poseProbe(p, 30));
+	calm(); p.throwA = 15; o.throwBack = M(F.poseProbe(p, 1)); p.throwA = 4; o.throwFwd = M(F.poseProbe(p, 1));
+	calm(); Object.assign(p, keep); F.ball.owner = owner;
+	o.blank = F.faceCell({ face: 3 }, { shirtHead: true, cel: 1 }); o.open = F.faceCell({ face: 3 }, { shirtHead: false, cel: 1 });
+	return o;
+});
+const R2 = raised, all2 = (k, f) => R2[k].a.every(f);
+check("arms to the sky: both hands above the head and outside the shoulders", all2("sky", a => a.hy > 4 && a.hout > 1), JSON.stringify(R2.sky));
+check("celebrating: arms up and out, not behind him", all2("up", a => a.hy > 2 && a.hout > 3 && a.hx > -2), JSON.stringify(R2.up));
+check("fist pump: the fist up in front of him, the other arm in front", R2.fist.a[1].hx > 2 && R2.fist.a[1].hy > -5 && R2.fist.a[0].hx > 2, JSON.stringify(R2.fist));
+check("badge kiss: one hand at his mouth in front, the other arm up pointing forward", R2.badge.a[0].hx > 2 && R2.badge.a[0].hy > -6 && Math.abs(R2.badge.a[0].hout) < 3 && R2.badge.a[1].hx > 3 && R2.badge.a[1].hy > 1, JSON.stringify(R2.badge));
+check("throw-in: the ball behind his head with the hands together, then out in front", all2("throwBack", a => a.hy > 2 && a.hx < 0) && all2("throwFwd", a => a.hx > 5) && R2.throwBack.hd < 9, JSON.stringify({ b: R2.throwBack, f: R2.throwFwd }));
+check("shirt over the head: no face painted on it", R2.blank === -1 && R2.open === 11, JSON.stringify({ b: R2.blank, o: R2.open }));
 check("no errors after the woodwork checks (and no 3D failure)", errs.length === 0 && !errs.some(e => /3D view failed/.test(e)), errs.join(" | "));
 await browser.close(); server.stop();
 process.exit(done() ? 1 : 0);
