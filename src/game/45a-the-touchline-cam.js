@@ -209,6 +209,40 @@
 		for (const sf of staff3) { if (sf.sprint) { const se = (performance.now() - sf.sprint.t0) / 1000; if (se > 0.4 && se < 4.6) { return sf.mgr; } } }
 		return null;
 	}
+	// The manager's gesture, on a figure already posed by pose3D: g is "up", "head", "clap", "protest",
+	// "point" or "" (hands behind his back); sprinting: the Mourinho run (kn: on his knees at the end of it).
+	// Signs measured on the rig: +z on a shoulder swings the arm forward; OUT3 on x takes a hanging arm out
+	// to the side (and, past horizontal, raises it out wide); -z on the spine leans forward; +z on the neck
+	// tips the head back. Each gesture is checked numerically in tests/move.mjs.
+	function staffGesture3D (r, g, ph, sprinting, kn) {
+		const rm = reduceMotion, O = OUT3;
+		if (sprinting) {
+			// Fists pumping in front of him as he runs; on his knees at the end, both arms flung up and out.
+			const pump = rm ? 0.5 : Math.abs(Math.sin(ph * 9));
+			for (let i = 0; i < 2; i++) {
+				const k = i ? pump : 1 - pump;
+				r.sh[i].rotation.z = lerp3(0.5 + 1.0 * k, 0.25, kn); r.sh[i].rotation.x = O(i) * lerp3(0.25, 2.45, kn); r.el[i].rotation.z = lerp3(1.75 - 0.5 * k, 0.3, kn);
+			}
+			r.neck.rotation.z = 0.4; r.spine.rotation.z = lerp3(r.spine.rotation.z, 0.35, kn);   // roaring, head back; arched back on his knees
+		} else if (g === "up") { const b = rm ? 0 : Math.sin(ph * 6) * 0.15; for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = 0.25; r.sh[i].rotation.x = O(i) * (2.45 + b); r.el[i].rotation.z = 0.25; } r.neck.rotation.z = 0.35; }   // arms up and out, looking up
+		else if (g === "head") { for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = 2.3; r.sh[i].rotation.x = O(i) * 0.8; r.el[i].rotation.z = 1.9; } r.spine.rotation.z = -0.1; r.neck.rotation.z = 0.25; }   // hands on his head, as the players do it
+		else if (g === "clap") { const c = rm ? 0.5 : Math.abs(Math.sin(ph * 14)); for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = 0.75; r.sh[i].rotation.x = -O(i) * (0.5 + 0.12 * c); r.el[i].rotation.z = 1.3; r.sh[i].rotation.y = -O(i) * 0.5; } }   // hands meeting in front of his chest
+		else if (g === "protest") { const c = rm ? 0 : Math.sin(ph * 5) * 0.15; for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = 0.55 + c; r.sh[i].rotation.x = O(i) * 0.75; r.el[i].rotation.z = 0.7; } r.neck.rotation.z = 0.15; }   // arms out in front, palms up: "what was that?"
+		else if (g === "point") { r.sh[1].rotation.z = 1.5; r.sh[1].rotation.x = O(1) * 0.15; r.el[1].rotation.z = 0.05; r.sh[0].rotation.z = 0.1; r.sh[0].rotation.x = O(0) * 0.12; r.el[0].rotation.z = 0.6; }   // pointing out to the pitch
+		else { for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = -0.6; r.sh[i].rotation.x = -O(i) * 0.3; r.el[i].rotation.z = 0.8; r.sh[i].rotation.y = O(i) * 0.4; } }   // hands behind his back
+	}
+	// A substitute on the bench: sitting (st 0, leaning forward, forearms on his thighs), or up on his feet
+	// with his arms up and out (st 1); hop: a jump for joy.
+	function benchPose3D (r, st, ph, hop, i) {
+		const rm = reduceMotion, sit = 1 - st;
+		r.hips.position.y = 15.6 * st + 9.2 * sit + hop;
+		for (let k = 0; k < 2; k++) {
+			r.hip[k].rotation.z = 1.5 * sit; r.kn[k].rotation.z = -1.5 * sit - 0.1; r.an[k].rotation.z = 0.1 * sit;
+			r.sh[k].rotation.z = 0.45 * sit + 0.25 * st; r.sh[k].rotation.x = OUT3(k) * (0.12 * sit + 2.45 * st); r.el[k].rotation.z = 0.9 * sit + 0.25 * st;
+		}
+		r.spine.rotation.z = -0.18 * sit; r.neck.rotation.z = 0.12 * sit + (rm ? 0 : Math.sin(ph * 0.4) * 0.05);
+		r.head.rotation.y = rm ? 0 : Math.sin(ph * 0.3 + i) * 0.3 * sit;
+	}
 	function staff3D (WX) {
 		const F = G3.fig;
 		if (!F || !ball || state === "intro" || bulkSim) { return; }
@@ -245,21 +279,7 @@
 			if (F.n < MAXF3) {
 				const r = F.rigs[F.n];
 				pose3D(r, m, m.x, m.y, m.dir, 0, 0);
-				const ph = rm ? 0 : m.idlePh, g = sf.g;
-				if (sf.sprint && (m.celebA || 0) > 0.3) {
-					// Fists pumping as he runs, both arms flung up on his knees.
-					const pump = rm ? 0.5 : Math.abs(Math.sin(ph * 9)), kn = m.kneel || 0;
-					for (let i = 0; i < 2; i++) {
-						const k = i ? pump : 1 - pump;
-						r.sh[i].rotation.z = lerp3(-1.3 - 1.1 * k, -0.4, kn); r.sh[i].rotation.x = (i ? 1 : -1) * lerp3(0.35, 2.4, kn); r.el[i].rotation.z = lerp3(1.6 - 0.9 * k, 0.3, kn);
-					}
-					r.neck.rotation.z = -0.4; r.spine.rotation.z = lerp3(r.spine.rotation.z, -0.35, kn);
-				} else if (g === "up") { const b = rm ? 0 : Math.sin(ph * 6) * 0.15; for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = -0.3; r.sh[i].rotation.x = (i ? 1 : -1) * (2.55 + b); r.el[i].rotation.z = 0.25; } r.neck.rotation.z = -0.35; }
-				else if (g === "head") { for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = -2.3; r.sh[i].rotation.x = (i ? 1 : -1) * 0.95; r.el[i].rotation.z = 2.25; } r.spine.rotation.z = 0.2; r.neck.rotation.z = 0.35; }
-				else if (g === "clap") { const c = rm ? 0.5 : Math.abs(Math.sin(ph * 14)); for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = -1.15; r.sh[i].rotation.x = (i ? 1 : -1) * (0.05 + 0.25 * c); r.el[i].rotation.z = 1.1; } }
-				else if (g === "protest") { const c = rm ? 0 : Math.sin(ph * 5) * 0.15; for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = -0.75 + c; r.sh[i].rotation.x = (i ? 1 : -1) * 0.95; r.el[i].rotation.z = 0.55; } r.neck.rotation.z = -0.15; }
-				else if (g === "point") { r.sh[1].rotation.z = -1.55; r.sh[1].rotation.x = 0.35; r.el[1].rotation.z = 0.05; r.sh[0].rotation.z = -0.15; r.el[0].rotation.z = 0.9; }
-				else { for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = 0.25; r.sh[i].rotation.x = (i ? 1 : -1) * 0.25; r.el[i].rotation.z = 1.35; } }   // hands behind his back
+				staffGesture3D(r, sf.g, rm ? 0 : m.idlePh, sf.sprint && (m.celebA || 0) > 0.3, m.kneel || 0);
 				commitFigure3D(r, sf.look[0], staffKit(t, "mgr"), null);
 			}
 			// The bench running on: out of the dugout, over the line and away down the touchline towards the
@@ -291,14 +311,7 @@
 				q.st = (q.st || 0) + (upAmt - (q.st || 0)) * Math.min(1, (upAmt ? 0.12 : 0.04) * dt);
 				const st = q.st, ph = rm ? 0 : q.idlePh;
 				pose3D(r, q, q.x, q.y, -Math.PI / 2, 0, 0);
-				const sit = 1 - st, hop = rm ? 0 : Math.max(0, Math.sin(ph * 7 + q.hop)) * 4 * st;
-				r.hips.position.y = 15.6 * st + 9.2 * sit + hop;
-				for (let k = 0; k < 2; k++) {
-					r.hip[k].rotation.z = 1.5 * sit; r.kn[k].rotation.z = -1.5 * sit - 0.1; r.an[k].rotation.z = 0.1 * sit;
-					r.sh[k].rotation.z = -0.35 * sit - 0.3 * st; r.sh[k].rotation.x = (k ? 1 : -1) * (0.15 * sit + 2.5 * st); r.el[k].rotation.z = 1.0 * sit + 0.25 * st;
-				}
-				r.spine.rotation.z = 0.18 * sit; r.neck.rotation.z = -0.1 * sit + (rm ? 0 : Math.sin(ph * 0.4) * 0.05);
-				r.head.rotation.y = rm ? 0 : Math.sin(ph * 0.3 + i) * 0.3 * sit;
+				benchPose3D(r, st, ph, rm ? 0 : Math.max(0, Math.sin(ph * 7 + q.hop)) * 4 * st, i);
 				commitFigure3D(r, sf.look[i + 1], staffKit(t, i === 3 ? "coach" : "sub"), null);
 			});
 		}

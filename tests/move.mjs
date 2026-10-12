@@ -496,6 +496,29 @@ const bench = await page.evaluate(async () => {
 	return { set, onPitch, up: +up.toFixed(2), ran: +ran.toFixed(2) };
 });
 check("a late winner: the bench runs on to the touchline, arms up", bench.set && bench.onPitch >= 3 && bench.up > 0.5, JSON.stringify(bench));
+// The touchline staff: each gesture measured on the rig (hx: hand ahead of the chest, hy: above the head
+// centre, hout: beyond his own shoulder, hd: hands apart, lean: forward is positive).
+const staff = await page.evaluate(() => {
+	const F = window.__ff, W = n => n.getWorldPosition(n.position.clone());
+	const M = r => { const inv = r.root.matrixWorld.clone().invert(), L = n => W(n).applyMatrix4(inv), hp = L(r.hips), nk = L(r.neck), hd = L(r.head), ch = L(r.chest);
+		const arm = k => { const sg = Math.sign(L(r.sh[k]).z) || 1, h = L(r.ha[k]), sh = L(r.sh[k]); return { hx: +(h.x - ch.x).toFixed(1), hy: +(h.y - hd.y).toFixed(1), hout: +(h.z * sg - Math.abs(sh.z)).toFixed(1) }; };
+		const a = [ arm(0), arm(1) ], h0 = L(r.ha[0]), h1 = L(r.ha[1]);
+		return { lean: +(Math.atan2(nk.x - hp.x, nk.y - hp.y) * 57.3).toFixed(0), a, hd: +h0.distanceTo(h1).toFixed(1) }; };
+	const o = {};
+	for (const g of [ "up", "head", "clap", "protest", "point", "" ]) { o[g || "idle"] = M(F.staffProbe(g, { ph: 0.3 })); }
+	o.sprint = M(F.staffProbe("sprint", { ph: 0.1, run: 1, celebA: 1 })); o.knees = M(F.staffProbe("sprint", { kneel: 1, celebA: 1 }));
+	o.sit = M(F.staffProbe("bench", { st: 0 })); o.stand = M(F.staffProbe("bench", { st: 1 }));
+	return o;
+});
+const both = (g, f) => staff[g].a.every(f);
+check("staff 'up': both arms up and out wide, not crossed or behind", both("up", a => a.hy > 2 && a.hout > 2 && a.hx > -2), JSON.stringify(staff.up));
+check("staff 'head': hands on his head (over it, beside it, not behind)", both("head", a => a.hy > 0 && Math.abs(a.hx) < 3) && staff.head.hd < 4, JSON.stringify(staff.head));
+check("staff 'clap': hands meet in front of his chest", staff.clap.hd < 2 && both("clap", a => a.hx > 4 && a.hy > -8), JSON.stringify(staff.clap));
+check("staff 'protest': arms out in front of him, palms up", both("protest", a => a.hx > 4 && a.hout > 1), JSON.stringify(staff.protest));
+check("staff 'point': the arm points out ahead of him", staff.point.a[1].hx > 9 && Math.abs(staff.point.a[1].hy) < 8, JSON.stringify(staff.point));
+check("staff idle: hands behind his back, together", both("idle", a => a.hx < -1) && staff.idle.hd < 3, JSON.stringify(staff.idle));
+check("staff sprint: fists pumping in front, leaning into the run; on his knees arms up and out, arched back", both("sprint", a => a.hx > 4) && staff.sprint.lean > 5 && both("knees", a => a.hy > 2 && a.hout > 2) && staff.knees.lean < -5, JSON.stringify({ s: staff.sprint, k: staff.knees }));
+check("bench: sitting leans forward, hands on his thighs; standing, arms up and out", staff.sit.lean > 5 && both("sit", a => a.hx > 3) && both("stand", a => a.hy > 2 && a.hout > 2), JSON.stringify({ s: staff.sit, u: staff.stand }));
 check("no errors after the woodwork checks (and no 3D failure)", errs.length === 0 && !errs.some(e => /3D view failed/.test(e)), errs.join(" | "));
 await browser.close(); server.stop();
 process.exit(done() ? 1 : 0);
