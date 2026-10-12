@@ -1390,6 +1390,7 @@
 			<button id="camBtn" type="button" aria-pressed="false" title="Camera (C): click to cycle overhead, TV and 3D">Camera: overhead</button>
 			<label class="field" for="gfx" title="How much the 3D view draws: crowd density and detail, floodlight shadows, sharpness and smoothing">Graphics
 				<select id="gfx">
+					<option value="auto">Auto</option>
 					<option value="low">Low</option>
 					<option value="medium">Medium</option>
 					<option value="high">High</option>
@@ -14161,6 +14162,7 @@
 	function loop (now) {
 		if (!frameDue(now, last)) { requestAnimationFrame(loop); return; }
 		frameDt = clamp(now - last, 1, 100);
+		if (!(IDLE_STATES.has(state) && now - idleSince > IDLE_AFTER)) { gfxAutoTick(now - last, now); }
 		pollPad();
 		acc = Math.min(acc + (now - last) * (slowMo > 0 && !odr ? SLOW_RATE : 1), 250);
 		last = now;
@@ -14515,11 +14517,38 @@
 	// frame; a change of antialiasing needs a new WebGL context, so the 3D view starts afresh on a new
 	// canvas. Saved only once chosen, like the camera.
 	const gfxSel = $("gfx");
+	// Auto (the default until you pick a level): starts at this machine's level and drops one step when
+	// frames run long in play (a smoothed 22 ms and up, under about 45 a second, for three seconds), then
+	// tries its way back after half a minute of smooth frames; a step back up that has to be undone
+	// doubles the wait. Never below Medium on a computer (Low means a new WebGL context, a hitch).
+	const gfxAuto = { on: false, top: "high", ms: 16.7, slow: 0, good: 0, wait: 30, lastUp: -1e9 };
+	const gfxLabel = () => (gfxAuto.on ? `Auto (${GFX_NAME[gfxLevel]})` : GFX_NAME[gfxLevel]);
+	function gfxAutoTick (dt, now) {
+		if (!gfxAuto.on || state !== "play" || camMode !== "3d" || document.hidden || dt > 80) { return; }
+		gfxAuto.ms += (dt - gfxAuto.ms) * 0.05;
+		const order = [ "low", "medium", "high" ], i = order.indexOf(gfxLevel), floor = coarse ? 0 : 1;
+		if (gfxAuto.ms > 22) { gfxAuto.slow += dt / 1000; gfxAuto.good = 0; } else { gfxAuto.slow = 0; }
+		if (gfxAuto.ms < 18) { gfxAuto.good += dt / 1000; }
+		if (gfxAuto.slow > 3 && i > floor) {
+			if (now - gfxAuto.lastUp < 15000) { gfxAuto.wait = Math.min(600, gfxAuto.wait * 2); }   // that step up was too much
+			setGfx(order[i - 1]); gfxAuto.slow = 0; gfxAuto.good = 0; gfxAuto.ms = 16.7;
+		} else if (gfxAuto.good > gfxAuto.wait && order.indexOf(gfxAuto.top) > i) {
+			setGfx(order[i + 1]); gfxAuto.good = 0; gfxAuto.lastUp = now; gfxAuto.ms = 16.7;
+		}
+	}
 	function setGfx (level, chosen = false) {
+		if (level === "auto") {
+			gfxAuto.on = true; gfxAuto.top = defaultGfx(); gfxAuto.slow = gfxAuto.good = 0;
+			if (chosen) { store.set("ff-gfx", "auto"); }
+			setGfx(gfxAuto.top);
+			if (gfxSel) { gfxSel.value = "auto"; }
+			return;
+		}
 		if (!GFX3[level]) { return; }
+		if (chosen) { gfxAuto.on = false; }
 		const was = gfxLevel;
 		gfxLevel = level;
-		if (gfxSel) { gfxSel.value = level; }
+		if (gfxSel) { gfxSel.value = gfxAuto.on ? "auto" : level; }
 		if (chosen) { store.set("ff-gfx", level); }
 		if (level === was || !G3.renderer) { return; }
 		if (G3.aa !== gfx3().aa && canvas3d) {
@@ -14534,10 +14563,10 @@
 		}
 	}
 	if (gfxSel) {
-		gfxSel.value = gfxLevel;
+		gfxSel.value = gfxAuto.on ? "auto" : gfxLevel;
 		gfxSel.addEventListener("change", () => {
 			setGfx(gfxSel.value, true);
-			if (state === "play" || state === "goal" || state === "paused") { toast(`Graphics: ${GFX_NAME[gfxLevel]}`, "#f2b52e"); }
+			if (state === "play" || state === "goal" || state === "paused") { toast(`Graphics: ${gfxLabel()}`, "#f2b52e"); }
 			gfxSel.blur();
 		});
 	}
@@ -14662,7 +14691,7 @@
 			[ musicOn ? "Music on" : "Music off", musicOn, () => $("musicBtn").click() ],
 			[ hintsOn ? "Hints on" : "Hints off", hintsOn, () => $("hintsBtn").click() ],
 			[ highContrast ? "Kit contrast on" : "Kit contrast off", highContrast, () => $("contrastBtn").click() ],
-			[ `Graphics: ${GFX_NAME[gfxLevel]}`, false, () => { const ks = Object.keys(GFX3); setGfx(ks[(ks.indexOf(gfxLevel) + 1) % ks.length], true); } ]
+			[ `Graphics: ${gfxLabel()}`, false, () => { const ks = [ "auto", ...Object.keys(GFX3) ], cur = gfxAuto.on ? "auto" : gfxLevel; setGfx(ks[(ks.indexOf(cur) + 1) % ks.length], true); } ]
 		];
 		q.replaceChildren(...items.map(([ label, on, act ]) => {
 			const b = document.createElement("button");
@@ -14795,7 +14824,7 @@
 		minimapOn = store.get("ff-map") === "1"; $("mapBtn").textContent = minimapOn ? "Minimap on" : "Minimap off"; $("mapBtn").setAttribute("aria-pressed", String(minimapOn));
 		if (store.get("ff-hints") === "0") { hintsOn = false; $("hintsBtn").textContent = "Hints off"; $("hintsBtn").setAttribute("aria-pressed", "false"); }
 		if (store.get("ff-music") === "0") { musicOn = false; $("musicBtn").textContent = "Music off"; $("musicBtn").setAttribute("aria-pressed", "false"); }
-		{ const g = store.get("ff-gfx"); if (g && GFX3[g]) { setGfx(g); } }
+		{ const g = store.get("ff-gfx"); if (g && GFX3[g]) { setGfx(g); } else { setGfx("auto"); } }   // Auto until a level is picked
 		if (store.get("ff-contrast") === "1") { highContrast = true; $("contrastBtn").textContent = "Kit contrast on"; $("contrastBtn").setAttribute("aria-pressed", "true"); }
 
 		try {
@@ -14866,7 +14895,7 @@
 				passTo(c, f);
 				return f;
 			},
-			get restartWalk () { return restartWalk; }, get review () { return review; }, get cpuSubs () { return cpuSubs; }, get surge () { return surge; }, get pressI () { return press; }, formBonus, get lastRatings () { return lastRatings; }, get stretcher () { return stretcher; }, injureTest (t, serious) { const v = outfield(t).find(p => !p.injured); const o = outfield(1 - t)[0]; if (v && o) { tackling[1 - t] = "hard"; const r = Math.random; Math.random = () => 0.01; try { commitFoul(o, v, true); } finally { Math.random = r; } } return v; }, staOf, get offside () { return offside; }, get deadBall () { return deadBall; }, get tally () { return tally; }, get freezeKind () { return freezeKind; }, fkDist () { return fkDist(); }, simExtra () { return { tally, poss: possFrames.slice() }; }, get setPieceKind () { return setPiece ? setPiece.kind : null; }, get gfxLevel () { return gfxLevel; }, setGfx, get musicBar () { return music ? music.bar : -1; }, get audioState () { return audio ? audio.state : "none"; }, get replayOn () { return replayOn(); }, get replay () { return replay; }, get recFrames () { return rec.n; }, REPLAY_AT, REPLAY_FR, GOAL_CELEB, get lastCaption () { return lastCaption; }, get lastCommentary () { return lastCommentary; }, moment, commReset () { commAt = -1e9; commRecent = []; },
+			get restartWalk () { return restartWalk; }, get review () { return review; }, get cpuSubs () { return cpuSubs; }, get surge () { return surge; }, get pressI () { return press; }, formBonus, get lastRatings () { return lastRatings; }, get stretcher () { return stretcher; }, injureTest (t, serious) { const v = outfield(t).find(p => !p.injured); const o = outfield(1 - t)[0]; if (v && o) { tackling[1 - t] = "hard"; const r = Math.random; Math.random = () => 0.01; try { commitFoul(o, v, true); } finally { Math.random = r; } } return v; }, staOf, get offside () { return offside; }, get deadBall () { return deadBall; }, get tally () { return tally; }, get freezeKind () { return freezeKind; }, fkDist () { return fkDist(); }, simExtra () { return { tally, poss: possFrames.slice() }; }, get setPieceKind () { return setPiece ? setPiece.kind : null; }, get gfxLevel () { return gfxLevel; }, get gfxAuto () { return gfxAuto; }, gfxAutoTick, setGfx, get musicBar () { return music ? music.bar : -1; }, get audioState () { return audio ? audio.state : "none"; }, get replayOn () { return replayOn(); }, get replay () { return replay; }, get recFrames () { return rec.n; }, REPLAY_AT, REPLAY_FR, GOAL_CELEB, get lastCaption () { return lastCaption; }, get lastCommentary () { return lastCommentary; }, moment, commReset () { commAt = -1e9; commRecent = []; },
 			// Pose one player on a spare figure, n frames in a row, right now (no simulation step in between).
 			staffProbe (kind, o = {}) { const F3 = G3.fig; if (!F3) { return null; } const r = F3.rigs[F3.rigs.length - 1], m = { x: FW / 2, y: FH + 13, vx: 0, vy: 0, dir: 0, stride: 0, runAmt: o.run || 0, idlePh: o.ph || 0, role: "staff", team: 0, celebA: o.celebA || 0, kneel: o.kneel || 0 }; r.mir = 1; resetRig3D(r); pose3D(r, m, m.x, m.y, 0, 0, 0); if (kind === "bench") { benchPose3D(r, o.st || 0, o.ph || 0, 0, 0); } else { staffGesture3D(r, kind === "sprint" ? "" : kind, o.ph || 0, kind === "sprint", o.kneel || 0); } r.root.updateMatrixWorld(true); return r; },
 			poseProbe (p, n = 30, ballNear = 0) { const F3 = G3.fig; if (!F3) { return null; } const r = F3.rigs[F3.rigs.length - 1]; r.mir = 1; for (let k = 0; k < n; k++) { resetRig3D(r); pose3D(r, p, p.x, p.y, p.dir, 0, ballNear, 0, 0); } r.root.updateMatrixWorld(true); return r; }, caption, get camMode () { return camMode; }, get crowdMood () { return crowdMood; }, get frameDt () { return frameDt; }, get crowdBed () { return crowd; }, get soundOn () { return soundOn; },

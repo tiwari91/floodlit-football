@@ -118,7 +118,7 @@
 			[ musicOn ? "Music on" : "Music off", musicOn, () => $("musicBtn").click() ],
 			[ hintsOn ? "Hints on" : "Hints off", hintsOn, () => $("hintsBtn").click() ],
 			[ highContrast ? "Kit contrast on" : "Kit contrast off", highContrast, () => $("contrastBtn").click() ],
-			[ `Graphics: ${GFX_NAME[gfxLevel]}`, false, () => { const ks = Object.keys(GFX3); setGfx(ks[(ks.indexOf(gfxLevel) + 1) % ks.length], true); } ]
+			[ `Graphics: ${gfxLabel()}`, false, () => { const ks = [ "auto", ...Object.keys(GFX3) ], cur = gfxAuto.on ? "auto" : gfxLevel; setGfx(ks[(ks.indexOf(cur) + 1) % ks.length], true); } ]
 		];
 		q.replaceChildren(...items.map(([ label, on, act ]) => {
 			const b = document.createElement("button");

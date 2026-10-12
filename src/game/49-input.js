@@ -281,11 +281,38 @@
 	// frame; a change of antialiasing needs a new WebGL context, so the 3D view starts afresh on a new
 	// canvas. Saved only once chosen, like the camera.
 	const gfxSel = $("gfx");
+	// Auto (the default until you pick a level): starts at this machine's level and drops one step when
+	// frames run long in play (a smoothed 22 ms and up, under about 45 a second, for three seconds), then
+	// tries its way back after half a minute of smooth frames; a step back up that has to be undone
+	// doubles the wait. Never below Medium on a computer (Low means a new WebGL context, a hitch).
+	const gfxAuto = { on: false, top: "high", ms: 16.7, slow: 0, good: 0, wait: 30, lastUp: -1e9 };
+	const gfxLabel = () => (gfxAuto.on ? `Auto (${GFX_NAME[gfxLevel]})` : GFX_NAME[gfxLevel]);
+	function gfxAutoTick (dt, now) {
+		if (!gfxAuto.on || state !== "play" || camMode !== "3d" || document.hidden || dt > 80) { return; }
+		gfxAuto.ms += (dt - gfxAuto.ms) * 0.05;
+		const order = [ "low", "medium", "high" ], i = order.indexOf(gfxLevel), floor = coarse ? 0 : 1;
+		if (gfxAuto.ms > 22) { gfxAuto.slow += dt / 1000; gfxAuto.good = 0; } else { gfxAuto.slow = 0; }
+		if (gfxAuto.ms < 18) { gfxAuto.good += dt / 1000; }
+		if (gfxAuto.slow > 3 && i > floor) {
+			if (now - gfxAuto.lastUp < 15000) { gfxAuto.wait = Math.min(600, gfxAuto.wait * 2); }   // that step up was too much
+			setGfx(order[i - 1]); gfxAuto.slow = 0; gfxAuto.good = 0; gfxAuto.ms = 16.7;
+		} else if (gfxAuto.good > gfxAuto.wait && order.indexOf(gfxAuto.top) > i) {
+			setGfx(order[i + 1]); gfxAuto.good = 0; gfxAuto.lastUp = now; gfxAuto.ms = 16.7;
+		}
+	}
 	function setGfx (level, chosen = false) {
+		if (level === "auto") {
+			gfxAuto.on = true; gfxAuto.top = defaultGfx(); gfxAuto.slow = gfxAuto.good = 0;
+			if (chosen) { store.set("ff-gfx", "auto"); }
+			setGfx(gfxAuto.top);
+			if (gfxSel) { gfxSel.value = "auto"; }
+			return;
+		}
 		if (!GFX3[level]) { return; }
+		if (chosen) { gfxAuto.on = false; }
 		const was = gfxLevel;
 		gfxLevel = level;
-		if (gfxSel) { gfxSel.value = level; }
+		if (gfxSel) { gfxSel.value = gfxAuto.on ? "auto" : level; }
 		if (chosen) { store.set("ff-gfx", level); }
 		if (level === was || !G3.renderer) { return; }
 		if (G3.aa !== gfx3().aa && canvas3d) {
@@ -300,10 +327,10 @@
 		}
 	}
 	if (gfxSel) {
-		gfxSel.value = gfxLevel;
+		gfxSel.value = gfxAuto.on ? "auto" : gfxLevel;
 		gfxSel.addEventListener("change", () => {
 			setGfx(gfxSel.value, true);
-			if (state === "play" || state === "goal" || state === "paused") { toast(`Graphics: ${GFX_NAME[gfxLevel]}`, "#f2b52e"); }
+			if (state === "play" || state === "goal" || state === "paused") { toast(`Graphics: ${gfxLabel()}`, "#f2b52e"); }
 			gfxSel.blur();
 		});
 	}

@@ -12,6 +12,7 @@
 	function loop (now) {
 		if (!frameDue(now, last)) { requestAnimationFrame(loop); return; }
 		frameDt = clamp(now - last, 1, 100);
+		if (!(IDLE_STATES.has(state) && now - idleSince > IDLE_AFTER)) { gfxAutoTick(now - last, now); }
 		pollPad();
 		acc = Math.min(acc + (now - last) * (slowMo > 0 && !odr ? SLOW_RATE : 1), 250);
 		last = now;
