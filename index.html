@@ -8702,10 +8702,14 @@
 					}
 				}
 			}
-			// Wet: darker, richer grass, and a sheen under the lights.
+			// Wet: darker, richer grass, and (by day) a sheen from the sky. Under floodlights the pale sheen
+			// washed the whole pitch out (the lights' own reflections and pools do that job at night).
 			if (cond.wet) {
-				g.fillStyle = `rgba(0, 24, 12, ${0.08 * cond.wet})`; g.fillRect(ox, oy, FW, FH);
-				for (const [ cx, cy ] of [ [ ox, oy ], [ ox + FW, oy ], [ ox, oy + FH ], [ ox + FW, oy + FH ] ]) {
+				// by night multiplied in, red and blue more than green, so it deepens without greying
+				g.save(); if (cond.ko !== "day") { g.globalCompositeOperation = "multiply"; }
+				g.fillStyle = cond.ko === "day" ? `rgba(0, 24, 12, ${0.08 * cond.wet})` : `rgb(${255 - 35 * cond.wet}, ${255 - 15 * cond.wet}, ${255 - 33 * cond.wet})`; g.fillRect(ox, oy, FW, FH);
+				g.restore();
+				for (const [ cx, cy ] of cond.ko === "day" ? [ [ ox, oy ], [ ox + FW, oy ], [ ox, oy + FH ], [ ox + FW, oy + FH ] ] : []) {
 					const gr = g.createRadialGradient(cx, cy, 10, cx, cy, 420 * S);
 					gr.addColorStop(0, `rgba(225, 240, 255, ${0.1 * cond.wet})`); gr.addColorStop(1, "rgba(225, 240, 255, 0)");
 					g.fillStyle = gr; g.fillRect(ox, oy, FW, FH);
@@ -8747,7 +8751,7 @@
 	}
 	let grassC = null, grassKey = "";
 	function grassCanvas () {
-		const key = `${FW}x${FH}|${cond.surfaceKey}|${cond.wet}|${cond.snow}${cond.heat}|${gstyle ? gstyle.mow + gstyle.concrete : ""}`;
+		const key = `${FW}x${FH}|${cond.surfaceKey}|${cond.wet}|${cond.ko}|${cond.snow}${cond.heat}|${gstyle ? gstyle.mow + gstyle.concrete : ""}`;
 		if (grassKey === key) { return grassC; }
 		grassKey = key; grassC = null;
 		try {
@@ -9629,7 +9633,8 @@
 	let drops = [];
 	function drawRain () {
 		if (cond.wet) {
-			ctx.fillStyle = `rgba(12, 20, 30, ${0.1 * cond.wet})`;
+			// A grey sky by day; at night the dark is already there, and a flat veil only greyed the pitch.
+			ctx.fillStyle = `rgba(12, 20, 30, ${(cond.ko === "day" ? 0.1 : 0.025) * cond.wet})`;
 			ctx.fillRect(0, 0, SW, SH);
 			const want = reduceMotion ? 0 : 90 * cond.wet;
 			while (drops.length < want) { drops.push({ x: Math.random() * SW, y: Math.random() * SH, v: 14 + Math.random() * 10 }); }
