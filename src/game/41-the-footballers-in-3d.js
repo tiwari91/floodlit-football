@@ -525,6 +525,56 @@
 				r.chest.rotation.y -= 0.12 * fp;
 			}
 		}
+		// Off the ball and on it: receiving a pass, shielding it, jockeying the man on it. Each eases in
+		// and out (p.jockW / p.shieldW are visual state, smoothed here) and gives way to any action.
+		if (!rm && !acting && cel <= 0 && !down && p.team >= 0 && p.role !== "staff" && state === "play") {
+			const o = ball && ball.owner, wrap = v => Math.atan2(Math.sin(v), Math.cos(v));
+			// Jockeying: goal-side of the carrier, facing him, not flat out: crouched, side-on, arms out.
+			let jw = 0;
+			if (o && o.team !== p.team && !gk && o.role !== "gk") {
+				const d = dist(p, o), facing = Math.cos(wrap(Math.atan2(o.y - p.y, o.x - p.x) - (p.dir || 0)));
+				jw = clamp((55 - d) / 15, 0, 1) * clamp((facing - 0.5) / 0.3, 0, 1) * clamp((0.75 - a) / 0.35, 0, 1);
+			}
+			p.jockW = (p.jockW || 0) + (jw - (p.jockW || 0)) * 0.15;
+			const J = p.jockW;
+			if (J > 0.02) {
+				r.hips.position.y -= 1.3 * J; r.spine.rotation.z += 0.18 * J; r.hips.rotation.y += 0.32 * J; r.chest.rotation.y -= 0.18 * J;
+				for (let i = 0; i < 2; i++) { r.hip[i].rotation.z += 0.28 * J; r.kn[i].rotation.z -= 0.5 * J; r.sh[i].rotation.x += OUT3(i) * 0.32 * J; r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 0.25, J); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.7, J); }
+			}
+			// Shielding: on the ball, slow, a man at his shoulder or behind: low, and the arm on that side out to hold him off.
+			let sw = 0, side = 1;
+			if (o === p && !gk) {
+				let near = null, nd = 1e9;
+				for (const q of players) { if (q.team !== p.team && q.role !== "gk") { const d = dist(p, q); if (d < nd) { nd = d; near = q; } } }
+				if (near) {
+					const rel = wrap(Math.atan2(near.y - p.y, near.x - p.x) - (p.dir || 0));
+					sw = clamp((32 - nd) / 10, 0, 1) * clamp((Math.abs(rel) - 0.9) / 0.4, 0, 1) * clamp((0.7 - a) / 0.3, 0, 1);
+					side = rel * (r.mir || 1) > 0 ? 1 : 0;   // which of his arms faces the man (the pitch can be mirrored)
+				}
+			}
+			p.shieldW = (p.shieldW || 0) + (sw - (p.shieldW || 0)) * 0.15;
+			p.shieldSide = sw > 0 ? side : (p.shieldSide ?? 1);
+			const S2 = p.shieldW;
+			if (S2 > 0.02) {
+				const i = p.shieldSide;
+				r.hips.position.y -= 0.9 * S2; r.spine.rotation.z += 0.12 * S2; r.chest.rotation.y += (i ? -1 : 1) * 0.25 * S2;
+				for (let k = 0; k < 2; k++) { r.kn[k].rotation.z -= 0.35 * S2; r.hip[k].rotation.z += 0.18 * S2; }
+				r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, OUT3(i) * 0.95, S2); r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 0.15, S2); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.35, S2);
+			}
+			// Receiving: the first few frames after a pass reaches him. Along the ground the foot comes up to
+			// cushion it and the arms go out for balance; in the air he leans back and takes it on the chest.
+			const since = p.recv && p.gotAt !== undefined ? frame - p.gotAt : 99, rk = since < 18 ? Math.sin(Math.PI * clamp(since / 18, 0, 1)) : 0;
+			if (rk > 0 && o === p) {
+				if (p.recv === 2) {
+					r.spine.rotation.z -= 0.38 * rk; r.neck.rotation.z += 0.35 * rk;
+					for (let i = 0; i < 2; i++) { r.sh[i].rotation.x += OUT3(i) * 0.8 * rk; r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 0.1, rk); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.5, rk); }
+				} else {
+					const f = build(p).left ? 0 : 1;
+					r.hip[f].rotation.z += 0.65 * rk; r.kn[f].rotation.z -= 0.8 * rk; r.an[f].rotation.z += 0.3 * rk; r.spine.rotation.z -= 0.08 * rk; r.neck.rotation.z += 0.2 * rk;
+					for (let i = 0; i < 2; i++) { r.sh[i].rotation.x += OUT3(i) * 0.4 * rk; }
+				}
+			}
+		}
 		// Turning: the head and then the chest come round first, the hips follow.
 		if (!rm && lead && fall < 0 && dive < 0 && !down) { r.chest.rotation.y += lead * 0.35; r.neck.rotation.y += lead * 0.3; }
 		// The keeper on his toes when the ball is near: knees bent, hands ready.

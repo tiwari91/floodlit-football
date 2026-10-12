@@ -748,6 +748,7 @@
 			if (threeToldLoading) { threeToldLoading = false; fx = fx.filter(f => !(f.toast && f.label === "Loading 3D view")); }
 		} catch (e) {
 			threeFailed = true;
+			console.error("3D view failed, falling back to the 2D cameras:", e);   // say why, so it can be fixed
 			return false;
 		}
 		return true;

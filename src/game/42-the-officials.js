@@ -71,7 +71,7 @@
 			F.captFor = players;
 			F.capt = [ 0, 1 ].map(t => outfield(t).reduce((a, q) => (!a || A(q, "pas") + A(q, "def") > A(a, "pas") + A(a, "def") ? q : a), null));
 		}
-		F.n = 0; F.nums.count = 0; if (F.chest) { F.chest.count = 0; } if (F.names) { F.names.count = 0; }
+		F.n = 0; F.rigOf = new Map(); F.nums.count = 0;   // rigOf: which figure each drawn player got this frame (off-screen players get none) if (F.chest) { F.chest.count = 0; } if (F.names) { F.names.count = 0; }
 		// Repaint the chest prints when the kits or the clubs change.
 		const ck = `${KITS[0].outfield}${KITS[0].second}${KITS[0].ink}|${KITS[1].outfield}${KITS[1].second}${KITS[1].ink}|${YOU.name}|${opp && opp.name}`;
 		if (F.chest && F.chestKey !== ck) {
@@ -107,8 +107,10 @@
 			const relB = wrapA(Math.atan2(ball.y - p.y, ball.x - p.x) - face);
 			const yaw = -clamp(relB, -0.85, 0.85) * clamp(1 - dBall / (420 * S), 0, 1);
 			const mir = WX(1) < WX(0) ? -1 : 1;
+			rig.mir = mir;   // the pose needs it to tell his left from his right
 			pose3D(rig, p, WX(p.x), p.y, WD(face), mir * turn, near, mir * yaw, mir * lead);
 			{ const bd = build(p), ht = 0.95 + 0.1 * bd.seed + (p.role === "gk" ? 0.03 : 0), gth = p.team >= 0 ? bd.girth : 1; rig.root.scale.set(ht * gth, ht, ht * gth); }   // tall and short, broad and slight
+			F.rigOf.set(p, rig);
 			commitFigure3D(rig, look(p), kit3D(p), p.num);
 		}
 		if (state === "play" || state === "goal" || state === "half" || state === "paused") { updateOfficials3(state === "play" || state === "goal" ? dt : 0); }

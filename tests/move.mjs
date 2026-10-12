@@ -139,7 +139,7 @@ const tired = await page.evaluate(() => new Promise(res => {
 	const F = window.__ff; for (let i = 0; i < 3000 && F.state !== "play"; i++) { F.step(1); } F.freeze = 0;
 	const keep = F.players.map(p => p.sta); for (const p of F.players) { p.sta = 0.3; }
 	let n = 0, bent = 0;
-	const tick = () => { F.players.forEach((p, i) => { const r = F.G3.fig.rigs[i]; if (r && F.state === "play" && F.freeze <= 0 && r.spine.rotation.z > 0.55) { bent++; } }); if (++n < 90) { requestAnimationFrame(tick); } else { F.players.forEach((p, i) => { p.sta = keep[i]; }); res({ bent }); } };
+	const tick = () => { F.players.forEach((p, i) => { const r = F.G3.fig.rigOf && F.G3.fig.rigOf.get(p); if (r && F.state === "play" && F.freeze <= 0 && r.spine.rotation.z > 0.55) { bent++; } }); if (++n < 90) { requestAnimationFrame(tick); } else { F.players.forEach((p, i) => { p.sta = keep[i]; }); res({ bent }); } };
 	requestAnimationFrame(tick);
 }));
 check("exhausted players stay upright in open play (no bending over mid-match)", tired.bent === 0, JSON.stringify(tired));
@@ -188,7 +188,7 @@ const swing = await page.evaluate(async () => {
 	for (let k = 0; k < 40; k++) {
 		await new Promise(r => setTimeout(r, 40));
 		F.players.forEach((p, i) => {
-			const r = G3.fig && G3.fig.rigs[i];
+			const r = G3.fig && G3.fig.rigOf && G3.fig.rigOf.get(p);
 			if (!r || p.role === "gk" || Math.hypot(p.vx || 0, p.vy || 0) < 1.2) { return; }
 			const o = r.root.getWorldPosition(r.root.position.clone()), fwd = r.root.localToWorld(r.root.position.clone().set(1, 0, 0)).sub(o).normalize();
 			for (let j = 0; j < 2; j++) {
@@ -210,7 +210,7 @@ const huddle = await page.evaluate(async () => {
 	for (let i = 0; i < 1500 && F.state === "goal" && !h; i++) { F.step(1); h = F.players.find(p => (p.hug || 0) > 0.5) || null; }
 	if (!h) { return { hug: false }; }
 	await new Promise(r => setTimeout(r, 120));
-	const r = G3.fig.rigs[F.players.indexOf(h)], o = r.chest.getWorldPosition(r.chest.position.clone()), root = r.root.getWorldPosition(r.root.position.clone());
+	const r = G3.fig.rigOf.get(h), o = r.chest.getWorldPosition(r.chest.position.clone()), root = r.root.getWorldPosition(r.root.position.clone());
 	const fwd = r.root.localToWorld(r.root.position.clone().set(1, 0, 0)).sub(root).normalize();
 	return { hug: true, fwd: [ 0, 1 ].map(j => +r.ha[j].getWorldPosition(r.ha[j].position.clone()).sub(o).dot(fwd).toFixed(1)) };
 });
@@ -223,7 +223,7 @@ const sides = await page.evaluate(async () => {
 	for (let k = 0; k < 60 && out.length < 40; k++) {
 		await new Promise(r => setTimeout(r, 40));
 		F.players.forEach((p, i) => {
-			const r = G3.fig && G3.fig.rigs[i];
+			const r = G3.fig && G3.fig.rigOf && G3.fig.rigOf.get(p);
 			if (!r || p.role === "gk" || Math.hypot(p.vx || 0, p.vy || 0) > 0.3 || p.kickA > 0 || (p.celebA || 0) > 0 || p.headHands > 0 || p.fistPump > 0 || F.staOf(p) < 0.6 || F.ball.owner === p) { return; }
 			const hip = r.hips.getWorldPosition(r.hips.position.clone()), o = r.root.getWorldPosition(r.root.position.clone());
 			const side = r.root.localToWorld(r.root.position.clone().set(0, 0, 1)).sub(o).normalize();
@@ -249,11 +249,48 @@ const mom = await page.evaluate(async () => {
 	F.moment("save", F.outfield(0)[1], { keeper: F.players.find(q => q.role === "gk" && q.team === 1) });
 	const second = document.getElementById("commText").textContent;
 	await new Promise(r => setTimeout(r, 450));
-	const r = G3.fig.rigs[F.players.indexOf(p)], top = W(r.head).y + 1.4;
+	const r = G3.fig.rigOf.get(p), top = W(r.head).y + 1.4;
 	const d = [ 0, 1 ].map(j => { const h = W(r.ha[j]), hd = W(r.head); return +Math.hypot(h.x - hd.x, h.y - top, h.z - hd.z).toFixed(1); });
 	return { shown, named: text.includes(p.name || "") && text.length > 8, oneAtATime: second === text, kind: F.lastCommentary && F.lastCommentary.kind, d, hh: p.headHands, shz: [0,1].map(j => +r.sh[j].rotation.z.toFixed(2)), el: [0,1].map(j => +r.el[j].rotation.z.toFixed(2)), run: +(p.runAmt || 0).toFixed(2), jump: p.jump, idx: F.players.indexOf(p), n: G3.fig.n, st: F.state, kick: p.kickA, fall: p.fall, cel: p.celebA, own: F.ball.owner === p };
 });
 check("a near miss: one commentary line naming the shooter, and his hands go to his head", mom.shown && mom.named && mom.oneAtATime && mom.kind === "near" && mom.d.every(v => v < 4), JSON.stringify(mom));
+// Shielding, jockeying and receiving: players placed by hand and posed on a spare figure at once.
+const pos3 = await page.evaluate(() => {
+	const F = window.__ff, W = n => n.getWorldPosition(n.position.clone()), out = {};
+	F.state === "play" || (F.state = "play");
+	const c = F.outfield(0)[3], o1 = F.outfield(1)[3], j = F.outfield(1)[1], rc = F.outfield(0)[2];
+	const keep = F.players.map(q => [ q, q.x, q.y, q.vx, q.vy, q.dir, q.runAmt, q.jockW, q.shieldW ]), owner = F.ball.owner;
+	const calm = q => Object.assign(q, { kickA: 0, lunge: 0, slideAI: 0, fall: 0, celebA: 0, jump: 0, throwA: 0, dive: 0, headHands: 0, fistPump: 0 });
+	for (const q of [ c, o1, j, rc ]) { calm(q); }
+	for (const q of F.players) { q.x = 40 + (F.players.indexOf(q) % 6) * 10; q.y = 40 + Math.floor(F.players.indexOf(q) / 6) * 10; q.vx = q.vy = 0; q.runAmt = 0; q.jockW = 0; q.shieldW = 0; }
+	c.x = F.FW / 2; c.y = F.FH / 2; c.dir = 0; F.ball.owner = c;
+	// shielding: a man at his left shoulder, a touch behind
+	o1.x = c.x - 8; o1.y = c.y + 18;
+	let r = F.poseProbe(c);
+	const op = { x: o1.x, y: 15, z: o1.y, isVector3: true };
+	out.shield = { w: +(c.shieldW || 0).toFixed(2), ext: c.shieldSide, hand: [ 0, 1 ].map(k => +Math.hypot(W(r.ha[k]).x - op.x, W(r.ha[k]).z - op.z).toFixed(1)) };
+	// jockeying: 35 in front of the carrier, facing him, against the same man well away
+	o1.x = 40; o1.y = 40;
+	j.x = c.x + 150; j.y = c.y; j.dir = Math.PI; j.jockW = 0;
+	const hip0 = W(F.poseProbe(j).hips).y;
+	j.x = c.x + 35; j.jockW = 0;
+	r = F.poseProbe(j);
+	out.jockey = { w: +(j.jockW || 0).toFixed(2), drop: +(hip0 - W(r.hips).y).toFixed(2) };
+	// receiving a ground pass: the receiving foot comes up, against the same man without it
+	F.ball.owner = rc; rc.recv = 0;
+	const f = rc.build && rc.build.left ? 0 : 1;
+	r = F.poseProbe(rc, 1); const a0 = W(r.an[f]).y;
+	rc.recv = 1; rc.gotAt = F.frame - 9;
+	r = F.poseProbe(rc, 1);
+	out.recv = { lift: +(W(r.an[f]).y - a0).toFixed(2) };
+	rc.recv = 0;
+	for (const [ q, x, y, vx, vy, d, ra, jw, sw ] of keep) { Object.assign(q, { x, y, vx, vy, dir: d, runAmt: ra, jockW: jw, shieldW: sw }); }
+	F.ball.owner = owner;
+	return out;
+});
+check("shielding: low, and the arm nearest the challenger goes out to hold him off", pos3.shield && pos3.shield.w > 0.6 && Math.min(...pos3.shield.hand) === pos3.shield.hand[pos3.shield.ext], JSON.stringify({ s: pos3.shield, pd: pos3.pd }));
+check("jockeying: the defender sinks into a crouch facing the carrier", pos3.jockey && pos3.jockey.w > 0.6 && pos3.jockey.drop > 0.6, JSON.stringify(pos3.jockey));
+check("receiving a pass along the ground: the receiving foot comes up to meet it", pos3.recv && pos3.recv.lift > 0.5, JSON.stringify(pos3.recv));
 check("home ends dressed: banners and big flags that wave", dress.banners >= 1 && dress.flags >= 3 && dress.waves, JSON.stringify(dress));
 await browser.close(); server.stop();
 process.exit(done() ? 1 : 0);

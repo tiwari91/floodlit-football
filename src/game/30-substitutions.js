@@ -703,6 +703,8 @@
 		if (offside.team === p.team && offside.set.has(p)) { callOffside(p); return; }
 		lastTouch = p.team;
 		offside = { team: -1, set: new Set() };
+		// How it reached him, for his receiving pose: a pass along the ground (1) or in the air (2).
+		p.recv = ball.lastBy && ball.lastBy !== p && ball.lastBy.team === p.team ? ((ball.z || 0) > 22 ? 2 : 1) : 0;
 		ball.owner = p;
 		ball.headed = false;
 		ball.indirect = null;
