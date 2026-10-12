@@ -645,8 +645,20 @@
 			if (ctrl !== plate3.ctrl) { plate3.ctrl = ctrl; plate3.at = frame; }
 			const compact = frame - plate3.at > PLATE_FULL3 && !charging && !passCharge && staOf(me) >= TIRED_STA;
 			// Clear of the S marker over the man you would switch to, when he stands just behind you.
+			// Also clear of the ball and of anyone standing just beyond him (the camera looks down the pitch, so
+			// the man a few yards further on is drawn right where the plate sits).
 			const sm = playing && !receiver && !(ball.owner && ball.owner.team === 0) && !inHands(ball.owner) ? nextSwitchTarget() : null, sq = sm && proj3D(sm.x, sm.y, 46);
-			if (top && me.name) { drawPlate(me, top.x, top.y, compact, false, sq ? [ sq.x - 12, sq.y - 30, sq.x + 12, sq.y + 2 ] : null); ctx.textAlign = "center"; ctx.textBaseline = "middle"; }
+			let avoid = sq ? [ sq.x - 12, sq.y - 30, sq.x + 12, sq.y + 2 ] : null;
+			if (!avoid && top) {
+				const bq = ball && ball.owner !== me ? proj3D(ball.x, ball.y, ball.z || 0) : null;
+				if (bq && bq.y < top.y && bq.y > top.y - 40 && Math.abs(bq.x - top.x) < 50) { avoid = [ bq.x - 6, bq.y - 6, bq.x + 6, bq.y + 6 ]; }
+				for (const q of players) {
+					if (avoid || q === me) { continue; }
+					const h = proj3D(q.x, q.y, 30);
+					if (h && h.y < top.y && h.y > top.y - 40 && Math.abs(h.x - top.x) < 40) { avoid = [ h.x - 8, h.y - 14, h.x + 8, h.y + 14 ]; }
+				}
+			}
+			if (top && me.name) { drawPlate(me, top.x, top.y, compact, false, avoid); ctx.textAlign = "center"; ctx.textBaseline = "middle"; }
 		}
 		if (playing && me && ball.owner === me) {
 			const m = strikerTarget(me), q = m && proj3D(m.x, m.y, 44);

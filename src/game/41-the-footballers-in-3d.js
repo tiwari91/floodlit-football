@@ -531,7 +531,12 @@
 		const rings = new T.InstancedMesh(G3.geo.ring, new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.36, depthWrite: false }), MAXF3);   // the side's ring under each man: a hint, not a halo
 		const blobs = new T.InstancedMesh(G3.geo.shadow, new T.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.32, depthWrite: false }), MAXF3);
 		// Under four floodlights a player throws four faint shadows, one away from each (as many as the Graphics setting draws).
-		const longs = new T.InstancedMesh(G3.geo.shadow, new T.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.12, depthWrite: false }), MAXF3 * 4);
+		// The floodlight shadows: darkest at his feet and fading out toward the tip with soft sides, as a
+		// shadow from a lamp a long way off does; an even grey ellipse read as four dark legs round each man.
+		const lsc = document.createElement("canvas"); lsc.width = 64; lsc.height = 32;
+		const lsg = lsc.getContext && lsc.getContext("2d");
+		if (lsg) { const im = lsg.createImageData(64, 32); for (let y = 0; y < 32; y++) { for (let x = 0; x < 64; x++) { const u = x / 63, v = Math.abs(y / 31 - 0.5) * 2, a = Math.pow(1 - u, 1.4) * (1 - v * v) * Math.min(1, u * 8 + 0.3); im.data[(y * 64 + x) * 4 + 3] = Math.round(255 * a); } } lsg.putImageData(im, 0, 0); }
+		const longs = new T.InstancedMesh(G3.geo.shadow, new T.MeshBasicMaterial({ color: 0x000000, map: lsg ? new T.CanvasTexture(lsc) : null, transparent: true, opacity: lsg ? 0.2 : 0.12, depthWrite: false }), MAXF3 * 4);
 		for (const m of [ rings, blobs, longs ]) { m.instanceMatrix.setUsage(T.DynamicDrawUsage); m.frustumCulled = false; m.count = 0; G3.scene.add(m); }
 		rings.setColorAt(0, white);
 		// The assistants' flags, held in the hand: a pole and a red-and-yellow chequered cloth.
