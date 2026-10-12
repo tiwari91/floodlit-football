@@ -56,6 +56,20 @@
 		} else if (kind === "tackle") {
 			thump(t, 220, 80, 0.11, 0.05, "square");
 			noiseBurst("brown", t, 0.12, 0.12, "lowpass", 700, 250);
+		} else if (kind === "post") {
+			// The woodwork: a hollow metal frame rings, the partials of a struck tube dying away at
+			// different rates over the dull thud of the ball.
+			const f0 = 520 + 60 * pow;
+			for (const [ m, d, g ] of [ [ 1, 1.1, 0.13 ], [ 2.76, 0.7, 0.07 ], [ 5.4, 0.42, 0.045 ], [ 8.93, 0.26, 0.03 ] ]) {
+				const osc = audio.createOscillator(), gn = audio.createGain();
+				osc.type = "sine"; osc.frequency.value = f0 * m;
+				gn.gain.setValueAtTime((0.4 + 0.6 * pow) * g * dist, t);
+				gn.gain.exponentialRampToValueAtTime(0.0008, t + d);
+				osc.connect(gn).connect(out());
+				osc.start(t); osc.stop(t + d + 0.02);
+			}
+			thump(t, 170, 60, 0.08, 0.12 * dist);
+			noiseBurst("white", t, 0.03, 0.09 * dist, "highpass", 3200, 5200, 0.7);
 		} else if (kind === "net") {
 			noiseBurst("white", t + 0.05, 0.28, 0.05, "highpass", 2500, 4000, 0.5);
 		} else if (kind === "tick") {

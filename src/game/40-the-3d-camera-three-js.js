@@ -620,6 +620,13 @@
 		st.add(net);
 		G3.nets = { net, rest: Float32Array.from(rest), nrm: Float32Array.from(nrm), wgt: Float32Array.from(wgt), goalOf, amp: [ 0, 0 ], ph: [ 0, 0 ], hit: [ null, null ], inside: [ false, false ], moving: false };
 	}
+	// The ball off the woodwork: the frame shudders and the net swings from the post or the bar.
+	function shakeGoal3D (left, y, z) {
+		const NT = G3.nets;
+		if (!NT || bulkSim) { return; }
+		const wx = (endsSwapped() ? !left : left) ? 0 : FW, g = wx < FW / 2 ? 0 : 1;
+		NT.amp[g] = Math.max(NT.amp[g], 4.5); NT.ph[g] = 0; NT.hit[g] = [ wx, Math.max(0, z) * Z3, y ]; NT.moving = true;
+	}
 	// Every frame: is the ball in a net? Push it back where the ball is and let it swing.
 	function animateNets3D (bx, by, bh, dt) {
 		const NT = G3.nets;

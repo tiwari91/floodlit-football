@@ -292,5 +292,47 @@ check("shielding: low, and the arm nearest the challenger goes out to hold him o
 check("jockeying: the defender sinks into a crouch facing the carrier", pos3.jockey && pos3.jockey.w > 0.6 && pos3.jockey.drop > 0.6, JSON.stringify(pos3.jockey));
 check("receiving a pass along the ground: the receiving foot comes up to meet it", pos3.recv && pos3.recv.lift > 0.5, JSON.stringify(pos3.recv));
 check("home ends dressed: banners and big flags that wave", dress.banners >= 1 && dress.flags >= 3 && dress.waves, JSON.stringify(dress));
+// The woodwork: a ball just wide of a post or just over the bar comes back off the frame (and only those).
+const wood = await page.evaluate(() => {
+	const F = window.__ff, out = {}, B = F.ball, FW = F.FW, FH = F.FH, T = F.GOAL_T, Bt = F.GOAL_B;
+	for (const id of [ "lowerThird", "commLine" ]) { const e = document.getElementById(id); if (e) { e.hidden = true; } }
+	F.freeze = 0;
+	for (const g of F.players.filter(q => q.role === "gk")) { g.y = 20; g.vx = g.vy = 0; }
+	const sh = F.outfield(0)[F.outfield(0).length - 1];
+	const fire = (y, z, vx, vy = 0, vz = 0) => {
+		F.commReset(); for (const id of [ "lowerThird", "commLine" ]) { document.getElementById(id).hidden = true; }
+		sh.headHands = 0; B.owner = null; B.woodAt = -999; B.x = FW - 1.3 * vx; B.y = y - vy * 1.3; B.z = z; B.vx = vx; B.vy = vy; B.vz = vz; B.curlT = 0; B.dipG = 0;
+		B.lastBy = sh; B.shot = true; B.kickedAt = F.frame; B.indirect = null; B.pen = null;
+		const s0 = F.score.slice();
+		for (let i = 0; i < 8 && F.state === "play" && !F.setPiece; i++) { F.stepBallTest(); if (B.woodAt > -999) { break; } }
+		return { wood: B.wood && B.woodAt > -999 ? B.wood : null, vx: +B.vx.toFixed(2), x: +B.x.toFixed(1), z: +(B.z || 0).toFixed(1), state: F.state, sp: F.setPieceKind, goal: F.score[0] > s0[0], kind: F.lastCommentary && F.lastCommentary.kind, hh: sh.headHands };
+	};
+	out.post = fire(T - 1, 4, 12, 0.6);
+	B.wood = null; out.inPost = fire(T + 2.5, 4, 13);
+	B.wood = null; out.bar = fire(FH / 2 + 10, 57.5, 12, 0, 0.2);
+	B.wood = null; out.fast = fire(Bt + 3, 2, 18, -0.5);
+	B.wood = null; out.wide = fire(T - 40, 2, 12);
+	// The pure check: nothing that crosses the line inside the mouth, under the bar, ever counts as woodwork.
+	let bad = 0;
+	for (let y = T + 4.01; y < Bt - 4; y += 3) { for (let z = 0; z <= 55; z += 5) { for (const vy of [ -3, 0, 3 ]) { if (F.woodworkHit(false, FW + 6, y + vy * 0.5, z, 12, vy, 0) || F.woodworkHit(true, -6, y + vy * 0.5, z, -12, vy, 0)) { bad++; } } } }
+	out.bad = bad;
+	return out;
+});
+check("woodwork: a shot just wide hits the post, comes back into play, commentary and hands on head", wood.post.wood === "post" && wood.post.vx < 0 && wood.post.state === "play" && !wood.post.sp && wood.post.kind === "woodwork" && wood.post.hh > 0, JSON.stringify(wood.post));
+check("woodwork: inside edge of the post (already going out) and a frame-skipping 18/frame shot rebound too", wood.inPost.wood === "post" && wood.inPost.vx < 0 && wood.fast.wood === "post" && wood.fast.vx < 0 && wood.fast.state === "play", JSON.stringify({ i: wood.inPost, f: wood.fast }));
+check("woodwork: just over the bar drops down and back out, 'bar' commentary", wood.bar.wood === "bar" && wood.bar.vx < 0 && wood.bar.z <= 55 && wood.bar.state === "play" && wood.bar.kind === "bar", JSON.stringify(wood.bar));
+check("woodwork: a ball well wide is just out (goal kick or corner), and no ball going in is ever counted as woodwork", wood.wide.wood === null && (wood.wide.sp === "goalkick" || wood.wide.sp === "corner") && wood.bad === 0, JSON.stringify({ w: wood.wide, bad: wood.bad }));
+const woodGoal = await page.evaluate(() => {
+	const F = window.__ff, B = F.ball, FW = F.FW;
+	if (F.setPiece) { F.step(400); }
+	F.freeze = 0; const sh = F.outfield(0)[F.outfield(0).length - 1], s0 = F.score[0];
+	for (const g of F.players.filter(q => q.role === "gk")) { g.y = 20; g.vx = g.vy = 0; }
+	B.owner = null; B.woodAt = -999; B.wood = null; B.x = FW - 36; B.y = F.GOAL_T + 5; B.z = 3; B.vx = 12; B.vy = 0; B.vz = 0; B.lastBy = sh; B.shot = true; B.kickedAt = F.frame; B.indirect = null;
+	for (let i = 0; i < 8 && F.state === "play"; i++) { F.stepBallTest(); }
+	return { st: F.state, goal: F.score[0] - s0, wood: B.wood, sp: F.setPieceKind };
+});
+check("woodwork: a shot just inside the post goes in (never deflected)", woodGoal.st === "goal" && woodGoal.goal === 1 && !woodGoal.wood, JSON.stringify(woodGoal));
+await page.evaluate(() => { const F = window.__ff; for (let i = 0; i < 1500 && F.state === "goal"; i++) { F.step(1); } });
+check("no errors after the woodwork checks (and no 3D failure)", errs.length === 0 && !errs.some(e => /3D view failed/.test(e)), errs.join(" | "));
 await browser.close(); server.stop();
 process.exit(done() ? 1 : 0);

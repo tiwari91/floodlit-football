@@ -788,6 +788,67 @@
 		renderHud();
 	}
 
+	// The woodwork. Called only for a ball that is about to be given out over the goal line, so it can
+	// never take a goal away: where did it cross the line? Within a post's width of either post (and no
+	// higher than the bar), or just over the bar between them, it hits the frame. Off a post it comes back
+	// at an angle set by which side of the post it caught; off the bar it drops down and out, or, rising,
+	// clips the top and goes over. Then the moment: a clang, the crowd, the shooter's hands on his head.
+	const POST_R = 5;   // post plus ball, in pitch units (the mouth already leaves 4 either side)
+	function woodworkHit (left, x, y, z, vx, vy, vz) {
+		if (left ? vx > -0.5 : vx < 0.5) { return null; }
+		const k = ((left ? 0 : FW) - x) / vx;   // frames ago it crossed the line (negative)
+		if (k > 0 || k < -3) { return null; }
+		const yc = y + vy * k, zc = Math.max(0, z + vz * k);
+		for (const py of [ GOAL_T, GOAL_B ]) {
+			const off = yc - py, inside = py === GOAL_T ? off > 0 : off < 0;
+			if (Math.abs(off) <= (inside ? 4 : POST_R) && zc <= 55 + POST_R * 0.6) { return { kind: "post", y: yc, z: Math.min(zc, 54), off, py }; }
+		}
+		if (yc > GOAL_T && yc < GOAL_B && zc > 55 && zc <= 55 + POST_R) { return { kind: "bar", y: yc, z: zc }; }
+		return null;
+	}
+	function woodwork (left) {
+		if (shoot || tut || frame - (ball.woodAt ?? -999) < 30) { return false; }
+		const h = woodworkHit(left, ball.x, ball.y, ball.z || 0, ball.vx, ball.vy, ball.vz || 0);
+		if (!h) { return false; }
+		const into = left ? 1 : -1, e = 0.45 + Math.random() * 0.2;
+		let over = false;
+		if (h.kind === "post" && h.off * (h.py === GOAL_T ? 1 : -1) < -POST_R * 0.75) {
+			over = true;   // a graze on the outside of the post: deflected a little wider, and out
+			ball.vy += (h.py === GOAL_T ? -1 : 1) * (0.8 + Math.random() * 0.8); ball.vx *= 0.85;
+		} else if (h.kind === "post") {
+			// Reflect off the round post: the normal points from the post's centre to the ball's.
+			const s = clamp(h.off / POST_R, -0.95, 0.95), nx = into * Math.sqrt(1 - s * s), ny = s;
+			const vn = ball.vx * nx + ball.vy * ny;
+			if (vn < 0) { ball.vx -= (1 + e) * vn * nx; ball.vy -= (1 + e) * vn * ny; }
+			ball.vx *= 0.82; ball.vy = ball.vy * 0.82 + (Math.random() * 2 - 1) * 0.8;
+			if (ball.vx * into < 1.5) { ball.vx = into * (1.5 + Math.random()); }
+			ball.vz = (ball.vz || 0) * 0.5; ball.z = h.z;
+			ball.y = clamp(h.y + s * 2, 8, FH - 8);
+		} else if ((ball.vz || 0) > 0 && h.z > 55 + POST_R * 0.5) {
+			over = true;   // rising, it clips the top of the bar and flies on over
+			ball.vz = Math.abs(ball.vz) * 0.6 + 1; ball.vx *= 0.7;
+		} else {
+			// Under the bar and back down: it drops in front of the line and away from goal.
+			ball.vx = into * Math.max(1.5, Math.abs(ball.vx) * e * 0.8); ball.vy = ball.vy * 0.6 + (Math.random() * 2 - 1) * 0.6;
+			ball.vz = -Math.max(1, Math.abs(ball.vz || 0) * 0.4); ball.z = 50; ball.y = h.y;
+		}
+		if (!over) { ball.x = left ? 3 : FW - 3; }
+		ball.curlT = 0; ball.dipG = 0; ball.woodAt = frame; ball.wood = h.kind;
+		const by = ball.lastBy, wasShot = ball.shot;
+		ball.shot = false;   // the rebound is a loose ball, not a shot (no second near miss or save)
+		tally.woodwork = (tally.woodwork || 0) + 1;
+		sfx("post", { x: left ? 0 : FW, y: h.y, pow: Math.min(1, Math.hypot(ball.vx, ball.vy) / 10) });
+		buzz(40);
+		shakeGoal3D(left, h.y, h.z);
+		if (by && (wasShot || frame - (ball.kickedAt ?? -999) < 150)) {
+			ooh(); slowMotion(40);
+			crowdReact("near", by.team); benchReact("near", { team: by.team });
+			moment("woodwork", by, { bar: h.kind === "bar" });
+		}
+		if (over) { outOfPlay(left); }
+		return true;
+	}
+
 	function stepBall () {
 		if (ball.owner) { return; }
 		ball.x += ball.vx;
@@ -837,9 +898,10 @@
 		}
 		if (!inMouth) {
 			if (state === "play") {
-				// Over the goal line (wide, or over the bar): a corner or a goal kick.
-				if (ball.x < -4) { outOfPlay(true); return; }
-				if (ball.x > FW + 4) { outOfPlay(false); return; }
+				// Over the goal line (wide, or over the bar): a corner or a goal kick. Unless it clipped the
+				// woodwork on the way: only a ball already going out can hit it, so no goal is ever lost.
+				if (ball.x < -4) { if (woodwork(true)) { return; } outOfPlay(true); return; }
+				if (ball.x > FW + 4) { if (woodwork(false)) { return; } outOfPlay(false); return; }
 			} else {
 				if (ball.x < 5) { ball.x = 5; ball.vx = Math.abs(ball.vx) * 0.7; }
 				if (ball.x > FW - 5) { ball.x = FW - 5; ball.vx = -Math.abs(ball.vx) * 0.7; }
