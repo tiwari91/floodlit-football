@@ -790,6 +790,7 @@
 	.pl-card .pc-badges .trait { margin-left: 0; }
 	.pl-detail select, .pl-detail button { font-size: 12px; padding: 3px 8px; }
 	.gls { margin-left: 6px; font-size: 11px; font-weight: 700; color: #7fd49b; }
+	.capt { display: inline-block; margin-left: 6px; padding: 0 4px; border-radius: 3px; font-size: 10px; font-weight: 800; line-height: 14px; background: #f2b52e; color: #1a1408; vertical-align: 1px; }
 	.inj { margin-left: 6px; font-size: 11px; font-weight: 700; color: #ef5b66; }
 	.fitbar { display: inline-block; width: 42px; height: 6px; border-radius: 3px; background: var(--panel-2); overflow: hidden; vertical-align: middle; }
 	.fitbar i { display: block; height: 100%; }

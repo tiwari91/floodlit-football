@@ -190,7 +190,7 @@
 
 	function renderClub () {
 		const c = league.club;
-		const open = windowOpen(), five = league.fmt !== "11", used = slotsFor(league.fmt);
+		const open = windowOpen(), five = league.fmt !== "11", used = slotsFor(league.fmt), capt = clubCaptain(c);
 		const sq = $("sqBody");
 		sq.replaceChildren();
 		let sum = 0, n = 0;
@@ -211,6 +211,7 @@
 			else if (fitOf(pl) < TIRED) { nameTd.append(el("span", "oop", "▽ tired")); }
 			if (pl.ban > 0) { nameTd.append(el("span", "inj", `suspended · ${pl.ban} game${pl.ban === 1 ? "" : "s"}`)); }
 			else if (pl.ycount > 0) { nameTd.append(el("span", "oop", `${pl.ycount} yellow${pl.ycount === 1 ? "" : "s"}`)); }
+			if (onPitch && pl === capt) { const cb = el("span", "capt", "C"); const sa = seasonAvg(pl); cb.title = `Captain: the best season in the side${sa !== null ? ` (average rating ${sa.toFixed(1)} over ${seasonRat(pl)[1]} game${seasonRat(pl)[1] === 1 ? "" : "s"})` : " so far"}`; cb.setAttribute("aria-label", cb.title); nameTd.append(cb); }
 			if (pl.goals > 0) { nameTd.append(el("span", "gls", `${pl.goals} goal${pl.goals === 1 ? "" : "s"}`)); }
 			ensurePlayer(pl);
 			if (pl.trait) { const tg = el("span", "trait", traitName(pl.trait)); tg.title = TRAITS[pl.trait][1]; nameTd.append(tg); }
@@ -367,7 +368,7 @@
 			if (on && matchGoals.includes(pl.name)) { d += 2 * matchGoals.filter(n => n === pl.name).length; }
 			if (pl.contract <= 1 && role === "key") { d -= 1; }
 			pl.morale = clamp(Math.round(pl.morale + d + (65 - pl.morale) * 0.04), 5, 100);
-			if (Number.isFinite(lastRatings[pl.name])) { pl.form = [ ...(Array.isArray(pl.form) ? pl.form : []), lastRatings[pl.name] ].slice(-5); }
+			if (Number.isFinite(lastRatings[pl.name])) { pl.form = [ ...(Array.isArray(pl.form) ? pl.form : []), lastRatings[pl.name] ].slice(-5); pl.rsum = (pl.rsum || 0) + lastRatings[pl.name]; pl.rn = (pl.rn || 0) + 1; }   // the season's ratings, for the armband
 			if (pl.adapt > 0) { pl.adapt = Math.max(0, pl.adapt - (on ? 1 : 0.5)); }
 		}
 		const wages = squadWages(c) / SEASON_ROUNDS, gate = lm.home ? 0.05 + 0.015 * yourStr() : 0;

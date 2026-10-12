@@ -47,7 +47,7 @@
 		// Auto-rotate carries on from season to season (and from your last choice for a new club).
 		if (club.autoRotate === undefined) { club.autoRotate = store.get("ff-autorot") === "1"; }
 		if (youDown) { club.budget = round1(club.budget * 0.5); }
-		if (prev) { for (const pl of [ ...club.squad, ...club.bench ]) { pl.fit = 100; pl.goals = 0; pl.apps = 0; pl.ycount = 0; } }   // a summer's rest, and a clean sheet of stats
+		if (prev) { for (const pl of [ ...club.squad, ...club.bench ]) { pl.fit = 100; pl.goals = 0; pl.apps = 0; pl.ycount = 0; pl.rsum = 0; pl.rn = 0; } }   // a summer's rest, and a clean sheet of stats
 		let gone = [];
 		league = {
 			v: 1,

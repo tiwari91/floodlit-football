@@ -65,11 +65,16 @@
 	function drawFigures3D (WX, WD) {
 		const F = G3.fig;
 		for (const k in F.parts) { F.cnt[k] = 0; }
-		// Each side's captain: chosen once per match (the best passer and defender together), and if he goes
-		// off the armband passes to the next in line.
+		// Each side's captain, chosen once per match; if he goes off the armband passes to the next in line.
+		// Yours is the man on the pitch with the best season (see captainScore); theirs, and yours outside a
+		// league, the best passer and defender together.
 		if (!F.capt || F.captFor !== players || F.capt.some((c, t) => c && !players.includes(c))) {
 			F.captFor = players;
 			F.capt = [ 0, 1 ].map(t => outfield(t).reduce((a, q) => (!a || A(q, "pas") + A(q, "def") > A(a, "pas") + A(a, "def") ? q : a), null));
+			const sq = league && league.club ? [ ...league.club.squad, ...league.club.bench ] : [];
+			const mine = new Map(outfield(0).map(q => [ sq.find(pl => pl.name === q.name), q ]).filter(([ pl ]) => pl));
+			const best = pickCaptain([ ...mine.keys() ]);
+			if (best) { F.capt[0] = mine.get(best); }
 		}
 		F.n = 0; F.rigOf = new Map(); F.nums.count = 0;   // rigOf: which figure each drawn player got this frame (off-screen players get none) if (F.chest) { F.chest.count = 0; } if (F.names) { F.names.count = 0; }
 		// Repaint the chest prints when the kits or the clubs change.

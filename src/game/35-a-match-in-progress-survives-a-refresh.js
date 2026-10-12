@@ -238,8 +238,7 @@
 	let fireworks = null;
 	function captainName () {
 		if (!league || !league.club) { return "Your captain"; }
-		const c = league.club, xi = slotsFor(league.fmt).map(i => c.squad[i]).filter(Boolean);
-		const k = xi.find(pl => pl.role === "key") || xi.slice().sort((a, b) => (b.age || 0) - (a.age || 0) + (ovrOf(b) - ovrOf(a)) * 0.2)[0];
+		const k = clubCaptain(league.club);
 		return k ? k.name : "Your captain";
 	}
 	function celebrateTrophy (what) {

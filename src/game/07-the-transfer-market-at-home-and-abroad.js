@@ -130,6 +130,15 @@
 	// each of his ratings; well below takes up to two off.
 	const formAvg = p => (Array.isArray(p.form) && p.form.length ? p.form.reduce((a, b) => a + b, 0) / p.form.length : null);
 	const formBonus = p => { const a = formAvg(p); return a === null || p.form.length < 2 ? 0 : clamp(Math.round((a - 6.6) * 1.3), -2, 2); };
+	// The captain: the outfielder in the side with the best season so far. His average match rating this
+	// season, eased toward 6.5 over his first three games so one big night doesn't hand him the armband,
+	// plus a little for being an ever-present; before a ball is kicked, the stronger, more senior man.
+	// A save from before season ratings were kept has only his form (the last five) to go on until then.
+	const seasonRat = p => (Number.isFinite(p.rn) && p.rn > 0 ? [ p.rsum, p.rn ] : Array.isArray(p.form) && p.form.length ? [ p.form.reduce((a, b) => a + b, 0), p.form.length ] : [ 0, 0 ]);
+	const seasonAvg = p => { const [ s, n ] = seasonRat(p); return n > 0 ? s / n : null; };
+	const captainScore = p => { const [ s, n ] = seasonRat(p); return (s + 6.5 * 3) / (n + 3) + 0.01 * Math.min(p.apps || 0, 30) + 0.0004 * (ovrOf(p) + (p.age || 25)); };
+	const pickCaptain = pls => pls.filter(p => p && p.pos !== "gk").reduce((a, p) => (!a || captainScore(p) > captainScore(a) ? p : a), null);
+	const clubCaptain = c => pickCaptain(slotsFor(league.fmt).map(i => c.squad[i]).filter(p => p && !(p.inj > 0) && !(p.ban > 0)));
 	// How good a player is in a given slot today.
 	const matchOvr = (pl, slotPos) => ovrOf({ ...effective(pl, slotPos), pos: slotPos });
 

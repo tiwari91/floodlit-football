@@ -811,6 +811,7 @@
 	.pl-card .pc-badges .trait { margin-left: 0; }
 	.pl-detail select, .pl-detail button { font-size: 12px; padding: 3px 8px; }
 	.gls { margin-left: 6px; font-size: 11px; font-weight: 700; color: #7fd49b; }
+	.capt { display: inline-block; margin-left: 6px; padding: 0 4px; border-radius: 3px; font-size: 10px; font-weight: 800; line-height: 14px; background: #f2b52e; color: #1a1408; vertical-align: 1px; }
 	.inj { margin-left: 6px; font-size: 11px; font-weight: 700; color: #ef5b66; }
 	.fitbar { display: inline-block; width: 42px; height: 6px; border-radius: 3px; background: var(--panel-2); overflow: hidden; vertical-align: middle; }
 	.fitbar i { display: block; height: 100%; }
@@ -2140,6 +2141,15 @@
 	// each of his ratings; well below takes up to two off.
 	const formAvg = p => (Array.isArray(p.form) && p.form.length ? p.form.reduce((a, b) => a + b, 0) / p.form.length : null);
 	const formBonus = p => { const a = formAvg(p); return a === null || p.form.length < 2 ? 0 : clamp(Math.round((a - 6.6) * 1.3), -2, 2); };
+	// The captain: the outfielder in the side with the best season so far. His average match rating this
+	// season, eased toward 6.5 over his first three games so one big night doesn't hand him the armband,
+	// plus a little for being an ever-present; before a ball is kicked, the stronger, more senior man.
+	// A save from before season ratings were kept has only his form (the last five) to go on until then.
+	const seasonRat = p => (Number.isFinite(p.rn) && p.rn > 0 ? [ p.rsum, p.rn ] : Array.isArray(p.form) && p.form.length ? [ p.form.reduce((a, b) => a + b, 0), p.form.length ] : [ 0, 0 ]);
+	const seasonAvg = p => { const [ s, n ] = seasonRat(p); return n > 0 ? s / n : null; };
+	const captainScore = p => { const [ s, n ] = seasonRat(p); return (s + 6.5 * 3) / (n + 3) + 0.01 * Math.min(p.apps || 0, 30) + 0.0004 * (ovrOf(p) + (p.age || 25)); };
+	const pickCaptain = pls => pls.filter(p => p && p.pos !== "gk").reduce((a, p) => (!a || captainScore(p) > captainScore(a) ? p : a), null);
+	const clubCaptain = c => pickCaptain(slotsFor(league.fmt).map(i => c.squad[i]).filter(p => p && !(p.inj > 0) && !(p.ban > 0)));
 	// How good a player is in a given slot today.
 	const matchOvr = (pl, slotPos) => ovrOf({ ...effective(pl, slotPos), pos: slotPos });
 
@@ -2492,7 +2502,7 @@
 		// Auto-rotate carries on from season to season (and from your last choice for a new club).
 		if (club.autoRotate === undefined) { club.autoRotate = store.get("ff-autorot") === "1"; }
 		if (youDown) { club.budget = round1(club.budget * 0.5); }
-		if (prev) { for (const pl of [ ...club.squad, ...club.bench ]) { pl.fit = 100; pl.goals = 0; pl.apps = 0; pl.ycount = 0; } }   // a summer's rest, and a clean sheet of stats
+		if (prev) { for (const pl of [ ...club.squad, ...club.bench ]) { pl.fit = 100; pl.goals = 0; pl.apps = 0; pl.ycount = 0; pl.rsum = 0; pl.rn = 0; } }   // a summer's rest, and a clean sheet of stats
 		let gone = [];
 		league = {
 			v: 1,
@@ -2878,7 +2888,7 @@
 
 	function renderClub () {
 		const c = league.club;
-		const open = windowOpen(), five = league.fmt !== "11", used = slotsFor(league.fmt);
+		const open = windowOpen(), five = league.fmt !== "11", used = slotsFor(league.fmt), capt = clubCaptain(c);
 		const sq = $("sqBody");
 		sq.replaceChildren();
 		let sum = 0, n = 0;
@@ -2899,6 +2909,7 @@
 			else if (fitOf(pl) < TIRED) { nameTd.append(el("span", "oop", "▽ tired")); }
 			if (pl.ban > 0) { nameTd.append(el("span", "inj", `suspended · ${pl.ban} game${pl.ban === 1 ? "" : "s"}`)); }
 			else if (pl.ycount > 0) { nameTd.append(el("span", "oop", `${pl.ycount} yellow${pl.ycount === 1 ? "" : "s"}`)); }
+			if (onPitch && pl === capt) { const cb = el("span", "capt", "C"); const sa = seasonAvg(pl); cb.title = `Captain: the best season in the side${sa !== null ? ` (average rating ${sa.toFixed(1)} over ${seasonRat(pl)[1]} game${seasonRat(pl)[1] === 1 ? "" : "s"})` : " so far"}`; cb.setAttribute("aria-label", cb.title); nameTd.append(cb); }
 			if (pl.goals > 0) { nameTd.append(el("span", "gls", `${pl.goals} goal${pl.goals === 1 ? "" : "s"}`)); }
 			ensurePlayer(pl);
 			if (pl.trait) { const tg = el("span", "trait", traitName(pl.trait)); tg.title = TRAITS[pl.trait][1]; nameTd.append(tg); }
@@ -3055,7 +3066,7 @@
 			if (on && matchGoals.includes(pl.name)) { d += 2 * matchGoals.filter(n => n === pl.name).length; }
 			if (pl.contract <= 1 && role === "key") { d -= 1; }
 			pl.morale = clamp(Math.round(pl.morale + d + (65 - pl.morale) * 0.04), 5, 100);
-			if (Number.isFinite(lastRatings[pl.name])) { pl.form = [ ...(Array.isArray(pl.form) ? pl.form : []), lastRatings[pl.name] ].slice(-5); }
+			if (Number.isFinite(lastRatings[pl.name])) { pl.form = [ ...(Array.isArray(pl.form) ? pl.form : []), lastRatings[pl.name] ].slice(-5); pl.rsum = (pl.rsum || 0) + lastRatings[pl.name]; pl.rn = (pl.rn || 0) + 1; }   // the season's ratings, for the armband
 			if (pl.adapt > 0) { pl.adapt = Math.max(0, pl.adapt - (on ? 1 : 0.5)); }
 		}
 		const wages = squadWages(c) / SEASON_ROUNDS, gate = lm.home ? 0.05 + 0.015 * yourStr() : 0;
@@ -8309,8 +8320,7 @@
 	let fireworks = null;
 	function captainName () {
 		if (!league || !league.club) { return "Your captain"; }
-		const c = league.club, xi = slotsFor(league.fmt).map(i => c.squad[i]).filter(Boolean);
-		const k = xi.find(pl => pl.role === "key") || xi.slice().sort((a, b) => (b.age || 0) - (a.age || 0) + (ovrOf(b) - ovrOf(a)) * 0.2)[0];
+		const k = clubCaptain(league.club);
 		return k ? k.name : "Your captain";
 	}
 	function celebrateTrophy (what) {
@@ -12704,11 +12714,16 @@
 	function drawFigures3D (WX, WD) {
 		const F = G3.fig;
 		for (const k in F.parts) { F.cnt[k] = 0; }
-		// Each side's captain: chosen once per match (the best passer and defender together), and if he goes
-		// off the armband passes to the next in line.
+		// Each side's captain, chosen once per match; if he goes off the armband passes to the next in line.
+		// Yours is the man on the pitch with the best season (see captainScore); theirs, and yours outside a
+		// league, the best passer and defender together.
 		if (!F.capt || F.captFor !== players || F.capt.some((c, t) => c && !players.includes(c))) {
 			F.captFor = players;
 			F.capt = [ 0, 1 ].map(t => outfield(t).reduce((a, q) => (!a || A(q, "pas") + A(q, "def") > A(a, "pas") + A(a, "def") ? q : a), null));
+			const sq = league && league.club ? [ ...league.club.squad, ...league.club.bench ] : [];
+			const mine = new Map(outfield(0).map(q => [ sq.find(pl => pl.name === q.name), q ]).filter(([ pl ]) => pl));
+			const best = pickCaptain([ ...mine.keys() ]);
+			if (best) { F.capt[0] = mine.get(best); }
 		}
 		F.n = 0; F.rigOf = new Map(); F.nums.count = 0;   // rigOf: which figure each drawn player got this frame (off-screen players get none) if (F.chest) { F.chest.count = 0; } if (F.names) { F.names.count = 0; }
 		// Repaint the chest prints when the kits or the clubs change.
