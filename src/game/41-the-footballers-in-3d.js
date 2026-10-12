@@ -33,23 +33,24 @@
 		g.save();
 		g.clearRect(x0, y0, 256, 128);
 		g.lineCap = "round";
-		// Shadow under the brow ridge and in the eye sockets, down the sides of the nose, under the cheekbones.
-		g.fillStyle = "rgba(40, 20, 10, 0.26)";
+		// Soft shadow in the eye sockets and under the cheekbones (the head's shape does the rest), blurred so
+		// nothing has a painted edge.
+		g.filter = "blur(3px)";
+		g.fillStyle = "rgba(40, 20, 10, 0.2)";
 		for (const sgn of [ -1, 1 ]) { g.beginPath(); g.ellipse(cx + sgn * 16, ey - 2, 13, 8.5, 0, 0, Math.PI * 2); g.fill(); }
 		g.fillStyle = "rgba(40, 20, 10, 0.12)";
 		for (const sgn of [ -1, 1 ]) { g.beginPath(); g.ellipse(cx + sgn * 34, ey + 22, 9, 14, sgn * 0.3, 0, Math.PI * 2); g.fill(); }
-		g.fillStyle = "rgba(40, 20, 10, 0.16)";
-		g.beginPath(); g.moveTo(cx - 3, ey + 4); g.lineTo(cx - 8, ey + 20); g.lineTo(cx + 8, ey + 20); g.lineTo(cx + 3, ey + 4); g.closePath(); g.fill();
 		// warm cheeks
 		g.fillStyle = "rgba(150, 60, 45, 0.035)";   // the faintest warmth on the cheeks, never a painted spot
 		for (const sgn of [ -1, 1 ]) { g.beginPath(); g.ellipse(cx + sgn * 24, ey + 15, 9, 6, 0, 0, Math.PI * 2); g.fill(); }
+		g.filter = "none";
 		for (const sgn of [ -1, 1 ]) {
 			const x = cx + sgn * 16;
 			// The eye, life-size rather than a cartoon's: a narrow almond of off-white mostly covered by the
 			// upper lid, a small iris and pupil half under it, a soft lid shadow, a faint lower lid, no big glint.
-			const eh = open ? 4.4 : 3.5, ew = 7.2;
+			const eh = open ? 4.2 : 3.3, ew = 6.6;
 			g.save(); g.beginPath(); g.ellipse(x, ey, ew, eh, 0, 0, Math.PI * 2); g.clip();
-			g.fillStyle = "#e6dfd4"; g.fillRect(x - ew, ey - eh, ew * 2, eh * 2);
+			g.fillStyle = "#d9d0c4"; g.fillRect(x - ew, ey - eh, ew * 2, eh * 2);
 			g.fillStyle = v % 3 === 1 ? "#3d5a74" : v % 3 === 2 ? "#4f6340" : "#3b2414"; g.beginPath(); g.arc(x + sgn * 0.4, ey + 0.6, 3.3, 0, Math.PI * 2); g.fill();
 			g.fillStyle = "#0c0604"; g.beginPath(); g.arc(x + sgn * 0.4, ey + 0.6, 1.5, 0, Math.PI * 2); g.fill();
 			g.fillStyle = "rgba(30, 14, 6, 0.45)"; g.fillRect(x - ew, ey - eh, ew * 2, eh * 0.75);   // the lid's shadow over the top of the eye
@@ -60,21 +61,23 @@
 			g.strokeStyle = "rgba(40, 20, 10, 0.22)"; g.lineWidth = 1; g.beginPath(); g.ellipse(x, ey, ew, eh, 0, Math.PI * 0.2, Math.PI * 0.8); g.stroke();
 			// the brow: flat, arched, heavy or angled; raised when celebrating
 			const by = open ? -4 : 0;
-			g.strokeStyle = "rgba(34, 21, 14, 0.82)"; g.lineWidth = brow === 2 ? 4.4 : 3.2;
+			g.strokeStyle = "rgba(34, 21, 14, 0.62)"; g.lineWidth = brow === 2 ? 3.8 : 2.8; g.filter = "blur(0.6px)";
 			g.beginPath();
 			if (brow === 1) { g.moveTo(x - sgn * 10, ey - 10 + by); g.quadraticCurveTo(x, ey - 17 + by, x + sgn * 11, ey - 11 + by); }
 			else if (brow === 3) { g.moveTo(x - sgn * 10, ey - 11 + by); g.lineTo(x + sgn * 11, ey - 14 + by); }
 			else { g.moveTo(x - sgn * 10, ey - 12 + by); g.quadraticCurveTo(x, ey - 14 + by, x + sgn * 11, ey - 11.5 + by); }
-			g.stroke();
+			g.stroke(); g.filter = "none";
 		}
 		// nostrils and the underside of the nose
-		g.fillStyle = "rgba(50, 20, 12, 0.55)";
-		for (const sgn of [ -1, 1 ]) { g.beginPath(); g.ellipse(cx + sgn * 3.6, ey + 19, 2.2, 1.4, 0, 0, Math.PI * 2); g.fill(); }
+		g.fillStyle = "rgba(50, 20, 12, 0.3)"; g.filter = "blur(0.8px)";
+		for (const sgn of [ -1, 1 ]) { g.beginPath(); g.ellipse(cx + sgn * 3.8, ey + 20, 1.8, 1.1, 0, 0, Math.PI * 2); g.fill(); }
+		g.filter = "none";
 		// stubble or a beard across the jaw (under the mouth, so the lips sit on top)
 		if (stubble || beard) {
-			g.fillStyle = beard ? "rgba(26, 16, 10, 0.85)" : "rgba(26, 16, 10, 0.32)";
+			g.fillStyle = beard ? "rgba(26, 16, 10, 0.72)" : "rgba(26, 16, 10, 0.18)"; g.filter = beard ? "blur(2.5px)" : "blur(5px)";   // stubble a shadow on the jaw, never a painted patch
 			g.beginPath(); g.moveTo(cx - 46, ey + 12); g.quadraticCurveTo(cx - 42, ey + 54, cx, ey + 60); g.quadraticCurveTo(cx + 42, ey + 54, cx + 46, ey + 12);
 			g.quadraticCurveTo(cx + 30, ey + 24, cx + 12, ey + 22); g.quadraticCurveTo(cx, ey + 20, cx - 12, ey + 22); g.quadraticCurveTo(cx - 30, ey + 24, cx - 46, ey + 12); g.closePath(); g.fill();
+			g.filter = "none";
 		}
 		// the mouth
 		if (open) {
@@ -178,6 +181,71 @@
 		g.fillStyle = ink; g.font = "900 62px 'Barlow', 'Helvetica Neue', Arial, sans-serif"; g.textBaseline = "middle";
 		g.fillText(SPONSORS3[h % SPONSORS3.length], w / 2, y0 + 98, w * 0.94);
 	}
+	// ---------- the head ----------
+	// A sculpted head rather than a ball: a unit sphere pushed into an ellipsoid the shape of a skull
+	// (longer than it is wide, taller than long), then modelled with soft bumps and hollows in the
+	// directions where they sit: a brow ridge over eye sockets, cheekbones with a hollow under them,
+	// the muzzle and lips, a chin, the angle of the jaw, the back of the skull. The face atlas's
+	// features land where the sockets are (the eye line a little above the equator). (x forward, y up.)
+	const HEAD_R3 = [ 1.98, 2.36, 1.7 ];   // half length, height, width of the skull ellipsoid
+	const HEAD_C3 = [ 0.2, 2.25, 0 ];      // its centre on the head joint
+	const HEAD_BUMPS3 = [
+		// [ y, z, ry, rz, amount, front-only ]: a gaussian along the surface, centred on direction (y, z)
+		[ 0.36, 0.3, 0.12, 0.3, 0.14, 1 ], [ 0.36, -0.3, 0.12, 0.3, 0.14, 1 ],      // the brow ridge
+		[ 0.12, 0.37, 0.12, 0.15, -0.2, 1 ], [ 0.12, -0.37, 0.12, 0.15, -0.2, 1 ],   // eye sockets
+		[ -0.04, 0.62, 0.14, 0.16, 0.1, 1 ], [ -0.04, -0.62, 0.14, 0.16, 0.1, 1 ],   // cheekbones
+		[ -0.3, 0.55, 0.14, 0.16, -0.08, 1 ], [ -0.3, -0.55, 0.14, 0.16, -0.08, 1 ], // hollows under them
+		[ -0.55, 0, 0.18, 0.28, 0.1, 1 ],                                           // the muzzle and lips
+		[ -0.84, 0, 0.14, 0.3, 0.16, 1 ],                                           // the chin, square rather than pointed
+		[ -0.55, 0.8, 0.18, 0.16, 0.09, 0 ], [ -0.55, -0.8, 0.18, 0.16, 0.09, 0 ],  // the angle of the jaw
+		[ 0.6, 0.0, 0.25, 0.5, 0.05, 1 ],                                           // the forehead, rounded
+		[ 0.42, 0.8, 0.16, 0.14, -0.06, 1 ], [ 0.42, -0.8, 0.16, 0.14, -0.06, 1 ]   // temples
+	];
+	function headPoint3 (dx, dy, dz) {
+		let x = dx * HEAD_R3[0], y = dy * HEAD_R3[1], z = dz * HEAD_R3[2];
+		const t = clamp(-dy, 0, 1), front = clamp((dx - 0.15) / 0.5, 0, 1), back = clamp(-dx / 0.6, 0, 1);
+		// the jaw: narrower toward the chin, the angle of the jaw kept under the ears
+		z *= 1 - 0.2 * Math.pow(t, 2.2) * (0.5 + 0.5 * front);
+		// under the skull at the back, the head tucks in to the neck; the back of the skull bulges a little
+		x *= 1 - 0.38 * back * Math.pow(t, 1.3) + 0.06 * back * Math.exp(-Math.pow((dy - 0.2) / 0.4, 2));
+		// the face plane is flatter than the skull: the front is pulled back at the sides, kept at the middle
+		x -= 0.22 * front * dz * dz * HEAD_R3[0];
+		// the lower face comes forward of the line of the skull, the chin most
+		x += 0.16 * front * Math.pow(t, 1.4) * HEAD_R3[0] * (1 - Math.abs(dz));
+		let bump = 0;
+		for (const [ by, bz, ry, rz, a, fo ] of HEAD_BUMPS3) { bump += a * Math.exp(-Math.pow((dy - by) / ry, 2) - Math.pow((dz - bz) / rz, 2)) * (fo ? front : 1); }
+		const n = Math.hypot(x, y, z) || 1;
+		return [ x + x / n * bump + HEAD_C3[0], y + y / n * bump + HEAD_C3[1], z + z / n * bump + HEAD_C3[2] ];
+	}
+	function sculpt3D (g) {
+		const P = g.attributes.position, dir = new Float32Array(P.count * 3);
+		for (let i = 0; i < P.count; i++) {
+			const x = P.getX(i), y = P.getY(i), z = P.getZ(i), n = Math.hypot(x, y, z) || 1;
+			dir[i * 3] = x / n; dir[i * 3 + 1] = y / n; dir[i * 3 + 2] = z / n;
+			const q = headPoint3(x / n, y / n, z / n); P.setXYZ(i, q[0], q[1], q[2]);
+		}
+		g.setAttribute("aDir", new THREE.BufferAttribute(dir, 3));
+		g.computeVertexNormals();
+		return g;
+	}
+	// The ear: on the side of the head, its top level with the brows and its lobe with the nose.
+	const EAR3 = (() => { const q = headPoint3(-0.12, -0.04, Math.sqrt(1 - 0.12 * 0.12 - 0.04 * 0.04)); return [ q[0], q[1], q[2] + 0.05 ]; })();
+	// The nose: a ridge lofted down the middle of the face from between the eyes to the tip, widening into
+	// the wings over the nostrils, set into the face so only its front stands out.
+	function noseGeo3 () {
+		const surf = y => { const dy = (y - HEAD_C3[1]) / HEAD_R3[1]; return headPoint3(Math.sqrt(Math.max(0, 1 - dy * dy)), dy, 0)[0]; };
+		const ring = (dy, w, df) => { const y = HEAD_C3[1] + dy * HEAD_R3[1], sx = surf(y); return [ y, w, df, 0.25, sx - 0.25 ]; };
+		const g = loft3D([ ring(0.24, 0.12, 0.27), ring(0.14, 0.17, 0.33), ring(0.0, 0.22, 0.46), ring(-0.14, 0.27, 0.62), ring(-0.24, 0.36, 0.7), ring(-0.3, 0.38, 0.6), ring(-0.35, 0.3, 0.36) ], 10, 2.0);
+		return g;
+	}
+	// Hair styles drawn by the hair shader on a copy of the skull surface: [ thickness over the top, at the
+	// sides, over the brow (a fringe or a quiff), curl, hairline lift (a receding line) ]. Thickness tapers
+	// to nothing at the hairline, where the hair dips under the skin, so there is never a helmet's edge.
+	const HAIR_STYLES3 = { short: [ 0.2, 0.12, 0.16, 0, 0 ], crop: [ 0.42, 0.08, 0.42, 0, 0 ], curly: [ 0.42, 0.26, 0.3, 1, 0 ], afro: [ 0.95, 0.75, 0.7, 1, -0.04 ], long: [ 0.26, 0.24, 0.2, 0, 0 ], tied: [ 0.16, 0.12, 0.1, 0, 0 ], buzz: [ 0.05, 0.04, 0.04, 0, 0.02 ], shaved: [ 0, 0, 0, 0, 1 ] };
+	const HAIR_IDS3 = Object.keys(HAIR_STYLES3);
+	// Painted face detail fades out by distance: near, the eyes, brows and mouth; far (the gantry camera,
+	// where a face is a few pixels), only the modelled shape, the skin and the hair.
+	const FACE_FADE3 = [ 150, 340 ];
 	function initFigures3D () {
 		const T = THREE;
 		const defs = {
@@ -188,20 +256,11 @@
 			shorts: () => loft3D([ [ 1.6, 3.05, 2.02, 2.05 ], [ 1.75, 3.12, 2.08, 2.1 ], [ 0.6, 3.5, 2.15, 2.32 ], [ -0.9, 3.8, 2.18, 2.4 ], [ -1.9, 3.5, 2.0, 2.1 ], [ -2.3, 2.6, 1.6, 1.6 ] ], 12, 2.4),
 			shortLeg: () => loft3D([ [ 0.9, 1.8, 1.9, 2.05 ], [ -0.6, 2.02, 2.12, 2.16 ], [ -2.5, 2.0, 2.2, 2.08, 0.1 ], [ -2.75, 2.06, 2.26, 2.12, 0.12 ], [ -2.95, 2.04, 2.22, 2.1, 0.12 ], [ -3.0, 1.62, 1.7, 1.6, 0.12 ] ], 12, 2.2),   // shorts to mid-thigh, over the fuller quads
 			neck: () => loft3D([ [ -0.6, 1.6, 1.38, 1.5 ], [ 0.4, 1.42, 1.24, 1.3, -0.05 ], [ 1.4, 1.3, 1.16, 1.18, 0.05 ], [ 2.3, 1.18, 1.1, 1.1, 0.1 ], [ 2.5, 0.7, 0.7, 0.7, 0.1 ] ], 10, 2),   // a footballer's neck, not a stalk
-			head: () => {
-			// A skull that narrows to a jaw and a chin rather than an egg: below the cheekbones the sides
-			// draw in and the back of the head tucks under; the front keeps its line down to the chin.
-			const g = new T.SphereGeometry(2.15, 18, 14), P = g.attributes.position;
-			for (let i = 0; i < P.count; i++) {
-				const x = P.getX(i), y = P.getY(i), z = P.getZ(i), t = clamp(-y / 2.15, 0, 1), u = clamp((y + 0.3) / 1.5, 0, 1);
-				P.setXYZ(i, x * (x < 0 ? 1 - 0.22 * t : 1 + 0.03 * t), y, z * (1 - 0.3 * t * t) * (1 + 0.04 * (1 - u) * (1 - t)));
-			}
-			g.computeVertexNormals(); g.scale(0.96, 1.12, 0.94); g.translate(0.2, 2.25, 0); return g;
-		},
-		ear: () => { const g = new T.SphereGeometry(0.62, 8, 6); g.scale(0.55, 1.05, 0.38); g.translate(0.05, 2.3, 0); return g; },
-		nose: () => { const g = new T.ConeGeometry(0.42, 1.0, 6); g.rotateZ(-0.35); g.scale(0.85, 1, 0.9); g.translate(2.12, 1.86, 0); return g; },
+			head: () => sculpt3D(new T.SphereGeometry(1, 48, 36)),
+		ear: () => { const g = new T.SphereGeometry(0.58, 10, 8); g.scale(0.5, 1.0, 0.32); g.rotateZ(0.18); return g; },
+		nose: () => noseGeo3(),
 		tail: () => new T.SphereGeometry(1, 9, 7),
-			hair: () => { const g = new T.SphereGeometry(2.27, 14, 8, 0, Math.PI * 2, 0, 1.5); g.scale(0.97, 1.12, 0.95); g.rotateZ(0.46); g.translate(0.2, 2.3, 0); return g; },   // close to the skull (a crop, not a helmet), tilted: high at the brow, low at the nape
+			hair: () => sculpt3D(new T.SphereGeometry(1, 48, 36)),   // the skull's own surface; the hair shader lifts it by style
 			// Short sleeves over the shoulder (a rounded cap, the deltoid under it) ending in a cuff.
 			sleeve: () => loft3D([ [ 0.5, 0.3, 0.3, 0.3 ], [ 0.36, 0.9, 0.92, 0.92 ], [ 0.0, 1.2, 1.2, 1.2 ], [ -0.5, 1.28, 1.27, 1.27 ], [ -1.9, 1.22, 1.2, 1.2 ], [ -2.35, 1.18, 1.16, 1.16 ], [ -2.4, 0.85, 0.85, 0.85 ] ], 10, 2.0),   // a fitted sleeve: the cap no higher than the shoulder line, so no pads
 			// The captain's armband on the left upper arm, just below the sleeve.
@@ -281,13 +340,49 @@
 		const headMat = new T.MeshLambertMaterial({ color: 0xffffff, map: faceTex });
 		headMat.onBeforeCompile = sh => {
 			sh.vertexShader = sh.vertexShader
-				.replace("#include <common>", "#include <common>\nattribute float aFace;")
-				.replace("#include <uv_vertex>", "#include <uv_vertex>\nvMapUv = (uv + vec2(mod(aFace, 4.0), 3.0 - floor(aFace / 4.0))) / vec2(4.0, 4.0);");
+				.replace("#include <common>", "#include <common>\nattribute float aFace; attribute float aJaw; varying float vFaceD;")
+				.replace("#include <uv_vertex>", "#include <uv_vertex>\nvMapUv = (uv + vec2(mod(aFace, 4.0), 3.0 - floor(aFace / 4.0))) / vec2(4.0, 4.0);")
+				.replace("#include <begin_vertex>", "#include <begin_vertex>\ntransformed.z *= mix(1.0, aJaw, pow(clamp((2.25 - transformed.y) / 2.4, 0.0, 1.0), 2.0));")
+				.replace("#include <project_vertex>", "#include <project_vertex>\nvFaceD = -mvPosition.z;");
 			sh.fragmentShader = sh.fragmentShader
+				.replace("#include <common>", "#include <common>\nvarying float vFaceD;")
 				.replace("#include <map_fragment>", "")
-				.replace("#include <color_fragment>", "#include <color_fragment>\nvec4 fx = texture2D(map, vMapUv); diffuseColor.rgb = mix(diffuseColor.rgb, fx.rgb, fx.a);");
+				.replace("#include <color_fragment>", `#include <color_fragment>\nvec4 fx = texture2D(map, vMapUv); diffuseColor.rgb = mix(diffuseColor.rgb, fx.rgb, fx.a * (1.0 - smoothstep(${FACE_FADE3[0].toFixed(1)}, ${FACE_FADE3[1].toFixed(1)}, vFaceD)));`);
 		};
 		headMat.customProgramCacheKey = () => "ff-face";
+		// The hair: the skull's surface lifted along its normal by the style's thickness (aHairA: over the top,
+		// at the sides, over the brow, curl; aHairB: how far the hairline is raised), tapering to nothing at the
+		// hairline and dipping under the skin beyond it. A little strand-to-strand variation in the shade.
+		const hairMat = new T.MeshLambertMaterial({ color: 0xffffff });
+		hairMat.onBeforeCompile = sh => {
+			sh.vertexShader = sh.vertexShader
+				.replace("#include <common>", "#include <common>\nattribute vec3 aDir; attribute vec4 aHairA; attribute float aHairB; attribute float aJaw; varying vec3 vHd;")
+				.replace("#include <begin_vertex>", `#include <begin_vertex>
+					vec3 d = aDir;
+					// the hairline: high on the forehead, down to the top of the ear at the side (a narrow
+					// sideburn in front of it), low at the nape
+					float line = d.x > 0.0 ? mix(0.06, 0.5, pow(d.x, 0.85)) : mix(0.06, -0.46, pow(-d.x, 1.2));
+					float earZone = exp(-pow((d.x + 0.04) / 0.22, 2.0)) * smoothstep(0.55, 0.9, abs(d.z));
+					float burn = exp(-pow((d.x - 0.2) / 0.06, 2.0)) * smoothstep(0.6, 0.9, abs(d.z));
+					line = mix(line, 0.22, earZone);
+					line = mix(line, -0.12, burn) + aHairB;
+					vCov = d.y - line;
+					float body = smoothstep(0.0, 0.22, vCov);
+					float th = mix(aHairA.y, aHairA.x, smoothstep(0.05, 0.75, d.y));
+					th = mix(th, aHairA.z, smoothstep(0.25, 0.75, d.x) * smoothstep(0.25, 0.6, d.y));
+					th += aHairA.w * 0.1 * sin(d.x * 23.0) * sin(d.y * 21.0) * sin(d.z * 25.0);
+					transformed += objectNormal * (0.03 + max(th, 0.0) * body);
+					transformed.z *= mix(1.0, aJaw, pow(clamp((2.25 - transformed.y) / 2.4, 0.0, 1.0), 2.0));
+					vHd = d;`);
+			sh.vertexShader = sh.vertexShader.replace("varying vec3 vHd;", "varying vec3 vHd; varying float vCov;");
+			sh.fragmentShader = sh.fragmentShader
+				.replace("#include <common>", "#include <common>\nvarying vec3 vHd; varying float vCov; float ffHash (vec3 p) { return fract(sin(dot(floor(p), vec3(12.9898, 78.233, 37.719))) * 43758.5453); }")
+				.replace("#include <color_fragment>", `#include <color_fragment>
+					if (vCov < 0.035 * (ffHash(vHd * 140.0) - 0.35)) { discard; }   // a soft, slightly ragged hairline cut per pixel, never a triangle's edge
+					diffuseColor.rgb *= 0.84 + 0.16 * ffHash(vHd * vec3(70.0, 90.0, 70.0));
+					diffuseColor.rgb *= 0.86 + 0.14 * smoothstep(0.0, 0.12, vCov);   // thinner, darker at the line`);
+		};
+		hairMat.customProgramCacheKey = () => "ff-hair";
 		const parts = {}, white = new T.Color(1, 1, 1);
 		for (const name of Object.keys(defs)) {
 			const geo = defs[name], cap = MAXF3 * PER_FIG3[name];
@@ -296,8 +391,10 @@
 				g.setAttribute("aPat", new T.InstancedBufferAttribute(new Float32Array(cap), 1).setUsage(T.DynamicDrawUsage));
 				g.setAttribute("aCol2", new T.InstancedBufferAttribute(new Float32Array(cap * 3), 3).setUsage(T.DynamicDrawUsage));
 			}
-			if (name === "head") { g.setAttribute("aFace", new T.InstancedBufferAttribute(new Float32Array(cap), 1).setUsage(T.DynamicDrawUsage)); }
-			const m = new T.InstancedMesh(g, name === "torso" ? shirtMat : name === "head" ? headMat : plain, cap);
+			const ia = (n, k) => g.setAttribute(n, new T.InstancedBufferAttribute(new Float32Array(cap * k), k).setUsage(T.DynamicDrawUsage));
+			if (name === "head") { ia("aFace", 1); ia("aJaw", 1); }
+			if (name === "hair") { ia("aHairA", 4); ia("aHairB", 1); ia("aJaw", 1); }
+			const m = new T.InstancedMesh(g, name === "torso" ? shirtMat : name === "head" ? headMat : name === "hair" ? hairMat : plain, cap);
 			m.instanceMatrix.setUsage(T.DynamicDrawUsage);
 			m.setColorAt(0, white);   // so the colour buffer exists before the first frame
 			m.frustumCulled = false; m.count = 0;
@@ -697,7 +794,9 @@
 			r.spine.rotation.z = lerp3(r.spine.rotation.z, -0.3, hug); r.neck.rotation.z = lerp3(r.neck.rotation.z, 0.1, hug);
 			r.hips.position.y += b * 6 * hug;
 		} else if (cel > 0 && fall < 0) {
-			const w = cel * (1 - 0.4 * kneel), wave = Math.sin(idle * 3 + x * 0.01) * 0.25 * cel;
+			// Team-mates near him hold celebA at 0.7: that must still be arms up, not arms stuck out level at the
+			// shoulders, so the weight reaches 1 by then (the in-between only shows for a moment as they rise).
+			const w = clamp(cel * 1.5, 0, 1) * (1 - 0.4 * kneel), wave = Math.sin(idle * 3 + x * 0.01) * 0.25 * cel;
 			for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, -0.45 + wave * (i ? -1 : 1), w); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, OUT3(i) * (2.35 + 0.5 * kneel), w); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.3, w); }   // arms up and out wide, not crossed
 			r.neck.rotation.z = lerp3(r.neck.rotation.z, 0.35 * cel, cel);
 		}
@@ -740,21 +839,25 @@
 		if (F.n >= MAXF3) { return; }
 		F.n++;
 		rig.root.updateMatrixWorld(true);
-		if (!HM3) { HM3 = [ new THREE.Matrix4(), new THREE.Matrix4() ]; }
+		if (!HM3) { HM3 = [ new THREE.Matrix4(), new THREE.Matrix4(), new THREE.Matrix4() ]; }
+		// His head's own proportions (longer or rounder, a broader or narrower jaw), fixed by his look.
+		if (!lk.shape) { const h = hashStr(`${lk.skin}|${lk.hair}|${lk.style}|${lk.face}|${lk.name || ""}`), u = k => ((h >>> (k * 6)) % 41) / 40; lk.shape = [ 0.95 + 0.09 * u(0), 0.97 + 0.06 * u(1), 0.95 + 0.08 * u(2), 0.9 + 0.17 * u(3) ]; }
+		const HS = HM3[2].makeTranslation(HEAD_C3[0], HEAD_C3[1], 0).multiply(HM3[0].makeScale(lk.shape[0], lk.shape[1], lk.shape[2])).multiply(HM3[1].makeTranslation(-HEAD_C3[0], -HEAD_C3[1], 0));
+		const hairStyle = rig.shirtHead ? "afro" : HAIR_STYLES3[lk.style] ? lk.style : "short";
 		for (const [ name, joint, side ] of PART_PLAN3) {
 			const mesh = F.parts[name], node = side === undefined ? rig[joint] : rig[joint][side];
 			let mtx = node.matrixWorld;
 			if (name === "hair") {
-				const s = rig.shirtHead ? HAIR_SCALE3.afro : HAIR_SCALE3[lk.style] === undefined ? HAIR_SCALE3.short : HAIR_SCALE3[lk.style];
-				if (!s) { continue; }
-				// scaled about the middle of the head, so a big afro grows out all round rather than up
-				mtx = M.makeTranslation(0.2, 2.25, 0).multiply(HM3[0].makeScale(s[0], s[1], s[2])).multiply(HM3[1].makeTranslation(-0.2, -2.25, 0)).premultiply(node.matrixWorld);
+				if (hairStyle === "shaved") { continue; }
+				mtx = M.copy(HS).premultiply(node.matrixWorld);
+			} else if (name === "head" || name === "nose") {
+				mtx = M.copy(HS).premultiply(node.matrixWorld);
 			} else if (name === "tail") {
-				const t = TAIL3[lk.style];
+				const t = rig.shirtHead ? null : TAIL3[lk.style];
 				if (!t) { continue; }
-				mtx = M.makeTranslation(t[0], t[1], t[2]).multiply(HM3[0].makeScale(t[3], t[4], t[5])).premultiply(node.matrixWorld);
+				mtx = M.makeTranslation(t[0], t[1], t[2]).multiply(HM3[0].makeScale(t[3], t[4], t[5])).premultiply(HS).premultiply(node.matrixWorld);
 			} else if (name === "ear") {
-				mtx = M.makeTranslation(0.05, 0, F.cnt.ear % 2 ? 1.92 : -1.92).premultiply(node.matrixWorld);
+				mtx = M.makeTranslation(EAR3[0], EAR3[1], F.cnt.ear % 2 ? EAR3[2] : -EAR3[2]).premultiply(HS).premultiply(node.matrixWorld);
 			} else if (name === "hand" && kit.gloves) { mtx = M.makeScale(1.45, 1.3, 1.5).premultiply(node.matrixWorld); }
 			if (name === "cuff" && kit.sleeves) { continue; }   // long sleeves have no cuff at the biceps
 			if (name === "armband" && !kit.captain) { continue; }
@@ -771,7 +874,8 @@
 			if (name === "torso") {
 				const g = mesh.geometry, pat = g.attributes.aPat, c2 = g.attributes.aCol2;
 				pat.setX(k, kit.pattern); C.set(kit.second); c2.setXYZ(k, C.r, C.g, C.b);
-			} else if (name === "head") { mesh.geometry.attributes.aFace.setX(k, ((lk.face || 0) % 8 + 8) % 8 + ((rig.cel || 0) > 0.3 ? 8 : 0)); }   // celebrating: the open-mouthed face
+			} else if (name === "head") { const ga = mesh.geometry.attributes; ga.aFace.setX(k, ((lk.face || 0) % 8 + 8) % 8 + ((rig.cel || 0) > 0.3 ? 8 : 0)); ga.aJaw.setX(k, lk.shape[3]); }
+			else if (name === "hair") { const ga = mesh.geometry.attributes, hs = HAIR_STYLES3[hairStyle]; ga.aHairA.setXYZW(k, hs[0], hs[1], hs[2], hs[3]); ga.aHairB.setX(k, hs[4]); ga.aJaw.setX(k, lk.shape[3]); }   // celebrating: the open-mouthed face
 		}
 		const V = F.V.setFromMatrixPosition(rig.root.matrixWorld), x = V.x, z = V.z, air = Math.max(0, V.y);
 		const [ sux, suz ] = sunDir3D();

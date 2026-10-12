@@ -137,7 +137,7 @@
 			m.count = F.cnt[k]; m.instanceMatrix.needsUpdate = true;
 			if (m.instanceColor) { m.instanceColor.needsUpdate = true; }
 		}
-		F.parts.head.geometry.attributes.aFace.needsUpdate = true;
+		{ const ha = F.parts.head.geometry.attributes, hr = F.parts.hair.geometry.attributes; ha.aFace.needsUpdate = true; ha.aJaw.needsUpdate = true; hr.aHairA.needsUpdate = true; hr.aHairB.needsUpdate = true; hr.aJaw.needsUpdate = true; }
 		const tg = F.parts.torso.geometry;
 		tg.attributes.aPat.needsUpdate = true; tg.attributes.aCol2.needsUpdate = true;
 		for (const m of [ F.nums, F.rings, F.blobs, F.longs ]) { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) { m.instanceColor.needsUpdate = true; } }
