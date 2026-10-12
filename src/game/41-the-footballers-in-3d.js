@@ -633,7 +633,7 @@
 		// Standing, nobody stands to attention: weight on one leg (hips over it, the other knee eased
 		// and that hip dropped, the shoulders tilted back against it), a slight turn, his own elbow bend,
 		// breathing. Run out of legs and he stands bent over with his hands on his knees.
-		const acting = p.kickA > 0 || thr >= 0 || jump > 0 || down || dive >= 0 || fall >= 0 || cel > 0;
+		const acting = p.kickA > 0 || p.windUp > 0 || thr >= 0 || jump > 0 || down || dive >= 0 || fall >= 0 || cel > 0;
 		const still = rm || acting ? 0 : clamp(1 - a * 5, 0, 1) * (1 - shuf);
 		if (still > 0 && !gk) {
 			const sd = p.build ? p.build.seed : 0.5, side = sd < 0.5 ? 0 : 1, sgn = side ? 1 : -1, free = 1 - side;

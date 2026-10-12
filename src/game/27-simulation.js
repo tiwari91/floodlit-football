@@ -135,6 +135,7 @@
 	}
 
 	function update () {
+		windUpBegin();   // a kick from a key press since the last frame
 		frame++;
 		stepReplay();
 		for (const p of players) { if (p.fall > 0) { p.fall--; } if (p.dive > 0) { p.dive--; } if (p.diveCd > 0) { p.diveCd--; } if (p.throwA > 0) { p.throwA--; } }
@@ -246,7 +247,7 @@
 			receiveTimer--;
 			// A pass that has died stays his to fetch while he is the nearest of yours to it.
 			const dead = Math.hypot(ball.vx, ball.vy) < 1, nearest = dead && outfield(0).every(q => q === receiver || dist(q, ball) > dist(receiver, ball));
-			if (ball.owner || receiveTimer <= 0 || (dead && !nearest)) { receiver = null; }
+			if ((ball.owner && !(ball.owner.windUp > 0)) || receiveTimer <= 0 || (dead && !nearest)) { receiver = null; }
 		}
 		// Once your keeper has played it, control leaves him at once: you never run him out of goal by accident.
 		if (human().role === "gk" && ball.owner !== human() && !receiver) {
@@ -340,6 +341,7 @@
 			if (p.kickCd > 0) { p.kickCd--; }
 			if (p.jump > 0) { p.jump--; }
 			if (p.lungeCd > 0) { p.lungeCd--; }
+			if (p.windUp > 0 && !windUpStep(p)) { continue; }
 			const isHuman = p.team === 0 && players.indexOf(p) === ctrl && !autoPilot;
 			// Only the player you control slides; leftovers would fire when you next control them.
 			if (!isHuman || p === receiver) { p.lunge = 0; }
@@ -575,6 +577,7 @@
 		}
 		stepLimbs();
 		keepClear();
+		windUpBegin();
 		syncOwnedBall();
 		stepBall();
 		contest();

@@ -161,6 +161,10 @@
 	// The kicking leg: back, through the ball, and a follow-through that's bigger on a shot.
 	const KICK_T = 16;
 	function kickSwing (p) {
+		if (p.windUp > 0) {   // the wind-up: the leg drawn back and the knee folding, over the planted foot
+			const w = 1 - (p.windUp - 1) / Math.max(1, p.windN), e = w * w * (3 - 2 * w), pow = p.kickPow || 0.5;
+			return { s: 0.1 - (0.45 + 0.5 * pow) * e, bend: 0.2 + 0.9 * e, wind: e };
+		}
 		if (!(p.kickA > 0)) { return null; }
 		const t = 1 - p.kickA / KICK_T, pow = p.kickPow || 0.5;
 		// The ball has already gone when kickA is set, so the swing starts at contact (the foot through the
@@ -171,8 +175,41 @@
 		return { s, bend: t < 0.4 ? 0.3 * (1 - up) + 0.08 : 0.08 + 0.35 * Math.max(0, t - 0.55) };
 	}
 
+	// The wind-up. The decision to kick is taken (and the ball's flight worked out, curl, lift and all) in
+	// one go, but the ball stays at his feet a few frames while he plants and swings the leg back: the
+	// flight is kept and let go on the strike. Longer for a harder kick, one frame for a first-time ball,
+	// at most five for yours so the keys never feel slow. A tackle in the meantime takes the ball as usual.
+	let windPending = null;
+	const WIND_SKIP = new Set([ "owner" ]);
+	function windUpBegin () {
+		const w = windPending; windPending = null;
+		if (!w) { return; }
+		const p = w.p;
+		if (ball.owner || ball.lastBy !== p || p.throwA > 0 || ball.pen || ball.headed || !players.includes(p)) { sfx(...w.sound); return; }
+		const first = frame - (p.gotAt || -99) < 12, pw = p.kickPow || 0.5, mine = p.team === 0 && players.indexOf(p) === ctrl;
+		const n = first ? 1 : p.team === 0 && (mine || receiver) ? Math.min(5, 2 + Math.round(3 * pw)) : 2 + Math.round(3 * pw);
+		const snap = {};
+		for (const k of Object.keys(ball)) { if (!WIND_SKIP.has(k)) { snap[k] = ball[k]; } }
+		p.windSnap = snap; p.windSound = w.sound; p.windUp = n; p.windN = n; p.kickA = 0;
+		ball.owner = p; ball.vx = ball.vy = ball.vz = 0; ball.z = 0; ball.shot = false;
+		if (receiver) { receiveTimer += n; }
+	}
+	// Called each frame for a man winding up: false while he still is (he slows and holds his line), true
+	// once the ball has gone (or been taken off him).
+	function windUpStep (p) {
+		if (ball.owner !== p || state !== "play") { p.windUp = 0; p.windSnap = null; return true; }
+		if (--p.windUp > 0) { movePlayer(p, 0, 0, cond.grip, ACC_AI, 0.85); return false; }
+		const s = p.windSnap, bx = ball.x, by = ball.y;
+		p.windSnap = null;
+		Object.assign(ball, s);
+		ball.owner = null; ball.x = bx; ball.y = by; ball.kickedAt = frame;
+		p.kickA = KICK_T; p.kickCd = Math.max(p.kickCd, 12);
+		sfx(...p.windSound);
+		return true;
+	}
 	function kick (p, tx, ty, speed, snd = "kick") {
 		p.kickLoft = false;   // loftTo, the chip and the lifted shot set it after: he leans back under those
+		const owned = ball.owner === p;
 		lastTouch = p.team;
 		markOffside(p);
 		if (p.team === 1) { switchCd = 0; }
@@ -197,7 +234,9 @@
 		p.kickCd = 20;
 		p.dir = Math.atan2(dy, dx);
 		if (!(p.jump > 0)) { p.kickA = KICK_T; p.kickPow = clamp((speed - 5) / 9, 0.25, 1); }
-		sfx(snd, { pow: clamp((speed - 4) / 12, 0, 1), x: ball.x, y: ball.y });
+		const sound = [ snd, { pow: clamp((speed - 4) / 12, 0, 1), x: ball.x, y: ball.y } ];
+		// A kick from the feet in open play gets a wind-up (see windUpBegin): the strike, and its sound, a few frames on.
+		if (owned && !(p.jump > 0) && p.role !== "gk" && state === "play" && !replayOn()) { windPending = { p, sound }; } else { sfx(...sound); }
 	}
 
 	function passTo (p, m) {
