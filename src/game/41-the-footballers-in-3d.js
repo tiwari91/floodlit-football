@@ -659,6 +659,7 @@
 		// instead fly to the corner like an aeroplane, pump his fist, or kiss the badge; team-mates who
 		// reach him hug him.
 		const ck = p.celebK | 0, hug = clamp(p.hug || 0, 0, 1) * cel;
+		r.shirtHead = ck === 6 && cel > 0.5 && fall < 0;
 		if (cel > 0 && fall < 0 && ck === 2) {
 			const w = cel, bank = rm ? 0 : Math.sin(idle * 1.6) * 0.22 * a;
 			for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 0.15, w); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, OUT3(i) * (1.45 + (i ? 1 : -1) * bank * 0.6), w); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.12, w); }   // wings out
@@ -677,6 +678,13 @@
 			r.sh[0].rotation.z = lerp3(r.sh[0].rotation.z, -1.25, w); r.sh[0].rotation.x = lerp3(r.sh[0].rotation.x, 0.35, w); r.el[0].rotation.z = lerp3(r.el[0].rotation.z, 2.3, w);
 			r.sh[1].rotation.z = lerp3(r.sh[1].rotation.z, -2.55 + pt, w); r.sh[1].rotation.x = lerp3(r.sh[1].rotation.x, 0.45, w); r.el[1].rotation.z = lerp3(r.el[1].rotation.z, 0.1, w);
 			r.neck.rotation.z = lerp3(r.neck.rotation.z, -0.3, w); r.spine.rotation.z = lerp3(r.spine.rotation.z, -0.08, w);
+		} else if (cel > 0 && fall < 0 && ck === 6) {
+			// The shirt pulled up over his head: both hands up at the crown holding it, elbows high and wide.
+			// Found by search on the rig: the arm raised out to the side (OUT3 on x), turned (OUT3 on y) so the
+			// elbow bends the forearm in over the head; hands 2.3 over the head, in front of the face, elbows 2.7 out.
+			const w = cel;
+			for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 0.2, w); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, OUT3(i) * 2.4, w); r.sh[i].rotation.y = lerp3(r.sh[i].rotation.y, OUT3(i) * 1.3, w); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 2.0, w); }
+			r.neck.rotation.z = lerp3(r.neck.rotation.z, -0.2, w);
 		} else if (cel > 0 && fall < 0 && ck === 5) {
 			// A brace or a hat-trick: both arms straight up, pointing to the sky, head back.
 			const w = cel, pt = rm ? 0 : Math.sin(idle * 1.5) * 0.06;
@@ -737,7 +745,7 @@
 			const mesh = F.parts[name], node = side === undefined ? rig[joint] : rig[joint][side];
 			let mtx = node.matrixWorld;
 			if (name === "hair") {
-				const s = HAIR_SCALE3[lk.style] === undefined ? HAIR_SCALE3.short : HAIR_SCALE3[lk.style];
+				const s = rig.shirtHead ? HAIR_SCALE3.afro : HAIR_SCALE3[lk.style] === undefined ? HAIR_SCALE3.short : HAIR_SCALE3[lk.style];
 				if (!s) { continue; }
 				// scaled about the middle of the head, so a big afro grows out all round rather than up
 				mtx = M.makeTranslation(0.2, 2.25, 0).multiply(HM3[0].makeScale(s[0], s[1], s[2])).multiply(HM3[1].makeTranslation(-0.2, -2.25, 0)).premultiply(node.matrixWorld);
@@ -754,7 +762,8 @@
 			if (k >= mesh.instanceMatrix.count) { F.cnt[name]--; continue; }   // never past the buffer
 			mesh.setMatrixAt(k, mtx);
 			if (name === "armband") { mesh.setColorAt(k, C.set(deltaE(kit.shirt, "#f4f1e6") < 25 ? "#1d2330" : "#f4f1e6")); continue; }   // white, or dark on a white shirt
-			const c = name === "torso" || name === "sleeve" || ((name === "upperArm" || name === "foreArm") && kit.sleeves) ? kit.shirt
+			const sh = rig.shirtHead && (name === "torso" || name === "collar") ? lk.skin : rig.shirtHead && (name === "head" || name === "hair" || name === "ear") ? kit.shirt : null;   // shirt over his head: bare chest, the shirt bunched round his head
+			const c = sh ? sh : name === "torso" || name === "sleeve" || ((name === "upperArm" || name === "foreArm") && kit.sleeves) ? kit.shirt
 				: name === "collar" || name === "cuff" || name === "band" ? trim3D(kit) : name === "sole" ? (lum(kit.boots) > 0.5 ? "#26292c" : "#e4e6e8")
 				: name === "shorts" || name === "shortLeg" ? kit.shorts : name === "shin" ? kit.socks : name === "boot" ? kit.boots
 				: name === "hair" || name === "tail" ? lk.hair : name === "hand" && kit.gloves ? kit.gloves : lk.skin;

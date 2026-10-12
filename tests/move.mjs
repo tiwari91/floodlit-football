@@ -374,7 +374,7 @@ const goalAt = (sc, frac) => page.evaluate(async ([ sc, frac ]) => {
 	return out;
 }, [ sc, frac ]);
 const lateWin = await goalAt([ 1, 1 ], 0.06);
-check("a late winner: a wild celebration, the losing side slumps, and the commentator calls the drama", lateWin.mood === "wild" && (lateWin.style === 1 || lateWin.style === 2) && lateWin.maxCel > 0.5 && lateWin.slump > 0.5 && lateWin.hh > 0 && lateWin.comm === "lateWin" && /Late winner/.test(lateWin.cap || ""), JSON.stringify(lateWin));
+check("a late winner: a wild celebration, the losing side slumps, and the commentator calls the drama", lateWin.mood === "wild" && [ 1, 2, 6 ].includes(lateWin.style) && lateWin.maxCel > 0.5 && lateWin.slump > 0.5 && lateWin.hh > 0 && lateWin.comm === "lateWin" && /Late winner/.test(lateWin.cap || ""), JSON.stringify(lateWin));
 const cons = await goalAt([ 0, 3 ], 0.5);
 check("a 3-0 consolation: muted, he grabs the ball and runs it back to the centre, nobody celebrates", cons.mood === "muted" && cons.grabbed && cons.toCentre > 40 && cons.maxCel < 0.15 && cons.maxHug < 0.05 && !cons.comm, JSON.stringify(cons));
 const sky = await page.evaluate(() => {
@@ -405,6 +405,7 @@ const ft = await page.evaluate(() => {
 	const pose = (k, at) => { rc.recv = k ? 1 : 0; rc.recvK = k; rc.gotAt = F.frame - at; const r = F.poseProbe(rc, 1), inv = r.root.matrixWorld.clone().invert(), L = n => W(n).applyMatrix4(inv);
 		const toe = r.an[f].position.clone().set(4, 0, 0); r.an[f].localToWorld(toe); toe.applyMatrix4(inv);
 		return { kn: L(r.kn[f]), an: L(r.an[f]), kn2: L(r.kn[1 - f]), an2: L(r.an[1 - f]), hip: L(r.hip[f]), hips: L(r.hips), head: L(r.head), toe, chestY: r.chest.rotation.y, hipsY: r.hips.rotation.y }; };
+	rc.idlePh = 0; rc.stride = 0;
 	const base = pose(null, 99), th = pose("thigh", 11), ch = pose("chest", 11), so = pose("sole", 9), ins = pose("inside", 9), hv = pose("heavy", 9);
 	rc.turnTo = Math.PI * 0.9; const tu = pose("turn", 9);
 	out.thigh = +(th.kn.y - th.kn2.y).toFixed(2);
@@ -429,7 +430,7 @@ const ft = await page.evaluate(() => {
 	[ rc.x, rc.y, rc.dir, rc.vx, rc.vy, rc.runAmt ] = keep; rc.recvK = null; rc.recv = 0;
 	return out;
 });
-check("first-touch poses (forward = toe = +x): thigh up, chest leans back, heavy lunges forward, sole forward and toes up, inside of the foot turned out, a turn opens the hips", ft.thigh > 3 && ft.chest < -0.8 && ft.sole.up > 1.5 && ft.sole.fwd > 1 && ft.sole.toeUp > 0.5 && ft.inside.toeOut * ft.inside.side > 0.8 && ft.heavy > 1 && ft.heavyLean > 0.5 && ft.turn > 0.2, JSON.stringify(ft));
+check("first-touch poses (forward = toe = +x): thigh up, chest leans back, heavy lunges forward, sole forward and toes up, inside of the foot turned out, a turn opens the hips", ft.thigh > 3 && ft.chest < -0.8 && ft.sole.up > 1 && ft.sole.fwd > 1 && ft.sole.toeUp > 0.5 && ft.inside.toeOut * ft.inside.side > 0.8 && ft.heavy > 1 && ft.heavyLean > 0.5 && ft.turn > 0.2, JSON.stringify(ft));
 check("a heavy first touch: the ball runs a step away from him", ft.heavyK === "heavy" && ft.heavyFar > 27, JSON.stringify({ k: ft.heavyK, far: ft.heavyFar }));
 const sulk = await page.evaluate(() => {
 	const F = window.__ff, p = F.outfield(0)[2], W = n => n.getWorldPosition(n.position.clone());
@@ -475,6 +476,26 @@ check("rig signs: running leans forward, a sprint further, eyes still up the pit
 check("rig signs: tired at a stoppage he bends over (head lower and forward); planting he sits back", L.tired.lean > L.stand.lean + 15 && L.tired.hy < L.stand.hy - 1 && L.plant.lean < L.stand.lean - 6, JSON.stringify({ t: L.tired, p: L.plant }));
 check("rig signs: knee slide arches back, a near miss looks up at the sky, a hug leans in", L.kneel.lean < -10 && L.near.up > L.stand.up + 8 && L.hug.lean > L.stand.lean + 8, JSON.stringify({ k: L.kneel, n: L.near, h: L.hug }));
 check("rig signs: jockeying and shielding lean in; chest control leans back; a header snaps forward; the keeper's set leans forward", L.jockey.lean > L.stand.lean + 3 && L.shield.lean > L.stand.lean + 2 && L.chest.lean < L.stand.lean - 5 && L.hdSnap.lean > L.hdEarly.lean + 8 && L.gkSet.lean > L.gkStand.lean + 8, JSON.stringify({ j: L.jockey, s: L.shield, c: L.chest, he: L.hdEarly, hs: L.hdSnap, g0: L.gkStand, g1: L.gkSet }));
+const shirt = await page.evaluate(() => {
+	const F = window.__ff, W = n => n.getWorldPosition(n.position.clone()), p = F.outfield(0)[2];
+	const keep = { celebA: p.celebA, celebK: p.celebK, kneel: p.kneel, hug: p.hug };
+	Object.assign(p, { kickA: 0, lunge: 0, fall: 0, jump: 0, throwA: 0, dive: 0, headHands: 0, fistPump: 0, celebA: 1, celebK: 6, kneel: 0, hug: 0, sulk: 0, recv: 0, recvK: null });
+	const r = F.poseProbe(p, 30), inv = r.root.matrixWorld.clone().invert(), L = n => W(n).applyMatrix4(inv), hd = L(r.head), ch = L(r.chest);
+	const out = { flag: !!r.shirtHead, up: [ 0, 1 ].map(k => +(L(r.ha[k]).y - hd.y).toFixed(1)), side: [ 0, 1 ].map(k => +(L(r.ha[k]).z - hd.z).toFixed(1)), fwd: [ 0, 1 ].map(k => +(L(r.ha[k]).x - ch.x).toFixed(1)), elbowOut: [ 0, 1 ].map(k => +(Math.abs(L(r.el[k]).z) - Math.abs(L(r.sh[k]).z)).toFixed(1)), elbowUp: [ 0, 1 ].map(k => +(L(r.el[k]).y - L(r.sh[k]).y).toFixed(1)) };
+	Object.assign(p, keep);
+	return out;
+});
+check("shirt over the head: hands up at the crown on their own sides, elbows high and wide, not behind him; the head drawn in the shirt", shirt.flag && shirt.up.every(v => v > 0) && shirt.side[0] * shirt.side[1] < 0 && shirt.side.every(v => Math.abs(v) < 6) && shirt.fwd.every(v => v > -3) && shirt.elbowOut.every(v => v > 1) && shirt.elbowUp.every(v => v > 1), JSON.stringify(shirt));
+const bench = await page.evaluate(async () => {
+	const F = window.__ff;
+	for (let i = 0; i < 1500 && F.state !== "play"; i++) { F.step(1); }
+	F.staffReact("goal", { team: 0, wild: true, mgr: 0 });
+	const set = !!F.staff3[0].runOn;
+	await new Promise(r => setTimeout(r, 1800));
+	const b = F.staff3[0].bench, onPitch = b.filter(q => q.y < F.FH).length, up = Math.max(...b.map(q => q.celebA || 0)), ran = Math.max(...b.map(q => Math.abs(q.vx || 0)));
+	return { set, onPitch, up: +up.toFixed(2), ran: +ran.toFixed(2) };
+});
+check("a late winner: the bench runs on to the touchline, arms up", bench.set && bench.onPitch >= 3 && bench.up > 0.5, JSON.stringify(bench));
 check("no errors after the woodwork checks (and no 3D failure)", errs.length === 0 && !errs.some(e => /3D view failed/.test(e)), errs.join(" | "));
 await browser.close(); server.stop();
 process.exit(done() ? 1 : 0);

@@ -671,7 +671,7 @@
 	// the same twice running). sulk: how hard it hits the side that conceded.
 	function celebPlan (ctx, rnd = Math.random) {
 		const late = ctx.minute >= 80, swings = ctx.diff === 0 || ctx.diff === -1;
-		if (late && swings) { return { mood: "wild", style: rnd() < 0.6 ? 1 : 2, run: 420, mgr: 0.85, comm: ctx.diff === 0 ? "lateWin" : "lateEq", sulk: "costly" }; }
+		if (late && swings) { const u = rnd(); return { mood: "wild", style: u < 0.45 ? 1 : u < 0.75 ? 2 : 6, run: 420, mgr: 0.85, comm: ctx.diff === 0 ? "lateWin" : "lateEq", sulk: "costly" }; }
 		if (ctx.diff <= -2) { return { mood: "muted", style: 0, run: 0, mgr: 0, comm: null, sulk: "light" }; }
 		if (!ctx.own && ctx.goals >= 2) { return { mood: "special", style: ctx.goals >= 3 || rnd() < 0.5 ? 5 : 4, run: 200, mgr: 0.45, comm: ctx.goals === 3 ? "hattrick" : null, sulk: "normal" }; }
 		return { mood: ctx.diff === 0 && ctx.first ? "opener" : "standard", style: 0, run: 0, mgr: 0.3, comm: null, sulk: "normal" };
@@ -709,7 +709,7 @@
 						[ tx, ty ] = C.target; spd = BASE_SPD; acc = 0.14;
 						if (Math.hypot(tx - p.x, ty - p.y) < 40 || T > 140) { C.posedAt = T; if (sc === homeSide) { roar(0.6); } }
 					}
-					p.celebK = C.posedAt < 0 && C.style !== 2 ? 0 : C.style;
+					p.celebK = C.posedAt < 0 && C.style !== 2 && C.style !== 6 ? 0 : C.style;   // the aeroplane and the shirt over the head are run, the rest are struck on arrival
 				} else if (kneeling) {
 					// Sliding on his knees: he carries his pace into the slide and it bleeds away.
 					p.vx *= 0.955; p.vy *= 0.955;

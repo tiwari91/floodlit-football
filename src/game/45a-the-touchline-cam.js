@@ -191,6 +191,8 @@
 			// Now and then the manager loses it, Mourinho at Old Trafford: out of his area and away down
 			// the touchline at full tilt, fists going, sliding on his knees at the end of it.
 			if ((o.force || Math.random() < (o.mgr ?? (o.wild ? 0.85 : o.muted ? 0 : 0.3))) && !reduceMotion && !bulkSim) { staff3[o.team].sprint = { t0: now, dir: 0 }; staff3[o.team].g = ""; }
+			// A late winner or equaliser: the substitutes and the coach come off the bench and race down the touchline too.
+			if (o.wild && (o.team === 0 || o.team === 1) && !reduceMotion && !bulkSim) { staff3[o.team].runOn = { t0: now, dir: 0 }; }
 		}
 		else if (kind === "near") { set(o.team, Math.random() < 0.6 ? "head" : "clap", 2200); }
 		else if (kind === "foul") { set(o.fouled, "protest", 2400); }
@@ -260,13 +262,32 @@
 				else { for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = 0.25; r.sh[i].rotation.x = (i ? 1 : -1) * 0.25; r.el[i].rotation.z = 1.35; } }   // hands behind his back
 				commitFigure3D(r, sf.look[0], staffKit(t, "mgr"), null);
 			}
+			// The bench running on: out of the dugout, over the line and away down the touchline towards the
+			// end the goal went in at, arms up, then back to their seats.
+			const ro = sf.runOn, re = ro ? (now - ro.t0) / 1000 : -1;
+			if (ro && re > 7.5) { sf.runOn = null; }
+			sf.bench.forEach((q, i) => {
+				const hx = cx + (i - 1.5) * Math.min(26, dw / 5), hy = FH + F_SIDE3 + 5;
+				if (!sf.runOn) { q.x = hx; q.y = hy; q.vx = q.vy = 0; q.celebA = 0; q.running = false; return; }
+				if (!ro.dir) { ro.dir = bx > cx ? 1 : -1; }
+				const out = re < 3.8, tx = out ? hx + ro.dir * (70 + 28 * i) * Math.min(1, re / 2.4) : hx, ty = out ? FH - 8 - 7 * i : hy;
+				const dx = tx - q.x, dy = ty - q.y, d = Math.hypot(dx, dy), v = d > 2 ? Math.min(out ? 2.7 : 1.6, d / 8) : 0;
+				q.vx += ((d ? dx / d * v : 0) - q.vx) * Math.min(1, 0.18 * dt); q.vy += ((d ? dy / d * v : 0) - q.vy) * Math.min(1, 0.18 * dt);
+				q.x += q.vx * dt; q.y += q.vy * dt;
+				q.runAmt = (q.runAmt || 0) + (Math.min(1, Math.hypot(q.vx, q.vy) / 2.6) - (q.runAmt || 0)) * Math.min(1, 0.12 * dt);
+				q.stride = (q.stride || 0) + Math.PI * 2 * (0.95 + 0.5 * Math.hypot(q.vx, q.vy)) / 60 * clamp(Math.hypot(q.vx, q.vy) / 0.4, 0, 1) * dt;
+				q.celebA = out ? Math.min(1, (q.celebA || 0) + 0.06 * dt) : Math.max(0, (q.celebA || 0) - 0.04 * dt);
+				q.dir = Math.hypot(q.vx, q.vy) > 0.3 ? Math.atan2(q.vy, q.vx) : -Math.PI / 2;
+				q.running = re < 6.5 || d > 4;
+			});
 			// The bench: only drawn when the dugouts are (the camera is not in the near stand).
 			if (!G3.showNear) { continue; }
 			const upAmt = now < sf.up ? 1 : 0;
 			sf.bench.forEach((q, i) => {
 				if (F.n >= MAXF3) { return; }
 				const r = F.rigs[F.n];
-				q.x = cx + (i - 1.5) * Math.min(26, dw / 5); q.y = FH + F_SIDE3 + 5; q.idlePh += 0.028 * dt;
+				if (q.running) { pose3D(r, q, q.x, q.y, q.dir, 0, 0); commitFigure3D(r, sf.look[i + 1], staffKit(t, i === 3 ? "coach" : "sub"), null); return; }
+				q.idlePh += 0.028 * dt;
 				q.st = (q.st || 0) + (upAmt - (q.st || 0)) * Math.min(1, (upAmt ? 0.12 : 0.04) * dt);
 				const st = q.st, ph = rm ? 0 : q.idlePh;
 				pose3D(r, q, q.x, q.y, -Math.PI / 2, 0, 0);
