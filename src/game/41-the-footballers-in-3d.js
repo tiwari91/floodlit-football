@@ -654,6 +654,11 @@
 			r.sh[0].rotation.z = lerp3(r.sh[0].rotation.z, -1.25, w); r.sh[0].rotation.x = lerp3(r.sh[0].rotation.x, 0.35, w); r.el[0].rotation.z = lerp3(r.el[0].rotation.z, 2.3, w);
 			r.sh[1].rotation.z = lerp3(r.sh[1].rotation.z, -2.55 + pt, w); r.sh[1].rotation.x = lerp3(r.sh[1].rotation.x, 0.45, w); r.el[1].rotation.z = lerp3(r.el[1].rotation.z, 0.1, w);
 			r.neck.rotation.z = lerp3(r.neck.rotation.z, 0.3, w); r.spine.rotation.z = lerp3(r.spine.rotation.z, 0.08, w);
+		} else if (cel > 0 && fall < 0 && ck === 5) {
+			// A brace or a hat-trick: both arms straight up, pointing to the sky, head back.
+			const w = cel, pt = rm ? 0 : Math.sin(idle * 1.5) * 0.06;
+			for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 2.85 + pt * (i ? 1 : -1), w); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, OUT3(i) * 0.3, w); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.15, w); }   // forward through to overhead, a little out
+			r.neck.rotation.z = lerp3(r.neck.rotation.z, -0.5, w); r.spine.rotation.z = lerp3(r.spine.rotation.z, -0.12, w);
 		} else if (hug > 0.02 && fall < 0) {
 			// The hug: arms forward and round him, leaning in, a little bounce.
 			const b = rm ? 0 : Math.sin(idle * 6 + x * 0.02) * 0.08;

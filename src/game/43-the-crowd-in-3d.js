@@ -345,7 +345,7 @@
 	function ev3d (kind, data) {
 		const m = crowdMood, homeFans = homeSide;
 		if (kind === "goal") {
-			if (data) { staffReact("goal", { team: data.scorer }); }
+			if (data) { staffReact("goal", { team: data.scorer, wild: data.wild, muted: data.muted, mgr: data.mgr }); }
 			if (data && data.scorer === homeFans) { m.home = 1; m.away = -1; m.wave = 1; throwTape3D(); } else { m.away = 1; m.home = -1; }
 			m.ooh = 0;
 		} else if (kind === "near" || kind === "ooh") { m.ooh = 1; m.excite = Math.min(1, m.excite + 0.35); }

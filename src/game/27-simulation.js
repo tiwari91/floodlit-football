@@ -656,12 +656,32 @@
 	// with their heads down while their keeper fetches the ball out of the net. Then everyone jogs
 	// back for the restart. Seven seconds, or any key or tap to get on with it.
 	let celeb = null, lastCelebStyle = 0;
+	// How the scorer's side celebrates depends on what the goal means. Pure, so the tests can ask it.
+	// ctx: minute, diff (the scorer's side's goal difference before this goal), goals (his goals this
+	// match, this one included), own (an own goal). Moods: "wild" for a late winner or equaliser (a long
+	// sprint to the corner and a slide, the keeper and everyone else piling on, the manager away down the
+	// touchline), "muted" for a consolation when two or more down (he grabs the ball out of the net and
+	// runs it back to the centre circle; nobody celebrates), "special" for a brace or a hat-trick (he
+	// stops and points both arms to the sky), otherwise "opener" or "standard" (one of the four, never
+	// the same twice running). sulk: how hard it hits the side that conceded.
+	function celebPlan (ctx, rnd = Math.random) {
+		const late = ctx.minute >= 80, swings = ctx.diff === 0 || ctx.diff === -1;
+		if (late && swings) { return { mood: "wild", style: rnd() < 0.6 ? 1 : 2, run: 420, mgr: 0.85, comm: ctx.diff === 0 ? "lateWin" : "lateEq", sulk: "costly" }; }
+		if (ctx.diff <= -2) { return { mood: "muted", style: 0, run: 0, mgr: 0, comm: null, sulk: "light" }; }
+		if (!ctx.own && ctx.goals >= 2) { return { mood: "special", style: ctx.goals >= 3 || rnd() < 0.5 ? 5 : 4, run: 200, mgr: 0.45, comm: ctx.goals === 3 ? "hattrick" : null, sulk: "normal" }; }
+		return { mood: ctx.diff === 0 && ctx.first ? "opener" : "standard", style: 0, run: 0, mgr: 0.3, comm: null, sulk: "normal" };
+	}
 	const celebTracking = () => state === "goal" && celeb && celeb.t > 45 && !replayOn();   // the camera is on the scorer
 	function celebrate () {
 		const C = celeb;
 		if (!C) { return; }
 		C.t++;
-		const T = C.t, hero = C.hero, sc = lastScorer;
+		const T = C.t, hero = C.hero, sc = lastScorer, mood = C.mood || "standard", muted = mood === "muted", wild = mood === "wild";
+		// The late drama gets a line from the commentator once the goal caption has gone (and not over the replay).
+		if (C.comm && !C.commDone && T > 20 && T < 900 && !replayOn()) {
+			const lt = $("lowerThird");
+			if (!lt || lt.hidden) { C.commDone = moment(C.comm, hero, { priority: true }) || T > 880; }
+		}
 		const kneeling = C.kneelAt >= 0 && T - C.kneelAt < 70;
 		if (C.kneelAt >= 0 && T === C.kneelAt + 1 && sc === homeSide) { roar(0.7); }   // the slide brings the fans up again
 		const home = T > 300 + (C.rp || 0);   // back for the restart (later when there is a replay first)
@@ -669,7 +689,14 @@
 			let tx = p.x, ty = p.y, spd = 0, acc = ACC_AI;
 			const scored = p.team === sc;
 			if (p === hero) {
-				if (home) { tx = p.bx; ty = p.by; spd = BASE_SPD * 0.7; }
+				if (muted) {
+					// No celebration: he gets the ball out of the net himself and runs it back to the centre spot.
+					if (!C.grabbed) {
+						tx = clamp(ball.x, 8, FW - 8); ty = clamp(ball.y, GOAL_T + 8, GOAL_B - 8); spd = BASE_SPD * 1.15; acc = 0.14;
+						if (dist(p, ball) < 36 || T > 200) { C.grabbed = true; ball.owner = p; ball.vx = ball.vy = 0; ball.z = 0; ball.vz = 0; }
+					} else { tx = FW / 2 + (sc === 0 ? -14 : 14); ty = FH / 2; spd = BASE_SPD * 1.05; }
+					p.celebK = 0;
+				} else if (home) { tx = p.bx; ty = p.by; spd = BASE_SPD * 0.7; }
 				else if (C.style !== 1) {
 					// The other celebrations: a run (arms out like wings for the aeroplane), then he stops
 					// and turns to the camera to pump his fist or kiss the badge in front of the fans.
@@ -690,12 +717,14 @@
 					if (Math.hypot(tx - p.x, ty - p.y) < 55 || T > 140) { C.kneelAt = T; }
 				}
 				p.kneel = Math.max(0, (p.kneel || 0) - 0.1);   // back on his feet, arms up, mobbed
-			} else if (scored && p.role !== "gk") {
-				if (home) { tx = p.bx; ty = p.by; spd = BASE_SPD * 0.7; }
+			} else if (scored && (p.role !== "gk" || wild)) {
+				// Team-mates chase him and mob him (for a late winner, flat out, and the keeper too); after a
+				// consolation they just jog back.
+				if (home || muted) { tx = p.bx; ty = p.by; spd = BASE_SPD * (muted ? 0.55 : 0.7); }
 				else {
 					const d = dist(p, hero);
-					if (d > 36) { tx = hero.x; ty = hero.y; spd = BASE_SPD * (d > 120 ? 1.45 : 0.85); }
-					else if (T > (C.kneelAt >= 0 ? C.kneelAt + 20 : 120) && !(p.jump > 0) && Math.random() < 0.04) { p.jump = JUMP; }
+					if (d > 36) { tx = hero.x; ty = hero.y; spd = BASE_SPD * (d > 120 ? (wild ? 1.65 : 1.45) : 0.85); }
+					else if (T > (C.kneelAt >= 0 ? C.kneelAt + 20 : 120) && !(p.jump > 0) && Math.random() < (wild ? 0.09 : 0.04)) { p.jump = JUMP; }
 				}
 			} else if (scored) {   // their keeper wanders out of his goal
 				tx = p.bx + (p.team === 0 ? 30 : -30); ty = p.by; spd = BASE_SPD * 0.3;
@@ -705,11 +734,16 @@
 					tx = ball.x; ty = ball.y; spd = BASE_SPD * 0.7;
 					if (dist(p, ball) < 36) { C.fetched = true; ball.owner = p; ball.vx = ball.vy = 0; ball.z = 0; ball.vz = 0; }   // (he cannot step into the net itself)
 				} else { tx = p.bx + (p.team === 0 ? 60 : -60); ty = p.by; spd = BASE_SPD * 0.35; }
+			} else if (C.slump && C.slump.has(p) && !home) {
+				// A late, costly goal: one or two of them sink to their knees where they stand.
+				tx = p.x; ty = p.y; p.vx *= 0.85; p.vy *= 0.85;
+				p.kneel = Math.min(1, (p.kneel || 0) + 0.05);
 			} else {
 				// Trudging back, heads down.
-				tx = p.bx; ty = p.by; spd = BASE_SPD * (home ? 0.5 : 0.22);
+				tx = p.bx; ty = p.by; spd = BASE_SPD * (home ? 0.5 : C.sulk === "costly" ? 0.15 : 0.22);
 			}
-			p.sulk = clamp((p.sulk || 0) + (!scored && p.role !== "gk" && !home ? 0.03 : -0.05), 0, 1);
+			const sRate = C.sulk === "costly" ? 0.07 : C.sulk === "light" ? 0.012 : 0.03, sCap = C.sulk === "light" ? 0.35 : 1;
+			p.sulk = clamp((p.sulk || 0) + (!scored && p.role !== "gk" && !home ? sRate : -0.05), 0, sCap);
 			const far = Math.hypot(tx - p.x, ty - p.y);
 			const [ dvx, dvy ] = spd && far > 6 ? steer(p, tx, ty, spd, far) : [ 0, 0 ];
 			movePlayer(p, dvx, dvy, cond.grip, acc);
@@ -721,11 +755,11 @@
 				p.dir = turnToward(p.dir, Math.atan2(ey - p.y, ex - p.x), 0.12);
 			}
 			// Team-mates who reach him wrap their arms round him; the rest jump and punch the air.
-			p.hug = clamp((p.hug || 0) + (scored && p !== hero && p.role !== "gk" && !home && dist(p, hero) < 40 ? 0.08 : -0.08), 0, 1);
+			p.hug = clamp((p.hug || 0) + (scored && p !== hero && (p.role !== "gk" || wild) && !home && !muted && dist(p, hero) < (wild ? 48 : 40) ? 0.08 : -0.08), 0, 1);
 			if (home && p === hero) { p.celebK = 0; }
-			const armsUp = p === hero ? (home ? 0 : 1) : scored && p.role !== "gk" && !home && dist(p, hero) < 60 ? 0.7 : 0;
+			const armsUp = muted ? 0 : p === hero ? (home ? 0 : 1) : scored && (p.role !== "gk" || wild) && !home && dist(p, hero) < 60 ? 0.7 : 0;
 			p.celebA = (p.celebA || 0) + (armsUp - (p.celebA || 0)) * 0.08;
-			if (p !== hero) { p.kneel = 0; }
+			if (p !== hero && !(C.slump && C.slump.has(p) && !home)) { p.kneel = Math.max(0, (p.kneel || 0) - 0.1); }
 		}
 	}
 	function skipCelebration () {
@@ -734,6 +768,7 @@
 
 	function goalScored (scorer) {
 		if (shoot) { if (shoot.live) { shootResult(scorer === shoot.att ? (ball.headed && ball.lastBy && ball.lastBy.team === scorer ? "Header, goal" : "Goal") : "Own goal", scorer); } else { return; } }
+		const diffB = score[scorer] - score[1 - scorer], firstGoal = score[0] + score[1] === 0;
 		score[scorer]++;
 		tally.goals[scorer]++;
 		slowMotion(70);
@@ -762,19 +797,32 @@
 		{
 			const side = outfield(scorer);
 			const hero = ball.lastBy && ball.lastBy.team === scorer ? ball.lastBy : side[side.length - 1] || team(scorer)[0];
-			// How he celebrates: 1 knee slide, 2 aeroplane to the corner flag, 3 fist pump, 4 badge kiss
-			// (never the same twice running). He heads for the corner flag, but not a marathon: at most
-			// 260 units (less for the fist pump and the badge), so his teammates can catch him.
-			let style = 1 + Math.floor(Math.random() * 4);
-			if (style === lastCelebStyle) { style = style % 4 + 1; }
-			lastCelebStyle = style;
-			const cx = scorer === 0 ? FW - 70 : 70, cy = hero.y < FH / 2 ? 44 : FH - 44, dx = cx - hero.x, dy = cy - hero.y, L = Math.hypot(dx, dy) || 1, run = Math.min(L, style >= 3 ? 110 : 260);
-			celeb = { t: 0, hero, style, target: [ hero.x + dx / L * run, hero.y + dy / L * run ], kneelAt: -1, posedAt: -1, fetched: false, rp: goalTimer - GOAL_CELEB };
+			// How he celebrates: 1 knee slide, 2 aeroplane to the corner flag, 3 fist pump, 4 badge kiss,
+			// 5 both arms to the sky; which, and how wild, from the plan (the minute and the score). He heads
+			// for the corner flag, but not a marathon: at most 260 units (less for the fist pump and the
+			// badge, more for a late winner), so his teammates can catch him.
+			const by0 = ball.lastBy, own0 = !!(by0 && by0.team !== scorer), nm = !own0 && hero.name;
+			const goals = nm ? matchLog.filter(e => e.kind === "goal" && e.team === scorer && (e.text === nm || e.text === `${nm} (header)`)).length : 1;
+			const plan = celebPlan({ minute: shoot || tut ? 0 : minuteNow(), diff: diffB, goals, own: own0, first: firstGoal });
+			let style = plan.style;
+			if (plan.mood === "standard" || plan.mood === "opener") {
+				style = 1 + Math.floor(Math.random() * 4);
+				if (style === lastCelebStyle) { style = style % 4 + 1; }
+				lastCelebStyle = style;
+			}
+			const cx = scorer === 0 ? FW - 70 : 70, cy = hero.y < FH / 2 ? 44 : FH - 44, dx = cx - hero.x, dy = cy - hero.y, L = Math.hypot(dx, dy) || 1, run = Math.min(L, plan.run || (style >= 3 ? 110 : 260));
+			celeb = { t: 0, hero, style, mood: plan.mood, comm: plan.comm, commDone: false, sulk: plan.sulk, mgr: plan.mgr, target: [ hero.x + dx / L * run, hero.y + dy / L * run ], kneelAt: -1, posedAt: -1, fetched: plan.mood === "muted", rp: goalTimer - GOAL_CELEB };
 			tlc = null;   // no touchline cutaway over a goal
 			for (const p of players) { p.kneel = 0; p.sulk = 0; p.celebK = 0; p.hug = 0; }
+			if (plan.sulk === "costly") {
+				// Late and costly for the other side: hands on heads, and one or two down on their knees.
+				const gx = scorer === 0 ? FW : 0, beaten = outfield(1 - scorer).slice().sort((a, b) => Math.abs(a.x - gx) - Math.abs(b.x - gx));
+				celeb.slump = new Set(beaten.slice(0, Math.random() < 0.5 ? 1 : 2));
+				for (const p of beaten.slice(0, 5)) { if (!celeb.slump.has(p)) { p.headHands = 95; } }
+			}
 			banner.textContent = ball.headed && ball.lastBy && ball.lastBy.team === scorer ? (scorer === 0 ? "Header! Goal" : `Header! ${opp.short} score`) : scorer === 0 ? "Goal" : `${opp.short} score`;
 			const by = ball.lastBy, own = by && by.team !== scorer, who = own ? by : hero;
-			caption(own ? "Own goal" : "Goal", "goal", (who && who.name) || (scorer === 0 ? "You" : opp.short), `${own ? "Own goal" : ball.headed ? "Header" : scorer === 0 ? "You" : opp.short} · ${minuteNow()}'${(() => { const n = scorer === 0 && !own && who && who.name ? matchGoals.filter(g => g === who.name).length : 0; return n === 2 ? " · Brace" : n === 3 ? " · Hat-trick" : n > 3 ? ` · ${n} goals` : ""; })()}`, own ? by.team : scorer);
+			caption(own ? "Own goal" : "Goal", "goal", (who && who.name) || (scorer === 0 ? "You" : opp.short), `${own ? "Own goal" : ball.headed ? "Header" : scorer === 0 ? "You" : opp.short} · ${minuteNow()}'${(() => { const n = scorer === 0 && !own && who && who.name ? matchGoals.filter(g => g === who.name).length : 0; return n === 2 ? " · Brace" : n === 3 ? " · Hat-trick" : n > 3 ? ` · ${n} goals` : ""; })()}${plan.comm === "lateWin" ? " · Late winner" : plan.comm === "lateEq" ? " · Late equaliser" : ""}`, own ? by.team : scorer);
 		}
 		banner.className = "banner goal " + (scorer === 0 ? "home" : "away");
 		hideLineups(); hideCoachMark();   // nothing over a goal: the line-ups and the first-match tip make way
@@ -783,8 +831,9 @@
 		sfx("whistle");
 		sfx("net");
 		buzz(scorer === 0 ? [ 70, 50, 70 ] : 120);
-		if (scorer === homeSide) { roar(1); playGoalSong(clubIdOfTeam(homeSide)); } else { groan(); awayCornerCheer(); }
-		ev3d("goal", { scorer });
+		const cm = celeb ? celeb.mood : "standard";
+		if (scorer === homeSide) { roar(cm === "muted" ? 0.5 : 1); if (cm !== "muted") { playGoalSong(clubIdOfTeam(homeSide)); } } else { groan(); if (cm !== "muted") { awayCornerCheer(); } }
+		ev3d("goal", { scorer, wild: cm === "wild", muted: cm === "muted", mgr: celeb ? celeb.mgr : undefined });
 		renderHud();
 	}
 

@@ -187,10 +187,10 @@
 	function staffReact (kind, o = {}) {
 		const now = performance.now(), set = (t, g, ms) => { if (t === 0 || t === 1) { staff3[t].g = g; staff3[t].t = now + ms; } };
 		if (kind === "goal") {
-			set(o.team, "up", 4200); set(1 - o.team, "head", 3200); staff3[o.team].up = now + 4200;
+			set(o.team, o.muted ? "clap" : "up", 4200); set(1 - o.team, o.muted ? "clap" : "head", 3200); if (!o.muted) { staff3[o.team].up = now + 4200; }
 			// Now and then the manager loses it, Mourinho at Old Trafford: out of his area and away down
 			// the touchline at full tilt, fists going, sliding on his knees at the end of it.
-			if ((o.force || Math.random() < 0.3) && !reduceMotion && !bulkSim) { staff3[o.team].sprint = { t0: now, dir: 0 }; staff3[o.team].g = ""; }
+			if ((o.force || Math.random() < (o.mgr ?? (o.wild ? 0.85 : o.muted ? 0 : 0.3))) && !reduceMotion && !bulkSim) { staff3[o.team].sprint = { t0: now, dir: 0 }; staff3[o.team].g = ""; }
 		}
 		else if (kind === "near") { set(o.team, Math.random() < 0.6 ? "head" : "clap", 2200); }
 		else if (kind === "foul") { set(o.fouled, "protest", 2400); }

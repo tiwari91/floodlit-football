@@ -333,6 +333,50 @@ const woodGoal = await page.evaluate(() => {
 });
 check("woodwork: a shot just inside the post goes in (never deflected)", woodGoal.st === "goal" && woodGoal.goal === 1 && !woodGoal.wood, JSON.stringify(woodGoal));
 await page.evaluate(() => { const F = window.__ff; for (let i = 0; i < 1500 && F.state === "goal"; i++) { F.step(1); } });
+// Celebrations that fit the moment: the plan from the minute and the score, then played out.
+const plan = await page.evaluate(() => {
+	const F = window.__ff, P = c => F.celebPlan(c, () => 0.3);
+	return { win: P({ minute: 86, diff: 0, goals: 1 }), eq: P({ minute: 90, diff: -1, goals: 1 }), cons: P({ minute: 40, diff: -3, goals: 1 }), opener: P({ minute: 12, diff: 0, goals: 1, first: true }), hat: P({ minute: 60, diff: 1, goals: 3 }), comfy: P({ minute: 85, diff: 2, goals: 1 }), ownLate: P({ minute: 85, diff: 0, goals: 1, own: true }) };
+});
+check("celebration plan: a late winner or equaliser is wild, a 3-0 consolation muted, an opener standard, a hat-trick special", plan.win.mood === "wild" && plan.win.comm === "lateWin" && plan.eq.mood === "wild" && plan.eq.comm === "lateEq" && plan.cons.mood === "muted" && plan.opener.mood === "opener" && plan.hat.mood === "special" && plan.hat.style === 5 && plan.comfy.mood === "standard" && plan.comfy.sulk === "normal" && plan.ownLate.mood === "wild", JSON.stringify(plan));
+const goalAt = (sc, frac) => page.evaluate(async ([ sc, frac ]) => {
+	const F = window.__ff;
+	for (let i = 0; i < 1500 && F.state !== "play"; i++) { F.step(1); }
+	if (F.setPiece) { F.step(400); }
+	F.score[0] = sc[0]; F.score[1] = sc[1]; F.timeLeft = F.matchLen * frac; F.freeze = 0;
+	F.forceGoal(0);
+	for (let i = 0; i < 20 && F.state === "play"; i++) { F.step(1); }
+	const C = F.celeb, hero = C && C.hero, out = { st: F.state, mood: C && C.mood, style: C && C.style };
+	if (!C) { return out; }
+	const hide = () => { for (const id of [ "lowerThird" ]) { document.getElementById(id).hidden = true; } };
+	const c0 = Math.hypot(hero.x - F.FW / 2, hero.y - F.FH / 2);
+	let maxHug = 0, maxCel = 0, slump = 0, hh = 0, grabbed = false, comm = null;
+	F.commReset(); const at0 = F.lastCommentary ? F.lastCommentary.at : -1, fresh = () => F.lastCommentary && F.lastCommentary.at !== at0 && /^late/.test(F.lastCommentary.kind);
+	for (let i = 0; i < 260 && F.state === "goal"; i++) {
+		F.step(1); hide();
+		for (const p of F.players) { if (p.team === 0 && p !== hero) { maxHug = Math.max(maxHug, p.hug || 0); } if (p.team === 0) { maxCel = Math.max(maxCel, p.celebA || 0); } if (p.team === 1) { slump = Math.max(slump, p.kneel || 0); if (p.headHands > 0) { hh++; } } }
+		if (F.ball.owner === hero) { grabbed = true; }
+		if (!comm && fresh()) { comm = F.lastCommentary; }
+	}
+	for (let i = 0; i < 900 && F.state === "goal" && !comm; i++) { F.step(1); hide(); if (fresh()) { comm = F.lastCommentary; } }
+	Object.assign(out, { maxHug: +maxHug.toFixed(2), maxCel: +maxCel.toFixed(2), slump: +slump.toFixed(2), hh, grabbed, toCentre: +(c0 - Math.hypot(hero.x - F.FW / 2, hero.y - F.FH / 2)).toFixed(0), comm: comm && comm.kind, text: comm && comm.text, cap: F.lastCaption && F.lastCaption.sub });
+	for (let i = 0; i < 1500 && F.state === "goal"; i++) { F.step(1); }
+	return out;
+}, [ sc, frac ]);
+const lateWin = await goalAt([ 1, 1 ], 0.06);
+check("a late winner: a wild celebration, the losing side slumps, and the commentator calls the drama", lateWin.mood === "wild" && (lateWin.style === 1 || lateWin.style === 2) && lateWin.maxCel > 0.5 && lateWin.slump > 0.5 && lateWin.hh > 0 && lateWin.comm === "lateWin" && /Late winner/.test(lateWin.cap || ""), JSON.stringify(lateWin));
+const cons = await goalAt([ 0, 3 ], 0.5);
+check("a 3-0 consolation: muted, he grabs the ball and runs it back to the centre, nobody celebrates", cons.mood === "muted" && cons.grabbed && cons.toCentre > 40 && cons.maxCel < 0.15 && cons.maxHug < 0.05 && !cons.comm, JSON.stringify(cons));
+const sky = await page.evaluate(() => {
+	const F = window.__ff, W = n => n.getWorldPosition(n.position.clone()), p = F.outfield(0)[2];
+	const keep = { celebA: p.celebA, celebK: p.celebK, kneel: p.kneel, hug: p.hug };
+	Object.assign(p, { kickA: 0, lunge: 0, fall: 0, jump: 0, throwA: 0, dive: 0, headHands: 0, fistPump: 0, celebA: 1, celebK: 5, kneel: 0, hug: 0, sulk: 0 });
+	const r = F.poseProbe(p, 40), head = W(r.head), hands = [ 0, 1 ].map(k => W(r.ha[k]));
+	const rootInv = r.root.matrixWorld.clone().invert(), loc = hands.map(h => h.clone().applyMatrix4(rootInv)), hl = head.clone().applyMatrix4(rootInv);
+	Object.assign(p, keep);
+	return { up: hands.map(h => +(h.y - head.y).toFixed(1)), side: loc.map(v => +v.z.toFixed(1)), fwd: loc.map(v => +(v.x - hl.x).toFixed(1)) };
+});
+check("brace / hat-trick pose: both hands above the head, on their own sides, not behind him", sky.up.every(v => v > 3) && sky.side[0] * sky.side[1] < 0 && sky.fwd.every(v => v > -3), JSON.stringify(sky));
 check("no errors after the woodwork checks (and no 3D failure)", errs.length === 0 && !errs.some(e => /3D view failed/.test(e)), errs.join(" | "));
 await browser.close(); server.stop();
 process.exit(done() ? 1 : 0);
