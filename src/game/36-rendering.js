@@ -662,17 +662,27 @@
 		}
 	}
 
+	// How crowded the man S would switch to is (0 in space, 1 with a man at his shoulder), eased so the
+	// ring doesn't twitch: his ring draws in close round him in a crowd, so it never laps the men beside him.
+	function switchRingTight (m) {
+		let dn = 1e9;
+		for (const q of players) { if (q !== m) { dn = Math.min(dn, Math.hypot(q.x - m.x, q.y - m.y)); } }
+		const t = clamp((34 - dn) / 20, 0, 1);
+		m.ringT = m.ringT === undefined ? t : m.ringT + (t - m.ringT) * 0.15;
+		return m.ringT;
+	}
+
 	// Hollow marker over the player S would switch to while you defend.
 	function drawSwitchPreview () {
 		if (state !== "play" || freeze > 0 || receiver) { return; }
 		if ((ball.owner && ball.owner.team === 0) || inHands(ball.owner)) { return; }
 		const m = nextSwitchTarget();
 		if (!m) { return; }
-		const X = MX + m.x, Y = MY + m.y;
-		ctx.strokeStyle = "rgba(255, 255, 255, 0.75)";
-		ctx.lineWidth = 2;
-		ctx.setLineDash([ 5, 4 ]);
-		ctx.beginPath(); ctx.arc(X, Y, 19, reduceMotion ? 0 : frame * 0.03, (reduceMotion ? 0 : frame * 0.03) + Math.PI * 2); ctx.stroke();
+		const X = MX + m.x, Y = MY + m.y, t = switchRingTight(m);
+		ctx.strokeStyle = `rgba(255, 255, 255, ${(0.7 - 0.25 * t).toFixed(2)})`;
+		ctx.lineWidth = 2 - 0.5 * t;
+		ctx.setLineDash([ 5 - t, 4 ]);
+		ctx.beginPath(); ctx.arc(X, Y, 18 - 6 * t, reduceMotion ? 0 : frame * 0.03, (reduceMotion ? 0 : frame * 0.03) + Math.PI * 2); ctx.stroke();
 		ctx.setLineDash([]);
 		ctx.beginPath();
 		ctx.moveTo(X - 7, Y - 37); ctx.lineTo(X + 7, Y - 37); ctx.lineTo(X, Y - 29);

@@ -557,7 +557,11 @@
 		}
 		if (playing && !receiver && !(ball.owner && ball.owner.team === 0) && !inHands(ball.owner)) {   // who S switches you to: a dashed ring at his feet
 			const m = nextSwitchTarget();
-			if (m) { mk.next.visible = true; mk.next.position.set(WX(m.x), 0.45, m.y); mk.next.scale.set(19, 1, 19); mk.next.rotation.y = reduceMotion ? 0 : -frame * 0.03; }
+			if (m) {   // just outside his side ring (12), drawn in and fainter in a crowd
+				const t = switchRingTight(m), R = 16.5 - 3 * t;
+				mk.next.visible = true; mk.next.position.set(WX(m.x), 0.45, m.y); mk.next.scale.set(R, 1, R); mk.next.rotation.y = reduceMotion ? 0 : -frame * 0.03;
+				mk.next.material.opacity = 0.36 - 0.12 * t;
+			}
 		}
 		if (playing && me && ball.owner === me) {
 			const t = passTarget(me);
