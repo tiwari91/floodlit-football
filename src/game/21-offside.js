@@ -163,11 +163,16 @@
 	function kickSwing (p) {
 		if (!(p.kickA > 0)) { return null; }
 		const t = 1 - p.kickA / KICK_T, pow = p.kickPow || 0.5;
-		const s = t < 0.18 ? -0.35 - 0.45 * pow + (t / 0.18) * (0.75 + 0.45 * pow) : t < 0.55 ? 0.4 + (t - 0.18) / 0.37 * (0.3 + 0.8 * pow) : (0.7 + 0.8 * pow) * (1 - (t - 0.55) / 0.45);
-		return { s, bend: t < 0.18 ? 1.1 * (1 - t / 0.18) : 0.1 + 0.3 * Math.max(0, t - 0.55) };
+		// The ball has already gone when kickA is set, so the swing starts at contact (the foot through the
+		// ball, just ahead of the standing foot) and only follows through toward the target, then settles:
+		// it used to play the backswing after the strike, a heel flick behind him as the ball left.
+		const peak = 0.55 + 0.8 * pow, e = Math.min(1, t / 0.4), up = e * (2 - e);
+		const s = t < 0.55 ? 0.25 + (peak - 0.25) * up : peak * (1 - smooth3((t - 0.55) / 0.45));
+		return { s, bend: t < 0.4 ? 0.3 * (1 - up) + 0.08 : 0.08 + 0.35 * Math.max(0, t - 0.55) };
 	}
 
 	function kick (p, tx, ty, speed, snd = "kick") {
+		p.kickLoft = false;   // loftTo, the chip and the lifted shot set it after: he leans back under those
 		lastTouch = p.team;
 		markOffside(p);
 		if (p.team === 1) { switchCd = 0; }
@@ -215,7 +220,7 @@
 		const d = Math.hypot(tx - ball.x, ty - ball.y);
 		if (passPow >= 0) { hang *= 1.2 - passPow * 0.4; }   // a charged loft: soft floats, full is driven flatter
 		const T = Math.round(clamp(d / 9, 24, 70) * hang);     // frames in the air
-		kick(p, tx, ty, d * (1 - AIR_DRAG) / (1 - Math.pow(AIR_DRAG, T)));
+		kick(p, tx, ty, d * (1 - AIR_DRAG) / (1 - Math.pow(AIR_DRAG, T))); p.kickLoft = true;
 		ball.vz = GRAV * T / 2;
 		setCurl(T, bow);
 		ball.landX = clamp(tx, 12, FW - 12);
@@ -260,7 +265,7 @@
 		const vh = clamp(D / 34, 5.5, 10);
 		const T = Math.log(Math.max(0.05, 1 - D * (1 - AIR_DRAG) / vh)) / Math.log(AIR_DRAG);
 		const zGoal = clamp(30 + gauss() * (10 + Math.max(0, 70 - sho) * 0.35), 4, 95);
-		kick(p, gx, ty, vh);
+		kick(p, gx, ty, vh); p.kickLoft = true;
 		ball.shot = true; ball.lift = true;
 		ball.vz = (zGoal + 0.5 * GRAV * T * T) / T;
 		predictLanding();

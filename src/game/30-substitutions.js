@@ -225,7 +225,7 @@
 		const T = Math.log(Math.max(0.05, 1 - D * (1 - AIR_DRAG) / vh)) / Math.log(AIR_DRAG);
 		// Height as it reaches the goal: under the bar (55) most of the time, over it now and then.
 		const zGoal = clamp(38 + gauss() * (13 + Math.max(0, 70 - sho) * 0.3), 6, 90);
-		kick(p, gx, ty, vh);
+		kick(p, gx, ty, vh); p.kickLoft = true;
 		ball.shot = true;
 		// Topspin makes it dip: it rises steeply over the wall and drops faster than gravity alone.
 		const dip = GRAV * (0.3 + clamp((sho - 55) / 100, 0, 0.35));

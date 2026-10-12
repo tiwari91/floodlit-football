@@ -784,7 +784,10 @@
 			const kf = build(p).left ? 0 : 1, pl = 1 - kf, pw = p.kickPow || 0.5;
 			r.hip[kf].rotation.z = ks.s * 1.15; r.kn[kf].rotation.z = -ks.bend * 1.25; r.an[kf].rotation.z = 0.35;
 			r.hip[pl].rotation.z = -0.12; r.kn[pl].rotation.z = -0.38;
-			r.spine.rotation.z = -(0.05 - 0.18 * ks.s - 0.1 * pw); r.hips.rotation.x += (kf ? -1 : 1) * 0.12;
+			// Over the ball for a pass or a drive (-z leans him forward), easing up as the leg comes through;
+			// under a lofted ball he leans back a little as the leg rises.
+			r.spine.rotation.z = p.kickLoft ? -0.04 + 0.16 * Math.max(0, ks.s - 0.3) : -(0.12 + 0.12 * pw) * (1 - 0.5 * clamp(ks.s / 1.4, 0, 1)); r.hips.rotation.x += (kf ? -1 : 1) * 0.12;
+			r.neck.rotation.z -= 0.15;   // eyes down on the ball
 			r.sh[pl].rotation.z = 0.5 * ks.s + 0.2; r.sh[kf].rotation.z = -0.4 * ks.s; r.sh[kf].rotation.x = (kf ? 1 : -1) * (0.35 + 0.5 * Math.abs(ks.s) * (0.6 + pw)); r.sh[pl].rotation.x = (pl ? 1 : -1) * (0.4 + 0.3 * pw);
 			r.el[kf].rotation.z = 0.5; r.el[pl].rotation.z = 0.7;
 		}
