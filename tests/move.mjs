@@ -399,7 +399,7 @@ const ft = await page.evaluate(() => {
 	rc.turnTo = Math.PI * 0.9; const tu = pose("turn", 9);
 	out.thigh = +(th.kn.y - th.kn2.y).toFixed(2);
 	out.chest = +((ch.head.x - ch.hips.x) - (base.head.x - base.hips.x)).toFixed(2);
-	out.sole = { up: +(so.an.y - so.an2.y).toFixed(2), fwd: +(so.an.x - base.an.x).toFixed(2), toeUp: +(so.toe.y - so.an.y).toFixed(2) };
+	out.sole = { up: +(so.an.y - Math.min(base.an.y, base.an2.y, so.an2.y)).toFixed(2), fwd: +(so.an.x - base.an.x).toFixed(2), toeUp: +(so.toe.y - so.an.y).toFixed(2) };
 	out.inside = { side: Math.sign(ins.hip.z), toeOut: +((ins.toe.z - ins.an.z) - (base.toe.z - base.an.z)).toFixed(2) };
 	out.heavy = +(hv.an.x - base.an.x).toFixed(2); out.heavyLean = +((hv.head.x - hv.hips.x) - (base.head.x - base.hips.x)).toFixed(2);
 	out.turn = +Math.abs(tu.hipsY - base.hipsY).toFixed(2);
@@ -421,6 +421,15 @@ const ft = await page.evaluate(() => {
 });
 check("first-touch poses (forward = toe = +x): thigh up, chest leans back, heavy lunges forward, sole forward and toes up, inside of the foot turned out, a turn opens the hips", ft.thigh > 3 && ft.chest < -0.8 && ft.sole.up > 1.5 && ft.sole.fwd > 1 && ft.sole.toeUp > 0.5 && ft.inside.toeOut * ft.inside.side > 0.8 && ft.heavy > 1 && ft.heavyLean > 0.5 && ft.turn > 0.2, JSON.stringify(ft));
 check("a heavy first touch: the ball runs a step away from him", ft.heavyK === "heavy" && ft.heavyFar > 27, JSON.stringify({ k: ft.heavyK, far: ft.heavyFar }));
+const sulk = await page.evaluate(() => {
+	const F = window.__ff, p = F.outfield(0)[2], W = n => n.getWorldPosition(n.position.clone());
+	const keep = [ p.sulk, p.recvK, p.recv ];
+	Object.assign(p, { kickA: 0, lunge: 0, fall: 0, jump: 0, throwA: 0, dive: 0, headHands: 0, fistPump: 0, celebA: 0, kneel: 0, hug: 0, recv: 0, recvK: null });
+	const m = s => { p.sulk = s; const r = F.poseProbe(p, 1), inv = r.root.matrixWorld.clone().invert(), L = n => W(n).applyMatrix4(inv); const face = r.head.position.clone().set(2.1, 1.9, 0); r.head.localToWorld(face); face.applyMatrix4(inv); const hd = L(r.head), hp = L(r.hips); return { headFwd: hd.x - hp.x, faceUp: face.y - hd.y }; };
+	const a = m(0), b = m(1); [ p.sulk, p.recvK, p.recv ] = keep;
+	return { fwd: +(b.headFwd - a.headFwd).toFixed(2), faceUp: +(b.faceUp - a.faceUp).toFixed(2) };
+});
+check("beaten (sulk): head bowed forward and the face toward the grass, not the sky", sulk.fwd > 1 && sulk.faceUp < -0.5, JSON.stringify(sulk));
 check("no errors after the woodwork checks (and no 3D failure)", errs.length === 0 && !errs.some(e => /3D view failed/.test(e)), errs.join(" | "));
 await browser.close(); server.stop();
 process.exit(done() ? 1 : 0);

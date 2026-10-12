@@ -695,7 +695,7 @@
 	// goal), space (room behind him), human (your man: never turned for you), wet. A dropping ball is
 	// taken on the chest or the thigh; along the ground a poor touch (worse at pace and in the wet) now and
 	// then runs away from him; with his back to goal and room behind, a computer player turns with it;
-	// otherwise a gentler pass is stopped under the sole by the neat footballers, the rest cushioned with
+	// otherwise (and always for your side, which you steer) a gentler pass is stopped under the sole by the neat footballers, the rest cushioned with
 	// the inside of the foot.
 	function recvKind (c, rnd = Math.random) {
 		if (c.z >= 26) { return "chest"; }
@@ -726,7 +726,7 @@
 			const toGoal = Math.atan2(FH / 2 - p.y, attackX(p.team) - p.x), off = Math.atan2(Math.sin(toGoal - (p.dir || 0)), Math.cos(toGoal - (p.dir || 0)));
 			const bx = p.x + Math.cos(toGoal) * 45, by = p.y + Math.sin(toGoal) * 45;
 			const space = !players.some(q => q.team !== p.team && Math.hypot(q.x - bx, q.y - by) < 55);
-			p.recvK = recvKind({ z: ball.z || 0, spd: Math.hypot(ball.vx, ball.vy), pas: A(p, "pas"), seed: build(p).seed, play: tr(p, "playmaker"), back: Math.abs(off) > 2.1, space, human: p.team === 0 && players.indexOf(p) === ctrl, wet: cond.wet > 0 });
+			p.recvK = recvKind({ z: ball.z || 0, spd: Math.hypot(ball.vx, ball.vy), pas: A(p, "pas"), seed: build(p).seed, play: tr(p, "playmaker"), back: Math.abs(off) > 2.1, space, human: p.team === 0, wet: cond.wet > 0 });
 			p.recvZ = ball.z || 0;
 			if (p.recvK === "turn") { p.turnTo = toGoal; p.turnT = 16; }
 			if (p.recvK === "heavy") { p.heavyT = 18; if (p.team === 0 && !bulkSim) { burst(p.x, p.y, "Heavy touch"); } }

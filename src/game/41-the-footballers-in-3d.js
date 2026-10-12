@@ -697,7 +697,7 @@
 		}
 		// Beaten: head down, shoulders rounded, arms hanging.
 		if (sulk > 0) {
-			r.spine.rotation.z += 0.28 * sulk; r.neck.rotation.z += 0.6 * sulk;
+			r.spine.rotation.z -= 0.28 * sulk; r.neck.rotation.z -= 0.6 * sulk;   // measured: -z on the spine bows him forward, -z on the neck drops the chin
 			for (let i = 0; i < 2; i++) { r.sh[i].rotation.z *= 1 - 0.7 * sulk; r.el[i].rotation.z *= 1 - 0.6 * sulk; }
 		}
 		r.root.position.set(x, y, z);
