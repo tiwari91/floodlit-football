@@ -23,7 +23,7 @@
 		oppStats = { passes: 0, completed: 0, shots: 0, tackles: 0, corners: 0, fouls: 0, cards: 0 }; oppPending = false;
 		matchInjuries = []; matchInjInfo = {};
 		matchCards = []; dismissed = [];
-		matchLog = []; matchGoals = [];
+		matchLog = []; matchGoals = []; matchGoalsOpp = [];
 		subsLeft = SUBS_MAX; cpuSubs = SUBS_MAX; subLog = []; cameOn = []; wentOff = []; subPick = {}; genericBench = null; cpuSubWin = 0; matchSta = {};
 		updateSubsBtn();
 		possFrames = [ 0, 0 ];

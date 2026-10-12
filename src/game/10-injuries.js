@@ -77,7 +77,7 @@
 	const SUBS_MAX = 5;
 	let subLog = [];   // [ idx, name ] of each change, so a refreshed match keeps them
 	// What happened, minute by minute: { min, team, kind, text }. Goals for your players by name.
-	let matchLog = [], matchGoals = [];
+	let matchLog = [], matchGoals = [], matchGoalsOpp = [];
 	const minuteNow = () => clamp(Math.ceil((1 - timeLeft / Math.max(1, matchLen)) * 90), 1, 90);
 	const logEvent = (team, kind, text, min = minuteNow()) => { matchLog.push({ min, team, kind, text }); };
 	let subsLeft = SUBS_MAX, cpuSubs = SUBS_MAX, cameOn = [], wentOff = [], subPick = {}, genericBench = null;

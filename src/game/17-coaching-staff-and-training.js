@@ -528,6 +528,7 @@
 					const sc = list.length ? pick(list, q => ({ fwd: 5, mid: 2.2, def: 0.7 }[q.role] || 1) * Math.max(0.3, A(q, "sho") / 65)) : null;
 					logEvent(t, "goal", sc ? sc.name || (t === 0 ? "You" : opp.short) : "Goal", m);
 					if (t === 0 && sc && sc.name) { matchGoals.push(sc.name); }
+					if (t === 1 && sc && sc.name) { matchGoalsOpp.push(sc.name); }
 				}
 				if (Math.random() < 1.6 / 90) { card(t, m, false); }
 				if (Math.random() < 0.03 / 90) { card(t, m, true); }

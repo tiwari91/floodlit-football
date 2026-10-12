@@ -142,12 +142,33 @@
 			TEAMS[x.id].name.localeCompare(TEAMS[y.id].name));
 	}
 
+	// The other clubs' players get a match rating every matchday, on the same lines as yours (the result,
+	// a little either way, a goal against you counted), and keep their last five: their form, which picks
+	// their captain. A new season brings new squads, so the record starts again.
+	function rateCpuRound (round, lm) {
+		if (!league.cpuForm || league.cpuForm.season !== league.season) { league.cpuForm = { season: league.season, clubs: {} }; }
+		const sl = slotsFor(league.fmt);
+		for (const [ h, a, hg, ag ] of round) {
+			for (const [ id, gf, ga ] of [ [ h, hg, ag ], [ a, ag, hg ] ]) {
+				if (id === 0 || !TEAMS[id]) { continue; }
+				const sq = cpuSquad(id, getStr(id)), xi = sl.map(i => sq[i]).filter(Boolean), avg = xi.reduce((t, pl) => t + ovrOf(pl), 0) / Math.max(1, xi.length);
+				const rec = league.cpuForm.clubs[id] || (league.cpuForm.clubs[id] = {});
+				for (const pl of xi) {
+					const goals = id === lm.opp ? matchGoalsOpp.filter(n => n === pl.name).length : 0;
+					let r = 6.6 + (gf > ga ? 0.6 : gf < ga ? -0.6 : 0) + (Math.random() * 2 - 1) * 0.45 + 0.03 * (ovrOf(pl) - avg) + 1.1 * goals;
+					if ((pl.pos === "gk" || pl.pos === "def") && ga === 0) { r += 0.6; }
+					rec[pl.name] = [ ...(rec[pl.name] || []), Math.round(clamp(r, 3.5, 9.8) * 10) / 10 ].slice(-5);
+				}
+			}
+		}
+	}
 	// Record your result and play out the rest of the matchday.
 	function recordLeagueResult (lm, h, a) {
 		if (!league || league.round !== lm.round) { return; }
 		const mine = lm.home ? [ 0, lm.opp, h, a ] : [ lm.opp, 0, a, h ];
 		const others = tickPlan && tickPlan.round === lm.round ? tickPlan.res.map(r => r.slice()) : league.fixtures[lm.round].filter(([ x, y ]) => x !== 0 && y !== 0).map(([ x, y ]) => simMatch(x, y));
 		league.results[lm.round] = [ mine, ...others ];
+		rateCpuRound(league.results[lm.round], lm);
 		league.round = lm.round + 1;
 		updateFitness();
 		weeklyClub(lm, h, a);

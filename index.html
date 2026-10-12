@@ -2287,7 +2287,7 @@
 	const SUBS_MAX = 5;
 	let subLog = [];   // [ idx, name ] of each change, so a refreshed match keeps them
 	// What happened, minute by minute: { min, team, kind, text }. Goals for your players by name.
-	let matchLog = [], matchGoals = [];
+	let matchLog = [], matchGoals = [], matchGoalsOpp = [];
 	const minuteNow = () => clamp(Math.ceil((1 - timeLeft / Math.max(1, matchLen)) * 90), 1, 90);
 	const logEvent = (team, kind, text, min = minuteNow()) => { matchLog.push({ min, team, kind, text }); };
 	let subsLeft = SUBS_MAX, cpuSubs = SUBS_MAX, cameOn = [], wentOff = [], subPick = {}, genericBench = null;
@@ -2598,12 +2598,33 @@
 			TEAMS[x.id].name.localeCompare(TEAMS[y.id].name));
 	}
 
+	// The other clubs' players get a match rating every matchday, on the same lines as yours (the result,
+	// a little either way, a goal against you counted), and keep their last five: their form, which picks
+	// their captain. A new season brings new squads, so the record starts again.
+	function rateCpuRound (round, lm) {
+		if (!league.cpuForm || league.cpuForm.season !== league.season) { league.cpuForm = { season: league.season, clubs: {} }; }
+		const sl = slotsFor(league.fmt);
+		for (const [ h, a, hg, ag ] of round) {
+			for (const [ id, gf, ga ] of [ [ h, hg, ag ], [ a, ag, hg ] ]) {
+				if (id === 0 || !TEAMS[id]) { continue; }
+				const sq = cpuSquad(id, getStr(id)), xi = sl.map(i => sq[i]).filter(Boolean), avg = xi.reduce((t, pl) => t + ovrOf(pl), 0) / Math.max(1, xi.length);
+				const rec = league.cpuForm.clubs[id] || (league.cpuForm.clubs[id] = {});
+				for (const pl of xi) {
+					const goals = id === lm.opp ? matchGoalsOpp.filter(n => n === pl.name).length : 0;
+					let r = 6.6 + (gf > ga ? 0.6 : gf < ga ? -0.6 : 0) + (Math.random() * 2 - 1) * 0.45 + 0.03 * (ovrOf(pl) - avg) + 1.1 * goals;
+					if ((pl.pos === "gk" || pl.pos === "def") && ga === 0) { r += 0.6; }
+					rec[pl.name] = [ ...(rec[pl.name] || []), Math.round(clamp(r, 3.5, 9.8) * 10) / 10 ].slice(-5);
+				}
+			}
+		}
+	}
 	// Record your result and play out the rest of the matchday.
 	function recordLeagueResult (lm, h, a) {
 		if (!league || league.round !== lm.round) { return; }
 		const mine = lm.home ? [ 0, lm.opp, h, a ] : [ lm.opp, 0, a, h ];
 		const others = tickPlan && tickPlan.round === lm.round ? tickPlan.res.map(r => r.slice()) : league.fixtures[lm.round].filter(([ x, y ]) => x !== 0 && y !== 0).map(([ x, y ]) => simMatch(x, y));
 		league.results[lm.round] = [ mine, ...others ];
+		rateCpuRound(league.results[lm.round], lm);
 		league.round = lm.round + 1;
 		updateFitness();
 		weeklyClub(lm, h, a);
@@ -3695,6 +3716,7 @@
 					const sc = list.length ? pick(list, q => ({ fwd: 5, mid: 2.2, def: 0.7 }[q.role] || 1) * Math.max(0.3, A(q, "sho") / 65)) : null;
 					logEvent(t, "goal", sc ? sc.name || (t === 0 ? "You" : opp.short) : "Goal", m);
 					if (t === 0 && sc && sc.name) { matchGoals.push(sc.name); }
+					if (t === 1 && sc && sc.name) { matchGoalsOpp.push(sc.name); }
 				}
 				if (Math.random() < 1.6 / 90) { card(t, m, false); }
 				if (Math.random() < 0.03 / 90) { card(t, m, true); }
@@ -6618,6 +6640,7 @@
 			const headed = ball.headed && !own;
 			logEvent(scorer, "goal", own ? `${name} (own goal)` : headed ? `${name || "Goal"} (header)` : name || "Goal");
 			if (scorer === 0 && by && !own && by.name) { matchGoals.push(by.name); }
+			if (scorer === 1 && by && !own && by.name) { matchGoalsOpp.push(by.name); }
 		}
 		// A goal against the run of play flips it; one for the side on top just adds to it.
 		if (edge(1 - scorer) > 0) { momentum = scorer === 0 ? 0.3 : -0.3; } else { swing(scorer, 0.22); }
@@ -7819,7 +7842,7 @@
 		oppStats = { passes: 0, completed: 0, shots: 0, tackles: 0, corners: 0, fouls: 0, cards: 0 }; oppPending = false;
 		matchInjuries = []; matchInjInfo = {};
 		matchCards = []; dismissed = [];
-		matchLog = []; matchGoals = [];
+		matchLog = []; matchGoals = []; matchGoalsOpp = [];
 		subsLeft = SUBS_MAX; cpuSubs = SUBS_MAX; subLog = []; cameOn = []; wentOff = []; subPick = {}; genericBench = null; cpuSubWin = 0; matchSta = {};
 		updateSubsBtn();
 		possFrames = [ 0, 0 ];
@@ -12789,6 +12812,13 @@
 			const mine = new Map(outfield(0).map(q => [ sq.find(pl => pl.name === q.name), q ]).filter(([ pl ]) => pl));
 			const best = pickCaptain([ ...mine.keys() ]);
 			if (best) { F.capt[0] = mine.get(best); }
+			// Theirs, in a league match, by form: the last five ratings (see rateCpuRound), eased in the same way.
+			const rec = league && leagueMatch && league.cpuForm && league.cpuForm.season === league.season && league.cpuForm.clubs[leagueMatch.opp];
+			if (rec) {
+				const sc = q => { const f = rec[q.name] || []; return (f.reduce((t, v) => t + v, 0) + 6.5 * 3) / (f.length + 3) + 0.0004 * (A(q, "pas") + A(q, "def")); };
+				const c = outfield(1).filter(q => (rec[q.name] || []).length).reduce((a, q) => (!a || sc(q) > sc(a) ? q : a), null);
+				if (c) { F.capt[1] = c; }
+			}
 		}
 		F.n = 0; F.rigOf = new Map(); F.nums.count = 0;   // rigOf: which figure each drawn player got this frame (off-screen players get none) if (F.chest) { F.chest.count = 0; } if (F.names) { F.names.count = 0; }
 		// Repaint the chest prints when the kits or the clubs change.

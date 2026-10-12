@@ -788,6 +788,7 @@
 			const headed = ball.headed && !own;
 			logEvent(scorer, "goal", own ? `${name} (own goal)` : headed ? `${name || "Goal"} (header)` : name || "Goal");
 			if (scorer === 0 && by && !own && by.name) { matchGoals.push(by.name); }
+			if (scorer === 1 && by && !own && by.name) { matchGoalsOpp.push(by.name); }
 		}
 		// A goal against the run of play flips it; one for the side on top just adds to it.
 		if (edge(1 - scorer) > 0) { momentum = scorer === 0 ? 0.3 : -0.3; } else { swing(scorer, 0.22); }

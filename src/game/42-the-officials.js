@@ -75,6 +75,13 @@
 			const mine = new Map(outfield(0).map(q => [ sq.find(pl => pl.name === q.name), q ]).filter(([ pl ]) => pl));
 			const best = pickCaptain([ ...mine.keys() ]);
 			if (best) { F.capt[0] = mine.get(best); }
+			// Theirs, in a league match, by form: the last five ratings (see rateCpuRound), eased in the same way.
+			const rec = league && leagueMatch && league.cpuForm && league.cpuForm.season === league.season && league.cpuForm.clubs[leagueMatch.opp];
+			if (rec) {
+				const sc = q => { const f = rec[q.name] || []; return (f.reduce((t, v) => t + v, 0) + 6.5 * 3) / (f.length + 3) + 0.0004 * (A(q, "pas") + A(q, "def")); };
+				const c = outfield(1).filter(q => (rec[q.name] || []).length).reduce((a, q) => (!a || sc(q) > sc(a) ? q : a), null);
+				if (c) { F.capt[1] = c; }
+			}
 		}
 		F.n = 0; F.rigOf = new Map(); F.nums.count = 0;   // rigOf: which figure each drawn player got this frame (off-screen players get none) if (F.chest) { F.chest.count = 0; } if (F.names) { F.names.count = 0; }
 		// Repaint the chest prints when the kits or the clubs change.
