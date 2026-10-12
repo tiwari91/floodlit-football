@@ -192,6 +192,10 @@
 		return best;
 	}
 
+	// When the computer plays your side's pass (autopilot, a test harness), the ball is handed on the way
+	// your own passes are: the man it is meant for runs onto it and control goes with it. Without this
+	// nobody of yours went to meet the pass (the passer chased his own ball) and it was not counted.
+	function aiHandOff (p, m, t) { if (p.team === 0 && m && m !== p) { handOff(m, t); } }
 	function aiOwnerAct (p) {
 		const cfg = p.team === 1 ? diff : DIFF.normal;
 		if (setPiece && (setPiece.kind === "free" || setPiece.kind === "pen") && setPiece.taker === p) {
@@ -201,7 +205,7 @@
 			const ind = setPiece.indirect, lay = setPiece.layoff && players.includes(setPiece.layoff.p) ? setPiece.layoff.p : null;
 			setPiece = null;
 			const g = { x: attackX(p.team), y: FH / 2 };
-			if (lay && (ind || Math.random() < 0.2)) { passTo(p, lay); return null; }
+			if (lay && (ind || Math.random() < 0.2)) { passTo(p, lay); aiHandOff(p, lay, 110); return null; }
 			if (!ind && dist(p, g) < 250 * Math.sqrt(S) && Math.random() < 0.7) {
 				if (Math.random() < 0.55) { liftShot(p); return null; }
 				shootAt(p, 0.75 + Math.random() * 0.25, FH / 2 + (Math.random() * 2 - 1) * FMT.goal * 0.48);
@@ -210,7 +214,7 @@
 			}
 			const mates = outfield(p.team).filter(m => m !== p && dist(m, p) < 420 * Math.sqrt(S));
 			const m = mates.sort((a, b) => openness(b) - openness(a))[0];
-			if (m) { passTo(p, m); } else { kick(p, g.x, g.y, 12); }
+			if (m) { passTo(p, m); aiHandOff(p, m, 110); } else { kick(p, g.x, g.y, 12); }
 			return null;
 		}
 		if (setPiece && setPiece.kind === "throw" && setPiece.taker === p) {
@@ -218,7 +222,7 @@
 			if (++p.hold < 25) { return null; }
 			const mates = outfield(p.team).filter(m => m !== p && dist(m, p) < 330 * Math.sqrt(S));
 			const m = mates.sort((a, b) => (openness(b) - dist(b, p) * 0.2) - (openness(a) - dist(a, p) * 0.2))[0];
-			throwIn(p, m || null, m ? dist(m, p) > 190 * Math.sqrt(S) : false);
+			throwIn(p, m || null, m ? dist(m, p) > 190 * Math.sqrt(S) : false); aiHandOff(p, m, 140);
 			return null;
 		}
 		if (setPiece && setPiece.kind === "corner" && setPiece.taker === p) {
@@ -252,7 +256,7 @@
 				if (box.length) {
 					const m = box.sort((a, b) => openness(b) - openness(a))[0];
 					const bend = (Math.random() < 0.5 ? 1 : -1) * (8 + Math.random() * 16) * GH;
-					loftTo(p, m.x + (goalX === FW ? -8 : 8), m.y + (Math.random() * 2 - 1) * (18 + 40 * edge(1 - p.team)), bend);
+					loftTo(p, m.x + (goalX === FW ? -8 : 8), m.y + (Math.random() * 2 - 1) * (18 + 40 * edge(1 - p.team)), bend); aiHandOff(p, m, 170);
 					return null;
 				}
 			}
@@ -280,7 +284,7 @@
 					if (laneBlockers(p, { x: lx, y: ly }, 1 - p.team) === 0) {
 						const err = 20 + 50 * edge(1 - p.team), d = Math.hypot(lx - ball.x, ly - ball.y);
 						notePass(p);
-						kick(p, lx + (Math.random() * 2 - 1) * err, ly + (Math.random() * 2 - 1) * err, clamp((d / 55 + 2) * cond.passComp, 6, 16));
+						kick(p, lx + (Math.random() * 2 - 1) * err, ly + (Math.random() * 2 - 1) * err, clamp((d / 55 + 2) * cond.passComp, 6, 16)); aiHandOff(p, runner, 130);
 						return null;
 					}
 				}
@@ -293,7 +297,7 @@
 				if (f) {
 					const [ lx, ly ] = leadPoint(p, f);
 					const err = (30 + 60 * edge(1 - p.team)) * (style[p.team] === "direct" || style[p.team] === "counter" ? 0.6 : 1);
-					loftTo(p, lx + (Math.random() * 2 - 1) * err, ly + (Math.random() * 2 - 1) * err);
+					loftTo(p, lx + (Math.random() * 2 - 1) * err, ly + (Math.random() * 2 - 1) * err); aiHandOff(p, f, 170);
 					return null;
 				}
 			}
@@ -314,9 +318,9 @@
 				if (pressure) {
 					const far = outfield(p.team).filter(m => m !== p && Math.abs(m.y - p.y) > FH * 0.45 && openness(m) > 90 && dist(p, m) < 520 * Math.sqrt(S) &&
 						!(offsideOn() && isOffside(m, offsideLine(p.team))))[0];
-					if (far && Math.random() < 0.5) { loftTo(p, far.x + (attackX(p.team) === FW ? 30 : -30), far.y); return null; }
+					if (far && Math.random() < 0.5) { loftTo(p, far.x + (attackX(p.team) === FW ? 30 : -30), far.y); aiHandOff(p, far, 170); return null; }
 				}
-				if (best && (pressure || bs > (style[p.team] === "possession" ? 0.5 : 0.9))) { passTo(p, best); return null; }
+				if (best && (pressure || bs > (style[p.team] === "possession" ? 0.5 : 0.9))) { passTo(p, best); aiHandOff(p, best, 100); return null; }
 			}
 		}
 		// Dribble toward goal, stepping around a defender in the way.

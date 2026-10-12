@@ -267,7 +267,7 @@
 			ball.pen = { gk, saved };
 			if (guess !== 0) { gk.dive = DIVE_T; gk.diveSide = guess * Math.cos(gk.dir) > 0 ? -1 : 1; gk.diveCd = 70; }
 		}
-		if (p.team === 0) { stats.shots++; burst(p.x, p.y, "Penalty"); } else { oppStats.shots++; ooh(); }
+		if (p.team === 0) { burst(p.x, p.y, "Penalty"); } else { ooh(); }   // shootAt has counted the shot
 	}
 
 	function awardThrow (t, spotX, top) {

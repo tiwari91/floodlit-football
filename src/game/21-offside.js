@@ -277,7 +277,7 @@
 	}
 
 	function shootAt (p, power01, aimY) {
-		if (p.team === 1) { oppStats.shots++; }
+		if (p.team === 1) { oppStats.shots++; } else { stats.shots++; }   // your side's computer-played shots count too (your own go through humanShootRelease)
 		tally.shots[p.team]++;
 		crowdReact("chance", p.team);
 		if (Math.abs(attackX(p.team) - p.x) > FW * 0.27) { moment("rocket", p); }   // a go from distance
