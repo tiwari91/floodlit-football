@@ -11765,6 +11765,9 @@
 		}
 		G3.fig = { parts, nums, chest, chestCv: cc, chestTex, chestKey: '', names, nameCv: nmc, nameTex, nameKeys: [], rings, blobs, longs, flags, rigs, cnt: {}, n: 0, M: new T.Matrix4(), M2: new T.Matrix4(), C: new T.Color(), V: new T.Vector3(), S: new T.Vector3(), Q: new T.Quaternion(), prevDir: new WeakMap(), yawSt: new WeakMap() };
 	}
+	// The arm axes, measured: +z on a shoulder swings the arm forward, and +x on the right shoulder
+	// (i = 1) or -x on the left (i = 0) brings it IN across the body. So "out to the side" is OUT3(i).
+	const OUT3 = i => (i ? -1 : 1);
 	// Reset a rig to standing.
 	function resetRig3D (r) {
 		r.hips.position.set(0, 15.6, 0); r.hips.rotation.set(0, 0, 0);
@@ -11807,9 +11810,8 @@
 			// a right angle, never reaching out straight or trailing behind the body.
 			const sw = -sn, run = clamp((a - 0.12) / 0.35, 0, 1);
 			r.sh[i].rotation.z = armA * (sw > 0 ? 0.62 * sw : 0.65 * sw);
-			// Sideways: on this rig +x on the right shoulder (and -x on the left) brings the arm IN across the
-			// body, so "out" is -s. The arms hang a little away from the sides, coming in a touch as they swing forward.
-			r.sh[i].rotation.x = -s * (0.12 + 0.05 * a - 0.12 * a * clamp(sw, 0, 1));
+			// Sideways (OUT3): the arms hang a little away from the sides, coming in a touch as they swing forward.
+			r.sh[i].rotation.x = OUT3(i) * (0.12 + 0.05 * a - 0.12 * a * clamp(sw, 0, 1));
 			const fore = 0.95 + 0.9 * (sw + 1) / 2 + gv.elbow * 0.5;
 			r.el[i].rotation.z = lerp3(0.45 + gv.elbow + 0.5 * a, clamp(fore - r.sh[i].rotation.z, 1.0, 1.75), run);
 		}
@@ -11835,7 +11837,7 @@
 			r.kn[free].rotation.z -= 0.32 * still; r.hip[free].rotation.z += 0.1 * still; r.kn[side].rotation.z -= 0.05 * still;
 			r.chest.rotation.y += (sd - 0.5) * 0.4 * still;
 			r.spine.rotation.z += Math.sin(idle * 1.3) * 0.015 * still;
-			for (let i = 0; i < 2; i++) { r.el[i].rotation.z += (0.1 + 0.3 * ((sd * 7.3 + i * 0.31) % 1)) * still; r.sh[i].rotation.x -= (i ? 1 : -1) * 0.04 * still; }   // arms eased away from the sides (-s is out)
+			for (let i = 0; i < 2; i++) { r.el[i].rotation.z += (0.1 + 0.3 * ((sd * 7.3 + i * 0.31) % 1)) * still; r.sh[i].rotation.x += OUT3(i) * 0.04 * still; }   // arms eased away from the sides
 			const calm = state !== "play" || freeze > 0;   // only at a stoppage: in open play a tired man stays upright
 			const w = p.team >= 0 && calm ? clamp((0.6 - staOf(p)) / 0.25, 0, 1) * still : 0;
 			if (w > 0) {
@@ -11884,7 +11886,7 @@
 		// The keeper on his toes when the ball is near: knees bent, hands ready.
 		if (gk && ballNear > 0 && !down && jump <= 0 && fall < 0 && dive < 0 && !(p.kickA > 0)) {
 			const g = ballNear * (1 - a);
-			for (let i = 0; i < 2; i++) { r.hip[i].rotation.z += 0.42 * g; r.kn[i].rotation.z -= 0.75 * g; r.sh[i].rotation.z += 0.75 * g; r.sh[i].rotation.x += (i ? 1 : -1) * 0.55 * g; r.el[i].rotation.z += 0.6 * g; }
+			for (let i = 0; i < 2; i++) { r.hip[i].rotation.z += 0.42 * g; r.kn[i].rotation.z -= 0.75 * g; r.sh[i].rotation.z += 0.75 * g; r.sh[i].rotation.x += OUT3(i) * 0.35 * g; r.el[i].rotation.z += 0.6 * g; }
 			r.hips.position.y -= 2.6 * g; r.spine.rotation.z += 0.3 * g;
 		}
 		// Kicking: a backswing, the strike and the follow-through on the kicking leg; the other leg
@@ -11908,7 +11910,7 @@
 		// Up for a header: legs tucked, arms out, the head snaps forward at the top.
 		if (jump > 0) {
 			y += jump * 13;
-			for (let i = 0; i < 2; i++) { r.hip[i].rotation.z = 0.35 * jump + (i ? 0.25 : -0.1) * jump; r.kn[i].rotation.z = -1.1 * jump; r.sh[i].rotation.x = (i ? 1 : -1) * 2.2 * jump; r.sh[i].rotation.z = -0.5 * jump; r.el[i].rotation.z = 0.35; }
+			for (let i = 0; i < 2; i++) { r.hip[i].rotation.z = 0.35 * jump + (i ? 0.25 : -0.1) * jump; r.kn[i].rotation.z = -1.1 * jump; r.sh[i].rotation.x = OUT3(i) * 2.2 * jump; r.sh[i].rotation.z = -0.5 * jump; r.el[i].rotation.z = 0.35; }
 			r.spine.rotation.z = -0.2 * jump + 0.35 * Math.max(0, jump - 0.75) * 4;
 			r.neck.rotation.z = -0.3 * jump + 0.9 * Math.max(0, jump - 0.8) * 5;
 		}
@@ -11942,7 +11944,7 @@
 		const ck = p.celebK | 0, hug = clamp(p.hug || 0, 0, 1) * cel;
 		if (cel > 0 && fall < 0 && ck === 2) {
 			const w = cel, bank = rm ? 0 : Math.sin(idle * 1.6) * 0.22 * a;
-			for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 0.15, w); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, (i ? 1 : -1) * (1.45 + (i ? 1 : -1) * bank * 0.6), w); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.12, w); }
+			for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 0.15, w); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, OUT3(i) * (1.45 + (i ? 1 : -1) * bank * 0.6), w); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.12, w); }   // wings out
 			r.root.rotation.x += bank; r.spine.rotation.z = lerp3(r.spine.rotation.z, 0.15, w); r.neck.rotation.z = lerp3(r.neck.rotation.z, -0.2, w);
 		} else if (cel > 0 && fall < 0 && ck === 3) {
 			// The fist pump: one bent arm driven down hard, again and again, leaning back and roaring.
@@ -11966,7 +11968,7 @@
 			r.hips.position.y += b * 6 * hug;
 		} else if (cel > 0 && fall < 0) {
 			const w = cel * (1 - 0.4 * kneel), wave = Math.sin(idle * 3 + x * 0.01) * 0.25 * cel;
-			for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, -0.45 + wave * (i ? -1 : 1), w); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, (i ? 1 : -1) * (2.35 + 0.5 * kneel), w); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.3, w); }
+			for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, -0.45 + wave * (i ? -1 : 1), w); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, OUT3(i) * (2.35 + 0.5 * kneel), w); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.3, w); }   // arms up and out wide, not crossed
 			r.neck.rotation.z = lerp3(r.neck.rotation.z, -0.35 * cel, cel);
 		}
 		if (kneel > 0) {
