@@ -87,8 +87,8 @@ r = await scene({ mode: "assisted", kind: "loose", steer: true, frames: 75, keep
 check("After a near switch control stays put (no ping-pong in the next second)", r.to === "d" && r.involuntary <= 1 && r.humanIsD, JSON.stringify(r));
 check("no console errors in the switch checks", errs.length === 0, errs.join(" | "));
 
-// 8. Sanity: a stretch of real play on auto-pilot runs clean.
-const sane = await page.evaluate(() => { const F = window.__ff; F.autoPilot = true; F.timeLeft = 1e9; F.freeze = 0; let sw = 0, last = F.ctrl; for (let i = 0; i < 3600; i++) { F.step(1); if (F.ctrl !== last) { sw++; last = F.ctrl; } } F.autoPilot = false; return { sw, state: F.state, score: F.score }; });
+// 8. Sanity: a stretch of real play on auto-pilot runs clean (a goal right at the end plays out to the kick-off).
+const sane = await page.evaluate(() => { const F = window.__ff; F.autoPilot = true; F.timeLeft = 1e9; F.freeze = 0; let sw = 0, last = F.ctrl; for (let i = 0; i < 3600; i++) { F.step(1); if (F.ctrl !== last) { sw++; last = F.ctrl; } } for (let i = 0; i < 1500 && F.state === "goal"; i++) { F.step(1); } F.autoPilot = false; return { sw, state: F.state, score: F.score }; });
 check("a minute of play on auto-pilot runs without errors", errs.length === 0 && sane.state === "play", JSON.stringify(sane) + " " + errs.join(" | "));
 await browser.close(); server.stop();
 process.exit(done() ? 1 : 0);

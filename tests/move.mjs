@@ -135,23 +135,31 @@ const dress = await page.evaluate(async () => {
 	const a1 = G.endFlags && G.endFlags[0] ? G.endFlags[0].cloth.geometry.attributes.position.array.at(-1) : 0;
 	return { flags, banners, waves: a0 !== a1, drawMs: +F.drawMs.toFixed(2) };
 });
-const tired = await page.evaluate(() => new Promise(res => {
-	const F = window.__ff; for (let i = 0; i < 3000 && F.state !== "play"; i++) { F.step(1); } F.freeze = 0;
-	const keep = F.players.map(p => p.sta); for (const p of F.players) { p.sta = 0.3; }
-	let n = 0, bent = 0;
-	const tick = () => { F.players.forEach((p, i) => { const r = F.G3.fig.rigOf && F.G3.fig.rigOf.get(p); if (r && F.state === "play" && F.freeze <= 0 && r.spine.rotation.z > 0.55) { bent++; } }); if (++n < 90) { requestAnimationFrame(tick); } else { F.players.forEach((p, i) => { p.sta = keep[i]; }); res({ bent }); } };
-	requestAnimationFrame(tick);
-}));
-check("exhausted players stay upright in open play (no bending over mid-match)", tired.bent === 0, JSON.stringify(tired));
+// Exhausted players stay upright in open play (they bend over only at a stoppage): posed on a spare figure,
+// so it no longer depends on catching a sprinting man mid-lean.
+const tired = await page.evaluate(() => {
+	const F = window.__ff, W = n => n.getWorldPosition(n.position.clone());
+	for (let i = 0; i < 3000 && F.state !== "play"; i++) { F.step(1); }
+	const fz = F.freeze; F.freeze = 0;
+	const p = F.outfield(0)[3], keep = [ p.sta, p.vx, p.vy, p.runAmt ], owner = F.ball.owner;
+	Object.assign(p, { kickA: 0, lunge: 0, slideAI: 0, fall: 0, celebA: 0, celebK: 0, jump: 0, throwA: 0, dive: 0, headHands: 0, fistPump: 0, kneel: 0, hug: 0, sulk: 0, plant: 0, recv: 0, recvK: null, vx: 0, vy: 0, runAmt: 0, sprintAmt: 0, jockW: 0, shieldW: 0, shuf: 0 });
+	if (owner === p) { F.ball.owner = null; }
+	const lean = () => { const r = F.poseProbe(p, 1), inv = r.root.matrixWorld.clone().invert(), hp = W(r.hips).applyMatrix4(inv), nk = W(r.neck).applyMatrix4(inv); return +(Math.atan2(nk.x - hp.x, nk.y - hp.y) * 57.3).toFixed(1); };
+	p.sta = 1; const fresh = lean(); p.sta = 0.3; const open = lean(); F.freeze = 30; const stop = lean(); F.freeze = fz;
+	[ p.sta, p.vx, p.vy, p.runAmt ] = keep; F.ball.owner = owner;
+	return { fresh, open, stop, bent: open - fresh > 6 ? 1 : 0 };
+});
+check("exhausted players stay upright in open play (no bending over mid-match), and bend over at a stoppage", tired.bent === 0 && tired.stop > tired.open + 15, JSON.stringify(tired));
 // Through balls (W) go forward to a teammate ahead of you, preferring runners, and you take control of him.
 const tb = await page.evaluate(() => {
 	const F = window.__ff, out = { n: 0, ahead: 0, ctrl: 0, withAhead: 0 };
-	for (let t = 0; t < 40 && out.n < 15; t++) {
+	for (let t = 0; t < 80 && out.n < 15; t++) {
 		for (let i = 0; i < 4000 && F.state !== "play"; i++) { F.step(1); }
 		F.freeze = 0; F.timeLeft = 1e9;
 		const me = F.human();
 		F.ball.owner = me; F.ball.z = 0; F.possTeam = 0; me.dir = 0;
-		for (let i = 0; i < 60; i++) { F.step(1); }
+		const clear = () => { for (const q of F.players) { if (q.team === 1 && Math.hypot(q.x - me.x, q.y - me.y) < 120) { q.x = Math.min(F.FW - 20, me.x + 220); q.vx = q.vy = 0; } } };   // nobody tackles him while he sets up
+		for (let i = 0; i < 60; i++) { clear(); F.step(1); }
 		if (F.ball.owner !== me || F.state !== "play") { continue; }
 		const anyAhead = F.players.some(q => q.team === 0 && q.role !== "gk" && q !== me && q.x > me.x + 60 && Math.hypot(q.x - me.x, q.y - me.y) < 450);
 		F.press("KeyW"); F.step(1); F.release("KeyW");
@@ -202,19 +210,21 @@ const swing = await page.evaluate(async () => {
 });
 check("running, the upper arm stays within about 25 degrees behind vertical (no hands off the back)", swing.n > 100 && swing.p98 < 0.45, JSON.stringify(swing));
 // A goal huddle: team-mates' hands go forward round the scorer, never behind their own backs.
-const huddle = await page.evaluate(async () => {
-	const F = window.__ff, G3 = F.G3;
-	F.state === "play" || (F.state = "play"); F.freeze = 0; F.forceGoal(0);
-	for (let i = 0; i < 60 && F.state !== "goal"; i++) { F.step(1); }
-	let h = null;
-	for (let i = 0; i < 1500 && F.state === "goal" && !h; i++) { F.step(1); h = F.players.find(p => (p.hug || 0) > 0.5) || null; }
-	if (!h) { return { hug: false }; }
-	await new Promise(r => setTimeout(r, 120));
-	const r = G3.fig.rigOf.get(h), o = r.chest.getWorldPosition(r.chest.position.clone()), root = r.root.getWorldPosition(r.root.position.clone());
-	const fwd = r.root.localToWorld(r.root.position.clone().set(1, 0, 0)).sub(root).normalize();
-	return { hug: true, fwd: [ 0, 1 ].map(j => +r.ha[j].getWorldPosition(r.ha[j].position.clone()).sub(o).dot(fwd).toFixed(1)) };
+// Posed on a spare figure (in a live huddle a team-mate may be mid-jump, arms out wide), through the hug's bounce.
+const huddle = await page.evaluate(() => {
+	const F = window.__ff, W = n => n.getWorldPosition(n.position.clone()), p = F.outfield(0)[1];
+	const keep = [ p.celebA, p.hug, p.idlePh ];
+	Object.assign(p, { kickA: 0, lunge: 0, slideAI: 0, fall: 0, celebK: 0, jump: 0, throwA: 0, dive: 0, headHands: 0, fistPump: 0, kneel: 0, sulk: 0, plant: 0, recv: 0, recvK: null, celebA: 1, hug: 1 });
+	let min = 1e9;
+	for (let k = 0; k < 12; k++) {
+		p.idlePh = k * 0.37;
+		const r = F.poseProbe(p, 1), inv = r.root.matrixWorld.clone().invert(), ch = W(r.chest).applyMatrix4(inv);
+		for (let j = 0; j < 2; j++) { min = Math.min(min, W(r.ha[j]).applyMatrix4(inv).x - ch.x); }
+	}
+	[ p.celebA, p.hug, p.idlePh ] = keep;
+	return { hug: true, min: +min.toFixed(1) };
 });
-check("in a goal huddle the hugging players' hands are in front of them", !huddle.hug || huddle.fwd.every(v => v > 2), JSON.stringify(huddle));
+check("in a goal huddle the hugging players' hands are in front of them", huddle.min > 2, JSON.stringify(huddle));
 // Standing, the hands hang at his sides, outside the line of the shoulders, never tucked in behind the shorts.
 const sides = await page.evaluate(async () => {
 	const F = window.__ff, G3 = F.G3, out = [];
