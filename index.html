@@ -4890,6 +4890,21 @@
 		const snap = {};
 		for (const k of Object.keys(ball)) { if (!WIND_SKIP.has(k)) { snap[k] = ball[k]; } }
 		p.windSnap = snap; p.windSound = w.sound; p.windUp = n; p.windN = n; p.kickA = 0;
+		// Who the ball is for: the team-mate nearest its line, ahead of it. On the strike it is aimed where
+		// he has got to in the meantime, not where he was when the pass was picked (left as it was, it went
+		// in behind him, and twice as many passes were cut out at his end).
+		p.windAim = null;
+		const sp = Math.hypot(snap.vx, snap.vy);
+		if (!snap.shot && sp > 0.5) {
+			const ux = snap.vx / sp, uy = snap.vy / sp;
+			let best = null, bs = Infinity;
+			for (const m of players) {
+				if (m === p || m.team !== p.team) { continue; }
+				const dx = m.x - snap.x, dy = m.y - snap.y, along = dx * ux + dy * uy, off = Math.abs(dx * uy - dy * ux);
+				if (along > 20 && off < along * 0.47 && off < bs) { bs = off; best = { m, mx: m.x, my: m.y, along }; }
+			}
+			if (best) { p.windAim = { ...best, bx: snap.x, by: snap.y, ux, uy, loft: snap.landT > 0, lx: snap.landX, ly: snap.landY }; }
+		}
 		ball.owner = p; ball.vx = ball.vy = ball.vz = 0; ball.z = 0; ball.shot = false;
 		if (receiver) { receiveTimer += n; }
 	}
@@ -4902,6 +4917,18 @@
 		p.windSnap = null;
 		Object.assign(ball, s);
 		ball.owner = null; ball.x = bx; ball.y = by; ball.kickedAt = frame;
+		const a = p.windAim; p.windAim = null;
+		if (a && players.includes(a.m)) {
+			const ax = a.loft ? a.lx : a.bx + a.ux * a.along, ay = a.loft ? a.ly : a.by + a.uy * a.along;
+			const ox = ax - a.bx, oy = ay - a.by, nx = ax + (a.m.x - a.mx) - bx, ny = ay + (a.m.y - a.my) - by;
+			const ol = Math.hypot(ox, oy), nl = Math.hypot(nx, ny);
+			if (ol > 1 && nl > 1) {
+				const rot = Math.atan2(ny, nx) - Math.atan2(oy, ox), k = clamp(nl / ol, 0.8, 1.25), c = Math.cos(rot) * k, s2 = Math.sin(rot) * k;
+				const vx = ball.vx, vy = ball.vy; ball.vx = vx * c - vy * s2; ball.vy = vx * s2 + vy * c;
+				if (ball.curlT > 0 && ball.cax !== undefined) { const cx = ball.cax, cy = ball.cay; ball.cax = cx * c - cy * s2; ball.cay = cx * s2 + cy * c; }
+				if (a.loft) { predictLanding(); }
+			}
+		}
 		p.kickA = KICK_T; p.kickCd = Math.max(p.kickCd, 12);
 		sfx(...p.windSound);
 		return true;
@@ -6143,7 +6170,9 @@
 			receiveTimer--;
 			// A pass that has died stays his to fetch while he is the nearest of yours to it.
 			const dead = Math.hypot(ball.vx, ball.vy) < 1, nearest = dead && outfield(0).every(q => q === receiver || dist(q, ball) > dist(receiver, ball));
-			if ((ball.owner && !(ball.owner.windUp > 0)) || receiveTimer <= 0 || (dead && !nearest)) { receiver = null; }
+			// (Not while the passer winds up: the ball is still at his feet, which read as a dead pass that the
+			// passer was nearest to, and the man it was for lost it, and with it the reach to control a firm one.)
+			if (!(ball.owner && ball.owner.windUp > 0) && (ball.owner || receiveTimer <= 0 || (dead && !nearest))) { receiver = null; }
 		}
 		// Once your keeper has played it, control leaves him at once: you never run him out of goal by accident.
 		if (human().role === "gk" && ball.owner !== human() && !receiver) {

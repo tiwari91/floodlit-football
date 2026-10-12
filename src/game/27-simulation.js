@@ -247,7 +247,9 @@
 			receiveTimer--;
 			// A pass that has died stays his to fetch while he is the nearest of yours to it.
 			const dead = Math.hypot(ball.vx, ball.vy) < 1, nearest = dead && outfield(0).every(q => q === receiver || dist(q, ball) > dist(receiver, ball));
-			if ((ball.owner && !(ball.owner.windUp > 0)) || receiveTimer <= 0 || (dead && !nearest)) { receiver = null; }
+			// (Not while the passer winds up: the ball is still at his feet, which read as a dead pass that the
+			// passer was nearest to, and the man it was for lost it, and with it the reach to control a firm one.)
+			if (!(ball.owner && ball.owner.windUp > 0) && (ball.owner || receiveTimer <= 0 || (dead && !nearest))) { receiver = null; }
 		}
 		// Once your keeper has played it, control leaves him at once: you never run him out of goal by accident.
 		if (human().role === "gk" && ball.owner !== human() && !receiver) {
