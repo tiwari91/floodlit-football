@@ -21,6 +21,7 @@
 			if (p.plant > 0) { p.plant--; }
 			if (p.headHands > 0) { p.headHands--; }
 			if (p.fistPump > 0) { p.fistPump--; }
+			if (p.heavyT > 0) { p.heavyT--; }
 		}
 	}
 
@@ -614,6 +615,10 @@
 		} else {
 			o.touchPh = 1;
 		}
+		// A heavy first touch: the ball runs a step further away for a moment (where a defender can nick it).
+		if (o.heavyT > 0) { ahead += 15 * clamp(o.heavyT / 18, 0, 1); }
+		// Turning with his first touch: a computer player, back to goal and room behind, comes round with it.
+		if (o.turnT > 0) { o.turnT--; if (!(o.team === 0 && players.indexOf(o) === ctrl)) { o.dir = turnToward(o.dir, o.turnTo, 0.2); } }
 		// The ball rolls to the spot at his feet rather than jumping there.
 		const fxb = o.x + Math.cos(o.dir) * ahead, fyb = o.y + Math.sin(o.dir) * ahead;
 		const settled = Math.hypot(fxb - ball.x, fyb - ball.y) > 60;   // a fresh gain from far away: take it

@@ -5829,6 +5829,7 @@
 			if (p.plant > 0) { p.plant--; }
 			if (p.headHands > 0) { p.headHands--; }
 			if (p.fistPump > 0) { p.fistPump--; }
+			if (p.heavyT > 0) { p.heavyT--; }
 		}
 	}
 
@@ -6422,6 +6423,10 @@
 		} else {
 			o.touchPh = 1;
 		}
+		// A heavy first touch: the ball runs a step further away for a moment (where a defender can nick it).
+		if (o.heavyT > 0) { ahead += 15 * clamp(o.heavyT / 18, 0, 1); }
+		// Turning with his first touch: a computer player, back to goal and room behind, comes round with it.
+		if (o.turnT > 0) { o.turnT--; if (!(o.team === 0 && players.indexOf(o) === ctrl)) { o.dir = turnToward(o.dir, o.turnTo, 0.2); } }
 		// The ball rolls to the spot at his feet rather than jumping there.
 		const fxb = o.x + Math.cos(o.dir) * ahead, fyb = o.y + Math.sin(o.dir) * ahead;
 		const settled = Math.hypot(fxb - ball.x, fyb - ball.y) > 60;   // a fresh gain from far away: take it
@@ -7434,7 +7439,7 @@
 				// A ball just struck is past the man closing the kicker down before he can react:
 				// pressing you forces a pass, it doesn't win it off your boot.
 				if (!isGk && p.team !== lastTouch && speed < 11 && frame - (ball.kickedAt || -99) < 7) { continue; }
-				if (ball.z > (isGk ? 45 : 16)) { continue; }   // over their head
+				if (ball.z > (isGk ? 45 : isReceiver && ball.vz < 0 && !ball.shot && ball.lastBy && ball.lastBy.team === p.team ? 34 : 16)) { continue; }   // over their head (the man it's meant for can chest a dropping ball down)
 				// The intended receiver always controls a firm pass.
 				if (speed > 11 && !isReceiver) {
 					// Your keeper holds most of what he reaches; theirs is set by the opponent level.
@@ -7681,6 +7686,21 @@
 		if (p.team === 0) { burst(p.x, p.y, "Blocked"); } else { ooh(); }
 	}
 
+	// The first touch, from how the ball arrives and who he is. Pure, so the tests can ask it. c: z (ball
+	// height), spd (its pace), pas (his passing), seed (his build), play (a playmaker), back (his back to
+	// goal), space (room behind him), human (your man: never turned for you), wet. A dropping ball is
+	// taken on the chest or the thigh; along the ground a poor touch (worse at pace and in the wet) now and
+	// then runs away from him; with his back to goal and room behind, a computer player turns with it;
+	// otherwise a gentler pass is stopped under the sole by the neat footballers, the rest cushioned with
+	// the inside of the foot.
+	function recvKind (c, rnd = Math.random) {
+		if (c.z >= 26) { return "chest"; }
+		if (c.z >= 11) { return "thigh"; }
+		const heavy = clamp((64 - c.pas) / 110, 0, 0.16) + (c.spd > 9 ? 0.04 : 0) + (c.wet ? 0.03 : 0) - (c.play ? 0.05 : 0);
+		if (rnd() < heavy) { return "heavy"; }
+		if (c.back && c.space && !c.human) { return "turn"; }
+		return c.spd < 7 && (c.seed < 0.4 || c.play) ? "sole" : "inside";
+	}
 	function gainBall (p) {
 		const lostBy = p.team !== possTeam ? possTeam : -1;
 		// First touch by a teammate who was offside when the ball was played (or a tight one either way).
@@ -7696,6 +7716,17 @@
 		offside = { team: -1, set: new Set() };
 		// How it reached him, for his receiving pose: a pass along the ground (1) or in the air (2).
 		p.recv = ball.lastBy && ball.lastBy !== p && ball.lastBy.team === p.team ? ((ball.z || 0) > 22 ? 2 : 1) : 0;
+		// And how he takes it: chest, thigh, the sole, the inside of the foot, a turn, or a heavy touch.
+		p.recvK = null; p.heavyT = 0; p.turnT = 0;
+		if (p.recv) {
+			const toGoal = Math.atan2(FH / 2 - p.y, attackX(p.team) - p.x), off = Math.atan2(Math.sin(toGoal - (p.dir || 0)), Math.cos(toGoal - (p.dir || 0)));
+			const bx = p.x + Math.cos(toGoal) * 45, by = p.y + Math.sin(toGoal) * 45;
+			const space = !players.some(q => q.team !== p.team && Math.hypot(q.x - bx, q.y - by) < 55);
+			p.recvK = recvKind({ z: ball.z || 0, spd: Math.hypot(ball.vx, ball.vy), pas: A(p, "pas"), seed: build(p).seed, play: tr(p, "playmaker"), back: Math.abs(off) > 2.1, space, human: p.team === 0 && players.indexOf(p) === ctrl, wet: cond.wet > 0 });
+			p.recvZ = ball.z || 0;
+			if (p.recvK === "turn") { p.turnTo = toGoal; p.turnT = 16; }
+			if (p.recvK === "heavy") { p.heavyT = 18; if (p.team === 0 && !bulkSim) { burst(p.x, p.y, "Heavy touch"); } }
+		}
 		ball.owner = p;
 		ball.headed = false;
 		ball.indirect = null;
@@ -12137,17 +12168,37 @@
 				for (let k = 0; k < 2; k++) { r.kn[k].rotation.z -= 0.35 * S2; r.hip[k].rotation.z += 0.18 * S2; }
 				r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, OUT3(i) * 0.95, S2); r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 0.15, S2); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.35, S2);
 			}
-			// Receiving: the first few frames after a pass reaches him. Along the ground the foot comes up to
-			// cushion it and the arms go out for balance; in the air he leans back and takes it on the chest.
-			const since = p.recv && p.gotAt !== undefined ? frame - p.gotAt : 99, rk = since < 18 ? Math.sin(Math.PI * clamp(since / 18, 0, 1)) : 0;
+			// Receiving: the first few frames after a pass reaches him (p.recvK, chosen in gainBall). On the
+			// chest he leans back, arms out; on the thigh the knee comes up to waist height; under the sole the
+			// foot reaches forward, toes up; with the inside of the foot the leg turns out to cushion it; turning,
+			// the hips open toward goal as the foot drags it round; a heavy touch, he lunges after it.
+			const K = p.recvK || (p.recv === 2 ? "chest" : "inside"), win = K === "chest" || K === "thigh" ? 22 : 18;
+			const since = p.recv && p.gotAt !== undefined ? frame - p.gotAt : 99, rk = since < win ? Math.sin(Math.PI * clamp(since / win, 0, 1)) : 0;
 			if (rk > 0 && o === p) {
-				if (p.recv === 2) {
-					r.spine.rotation.z -= 0.38 * rk; r.neck.rotation.z += 0.35 * rk;
-					for (let i = 0; i < 2; i++) { r.sh[i].rotation.x += OUT3(i) * 0.8 * rk; r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 0.1, rk); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.5, rk); }
+				const f = build(p).left ? 0 : 1;
+				if (K === "chest") {
+					r.spine.rotation.z += 0.36 * rk; r.neck.rotation.z -= 0.3 * rk;   // measured: +z on the spine takes the head back, -z on the neck tips the chin down to the ball
+					for (let i = 0; i < 2; i++) { r.kn[i].rotation.z -= 0.22 * rk; r.sh[i].rotation.x += OUT3(i) * 0.8 * rk; r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 0.1, rk); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.5, rk); }
+				} else if (K === "thigh") {
+					r.hip[f].rotation.z += 1.25 * rk; r.kn[f].rotation.z -= 1.35 * rk; r.an[f].rotation.z += 0.2 * rk; r.kn[1 - f].rotation.z -= 0.2 * rk;
+					r.spine.rotation.z += 0.1 * rk; r.neck.rotation.z -= 0.3 * rk;
+					for (let i = 0; i < 2; i++) { r.sh[i].rotation.x += OUT3(i) * 0.6 * rk; }
+				} else if (K === "sole") {
+					r.hip[f].rotation.z += 0.85 * rk; r.kn[f].rotation.z -= 0.4 * rk; r.an[f].rotation.z += 0.6 * rk; r.kn[1 - f].rotation.z -= 0.15 * rk;
+					r.spine.rotation.z += 0.05 * rk; r.neck.rotation.z -= 0.25 * rk;
+					for (let i = 0; i < 2; i++) { r.sh[i].rotation.x += OUT3(i) * 0.35 * rk; }
+				} else if (K === "heavy") {
+					r.hip[f].rotation.z += 0.95 * rk; r.kn[f].rotation.z -= 0.25 * rk; r.an[f].rotation.z += 0.1 * rk; r.kn[1 - f].rotation.z -= 0.3 * rk;
+					r.spine.rotation.z -= 0.2 * rk;   // lunging forward after it
+					for (let i = 0; i < 2; i++) { r.sh[i].rotation.x += OUT3(i) * 0.65 * rk; }
 				} else {
-					const f = build(p).left ? 0 : 1;
 					r.hip[f].rotation.z += 0.65 * rk; r.kn[f].rotation.z -= 0.8 * rk; r.an[f].rotation.z += 0.3 * rk; r.spine.rotation.z -= 0.08 * rk; r.neck.rotation.z += 0.2 * rk;
+					r.hip[f].rotation.y += OUT3(f) * 0.75 * rk;   // the leg turned out: the inside of the boot to the ball
 					for (let i = 0; i < 2; i++) { r.sh[i].rotation.x += OUT3(i) * 0.4 * rk; }
+					if (K === "turn" && p.turnTo !== undefined) {
+						const tw = -Math.sign(Math.atan2(Math.sin(p.turnTo - (p.dir || 0)), Math.cos(p.turnTo - (p.dir || 0)))) * (r.mir || 1);
+						r.hips.rotation.y += 0.5 * tw * rk; r.chest.rotation.y += 0.35 * tw * rk; r.neck.rotation.y += 0.3 * tw * rk;
+					}
 				}
 			}
 		}
@@ -13022,7 +13073,9 @@
 		// The ball, at its true height, rolling; its shadow stays on the grass.
 		// Near true size close up (a little bigger than a head), growing with the camera's distance so it
 		// never shrinks to a speck from the gantry.
-		const h = Math.max(0, ball.z || 0), bx = WX(ball.x), bz = ball.y;
+		// Taken on the chest or the thigh, the ball is drawn dropping from where he met it to his feet.
+		const ow = ball.owner, rs = ow && (ow.recvK === "chest" || ow.recvK === "thigh") && ow.gotAt !== undefined ? frame - ow.gotAt : 99;
+		const h = Math.max(0, ball.z || 0, rs >= 0 && rs < 14 ? (ow.recvZ || 0) * Math.pow(1 - rs / 14, 2) : 0), bx = WX(ball.x), bz = ball.y;
 		const br = G3.ballR = clamp(G3.cam.position.distanceTo(G3.v.set(bx, h * Z3, bz)) * BALL_R_PER_DIST, 2.4, 5);
 		G3.ball.scale.setScalar(br / 5);
 		G3.ball.position.set(bx, h * Z3 + br, bz);
@@ -14437,7 +14490,7 @@
 		window.__ff = {
 			get state () { return state; }, get frame () { return frame; }, get ctrl () { return ctrl; }, get players () { return players; },
 			get ball () { return ball; }, get score () { return score; }, get possFrames () { return possFrames; }, get possTeam () { return possTeam; },
-			get goalTimer () { return goalTimer; }, get timeLeft () { return timeLeft; }, get freeze () { return freeze; }, get FW () { return FW; }, get FH () { return FH; }, get GOAL_T () { return GOAL_T; }, get GOAL_B () { return GOAL_B; }, woodworkHit, celebPlan, get matchLen () { return matchLen; },
+			get goalTimer () { return goalTimer; }, get timeLeft () { return timeLeft; }, get freeze () { return freeze; }, get FW () { return FW; }, get FH () { return FH; }, get GOAL_T () { return GOAL_T; }, get GOAL_B () { return GOAL_B; }, woodworkHit, celebPlan, recvKind, gainBallTest (p) { gainBall(p); }, get matchLen () { return matchLen; },
 			get manualLock () { return manualLock; }, get receiver () { return receiver; }, get cond () { return cond; }, get celeb () { return typeof celeb === "undefined" ? null : celeb; },
 			get autoSwitchMode () { return autoSwitchMode; }, set autoSwitchMode (v) { autoSwitchMode = v; autoSwitchSel.value = v; },
 			get assistMode () { return assistMode; }, setAssist, assistRun, get lastDeal () { return lastDeal; }, valueOf, ovrNow, windowOpen,

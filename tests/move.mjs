@@ -277,7 +277,7 @@ const pos3 = await page.evaluate(() => {
 	r = F.poseProbe(j);
 	out.jockey = { w: +(j.jockW || 0).toFixed(2), drop: +(hip0 - W(r.hips).y).toFixed(2) };
 	// receiving a ground pass: the receiving foot comes up, against the same man without it
-	F.ball.owner = rc; rc.recv = 0;
+	F.ball.owner = rc; rc.recv = 0; rc.recvK = null;
 	const f = rc.build && rc.build.left ? 0 : 1;
 	r = F.poseProbe(rc, 1); const a0 = W(r.an[f]).y;
 	rc.recv = 1; rc.gotAt = F.frame - 9;
@@ -377,6 +377,50 @@ const sky = await page.evaluate(() => {
 	return { up: hands.map(h => +(h.y - head.y).toFixed(1)), side: loc.map(v => +v.z.toFixed(1)), fwd: loc.map(v => +(v.x - hl.x).toFixed(1)) };
 });
 check("brace / hat-trick pose: both hands above the head, on their own sides, not behind him", sky.up.every(v => v > 3) && sky.side[0] * sky.side[1] < 0 && sky.fwd.every(v => v > -3), JSON.stringify(sky));
+// First touch: how he takes it depends on the ball's height and pace, his technique and his position.
+const rk = await page.evaluate(() => {
+	const F = window.__ff, K = (c, r = 0.99) => F.recvKind(Object.assign({ z: 0, spd: 8, pas: 70, seed: 0.6, play: false, back: false, space: false, human: false, wet: false }, c), () => r);
+	return { chest: K({ z: 30 }), thigh: K({ z: 18 }), low: K({ z: 6 }), sole: K({ spd: 4, seed: 0.2 }), hard: K({ spd: 10, seed: 0.2 }), inside: K({ spd: 5, seed: 0.8 }), turn: K({ back: true, space: true }), turnYou: K({ back: true, space: true, human: true }), turnTight: K({ back: true }), heavy: K({ pas: 40 }, 0.05), neat: K({ pas: 90, spd: 5 }, 0.05) };
+});
+check("first touch: chest high, thigh mid-height, sole or inside of the foot along the ground, a turn with space behind, a heavy touch for poor technique", rk.chest === "chest" && rk.thigh === "thigh" && rk.low !== "thigh" && rk.sole === "sole" && rk.hard === "inside" && rk.inside === "inside" && rk.turn === "turn" && rk.turnYou !== "turn" && rk.turnTight !== "turn" && rk.heavy === "heavy" && rk.neat !== "heavy", JSON.stringify(rk));
+const ft = await page.evaluate(() => {
+	const F = window.__ff, W = n => n.getWorldPosition(n.position.clone()), out = {};
+	for (let i = 0; i < 1500 && F.state !== "play"; i++) { F.step(1); }
+	const rc = F.outfield(0)[2], f = rc.build && rc.build.left ? 0 : 1, owner = F.ball.owner;
+	const keep = [ rc.x, rc.y, rc.dir, rc.vx, rc.vy, rc.runAmt ];
+	Object.assign(rc, { kickA: 0, lunge: 0, slideAI: 0, fall: 0, celebA: 0, jump: 0, throwA: 0, dive: 0, headHands: 0, fistPump: 0, jockW: 0, shieldW: 0, vx: 0, vy: 0, runAmt: 0, sulk: 0, kneel: 0, hug: 0 });
+	rc.x = F.FW / 2; rc.y = F.FH / 2; rc.dir = 0;
+	for (const q of F.players) { if (q !== rc) { q.x = 40 + (F.players.indexOf(q) % 6) * 10; q.y = 40 + Math.floor(F.players.indexOf(q) / 6) * 10; q.vx = q.vy = 0; } }
+	F.ball.owner = rc;
+	const pose = (k, at) => { rc.recv = k ? 1 : 0; rc.recvK = k; rc.gotAt = F.frame - at; const r = F.poseProbe(rc, 1), inv = r.root.matrixWorld.clone().invert(), L = n => W(n).applyMatrix4(inv);
+		const toe = r.an[f].position.clone().set(4, 0, 0); r.an[f].localToWorld(toe); toe.applyMatrix4(inv);
+		return { kn: L(r.kn[f]), an: L(r.an[f]), kn2: L(r.kn[1 - f]), an2: L(r.an[1 - f]), hip: L(r.hip[f]), hips: L(r.hips), head: L(r.head), toe, chestY: r.chest.rotation.y, hipsY: r.hips.rotation.y }; };
+	const base = pose(null, 99), th = pose("thigh", 11), ch = pose("chest", 11), so = pose("sole", 9), ins = pose("inside", 9), hv = pose("heavy", 9);
+	rc.turnTo = Math.PI * 0.9; const tu = pose("turn", 9);
+	out.thigh = +(th.kn.y - th.kn2.y).toFixed(2);
+	out.chest = +((ch.head.x - ch.hips.x) - (base.head.x - base.hips.x)).toFixed(2);
+	out.sole = { up: +(so.an.y - so.an2.y).toFixed(2), fwd: +(so.an.x - base.an.x).toFixed(2), toeUp: +(so.toe.y - so.an.y).toFixed(2) };
+	out.inside = { side: Math.sign(ins.hip.z), toeOut: +((ins.toe.z - ins.an.z) - (base.toe.z - base.an.z)).toFixed(2) };
+	out.heavy = +(hv.an.x - base.an.x).toFixed(2); out.heavyLean = +((hv.head.x - hv.hips.x) - (base.head.x - base.hips.x)).toFixed(2);
+	out.turn = +Math.abs(tu.hipsY - base.hipsY).toFixed(2);
+	// a heavy touch in play: the ball runs further from him for a moment
+	rc.recvK = null; rc.recv = 0;
+	const team = F.outfield(0), mate = team.find(q => q !== rc);
+	const R = Math.random; Math.random = () => 0.001;
+	let far = 0;
+	try {
+		F.freeze = 0; F.ball.owner = null; F.ball.x = rc.x + 10; F.ball.y = rc.y; F.ball.z = 0; F.ball.vx = -6; F.ball.vy = 0; F.ball.vz = 0; F.ball.lastBy = mate; F.ball.kickedAt = F.frame - 30; F.ball.shot = false;
+		if (rc.attr) { rc.attr.pas = 35; }
+		F.gainBallTest(rc);
+	} finally { Math.random = R; }
+	out.heavyK = rc.recvK;
+	for (let i = 0; i < 6; i++) { F.step(1); far = Math.max(far, Math.hypot(F.ball.x - rc.x, F.ball.y - rc.y)); }
+	out.heavyFar = +far.toFixed(1);
+	[ rc.x, rc.y, rc.dir, rc.vx, rc.vy, rc.runAmt ] = keep; rc.recvK = null; rc.recv = 0;
+	return out;
+});
+check("first-touch poses (forward = toe = +x): thigh up, chest leans back, heavy lunges forward, sole forward and toes up, inside of the foot turned out, a turn opens the hips", ft.thigh > 3 && ft.chest < -0.8 && ft.sole.up > 1.5 && ft.sole.fwd > 1 && ft.sole.toeUp > 0.5 && ft.inside.toeOut * ft.inside.side > 0.8 && ft.heavy > 1 && ft.heavyLean > 0.5 && ft.turn > 0.2, JSON.stringify(ft));
+check("a heavy first touch: the ball runs a step away from him", ft.heavyK === "heavy" && ft.heavyFar > 27, JSON.stringify({ k: ft.heavyK, far: ft.heavyFar }));
 check("no errors after the woodwork checks (and no 3D failure)", errs.length === 0 && !errs.some(e => /3D view failed/.test(e)), errs.join(" | "));
 await browser.close(); server.stop();
 process.exit(done() ? 1 : 0);

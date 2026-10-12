@@ -505,7 +505,9 @@
 		// The ball, at its true height, rolling; its shadow stays on the grass.
 		// Near true size close up (a little bigger than a head), growing with the camera's distance so it
 		// never shrinks to a speck from the gantry.
-		const h = Math.max(0, ball.z || 0), bx = WX(ball.x), bz = ball.y;
+		// Taken on the chest or the thigh, the ball is drawn dropping from where he met it to his feet.
+		const ow = ball.owner, rs = ow && (ow.recvK === "chest" || ow.recvK === "thigh") && ow.gotAt !== undefined ? frame - ow.gotAt : 99;
+		const h = Math.max(0, ball.z || 0, rs >= 0 && rs < 14 ? (ow.recvZ || 0) * Math.pow(1 - rs / 14, 2) : 0), bx = WX(ball.x), bz = ball.y;
 		const br = G3.ballR = clamp(G3.cam.position.distanceTo(G3.v.set(bx, h * Z3, bz)) * BALL_R_PER_DIST, 2.4, 5);
 		G3.ball.scale.setScalar(br / 5);
 		G3.ball.position.set(bx, h * Z3 + br, bz);

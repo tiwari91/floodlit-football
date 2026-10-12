@@ -443,7 +443,7 @@
 				// A ball just struck is past the man closing the kicker down before he can react:
 				// pressing you forces a pass, it doesn't win it off your boot.
 				if (!isGk && p.team !== lastTouch && speed < 11 && frame - (ball.kickedAt || -99) < 7) { continue; }
-				if (ball.z > (isGk ? 45 : 16)) { continue; }   // over their head
+				if (ball.z > (isGk ? 45 : isReceiver && ball.vz < 0 && !ball.shot && ball.lastBy && ball.lastBy.team === p.team ? 34 : 16)) { continue; }   // over their head (the man it's meant for can chest a dropping ball down)
 				// The intended receiver always controls a firm pass.
 				if (speed > 11 && !isReceiver) {
 					// Your keeper holds most of what he reaches; theirs is set by the opponent level.
@@ -690,6 +690,21 @@
 		if (p.team === 0) { burst(p.x, p.y, "Blocked"); } else { ooh(); }
 	}
 
+	// The first touch, from how the ball arrives and who he is. Pure, so the tests can ask it. c: z (ball
+	// height), spd (its pace), pas (his passing), seed (his build), play (a playmaker), back (his back to
+	// goal), space (room behind him), human (your man: never turned for you), wet. A dropping ball is
+	// taken on the chest or the thigh; along the ground a poor touch (worse at pace and in the wet) now and
+	// then runs away from him; with his back to goal and room behind, a computer player turns with it;
+	// otherwise a gentler pass is stopped under the sole by the neat footballers, the rest cushioned with
+	// the inside of the foot.
+	function recvKind (c, rnd = Math.random) {
+		if (c.z >= 26) { return "chest"; }
+		if (c.z >= 11) { return "thigh"; }
+		const heavy = clamp((64 - c.pas) / 110, 0, 0.16) + (c.spd > 9 ? 0.04 : 0) + (c.wet ? 0.03 : 0) - (c.play ? 0.05 : 0);
+		if (rnd() < heavy) { return "heavy"; }
+		if (c.back && c.space && !c.human) { return "turn"; }
+		return c.spd < 7 && (c.seed < 0.4 || c.play) ? "sole" : "inside";
+	}
 	function gainBall (p) {
 		const lostBy = p.team !== possTeam ? possTeam : -1;
 		// First touch by a teammate who was offside when the ball was played (or a tight one either way).
@@ -705,6 +720,17 @@
 		offside = { team: -1, set: new Set() };
 		// How it reached him, for his receiving pose: a pass along the ground (1) or in the air (2).
 		p.recv = ball.lastBy && ball.lastBy !== p && ball.lastBy.team === p.team ? ((ball.z || 0) > 22 ? 2 : 1) : 0;
+		// And how he takes it: chest, thigh, the sole, the inside of the foot, a turn, or a heavy touch.
+		p.recvK = null; p.heavyT = 0; p.turnT = 0;
+		if (p.recv) {
+			const toGoal = Math.atan2(FH / 2 - p.y, attackX(p.team) - p.x), off = Math.atan2(Math.sin(toGoal - (p.dir || 0)), Math.cos(toGoal - (p.dir || 0)));
+			const bx = p.x + Math.cos(toGoal) * 45, by = p.y + Math.sin(toGoal) * 45;
+			const space = !players.some(q => q.team !== p.team && Math.hypot(q.x - bx, q.y - by) < 55);
+			p.recvK = recvKind({ z: ball.z || 0, spd: Math.hypot(ball.vx, ball.vy), pas: A(p, "pas"), seed: build(p).seed, play: tr(p, "playmaker"), back: Math.abs(off) > 2.1, space, human: p.team === 0 && players.indexOf(p) === ctrl, wet: cond.wet > 0 });
+			p.recvZ = ball.z || 0;
+			if (p.recvK === "turn") { p.turnTo = toGoal; p.turnT = 16; }
+			if (p.recvK === "heavy") { p.heavyT = 18; if (p.team === 0 && !bulkSim) { burst(p.x, p.y, "Heavy touch"); } }
+		}
 		ball.owner = p;
 		ball.headed = false;
 		ball.indirect = null;

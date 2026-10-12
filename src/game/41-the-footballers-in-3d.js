@@ -561,17 +561,37 @@
 				for (let k = 0; k < 2; k++) { r.kn[k].rotation.z -= 0.35 * S2; r.hip[k].rotation.z += 0.18 * S2; }
 				r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, OUT3(i) * 0.95, S2); r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 0.15, S2); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.35, S2);
 			}
-			// Receiving: the first few frames after a pass reaches him. Along the ground the foot comes up to
-			// cushion it and the arms go out for balance; in the air he leans back and takes it on the chest.
-			const since = p.recv && p.gotAt !== undefined ? frame - p.gotAt : 99, rk = since < 18 ? Math.sin(Math.PI * clamp(since / 18, 0, 1)) : 0;
+			// Receiving: the first few frames after a pass reaches him (p.recvK, chosen in gainBall). On the
+			// chest he leans back, arms out; on the thigh the knee comes up to waist height; under the sole the
+			// foot reaches forward, toes up; with the inside of the foot the leg turns out to cushion it; turning,
+			// the hips open toward goal as the foot drags it round; a heavy touch, he lunges after it.
+			const K = p.recvK || (p.recv === 2 ? "chest" : "inside"), win = K === "chest" || K === "thigh" ? 22 : 18;
+			const since = p.recv && p.gotAt !== undefined ? frame - p.gotAt : 99, rk = since < win ? Math.sin(Math.PI * clamp(since / win, 0, 1)) : 0;
 			if (rk > 0 && o === p) {
-				if (p.recv === 2) {
-					r.spine.rotation.z -= 0.38 * rk; r.neck.rotation.z += 0.35 * rk;
-					for (let i = 0; i < 2; i++) { r.sh[i].rotation.x += OUT3(i) * 0.8 * rk; r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 0.1, rk); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.5, rk); }
+				const f = build(p).left ? 0 : 1;
+				if (K === "chest") {
+					r.spine.rotation.z += 0.36 * rk; r.neck.rotation.z -= 0.3 * rk;   // measured: +z on the spine takes the head back, -z on the neck tips the chin down to the ball
+					for (let i = 0; i < 2; i++) { r.kn[i].rotation.z -= 0.22 * rk; r.sh[i].rotation.x += OUT3(i) * 0.8 * rk; r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 0.1, rk); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.5, rk); }
+				} else if (K === "thigh") {
+					r.hip[f].rotation.z += 1.25 * rk; r.kn[f].rotation.z -= 1.35 * rk; r.an[f].rotation.z += 0.2 * rk; r.kn[1 - f].rotation.z -= 0.2 * rk;
+					r.spine.rotation.z += 0.1 * rk; r.neck.rotation.z -= 0.3 * rk;
+					for (let i = 0; i < 2; i++) { r.sh[i].rotation.x += OUT3(i) * 0.6 * rk; }
+				} else if (K === "sole") {
+					r.hip[f].rotation.z += 0.85 * rk; r.kn[f].rotation.z -= 0.4 * rk; r.an[f].rotation.z += 0.6 * rk; r.kn[1 - f].rotation.z -= 0.15 * rk;
+					r.spine.rotation.z += 0.05 * rk; r.neck.rotation.z -= 0.25 * rk;
+					for (let i = 0; i < 2; i++) { r.sh[i].rotation.x += OUT3(i) * 0.35 * rk; }
+				} else if (K === "heavy") {
+					r.hip[f].rotation.z += 0.95 * rk; r.kn[f].rotation.z -= 0.25 * rk; r.an[f].rotation.z += 0.1 * rk; r.kn[1 - f].rotation.z -= 0.3 * rk;
+					r.spine.rotation.z -= 0.2 * rk;   // lunging forward after it
+					for (let i = 0; i < 2; i++) { r.sh[i].rotation.x += OUT3(i) * 0.65 * rk; }
 				} else {
-					const f = build(p).left ? 0 : 1;
 					r.hip[f].rotation.z += 0.65 * rk; r.kn[f].rotation.z -= 0.8 * rk; r.an[f].rotation.z += 0.3 * rk; r.spine.rotation.z -= 0.08 * rk; r.neck.rotation.z += 0.2 * rk;
+					r.hip[f].rotation.y += OUT3(f) * 0.75 * rk;   // the leg turned out: the inside of the boot to the ball
 					for (let i = 0; i < 2; i++) { r.sh[i].rotation.x += OUT3(i) * 0.4 * rk; }
+					if (K === "turn" && p.turnTo !== undefined) {
+						const tw = -Math.sign(Math.atan2(Math.sin(p.turnTo - (p.dir || 0)), Math.cos(p.turnTo - (p.dir || 0)))) * (r.mir || 1);
+						r.hips.rotation.y += 0.5 * tw * rk; r.chest.rotation.y += 0.35 * tw * rk; r.neck.rotation.y += 0.3 * tw * rk;
+					}
 				}
 			}
 		}
