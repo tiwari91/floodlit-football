@@ -494,7 +494,9 @@
 		camera3D();
 		// The broadcast camera sits in the near stand, so that side of the ground (its seats, fans, roof
 		// and lights) is only drawn when the camera is out in front of it, looking back.
-		const showNear = G3.eye.z < FH + F_SIDE3 - 2 || G3.shot === "intro" || G3.shot === "boss" || G3.shot.startsWith("replay");
+		// High over the ground (the kick-off and half-time sweeps) he looks down on that stand too: without it
+		// the pitch's ground plane showed through as a green wedge where the near stand should be.
+		const showNear = G3.eye.z < FH + F_SIDE3 - 2 || G3.eye.y > (G3.standTop || 1e9) + 30 || G3.shot === "intro" || G3.shot === "boss" || G3.shot.startsWith("replay");
 		G3.showNear = showNear;
 		if (G3.nearRoof) { for (const o of G3.nearRoof) { o.visible = showNear; } }
 		if (G3.nearStand) { G3.nearStand.visible = showNear; }
