@@ -31,6 +31,7 @@
 		high: { seat: 10, fill: 1, hiRows: 2, nearHiRows: 5, liteRow: 8, lattice: true, shadows: 5, ratio: 2, aa: true }
 	};
 	const GFX_NAME = { low: "Low", medium: "Medium", high: "High" };
+	const PIX_BUDGET3 = 3.2e6;
 	const defaultGfx = () => {
 		const cores = navigator.hardwareConcurrency || 4;
 		if (coarse) { let big = false; try { big = Math.min(screen.width, screen.height) >= 700; } catch (e) { /* none */ } return big && cores >= 6 ? "medium" : "low"; }
@@ -52,7 +53,10 @@
 	function resize3D () {
 		if (!G3.renderer || !canvas3d || canvas3d.hidden) { return; }
 		const rect = canvas3d.getBoundingClientRect();
-		G3.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, gfx3().ratio));
+		// A pixel budget as well as the level's ratio: a retina laptop at 2x was drawing over five million
+		// pixels sixty times a second, which is what made it run hot; about three million looks the same.
+		const budget = Math.sqrt(PIX_BUDGET3 / Math.max(1, rect.width * rect.height));
+		G3.renderer.setPixelRatio(Math.max(1, Math.min(window.devicePixelRatio || 1, gfx3().ratio, budget)));
 		G3.renderer.setSize(Math.max(1, Math.round(rect.width)), Math.max(1, Math.round(rect.height)), false);
 	}
 	// One material per colour, shared by every mesh that wears it.
