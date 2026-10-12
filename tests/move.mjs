@@ -430,6 +430,41 @@ const sulk = await page.evaluate(() => {
 	return { fwd: +(b.headFwd - a.headFwd).toFixed(2), faceUp: +(b.faceUp - a.faceUp).toFixed(2) };
 });
 check("beaten (sulk): head bowed forward and the face toward the grass, not the sky", sulk.fwd > 1 && sulk.faceUp < -0.5, JSON.stringify(sulk));
+// Spine and neck signs, measured: forward is +x (toe, nose); -z on the spine leans him forward, +z on the
+// neck tips the head back. Each pose that leans or looks somewhere is checked for the right way round.
+const lean = await page.evaluate(() => {
+	const F = window.__ff, W = n => n.getWorldPosition(n.position.clone());
+	for (let i = 0; i < 1500 && F.state !== "play"; i++) { F.step(1); }
+	const p = F.outfield(0)[2], gk = F.players.find(q => q.role === "gk" && q.team === 1), c = F.outfield(1)[3];
+	const keepAll = F.players.map(q => [ q, q.x, q.y, q.vx, q.vy, q.dir, q.runAmt, q.sta ]), owner = F.ball.owner, fz = F.freeze;
+	const calm = q => Object.assign(q, { kickA: 0, lunge: 0, slideAI: 0, fall: 0, celebA: 0, celebK: 0, jump: 0, throwA: 0, dive: 0, headHands: 0, fistPump: 0, kneel: 0, hug: 0, sulk: 0, plant: 0, recv: 0, recvK: null, vx: 0, vy: 0, runAmt: 0, sprintAmt: 0, jockW: 0, shieldW: 0, sta: 1, shuf: 0 });
+	const M = (q, n = 1, bn = 0) => { const r = F.poseProbe(q, n, bn), inv = r.root.matrixWorld.clone().invert(), L = v => v.applyMatrix4(inv); const hp = L(W(r.hips)), nk = L(W(r.neck)), hd = L(W(r.head)); const face = r.head.position.clone().set(2.1, 1.9, 0); r.head.localToWorld(face); L(face);
+		return { lean: +(Math.atan2(nk.x - hp.x, nk.y - hp.y) * 57.3).toFixed(1), up: +(Math.atan2(face.y - hd.y - 1.63, face.x - hd.x) * 57.3).toFixed(1), hy: +hd.y.toFixed(1), hx: +(hd.x - hp.x).toFixed(1) }; };
+	for (const q of F.players) { q.x = 40 + (F.players.indexOf(q) % 6) * 10; q.y = 40 + Math.floor(F.players.indexOf(q) / 6) * 10; q.vx = q.vy = 0; }
+	const out = {};
+	F.ball.owner = null;
+	calm(p); p.x = F.FW / 2; p.y = F.FH / 2; p.dir = 0; out.stand = M(p);
+	calm(p); p.runAmt = 1; p.vx = 2.6; p.stride = 1; out.run = M(p);
+	calm(p); p.runAmt = 1; p.vx = 3.4; p.sprintAmt = 1; p.stride = 1; out.sprint = M(p);
+	calm(p); p.plant = 10; out.plant = M(p);
+	calm(p); p.sta = 0.2; F.freeze = 30; out.tired = M(p); F.freeze = fz;
+	calm(p); p.celebA = 1; p.kneel = 1; out.kneel = M(p);
+	calm(p); p.headHands = 60; out.near = M(p);
+	calm(p); p.celebA = 1; p.hug = 1; out.hug = M(p);
+	calm(p); p.jump = 3; out.hdEarly = M(p); p.jump = 11; out.hdSnap = M(p);
+	calm(p); c.x = p.x + 35; c.y = p.y; c.dir = Math.PI; calm(c); F.ball.owner = c; out.jockey = M(p, 30);
+	calm(p); calm(c); F.ball.owner = p; c.x = p.x - 8; c.y = p.y + 18; out.shield = M(p, 30);
+	calm(p); p.recv = 1; p.recvK = "chest"; p.gotAt = F.frame - 11; out.chest = M(p); p.recv = 0; p.recvK = null;
+	F.ball.owner = null; calm(gk); gk.x = 30; gk.y = F.FH / 2; gk.dir = 0; out.gkStand = M(gk); out.gkSet = M(gk, 1, 1);
+	for (const [ q, x, y, vx, vy, d, ra, st ] of keepAll) { Object.assign(q, { x, y, vx, vy, dir: d, runAmt: ra, sta: st }); calm(q); q.sta = st; }
+	F.ball.owner = owner;
+	return out;
+});
+const L = lean;
+check("rig signs: running leans forward, a sprint further, eyes still up the pitch (not at the sky or the grass)", L.run.lean > 8 && L.sprint.lean > L.run.lean + 3 && L.sprint.up > -15 && L.sprint.up < 10, JSON.stringify({ s: L.stand, r: L.run, sp: L.sprint }));
+check("rig signs: tired at a stoppage he bends over (head lower and forward); planting he sits back", L.tired.lean > L.stand.lean + 15 && L.tired.hy < L.stand.hy - 1 && L.plant.lean < L.stand.lean - 6, JSON.stringify({ t: L.tired, p: L.plant }));
+check("rig signs: knee slide arches back, a near miss looks up at the sky, a hug leans in", L.kneel.lean < -10 && L.near.up > L.stand.up + 8 && L.hug.lean > L.stand.lean + 8, JSON.stringify({ k: L.kneel, n: L.near, h: L.hug }));
+check("rig signs: jockeying and shielding lean in; chest control leans back; a header snaps forward; the keeper's set leans forward", L.jockey.lean > L.stand.lean + 3 && L.shield.lean > L.stand.lean + 2 && L.chest.lean < L.stand.lean - 5 && L.hdSnap.lean > L.hdEarly.lean + 8 && L.gkSet.lean > L.gkStand.lean + 8, JSON.stringify({ j: L.jockey, s: L.shield, c: L.chest, he: L.hdEarly, hs: L.hdSnap, g0: L.gkStand, g1: L.gkSet }));
 check("no errors after the woodwork checks (and no 3D failure)", errs.length === 0 && !errs.some(e => /3D view failed/.test(e)), errs.join(" | "));
 await browser.close(); server.stop();
 process.exit(done() ? 1 : 0);
