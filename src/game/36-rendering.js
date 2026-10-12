@@ -940,14 +940,23 @@
 	// shot charges, the power bar on top. (x, y) is the point just above his head the pointer touches.
 	// compact: just his number over the stamina bar (the 3D view, once he has been yours a couple of
 	// seconds); pointer: false where something else already points at him (the 3D marker cone).
-	// avoid: a box another marker is in ([ x0, y0, x1, y1 ]); the plate slides sideways clear of it.
+	// avoid: boxes other markers are in ([ x0, y0, x1, y1 ] each); the plate goes to the nearest place
+	// along its row (or a little higher) that is clear of all of them.
 	function drawPlate (p, x, y, compact = false, pointer = true, avoid = null) {
 		ctx.save();
 		ctx.font = "700 11px Barlow, Arial, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
 		const label = compact ? String(p.num) : `${p.num} ${pointer ? p.name : String(p.name).split(" ").pop()}`.toUpperCase(), w = Math.max(compact ? 30 : pointer ? 64 : 44, Math.ceil(ctx.measureText(label).width) + 18), h = 16, sh = 7;
-		const yb = Math.round(y - 7), y0 = yb - h - sh;
-		if (avoid && !pointer && avoid[1] < yb + 2 && avoid[3] > y0 - 2 && avoid[0] < x + w / 2 + 4 && avoid[2] > x - w / 2 - 4) {
-			x = (avoid[0] + avoid[2]) / 2 > x ? avoid[0] - 6 - w / 2 : avoid[2] + 6 + w / 2;
+		let yb = Math.round(y - 7), y0 = yb - h - sh;
+		if (avoid && avoid.length && !pointer) {
+			const hits = (cx, b0, b1) => avoid.some(a => a[1] < b1 + 2 && a[3] > b0 - 2 && a[0] < cx + w / 2 + 4 && a[2] > cx - w / 2 - 4);
+			let best = null;
+			for (const dy of [ 0, -14, -28 ]) {
+				for (let k = 0; k <= 24 && !best; k++) {
+					for (const sgn of k ? [ -1, 1 ] : [ 1 ]) { const cx = x + sgn * k * 6; if (!best && !hits(cx, y0 + dy, yb + dy)) { best = [ cx, dy ]; } }
+				}
+				if (best) { break; }
+			}
+			if (best) { x = best[0]; yb += best[1]; y0 += best[1]; }
 		}
 		const x0 = Math.round(x - w / 2);
 		ctx.fillStyle = "#f2b52e";

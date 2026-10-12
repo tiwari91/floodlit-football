@@ -648,15 +648,18 @@
 			// Also clear of the ball and of anyone standing just beyond him (the camera looks down the pitch, so
 			// the man a few yards further on is drawn right where the plate sits).
 			const sm = playing && !receiver && !(ball.owner && ball.owner.team === 0) && !inHands(ball.owner) ? nextSwitchTarget() : null, sq = sm && proj3D(sm.x, sm.y, 46);
-			let avoid = sq ? [ sq.x - 12, sq.y - 30, sq.x + 12, sq.y + 2 ] : null;
-			if (!avoid && top) {
+			const avoid = [];
+			if (sq) { avoid.push([ sq.x - 12, sq.y - 30, sq.x + 12, sq.y + 2 ]); }
+			if (top) {
 				const bq = ball && ball.owner !== me ? proj3D(ball.x, ball.y, ball.z || 0) : null;
-				if (bq && bq.y < top.y && bq.y > top.y - 40 && Math.abs(bq.x - top.x) < 50) { avoid = [ bq.x - 6, bq.y - 6, bq.x + 6, bq.y + 6 ]; }
+				if (bq) { avoid.push([ bq.x - 6, bq.y - 6, bq.x + 6, bq.y + 6 ]); }
 				for (const q of players) {
-					if (avoid || q === me) { continue; }
+					if (q === me) { continue; }
 					const h = proj3D(q.x, q.y, 30);
-					if (h && h.y < top.y && h.y > top.y - 40 && Math.abs(h.x - top.x) < 40) { avoid = [ h.x - 8, h.y - 14, h.x + 8, h.y + 14 ]; }
+					if (h && Math.abs(h.y - top.y) < 120 && Math.abs(h.x - top.x) < 200) { avoid.push([ h.x - 8, h.y - 14, h.x + 8, h.y + 14 ]); }
 				}
+				// the Q over the striker a long ball would find
+				if (playing && ball.owner === me) { const m = strikerTarget(me), qq = m && proj3D(m.x, m.y, 44); if (qq) { avoid.push([ qq.x - 8, qq.y - 9, qq.x + 8, qq.y + 9 ]); } }
 			}
 			if (top && me.name) { drawPlate(me, top.x, top.y, compact, false, avoid); ctx.textAlign = "center"; ctx.textBaseline = "middle"; }
 		}
