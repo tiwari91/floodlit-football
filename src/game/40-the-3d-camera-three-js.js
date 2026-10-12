@@ -238,6 +238,41 @@
 		return { rows, band, upper, back: d, top: h };
 	}
 	const gfx3 = () => GFX3[gfxLevel] || GFX3.high;
+	// A wet pitch: no longer a broad specular band from the two key lights (a flat pale wash over the near
+	// side), but each floodlight's own reflection, seen where the surface mirrors it toward the camera:
+	// tight and bright where water lies (low-frequency puddle noise), broken into glints by the blades
+	// everywhere else (a per-blade normal jitter), and stronger at grazing angles (Fresnel).
+	let WET_LAMPS3 = null;   // made once three.js is here
+	const wetLamps3 = () => WET_LAMPS3 || (WET_LAMPS3 = Array.from({ length: 8 }, () => new THREE.Vector3(0, -1e4, 0)));
+	function wetGround3D (mat) {
+		mat.onBeforeCompile = sh => {
+			sh.uniforms.ffLamps = { value: wetLamps3() }; sh.uniforms.ffWet = { value: Math.min(1.5, cond.wet) };
+			sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nvarying vec3 vWp;").replace("#include <begin_vertex>", "#include <begin_vertex>\nvWp = (modelMatrix * vec4(transformed, 1.0)).xyz;");
+			sh.fragmentShader = sh.fragmentShader
+				.replace("#include <common>", `#include <common>
+					varying vec3 vWp; uniform vec3 ffLamps[8]; uniform float ffWet;
+					float ffH (vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+					float ffNz (vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(ffH(i), ffH(i + vec2(1.0, 0.0)), f.x), mix(ffH(i + vec2(0.0, 1.0)), ffH(i + vec2(1.0, 1.0)), f.x), f.y); }`)
+				.replace("#include <map_fragment>", `#include <map_fragment>
+					{
+						vec2 q = vWp.xz;
+						float pud = smoothstep(0.6, 0.85, ffNz(q / 150.0) * 0.6 + ffNz(q / 41.0) * 0.4);
+						// the surface's tilt: smooth undulation (no per-pixel sparkle), finer ripples only close in
+						float dist = length(cameraPosition - vWp), fine = 1.0 - smoothstep(250.0, 900.0, dist);
+						vec2 tilt = vec2(ffNz(q / 9.0) - 0.5, ffNz(q / 9.0 + 17.0) - 0.5) + fine * 0.6 * vec2(ffNz(q / 2.6 + 5.0) - 0.5, ffNz(q / 2.6 + 41.0) - 0.5);
+						float rough = mix(0.7, 0.16, pud);
+						vec3 n = normalize(vec3(tilt.x * rough, 1.0, tilt.y * rough));
+						vec3 V = normalize(cameraPosition - vWp);
+						float fres = 0.04 + 0.96 * pow(1.0 - max(dot(n, V), 0.0), 5.0);
+						float shin = mix(60.0, 500.0, pud), norm = (shin + 8.0) / 25.0;
+						float sp = 0.0;
+						for (int i = 0; i < 8; i++) { vec3 L = normalize(ffLamps[i] - vWp); sp += pow(max(dot(n, normalize(L + V)), 0.0), shin); }
+						float blade = 0.55 + 0.45 * ffNz(q / 1.7);   // the blades break up the mirror, softly
+						diffuseColor.rgb = diffuseColor.rgb * (1.0 - 0.1 * pud * ffWet) + vec3(1.0, 0.94, 0.82) * 0.35 * (1.0 - exp(-sp * norm * fres * blade * ffWet * 0.08));   // soft roll-off, never a white patch
+					}`);
+		};
+		mat.customProgramCacheKey = () => "ff-wet";
+	}
 	function buildStadium3D () {
 		const gs = gstyle || { mow: "stripes", roof: true, lights: "roof", fill: 0.8, seat: "#3b4a58", concrete: "#1b2520", steps: "#262f21", arch: "azteca" };
 		const key = `${WW}x${WH}|${cond.label}|${cond.ko}|${cond.surfaceKey}|${gs.mow}${gs.roof}${gs.lights}${gs.fill}${gs.arch}${gs.mountains}|${KITS[0].outfield}${KITS[1].outfield}${homeSide}|${gfxLevel}`;
@@ -264,9 +299,8 @@
 			ctx = pg; stands = null;
 			try { drawPitch(true); } finally { ctx = keep; stands = keepStands; }
 			const tex = canvasTex3D(pc);
-			const mat = cond.wet > 0
-				? new THREE.MeshPhongMaterial({ color: 0x000000, emissive: 0xffffff, emissiveMap: tex, specular: new THREE.Color(0.08 + 0.1 * cond.wet, 0.09 + 0.11 * cond.wet, 0.1 + 0.11 * cond.wet), shininess: 34 })
-				: new THREE.MeshBasicMaterial({ map: tex });
+			const mat = new THREE.MeshBasicMaterial({ map: tex });
+			if (cond.wet > 0) { wetGround3D(mat); }
 			const ground = own(new THREE.Mesh(new THREE.PlaneGeometry(WW, WH), mat), true);
 			ground.rotation.x = -Math.PI / 2;
 			ground.position.set(WW / 2 - MX, 0, WH / 2 - MY);
@@ -513,6 +547,9 @@
 			st.add(p); if (isNearSide) { G3.nearRoof.push(p); }
 		};
 		glowPts(glow, false); glowPts(nearGlow, true);
+		// The wet pitch reflects these lamps: up to eight, spread along the lists.
+		const lampsAll = [ ...glow, ...nearGlow ], nL = lampsAll.length / 3;
+		wetLamps3().forEach((v, i) => { if (nL) { const k = Math.floor((i + 0.5) * nL / 8) * 3; v.set(lampsAll[k], lampsAll[k + 1], lampsAll[k + 2]); } else { v.set(0, -1e4, 0); } });
 		if (stands) {
 			// The ground's name, white on black, across the far side.
 			const nc = document.createElement("canvas"); nc.width = 1024; nc.height = 64;
