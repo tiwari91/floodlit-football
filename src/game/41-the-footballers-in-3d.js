@@ -435,7 +435,9 @@
 			// a right angle, never reaching out straight or trailing behind the body.
 			const sw = -sn, run = clamp((a - 0.12) / 0.35, 0, 1);
 			r.sh[i].rotation.z = armA * (sw > 0 ? 0.62 * sw : 0.65 * sw);
-			r.sh[i].rotation.x = s * (0.1 + 0.08 * a - 0.07 * a * clamp(sw, 0, 1));
+			// Sideways: on this rig +x on the right shoulder (and -x on the left) brings the arm IN across the
+			// body, so "out" is -s. The arms hang a little away from the sides, coming in a touch as they swing forward.
+			r.sh[i].rotation.x = -s * (0.12 + 0.05 * a - 0.12 * a * clamp(sw, 0, 1));
 			const fore = 0.95 + 0.9 * (sw + 1) / 2 + gv.elbow * 0.5;
 			r.el[i].rotation.z = lerp3(0.45 + gv.elbow + 0.5 * a, clamp(fore - r.sh[i].rotation.z, 1.0, 1.75), run);
 		}
@@ -461,7 +463,7 @@
 			r.kn[free].rotation.z -= 0.32 * still; r.hip[free].rotation.z += 0.1 * still; r.kn[side].rotation.z -= 0.05 * still;
 			r.chest.rotation.y += (sd - 0.5) * 0.4 * still;
 			r.spine.rotation.z += Math.sin(idle * 1.3) * 0.015 * still;
-			for (let i = 0; i < 2; i++) { r.el[i].rotation.z += (0.1 + 0.3 * ((sd * 7.3 + i * 0.31) % 1)) * still; r.sh[i].rotation.x += (i ? 1 : -1) * 0.1 * still; }   // arms eased away from the sides
+			for (let i = 0; i < 2; i++) { r.el[i].rotation.z += (0.1 + 0.3 * ((sd * 7.3 + i * 0.31) % 1)) * still; r.sh[i].rotation.x -= (i ? 1 : -1) * 0.04 * still; }   // arms eased away from the sides (-s is out)
 			const calm = state !== "play" || freeze > 0;   // only at a stoppage: in open play a tired man stays upright
 			const w = p.team >= 0 && calm ? clamp((0.6 - staOf(p)) / 0.25, 0, 1) * still : 0;
 			if (w > 0) {

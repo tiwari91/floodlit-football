@@ -215,6 +215,27 @@ const huddle = await page.evaluate(async () => {
 	return { hug: true, fwd: [ 0, 1 ].map(j => +r.ha[j].getWorldPosition(r.ha[j].position.clone()).sub(o).dot(fwd).toFixed(1)) };
 });
 check("in a goal huddle the hugging players' hands are in front of them", !huddle.hug || huddle.fwd.every(v => v > 2), JSON.stringify(huddle));
+// Standing, the hands hang at his sides, outside the line of the shoulders, never tucked in behind the shorts.
+const sides = await page.evaluate(async () => {
+	const F = window.__ff, G3 = F.G3, out = [];
+	F.state === "play" || (F.state = "play"); F.freeze = 0;
+	for (let k = 0; k < 20; k++) {
+		await new Promise(r => setTimeout(r, 40));
+		F.players.forEach((p, i) => {
+			const r = G3.fig && G3.fig.rigs[i];
+			if (!r || p.role === "gk" || Math.hypot(p.vx || 0, p.vy || 0) > 0.3 || p.kickA > 0 || (p.celebA || 0) > 0) { return; }
+			const hip = r.hips.getWorldPosition(r.hips.position.clone()), o = r.root.getWorldPosition(r.root.position.clone());
+			const side = r.root.localToWorld(r.root.position.clone().set(0, 0, 1)).sub(o).normalize();
+			for (let j = 0; j < 2; j++) {
+				const h = Math.abs(r.ha[j].getWorldPosition(r.ha[j].position.clone()).sub(hip).dot(side)), sh = Math.abs(r.sh[j].getWorldPosition(r.sh[j].position.clone()).sub(hip).dot(side));
+				out.push(h - sh);
+			}
+		});
+	}
+	out.sort((a, b) => a - b);
+	return { n: out.length, p10: +(out[Math.floor(out.length * 0.1)] || 0).toFixed(2) };
+});
+check("standing, the hands hang outside the shoulders, not in behind the shorts", sides.n >= 10 && sides.p10 > -0.3, JSON.stringify(sides));
 check("home ends dressed: banners and big flags that wave", dress.banners >= 1 && dress.flags >= 3 && dress.waves, JSON.stringify(dress));
 await browser.close(); server.stop();
 process.exit(done() ? 1 : 0);
