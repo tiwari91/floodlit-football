@@ -603,13 +603,15 @@
 	}
 
 	function syncOwnedBall () {
-		const o = ball.owner;
-		if (!o) { return; }
+		if (!ball.owner) { return; }
+		// Winding up, the ball goes on where it would have (from where he would have been, his windGhost)
+		// while he himself steps in to it: the strike leaves from the same place as before.
+		const own = ball.owner, o = own.windUp > 0 && own.windGhost ? own.windGhost : own;
 		// Dribbling is a run of touches, not a ball stuck to the boot. Each stride knocks it ahead,
 		// further the faster he runs (further still at a sprint and on wet grass, a little less for a
 		// nimble player), and he closes in on it before the next touch. A heavy touch leaves the ball
 		// a step away, where a defender can nick it (see the challenge below).
-		const v = Math.hypot(o.vx, o.vy), held = inHands(o) || (setPiece && setPiece.taker === o);
+		const v = Math.hypot(o.vx, o.vy), held = inHands(o) || (setPiece && setPiece.taker === own);
 		let ahead = 18;
 		if (!held && v > 0.6) {
 			const sprint = clamp(o.sprintAmt || 0, 0, 1);

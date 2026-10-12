@@ -795,6 +795,23 @@
 			r.neck.rotation.z -= 0.15;   // eyes down on the ball
 			r.sh[pl].rotation.z = 0.5 * ks.s + 0.2; r.sh[kf].rotation.z = -0.4 * ks.s; r.sh[kf].rotation.x = (kf ? 1 : -1) * (0.35 + 0.5 * Math.abs(ks.s) * (0.6 + pw)); r.sh[pl].rotation.x = (pl ? 1 : -1) * (0.4 + 0.3 * pw);
 			r.el[kf].rotation.z = 0.5; r.el[pl].rotation.z = 0.7;
+			// Winding up, the standing foot steps in beside the ball (a little behind it, a boot's width to
+			// its side) as the leg goes back: the leg aimed at that spot from the hip (measured on the rig:
+			// hip joint 1 below the hips and 2.45 out, thigh 7.3, shin 6.5, ankle 0.8 up; hip +z swings the
+			// leg forward, +x swings it toward -z, the knee folds the shin back), knee bent to fit, foot flat.
+			if (ks.wind !== undefined && ball && ball.owner === p) {
+				const m = r.mir || 1, dx = m * (ball.x - p.x), dz = ball.y - p.y, c = Math.cos(dir), s = Math.sin(dir), sp = pl ? 1 : -1;
+				const bf = dx * c + dz * s, bl = -dx * s + dz * c, w = ks.wind * clamp((bf - 2) / 4, 0, 1);   // not while he is still turning to a ball at his side
+				r.hips.position.y -= 2.2 * w;   // the standing knee gives
+				const A = 7.3, B = 6.5, hy = r.hips.position.y - 1, Dy = 1.1 - hy, Dz = clamp(bl + sp * 4.2 - sp * 2.45, -6, 6);
+				const reach = Math.sqrt(Math.max(0, (A + B - 0.15) ** 2 - Dy * Dy - Dz * Dz)), Dx = clamp(bf - 1.5, -2, reach);   // out of reach, the longest stride with the foot still down
+				const d = clamp(Math.hypot(Dx, Dy, Dz), 6, A + B - 0.05), lc = Math.hypot(Dy, Dz);
+				const ax = Math.atan2(-Dz, -Dy), fold = Math.PI - Math.acos(clamp((A * A + B * B - d * d) / (2 * A * B), -1, 1)), off = Math.acos(clamp((A * A + d * d - B * B) / (2 * A * d), -1, 1));
+				const az = Math.atan2(Dx, lc) + off;
+				r.hip[pl].rotation.x = lerp3(r.hip[pl].rotation.x, ax - r.hips.rotation.x, w);   // net of the pelvis tilt, which carries the leg with it
+				r.hip[pl].rotation.z = lerp3(-0.12, az, w);
+				r.kn[pl].rotation.z = lerp3(-0.38, -fold, w); r.an[pl].rotation.z = lerp3(r.an[pl].rotation.z, fold - az, w);
+			}
 		}
 		// A throw-in: ball over the head, arching back, then whipping forward.
 		if (thr >= 0) {

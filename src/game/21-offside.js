@@ -191,6 +191,7 @@
 		const snap = {};
 		for (const k of Object.keys(ball)) { if (!WIND_SKIP.has(k)) { snap[k] = ball[k]; } }
 		p.windSnap = snap; p.windSound = w.sound; p.windUp = n; p.windN = n; p.kickA = 0;
+		p.windGhost = Object.assign(Object.create(p), { x: p.x, y: p.y, vx: p.vx, vy: p.vy });   // where he would be, easing up, with the ball ahead of him
 		// Who the ball is for: the team-mate nearest its line, ahead of it. On the strike it is aimed where
 		// he has got to in the meantime, not where he was when the pass was picked (left as it was, it went
 		// in behind him, and twice as many passes were cut out at his end).
@@ -212,10 +213,19 @@
 	// Called each frame for a man winding up: false while he still is (he slows and holds his line), true
 	// once the ball has gone (or been taken off him).
 	function windUpStep (p) {
-		if (ball.owner !== p || state !== "play") { p.windUp = 0; p.windSnap = null; return true; }
-		if (--p.windUp > 0) { movePlayer(p, 0, 0, cond.grip, ACC_AI, 0.85); return false; }
+		if (ball.owner !== p || state !== "play") { p.windUp = 0; p.windSnap = null; p.windGhost = null; return true; }
+		if (--p.windUp > 0) {
+			if (p.windGhost) { movePlayer(p.windGhost, 0, 0, cond.grip, ACC_AI, 0.85); }
+			// He steps in to the ball (it runs on from his ghost, see syncOwnedBall): to a spot a stride
+			// behind it on the line of the kick by the strike, so the standing foot can land beside it.
+			const sx = ball.x - Math.cos(p.dir) * 7, sy = ball.y - Math.sin(p.dir) * 7, dx = sx - p.x, dy = sy - p.y, d = Math.hypot(dx, dy);
+			const v = Math.min(d / p.windUp, 5), tx = d > 0.5 ? dx / d * v : 0, ty = d > 0.5 ? dy / d * v : 0;
+			p.vx += (tx - p.vx) * 0.85; p.vy += (ty - p.vy) * 0.85;
+			p.x = clamp(p.x + p.vx, 12, FW - 12); p.y = clamp(p.y + p.vy, 12, FH - 12);
+			return false;
+		}
 		const s = p.windSnap, bx = ball.x, by = ball.y;
-		p.windSnap = null;
+		p.windSnap = null; p.windGhost = null;
 		Object.assign(ball, s);
 		ball.owner = null; ball.x = bx; ball.y = by; ball.kickedAt = frame;
 		const a = p.windAim; p.windAim = null;

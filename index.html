@@ -4890,6 +4890,7 @@
 		const snap = {};
 		for (const k of Object.keys(ball)) { if (!WIND_SKIP.has(k)) { snap[k] = ball[k]; } }
 		p.windSnap = snap; p.windSound = w.sound; p.windUp = n; p.windN = n; p.kickA = 0;
+		p.windGhost = Object.assign(Object.create(p), { x: p.x, y: p.y, vx: p.vx, vy: p.vy });   // where he would be, easing up, with the ball ahead of him
 		// Who the ball is for: the team-mate nearest its line, ahead of it. On the strike it is aimed where
 		// he has got to in the meantime, not where he was when the pass was picked (left as it was, it went
 		// in behind him, and twice as many passes were cut out at his end).
@@ -4911,10 +4912,19 @@
 	// Called each frame for a man winding up: false while he still is (he slows and holds his line), true
 	// once the ball has gone (or been taken off him).
 	function windUpStep (p) {
-		if (ball.owner !== p || state !== "play") { p.windUp = 0; p.windSnap = null; return true; }
-		if (--p.windUp > 0) { movePlayer(p, 0, 0, cond.grip, ACC_AI, 0.85); return false; }
+		if (ball.owner !== p || state !== "play") { p.windUp = 0; p.windSnap = null; p.windGhost = null; return true; }
+		if (--p.windUp > 0) {
+			if (p.windGhost) { movePlayer(p.windGhost, 0, 0, cond.grip, ACC_AI, 0.85); }
+			// He steps in to the ball (it runs on from his ghost, see syncOwnedBall): to a spot a stride
+			// behind it on the line of the kick by the strike, so the standing foot can land beside it.
+			const sx = ball.x - Math.cos(p.dir) * 7, sy = ball.y - Math.sin(p.dir) * 7, dx = sx - p.x, dy = sy - p.y, d = Math.hypot(dx, dy);
+			const v = Math.min(d / p.windUp, 5), tx = d > 0.5 ? dx / d * v : 0, ty = d > 0.5 ? dy / d * v : 0;
+			p.vx += (tx - p.vx) * 0.85; p.vy += (ty - p.vy) * 0.85;
+			p.x = clamp(p.x + p.vx, 12, FW - 12); p.y = clamp(p.y + p.vy, 12, FH - 12);
+			return false;
+		}
 		const s = p.windSnap, bx = ball.x, by = ball.y;
-		p.windSnap = null;
+		p.windSnap = null; p.windGhost = null;
 		Object.assign(ball, s);
 		ball.owner = null; ball.x = bx; ball.y = by; ball.kickedAt = frame;
 		const a = p.windAim; p.windAim = null;
@@ -6526,13 +6536,15 @@
 	}
 
 	function syncOwnedBall () {
-		const o = ball.owner;
-		if (!o) { return; }
+		if (!ball.owner) { return; }
+		// Winding up, the ball goes on where it would have (from where he would have been, his windGhost)
+		// while he himself steps in to it: the strike leaves from the same place as before.
+		const own = ball.owner, o = own.windUp > 0 && own.windGhost ? own.windGhost : own;
 		// Dribbling is a run of touches, not a ball stuck to the boot. Each stride knocks it ahead,
 		// further the faster he runs (further still at a sprint and on wet grass, a little less for a
 		// nimble player), and he closes in on it before the next touch. A heavy touch leaves the ball
 		// a step away, where a defender can nick it (see the challenge below).
-		const v = Math.hypot(o.vx, o.vy), held = inHands(o) || (setPiece && setPiece.taker === o);
+		const v = Math.hypot(o.vx, o.vy), held = inHands(o) || (setPiece && setPiece.taker === own);
 		let ahead = 18;
 		if (!held && v > 0.6) {
 			const sprint = clamp(o.sprintAmt || 0, 0, 1);
@@ -12657,6 +12669,23 @@
 			r.neck.rotation.z -= 0.15;   // eyes down on the ball
 			r.sh[pl].rotation.z = 0.5 * ks.s + 0.2; r.sh[kf].rotation.z = -0.4 * ks.s; r.sh[kf].rotation.x = (kf ? 1 : -1) * (0.35 + 0.5 * Math.abs(ks.s) * (0.6 + pw)); r.sh[pl].rotation.x = (pl ? 1 : -1) * (0.4 + 0.3 * pw);
 			r.el[kf].rotation.z = 0.5; r.el[pl].rotation.z = 0.7;
+			// Winding up, the standing foot steps in beside the ball (a little behind it, a boot's width to
+			// its side) as the leg goes back: the leg aimed at that spot from the hip (measured on the rig:
+			// hip joint 1 below the hips and 2.45 out, thigh 7.3, shin 6.5, ankle 0.8 up; hip +z swings the
+			// leg forward, +x swings it toward -z, the knee folds the shin back), knee bent to fit, foot flat.
+			if (ks.wind !== undefined && ball && ball.owner === p) {
+				const m = r.mir || 1, dx = m * (ball.x - p.x), dz = ball.y - p.y, c = Math.cos(dir), s = Math.sin(dir), sp = pl ? 1 : -1;
+				const bf = dx * c + dz * s, bl = -dx * s + dz * c, w = ks.wind * clamp((bf - 2) / 4, 0, 1);   // not while he is still turning to a ball at his side
+				r.hips.position.y -= 2.2 * w;   // the standing knee gives
+				const A = 7.3, B = 6.5, hy = r.hips.position.y - 1, Dy = 1.1 - hy, Dz = clamp(bl + sp * 4.2 - sp * 2.45, -6, 6);
+				const reach = Math.sqrt(Math.max(0, (A + B - 0.15) ** 2 - Dy * Dy - Dz * Dz)), Dx = clamp(bf - 1.5, -2, reach);   // out of reach, the longest stride with the foot still down
+				const d = clamp(Math.hypot(Dx, Dy, Dz), 6, A + B - 0.05), lc = Math.hypot(Dy, Dz);
+				const ax = Math.atan2(-Dz, -Dy), fold = Math.PI - Math.acos(clamp((A * A + B * B - d * d) / (2 * A * B), -1, 1)), off = Math.acos(clamp((A * A + d * d - B * B) / (2 * A * d), -1, 1));
+				const az = Math.atan2(Dx, lc) + off;
+				r.hip[pl].rotation.x = lerp3(r.hip[pl].rotation.x, ax - r.hips.rotation.x, w);   // net of the pelvis tilt, which carries the leg with it
+				r.hip[pl].rotation.z = lerp3(-0.12, az, w);
+				r.kn[pl].rotation.z = lerp3(-0.38, -fold, w); r.an[pl].rotation.z = lerp3(r.an[pl].rotation.z, fold - az, w);
+			}
 		}
 		// A throw-in: ball over the head, arching back, then whipping forward.
 		if (thr >= 0) {
@@ -12980,7 +13009,7 @@
 			// In an action (a kick, a slide, a header, a dive, a fall, a throw) the body faces where the play goes.
 			const acting = p.kickA > 0 || p.slideAI > 0 || (p.lunge > 0 && players.indexOf(p) === ctrl) || p.dive > 0 || p.fall > 0 || p.throwA > 0 || jumpAmt(p) > 0;
 			if (reduceMotion || replayOn() || acting || Math.hypot(p.x - ys.x, p.y - ys.y) > 40) { ys.yaw = p.dir; }
-			else { const mine = players.indexOf(p) === ctrl, cap = (mine ? 0.016 : 0.0095) * frameDt; ys.yaw = wrapA(ys.yaw + clamp(wrapA(p.dir - ys.yaw) * (1 - Math.exp(-frameDt / (mine ? 40 : 65))), -cap, cap)); }   // yours a touch quicker, so control stays crisp
+			else { const mine = players.indexOf(p) === ctrl, wind = p.windUp > 0, cap = (mine ? 0.016 : wind ? 0.015 : 0.0095) * frameDt; ys.yaw = wrapA(ys.yaw + clamp(wrapA(p.dir - ys.yaw) * (1 - Math.exp(-frameDt / (mine || wind ? 40 : 65))), -cap, cap)); }   // yours a touch quicker, so control stays crisp; winding up, he squares up to the ball as quick as yours (still a turn, never a snap)
 			ys.x = p.x; ys.y = p.y;
 			// Acceleration along his facing, smoothed, for the lean (none in a replay).
 			const fv = (p.vx || 0) * Math.cos(p.dir) + (p.vy || 0) * Math.sin(p.dir);
