@@ -644,7 +644,9 @@
 			// charging a pass or shot. The marker cone already points at him, so the plate has no pointer.
 			if (ctrl !== plate3.ctrl) { plate3.ctrl = ctrl; plate3.at = frame; }
 			const compact = frame - plate3.at > PLATE_FULL3 && !charging && !passCharge && staOf(me) >= TIRED_STA;
-			if (top && me.name) { drawPlate(me, top.x, top.y, compact, false); ctx.textAlign = "center"; ctx.textBaseline = "middle"; }
+			// Clear of the S marker over the man you would switch to, when he stands just behind you.
+			const sm = playing && !receiver && !(ball.owner && ball.owner.team === 0) && !inHands(ball.owner) ? nextSwitchTarget() : null, sq = sm && proj3D(sm.x, sm.y, 46);
+			if (top && me.name) { drawPlate(me, top.x, top.y, compact, false, sq ? [ sq.x - 12, sq.y - 30, sq.x + 12, sq.y + 2 ] : null); ctx.textAlign = "center"; ctx.textBaseline = "middle"; }
 		}
 		if (playing && me && ball.owner === me) {
 			const m = strikerTarget(me), q = m && proj3D(m.x, m.y, 44);

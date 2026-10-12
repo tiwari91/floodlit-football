@@ -940,11 +940,16 @@
 	// shot charges, the power bar on top. (x, y) is the point just above his head the pointer touches.
 	// compact: just his number over the stamina bar (the 3D view, once he has been yours a couple of
 	// seconds); pointer: false where something else already points at him (the 3D marker cone).
-	function drawPlate (p, x, y, compact = false, pointer = true) {
+	// avoid: a box another marker is in ([ x0, y0, x1, y1 ]); the plate slides sideways clear of it.
+	function drawPlate (p, x, y, compact = false, pointer = true, avoid = null) {
 		ctx.save();
 		ctx.font = "700 11px Barlow, Arial, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
 		const label = compact ? String(p.num) : `${p.num} ${pointer ? p.name : String(p.name).split(" ").pop()}`.toUpperCase(), w = Math.max(compact ? 30 : pointer ? 64 : 44, Math.ceil(ctx.measureText(label).width) + 18), h = 16, sh = 7;
-		const x0 = Math.round(x - w / 2), yb = Math.round(y - 7), y0 = yb - h - sh;
+		const yb = Math.round(y - 7), y0 = yb - h - sh;
+		if (avoid && !pointer && avoid[1] < yb + 2 && avoid[3] > y0 - 2 && avoid[0] < x + w / 2 + 4 && avoid[2] > x - w / 2 - 4) {
+			x = (avoid[0] + avoid[2]) / 2 > x ? avoid[0] - 6 - w / 2 : avoid[2] + 6 + w / 2;
+		}
+		const x0 = Math.round(x - w / 2);
 		ctx.fillStyle = "#f2b52e";
 		if (pointer) { ctx.beginPath(); ctx.moveTo(x - 5, yb); ctx.lineTo(x + 5, yb); ctx.lineTo(x, yb + 6); ctx.closePath(); ctx.fill(); }
 		ctx.fillStyle = "rgba(10, 14, 20, 0.86)"; ctx.fillRect(x0, y0, w, h + sh);
