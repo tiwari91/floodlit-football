@@ -11914,7 +11914,7 @@
 	// surfaces facing down (under the brow, nose and chin), a warm band where the key light turns to shadow,
 	// a rim of floodlight on the edge turned to the light, and a faint sheen. All of it fades out by
 	// distance, so the broadcast camera sees the figures as before. k: [ fill, warmth, rim, sheen ].
-	const SKIN_LIGHT3 = [ 1, 1, 1, 1 ], HAIR_LIGHT3 = [ 0.6, 0, 0.7, 0.5 ];
+	const SKIN_LIGHT3 = [ 1, 1, 1, 1 ], HAIR_LIGHT3 = [ 0.6, 0, 0.7, 0.5 ], BODY_LIGHT3 = [ 1, 0, 0.8, 0 ];
 	function skinLight3D (fs, k) {
 		return fs.replace("#include <aomap_fragment>", `#include <aomap_fragment>
 			{
@@ -11999,7 +11999,11 @@
 				return merge3D(list);
 			}
 		};
+		// The rest of him (arms, legs, kit) takes the same close-up shaping as the head, without the skin's
+		// warmth and sheen, so a face never looks lit differently from the arm beside it.
 		const plain = new T.MeshLambertMaterial({ color: 0xffffff });
+		plain.onBeforeCompile = sh => { sh.fragmentShader = skinLight3D(sh.fragmentShader, BODY_LIGHT3); };
+		plain.customProgramCacheKey = () => "ff-body";
 		// The shirt: the kit's pattern (stripes, hoops, halves, a sash) drawn in its second colour.
 		const shirtMat = new T.MeshLambertMaterial({ color: 0xffffff });
 		shirtMat.onBeforeCompile = sh => {
@@ -12016,6 +12020,7 @@
 					else if (vPat > 3.5) { km = 1.0 - step(1.5, abs(vKp.y - 4.7 + vKp.z * 0.95)); }
 					diffuseColor.rgb = mix(diffuseColor.rgb, vCol2, km);
 					diffuseColor.rgb *= 0.8 + 0.2 * smoothstep(-0.6, 6.8, vKp.y);   // cloth in shade toward the hem, under the chest`);
+			sh.fragmentShader = skinLight3D(sh.fragmentShader, BODY_LIGHT3);
 		};
 		shirtMat.customProgramCacheKey = () => "ff-shirt";
 		// Faces: an atlas of eight, painted once (eyes, brows, a nose, a mouth, stubble or a beard on
