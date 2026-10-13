@@ -43,7 +43,7 @@
 		// Soft shadow in the eye sockets and under the cheekbones (the head's shape does the rest), blurred so
 		// nothing has a painted edge.
 		g.filter = "blur(3px)";
-		g.fillStyle = "rgba(40, 20, 10, 0.2)";
+		g.fillStyle = "rgba(40, 20, 10, 0.26)";
 		for (const sgn of [ -1, 1 ]) { g.beginPath(); g.ellipse(cx + sgn * 16, ey - 2, 13, 8.5, 0, 0, Math.PI * 2); g.fill(); }
 		g.fillStyle = "rgba(40, 20, 10, 0.05)";   // faint: the modelled hollow and the light do most of it
 		for (const sgn of [ -1, 1 ]) { g.beginPath(); g.ellipse(cx + sgn * 34, ey + 22, 9, 14, sgn * 0.3, 0, Math.PI * 2); g.fill(); }
@@ -292,9 +292,11 @@
 	// to nothing at the hairline, where the hair dips under the skin, so there is never a helmet's edge.
 	const HAIR_STYLES3 = { short: [ 0.2, 0.12, 0.16, 0, 0 ], crop: [ 0.42, 0.08, 0.42, 0, 0 ], curly: [ 0.42, 0.26, 0.3, 1, 0 ], afro: [ 0.95, 0.75, 0.7, 1, -0.04 ], long: [ 0.26, 0.24, 0.2, 0, 0 ], tied: [ 0.16, 0.12, 0.1, 0, 0 ], buzz: [ 0.05, 0.04, 0.04, 0, 0.02 ], shaved: [ 0, 0, 0, 0, 1 ] };
 	const HAIR_IDS3 = Object.keys(HAIR_STYLES3);
-	// Painted face detail fades out by distance: near, the eyes, brows and mouth; far (the gantry camera,
-	// where a face is a few pixels), only the modelled shape, the skin and the hair.
-	const FACE_FADE3 = [ 150, 340 ];
+	// Painted face detail by distance: the pale parts (whites of the eyes, teeth) go by 190 units; the dark
+	// marks (brows, the shade of the eye sockets, the mouth, facial hair) grow bolder from the first pair of
+	// distances to the second, so the mipmapped face still reads as brows over eyes and a mouth at the
+	// celebration and broadcast cameras, and only fade out between the last pair (beyond the gantry camera).
+	const FACE_FADE3 = [ 150, 450, 1300, 1900 ], FACE_BOLD3 = 1.8, FACE_PALE3 = [ 70, 190 ];
 	// Close-up light on skin and hair, after three.js's Lambert lighting: the flat ambient fill eases off on
 	// surfaces facing down (under the brow, nose and chin), a warm band where the key light turns to shadow,
 	// a rim of floodlight on the edge turned to the light, and a faint sheen. All of it fades out by
@@ -428,7 +430,7 @@
 			sh.fragmentShader = sh.fragmentShader
 				.replace("#include <common>", "#include <common>\nvarying float vFaceD; varying float vFaceI;")
 				.replace("#include <map_fragment>", "")
-				.replace("#include <color_fragment>", `#include <color_fragment>\nvec4 fx = vFaceI < -0.5 ? vec4(0.0) : texture2D(map, vMapUv); float fxL = dot(fx.rgb - diffuseColor.rgb, vec3(0.3, 0.59, 0.11)); diffuseColor.rgb = mix(diffuseColor.rgb, fx.rgb, fx.a * (1.0 - smoothstep(mix(${FACE_FADE3[0].toFixed(1)}, 70.0, smoothstep(0.0, 0.08, fxL)), mix(${FACE_FADE3[1].toFixed(1)}, 190.0, smoothstep(0.0, 0.08, fxL)), vFaceD)));`);   // anything lighter than the skin (the whites of the eyes, teeth) goes first, before it reads as a pale dot
+				.replace("#include <color_fragment>", `#include <color_fragment>\nvec4 fx = vFaceI < -0.5 ? vec4(0.0) : texture2D(map, vMapUv); float fxL = dot(fx.rgb - diffuseColor.rgb, vec3(0.3, 0.59, 0.11)); float fxP = smoothstep(0.0, 0.08, fxL); diffuseColor.rgb = mix(diffuseColor.rgb, fx.rgb, min(0.92, fx.a * (1.0 + ${FACE_BOLD3.toFixed(2)} * (1.0 - fxP) * smoothstep(${FACE_FADE3[0].toFixed(1)}, ${FACE_FADE3[1].toFixed(1)}, vFaceD))) * (1.0 - smoothstep(mix(${FACE_FADE3[2].toFixed(1)}, ${FACE_PALE3[0].toFixed(1)}, fxP), mix(${FACE_FADE3[3].toFixed(1)}, ${FACE_PALE3[1].toFixed(1)}, fxP), vFaceD)));`);   // anything lighter than the skin (the whites of the eyes, teeth) goes first, before it reads as a pale dot; the dark marks grow bolder with distance
 			sh.fragmentShader = skinLight3D(sh.fragmentShader, SKIN_LIGHT3);
 		};
 		headMat.customProgramCacheKey = () => "ff-face";

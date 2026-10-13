@@ -520,18 +520,18 @@ check("staff idle: hands behind his back, together", both("idle", a => a.hx < -1
 check("staff sprint: fists pumping in front, leaning into the run; on his knees arms up and out, arched back", both("sprint", a => a.hx > 4) && staff.sprint.lean > 5 && both("knees", a => a.hy > 2 && a.hout > 2) && staff.knees.lean < -5, JSON.stringify({ s: staff.sprint, k: staff.knees }));
 check("bench: sitting leans forward, hands on his thighs; standing, arms up and out", staff.sit.lean > 5 && both("sit", a => a.hx > 3) && both("stand", a => a.hy > 2 && a.hout > 2), JSON.stringify({ s: staff.sit, u: staff.stand }));
 // Faces: a modelled head (a chin below and ahead of the ear line, a skull longer than it is wide), the
-// hair on the skull's own surface, and painted detail gone well before the gantry camera's distance.
+// hair on the skull's own surface, and only the dark painted marks left at the gantry camera's distance.
 const face = await page.evaluate(() => {
 	const F = window.__ff, G3 = F.G3, I = F.headInfo(), hp = G3.fig.parts.head.geometry.attributes.position, hr = G3.fig.parts.hair.geometry.attributes.position;
 	let chin = null, xmin = 1e9, xmax = -1e9, zmax = 0, ymax = -1e9;
 	for (let i = 0; i < hp.count; i++) { const x = hp.getX(i), y = hp.getY(i), z = hp.getZ(i); xmin = Math.min(xmin, x); xmax = Math.max(xmax, x); zmax = Math.max(zmax, Math.abs(z)); ymax = Math.max(ymax, y); if (Math.abs(z) < 0.3 && y < I.ear[1] - 1.5 && (!chin || x > chin[0])) { chin = [ x, y ]; } }   // the chin: the most forward point of the face well below the ear
 	let same = 0; for (let i = 0; i < hp.count; i++) { if (Math.abs(hp.getX(i) - hr.getX(i)) + Math.abs(hp.getY(i) - hr.getY(i)) + Math.abs(hp.getZ(i) - hr.getZ(i)) < 1e-4) { same++; } }
 	const c = G3.cam.position, d = F.players.map(p => { const r = G3.fig.rigOf.get(p); return r ? r.head.getWorldPosition(r.head.position.clone()).distanceTo(c) : 1e9; });
-	return { chinBelowEar: +(I.ear[1] - chin[1]).toFixed(2), chinAheadOfEar: +(chin[0] - I.ear[0]).toFixed(2), len: +((xmax - xmin) / 2).toFixed(2), wid: +zmax.toFixed(2), hairOnSkull: same === hp.count, shortHair: I.styles.short[0], fade: I.fade, camNear: Math.round(Math.min(...d)), cam: G3.camKind || null };
+	return { chinBelowEar: +(I.ear[1] - chin[1]).toFixed(2), chinAheadOfEar: +(chin[0] - I.ear[0]).toFixed(2), len: +((xmax - xmin) / 2).toFixed(2), wid: +zmax.toFixed(2), hairOnSkull: same === hp.count, shortHair: I.styles.short[0], fade: I.fade, pale: I.pale, camNear: Math.round(Math.min(...d)), cam: G3.camKind || null };
 });
 check("faces: a jaw and chin below and ahead of the ear line, a skull longer than wide (not a ball)", face.chinBelowEar > 1.5 && face.chinAheadOfEar > 1.5 && face.wid < face.len * 0.92, JSON.stringify(face));
 check("faces: the hair sits on the skull's own surface (short hair a few tenths thick, no helmet)", face.hairOnSkull && face.shortHair <= 0.3, JSON.stringify(face));
-check("faces: painted features are gone well before the default camera's distance", face.fade[1] < 400 && face.fade[1] * 1.6 < face.camNear, JSON.stringify(face));
+check("faces: the pale marks (whites of the eyes) are gone well before the default camera; brows, eyes and mouth still read there", face.pale[1] * 2 < face.camNear && face.fade[2] > face.camNear, JSON.stringify(face));
 const mates = await page.evaluate(() => {
 	const F = window.__ff, W = n => n.getWorldPosition(n.position.clone()), p = F.outfield(0)[2], keep = { celebA: p.celebA, hug: p.hug };
 	Object.assign(p, { kickA: 0, lunge: 0, fall: 0, jump: 0, throwA: 0, dive: 0, headHands: 0, fistPump: 0, celebK: 0, kneel: 0, hug: 0, sulk: 0, recv: 0, recvK: null, celebA: 0.7 });
