@@ -10979,7 +10979,7 @@
 		const down = (p.lunge > 0 && players.indexOf(p) === ctrl) || p.slideAI > 0;
 		// In the air for a header the jump is timed from the ball, as in 3D (aerial3): at the top as it arrives.
 		const airTV = reduceMotion || down ? null : aerial3(p, 1);
-		const jump = airTV ? airTV.up : reduceMotion ? 0 : jumpAmt(p);
+		const jump = airTV ? airTV.up : reduceMotion || (p.role !== "gk" && state === "play") ? 0 : jumpAmt(p);
 		const H = 34 * k, Y = b.y - (airTV ? airTV.y * H / 32 : jump * 34 * k * 0.32);   // full size even on the ground: a slide is a man low on the grass, not a smaller man
 		let X = b.x;
 		// A soft shadow cast away from the floodlights, staying on the grass when he jumps.
@@ -13041,7 +13041,7 @@
 			r.neck.rotation.z += 0.32 * cock - (goal ? 0.55 : 0.05) * snap + 0.35 * st;
 		}
 		// Up for a header: legs tucked, arms out, the head snaps forward at the top.
-		if (jump > 0 && !air) {
+		if (jump > 0 && !air && (gk || state !== "play")) {   // a keeper going up to claim, a celebration hop (a header's jump is timed from the ball above)
 			y += jump * 13;
 			for (let i = 0; i < 2; i++) { r.hip[i].rotation.z = 0.35 * jump + (i ? 0.25 : -0.1) * jump; r.kn[i].rotation.z = -1.1 * jump; r.sh[i].rotation.x = OUT3(i) * 2.2 * jump; r.sh[i].rotation.z = -0.5 * jump; r.el[i].rotation.z = 0.35; }
 			r.spine.rotation.z = 0.2 * jump - 0.35 * Math.max(0, jump - 0.75) * 4;

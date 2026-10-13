@@ -533,7 +533,9 @@ const lean = await page.evaluate(() => {
 	calm(p); p.celebA = 1; p.kneel = 1; out.kneel = M(p);
 	calm(p); p.headHands = 60; out.near = M(p);
 	calm(p); p.celebA = 1; p.hug = 1; out.hug = M(p);
-	calm(p); p.jump = 3; out.hdEarly = M(p); p.jump = 11; out.hdSnap = M(p);
+	// a header, timed from the ball: in the air with the head cocked six frames before it arrives, snapped through it just after
+	{ const B = F.ball, keepB = [ B.x, B.y, B.z, B.vx, B.vy, B.vz, B.lastBy ]; calm(p); B.owner = null; B.lastBy = c; B.vy = 0; B.vx = 4; B.y = p.y;
+		B.x = p.x - 24; B.vz = 0; B.z = 51.3; out.hdEarly = M(p); B.x = p.x + 4; B.vz = -2; B.z = 43.2; out.hdSnap = M(p); [ B.x, B.y, B.z, B.vx, B.vy, B.vz, B.lastBy ] = keepB; }
 	calm(p); c.x = p.x + 35; c.y = p.y; c.dir = Math.PI; calm(c); F.ball.owner = c; out.jockey = M(p, 30);
 	calm(p); calm(c); F.ball.owner = p; c.x = p.x - 8; c.y = p.y + 18; out.shield = M(p, 30);
 	calm(p); p.recv = 1; p.recvK = "chest"; p.gotAt = F.frame - 11; out.chest = M(p); p.recv = 0; p.recvK = null;

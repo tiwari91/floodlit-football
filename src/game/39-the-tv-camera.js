@@ -237,7 +237,7 @@
 		const down = (p.lunge > 0 && players.indexOf(p) === ctrl) || p.slideAI > 0;
 		// In the air for a header the jump is timed from the ball, as in 3D (aerial3): at the top as it arrives.
 		const airTV = reduceMotion || down ? null : aerial3(p, 1);
-		const jump = airTV ? airTV.up : reduceMotion ? 0 : jumpAmt(p);
+		const jump = airTV ? airTV.up : reduceMotion || (p.role !== "gk" && state === "play") ? 0 : jumpAmt(p);
 		const H = 34 * k, Y = b.y - (airTV ? airTV.y * H / 32 : jump * 34 * k * 0.32);   // full size even on the ground: a slide is a man low on the grass, not a smaller man
 		let X = b.x;
 		// A soft shadow cast away from the floodlights, staying on the grass when he jumps.

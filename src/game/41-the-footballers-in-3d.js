@@ -855,7 +855,7 @@
 			r.neck.rotation.z += 0.32 * cock - (goal ? 0.55 : 0.05) * snap + 0.35 * st;
 		}
 		// Up for a header: legs tucked, arms out, the head snaps forward at the top.
-		if (jump > 0 && !air) {
+		if (jump > 0 && !air && (gk || state !== "play")) {   // a keeper going up to claim, a celebration hop (a header's jump is timed from the ball above)
 			y += jump * 13;
 			for (let i = 0; i < 2; i++) { r.hip[i].rotation.z = 0.35 * jump + (i ? 0.25 : -0.1) * jump; r.kn[i].rotation.z = -1.1 * jump; r.sh[i].rotation.x = OUT3(i) * 2.2 * jump; r.sh[i].rotation.z = -0.5 * jump; r.el[i].rotation.z = 0.35; }
 			r.spine.rotation.z = 0.2 * jump - 0.35 * Math.max(0, jump - 0.75) * 4;
