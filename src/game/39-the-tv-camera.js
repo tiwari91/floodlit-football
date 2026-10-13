@@ -455,8 +455,10 @@
 			ctx.beginPath(); ctx.moveTo(ex - face * er * 1.4, ey - er * 2.2); ctx.lineTo(ex + face * er * 1.8, ey - er * 2.4); ctx.stroke();
 			if (fine) {
 				ctx.fillStyle = L.skin; ctx.beginPath(); ctx.moveTo(hx + face * H * 0.08, hy - H * 0.004); ctx.lineTo(hx + face * H * 0.104, hy + H * 0.026); ctx.lineTo(hx + face * H * 0.078, hy + H * 0.03); ctx.closePath(); ctx.fill();
-				const lf = L.face || 0;
-				if (lf === 3 || lf === 7 || lf === 2 || lf === 5) { ctx.fillStyle = lf === 3 || lf === 7 ? "rgba(26, 16, 10, 0.75)" : "rgba(26, 16, 10, 0.28)"; ctx.beginPath(); ctx.arc(hx + face * H * 0.03, hy + H * 0.035, H * 0.05, face > 0 ? -0.3 : Math.PI * 0.5, face > 0 ? Math.PI * 0.5 : Math.PI + 0.3); ctx.closePath(); ctx.fill(); }
+				const fh = FACE_HAIR3[(L.face || 0) % FACE_HAIR3.length], jaw = fh === "beard" || fh === "short" || fh === "chin" || fh === "stubble" || fh === "mstub";   // the same facial hair as in 3D
+				if (fh === "moustache" || fh === "goatee" || fh === "mstub") { ctx.fillStyle = "rgba(26, 16, 10, 0.7)"; ctx.fillRect(hx + face * H * 0.062 - H * 0.016, hy + H * 0.037, H * 0.032, Math.max(0.8, H * 0.009)); }
+				if (fh === "goatee") { ctx.fillStyle = "rgba(26, 16, 10, 0.7)"; ctx.beginPath(); ctx.arc(hx + face * H * 0.056, hy + H * 0.074, H * 0.016, 0, Math.PI * 2); ctx.fill(); }
+				if (jaw) { ctx.fillStyle = fh === "beard" || fh === "chin" ? "rgba(26, 16, 10, 0.75)" : fh === "short" ? "rgba(26, 16, 10, 0.5)" : "rgba(26, 16, 10, 0.28)"; ctx.beginPath(); ctx.arc(hx + face * H * 0.03, hy + H * 0.035, H * 0.05, face > 0 ? -0.3 : Math.PI * 0.5, face > 0 ? Math.PI * 0.5 : Math.PI + 0.3); ctx.closePath(); ctx.fill(); }
 				const mx = hx + face * H * 0.066, my = hy + H * 0.05;
 				if ((p.celebA || 0) > 0.3) { ctx.fillStyle = "#3a0e0c"; ctx.beginPath(); ctx.ellipse(mx, my, H * 0.014, H * 0.018, 0, 0, Math.PI * 2); ctx.fill(); }
 				else { ctx.strokeStyle = "rgba(70, 22, 18, 0.85)"; ctx.lineWidth = Math.max(0.6, H * 0.008); ctx.beginPath(); ctx.moveTo(mx - face * H * 0.02, my); ctx.lineTo(mx + face * H * 0.008, my - H * 0.002); ctx.stroke(); }

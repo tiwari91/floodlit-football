@@ -73,7 +73,7 @@ await page.keyboard.down("ArrowRight"); await sleep(1200);
 await page.screenshot({ path: `${OUT}/3d-run.png` });
 await page.keyboard.up("ArrowRight");
 check("3D camera renders with the new poses, no errors", cam === "3d" && errs.length === 0, `cam=${cam} ${errs.join(" | ")}`);
-// Faces: every player has a valid look (face cell 0-7, a hair colour, a known style), and it is
+// Faces: every player has a valid look (face cell 0-15, a hair colour, a known style), and it is
 // fixed by name: clearing the cached look rebuilds exactly the same one.
 const looks = await page.evaluate(async () => {
 	const ps = window.__ff.players, before = ps.map(p => JSON.stringify(p.look));
@@ -81,7 +81,7 @@ const looks = await page.evaluate(async () => {
 	await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));   // the next frame draws them, rebuilding each look
 	return ps.map((p, i) => ({ a: before[i], b: JSON.stringify(p.look), face: p.look ? p.look.face : -1, hair: p.look ? p.look.hair : null, style: p.look ? p.look.style : null }));
 });
-check("every player has a face, hair colour and style", looks.length > 0 && looks.every(l => l.face >= 0 && l.face < 8 && /^#/.test(l.hair || "") && [ "short", "crop", "curly", "afro", "long", "tied", "buzz", "shaved" ].includes(l.style)), JSON.stringify(looks.filter(l => !(l.face >= 0 && l.face < 8 && l.hair)).slice(0, 2)));
+check("every player has a face, hair colour and style", looks.length > 0 && looks.every(l => l.face >= 0 && l.face < 16 && /^#/.test(l.hair || "") && [ "short", "crop", "curly", "afro", "long", "tied", "buzz", "shaved" ].includes(l.style)), JSON.stringify(looks.filter(l => !(l.face >= 0 && l.face < 16 && l.hair)).slice(0, 2)));
 check("a player's look is fixed by name (same after a rebuild)", looks.every(l => l.a === l.b), JSON.stringify(looks.filter(l => l.a !== l.b).slice(0, 1)));
 // Brace and hat-trick captions: the same man scoring again is named in the goal caption.
 const caps = await page.evaluate(() => { const F = window.__ff, out = []; F.autoPilot = false; F.timeLeft = 1e9; for (let k = 0; k < 3; k++) { F.freeze = 0; F.forceGoal(0); const s0 = F.score[0]; for (let i = 0; i < 200 && F.score[0] === s0; i++) { F.step(1); } out.push(F.lastCaption && F.lastCaption.sub); for (let i = 0; i < 3000 && F.state !== "play"; i++) { F.step(1); } } return out; });
@@ -564,7 +564,7 @@ check("celebrating: arms up and out, not behind him", all2("up", a => a.hy > 2 &
 check("fist pump: the fist up in front of him, the other arm in front", R2.fist.a[1].hx > 2 && R2.fist.a[1].hy > -5 && R2.fist.a[0].hx > 2, JSON.stringify(R2.fist));
 check("badge kiss: one hand at his mouth in front, the other arm up pointing forward", R2.badge.a[0].hx > 2 && R2.badge.a[0].hy > -6 && Math.abs(R2.badge.a[0].hout) < 3 && R2.badge.a[1].hx > 3 && R2.badge.a[1].hy > 1, JSON.stringify(R2.badge));
 check("throw-in: the ball behind his head with the hands together, then out in front", all2("throwBack", a => a.hy > 2 && a.hx < 0) && all2("throwFwd", a => a.hx > 5) && R2.throwBack.hd < 9, JSON.stringify({ b: R2.throwBack, f: R2.throwFwd }));
-check("shirt over the head: no face painted on it", R2.blank === -1 && R2.open === 11, JSON.stringify({ b: R2.blank, o: R2.open }));
+check("shirt over the head: no face painted on it", R2.blank === -1 && R2.open === 19, JSON.stringify({ b: R2.blank, o: R2.open }));
 // The stretcher in 3D: two medics carry it (real figures, not the flat 2D marks), hands at the handles.
 const st3 = await page.evaluate(async () => {
 	const F = window.__ff; F.freeze = 0; F.timeLeft = 1e9; F.autoPilot = true;

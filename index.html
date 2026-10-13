@@ -9321,7 +9321,7 @@
 			// curly or a full afro, long or tied back), so nobody's look changes beyond recognition.
 			const base = [ "short", "short", "short", "curly", "long", "buzz", "shaved" ][(h >>> 5) % 7], alt = (h >>> 13) % 2;
 			const style = base === "short" && alt ? "crop" : base === "curly" && alt ? "afro" : base === "long" && alt ? "tied" : base;
-			p.look = { skin: SKIN[h % SKIN.length], hair: HAIR[(h >>> 2) % HAIR.length], shaved: style === "shaved", style, face: (h >>> 9) % 8 };
+			p.look = { skin: SKIN[h % SKIN.length], hair: HAIR[(h >>> 2) % HAIR.length], shaved: style === "shaved", style, face: (h >>> 9) % 16 };
 		}
 		return p.look;
 	}
@@ -11023,8 +11023,10 @@
 			ctx.beginPath(); ctx.moveTo(ex - face * er * 1.4, ey - er * 2.2); ctx.lineTo(ex + face * er * 1.8, ey - er * 2.4); ctx.stroke();
 			if (fine) {
 				ctx.fillStyle = L.skin; ctx.beginPath(); ctx.moveTo(hx + face * H * 0.08, hy - H * 0.004); ctx.lineTo(hx + face * H * 0.104, hy + H * 0.026); ctx.lineTo(hx + face * H * 0.078, hy + H * 0.03); ctx.closePath(); ctx.fill();
-				const lf = L.face || 0;
-				if (lf === 3 || lf === 7 || lf === 2 || lf === 5) { ctx.fillStyle = lf === 3 || lf === 7 ? "rgba(26, 16, 10, 0.75)" : "rgba(26, 16, 10, 0.28)"; ctx.beginPath(); ctx.arc(hx + face * H * 0.03, hy + H * 0.035, H * 0.05, face > 0 ? -0.3 : Math.PI * 0.5, face > 0 ? Math.PI * 0.5 : Math.PI + 0.3); ctx.closePath(); ctx.fill(); }
+				const fh = FACE_HAIR3[(L.face || 0) % FACE_HAIR3.length], jaw = fh === "beard" || fh === "short" || fh === "chin" || fh === "stubble" || fh === "mstub";   // the same facial hair as in 3D
+				if (fh === "moustache" || fh === "goatee" || fh === "mstub") { ctx.fillStyle = "rgba(26, 16, 10, 0.7)"; ctx.fillRect(hx + face * H * 0.062 - H * 0.016, hy + H * 0.037, H * 0.032, Math.max(0.8, H * 0.009)); }
+				if (fh === "goatee") { ctx.fillStyle = "rgba(26, 16, 10, 0.7)"; ctx.beginPath(); ctx.arc(hx + face * H * 0.056, hy + H * 0.074, H * 0.016, 0, Math.PI * 2); ctx.fill(); }
+				if (jaw) { ctx.fillStyle = fh === "beard" || fh === "chin" ? "rgba(26, 16, 10, 0.75)" : fh === "short" ? "rgba(26, 16, 10, 0.5)" : "rgba(26, 16, 10, 0.28)"; ctx.beginPath(); ctx.arc(hx + face * H * 0.03, hy + H * 0.035, H * 0.05, face > 0 ? -0.3 : Math.PI * 0.5, face > 0 ? Math.PI * 0.5 : Math.PI + 0.3); ctx.closePath(); ctx.fill(); }
 				const mx = hx + face * H * 0.066, my = hy + H * 0.05;
 				if ((p.celebA || 0) > 0.3) { ctx.fillStyle = "#3a0e0c"; ctx.beginPath(); ctx.ellipse(mx, my, H * 0.014, H * 0.018, 0, 0, Math.PI * 2); ctx.fill(); }
 				else { ctx.strokeStyle = "rgba(70, 22, 18, 0.85)"; ctx.lineWidth = Math.max(0.6, H * 0.008); ctx.beginPath(); ctx.moveTo(mx - face * H * 0.02, my); ctx.lineTo(mx + face * H * 0.008, my - H * 0.002); ctx.stroke(); }
@@ -11918,8 +11920,15 @@
 	// The front of the head is the middle of the cell; the eye line sits a little above the equator.
 	// Features are drawn bold so the mipmapped texture still shows eyes and brows at mid distance.
 	// open: the celebrating version of the same face, mouth wide open.
+	// Sixteen faces: four brows (flat, arched, heavy, angled) at two weights, three mouths, three eye
+	// colours, narrower eyes on half of them, and the facial hair below.
+	const FACES3 = 16;
+	// Facial hair by face: none, stubble, a full beard, a short beard, a moustache, a goatee (with a
+	// moustache), a chin strap along the jaw, or a moustache over stubble. The 2D TV camera reads it too.
+	const FACE_HAIR3 = [ "", "", "stubble", "beard", "", "stubble", "", "beard", "moustache", "goatee", "", "stubble", "chin", "", "mstub", "short" ];
 	function paintFace3D (g, x0, y0, v, open) {
-		const cx = x0 + 128, ey = y0 + 60, brow = v % 4, mouth = (v >> 1) % 3, beard = v === 3 || v === 7, stubble = v === 2 || v === 5;
+		const cx = x0 + 128, ey = y0 + 60, brow = v % 4, mouth = (v >> 1) % 3, fh = FACE_HAIR3[v] || "", beard = fh === "beard", stubble = fh === "stubble" || fh === "mstub";
+		const bw = v >= 8 ? (v % 3 === 0 ? 0.8 : 1.25) : 1, narrow = v >= 8 && v % 2 === 1;   // brow weight; narrower eyes
 		const ink = "#22150e", dark = "rgba(20, 12, 8, 0.6)";
 		g.save();
 		g.clearRect(x0, y0, 256, 128);
@@ -11939,7 +11948,7 @@
 			const x = cx + sgn * 16;
 			// The eye, life-size rather than a cartoon's: a narrow almond of off-white mostly covered by the
 			// upper lid, a small iris and pupil half under it, a soft lid shadow, a faint lower lid, no big glint.
-			const eh = open ? 4.2 : 3.3, ew = 6.6;
+			const eh = (open ? 4.2 : 3.3) * (narrow ? 0.82 : 1), ew = 6.6;
 			g.save(); g.beginPath(); g.ellipse(x, ey, ew, eh, 0, 0, Math.PI * 2); g.clip();
 			g.fillStyle = "#d9d0c4"; g.fillRect(x - ew, ey - eh, ew * 2, eh * 2);
 			g.fillStyle = v % 3 === 1 ? "#3d5a74" : v % 3 === 2 ? "#4f6340" : "#3b2414"; g.beginPath(); g.arc(x + sgn * 0.4, ey + 0.6, 3.3, 0, Math.PI * 2); g.fill();
@@ -11952,7 +11961,7 @@
 			g.strokeStyle = "rgba(40, 20, 10, 0.22)"; g.lineWidth = 1; g.beginPath(); g.ellipse(x, ey, ew, eh, 0, Math.PI * 0.2, Math.PI * 0.8); g.stroke();
 			// the brow: flat, arched, heavy or angled; raised when celebrating
 			const by = open ? -4 : 0;
-			g.strokeStyle = "rgba(34, 21, 14, 0.62)"; g.lineWidth = brow === 2 ? 3.8 : 2.8; g.filter = "blur(0.6px)";
+			g.strokeStyle = "rgba(34, 21, 14, 0.62)"; g.lineWidth = (brow === 2 ? 3.8 : 2.8) * bw; g.filter = "blur(0.6px)";
 			g.beginPath();
 			if (brow === 1) { g.moveTo(x - sgn * 10, ey - 10 + by); g.quadraticCurveTo(x, ey - 17 + by, x + sgn * 11, ey - 11 + by); }
 			else if (brow === 3) { g.moveTo(x - sgn * 10, ey - 11 + by); g.lineTo(x + sgn * 11, ey - 14 + by); }
@@ -11967,18 +11976,29 @@
 		// Worked out per pixel rather than as a blurred shape: the density rises over 10px below the cheek
 		// line (low under the nose, high at the sides) and runs up into the sideburn by the ear, so there
 		// is no edge on the cheek, and it never depends on canvas blur support.
-		if (stubble || beard) {
+		if (fh) {
 			const bc = document.createElement("canvas"); bc.width = 256; bc.height = 128;
-			const bg = bc.getContext("2d"), im = bg.createImageData(256, 128), A = beard ? 0.74 : 0.2, ey0 = ey - y0;
+			const bg = bc.getContext("2d"), im = bg.createImageData(256, 128), full = beard || fh === "short" || fh === "chin", A = beard ? 0.74 : fh === "short" ? 0.5 : fh === "chin" ? 0.7 : 0.2, ey0 = ey - y0;
+			const sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 			for (let py = 0; py < 128; py++) {
 				for (let px = 0; px < 256; px++) {
-					const u = Math.abs(px - 128) / 56, dy = py - ey0;
-					const top = 22 - 11 * u * u - 14 * Math.max(0, (u - 0.72) / 0.28) ** 2;   // under the nose, along the cheek, up to the sideburn
-					const ramp = Math.min(1, Math.max(0, (dy - top) / (beard ? 9 : 13)));
-					const side = 1 - Math.min(1, Math.max(0, (u - 0.92) / 0.16));
-					const lip = beard ? 1 : 1 - 0.6 * Math.exp(-(((px - 128) / 9) ** 2) - ((dy - 31) / 4) ** 2);   // stubble thins on the lip itself
+					const u = Math.abs(px - 128) / 56, dy = py - ey0, ax = Math.abs(px - 128);
 					const n = 0.82 + 0.18 * ((Math.sin(px * 12.9898 + py * 78.233) * 43758.5453) % 1 + 1) % 1;
-					const a = A * ramp * ramp * (3 - 2 * ramp) * side * lip * n;
+					let a = 0;
+					if (stubble || full) {
+						const top = 22 - 11 * u * u - 14 * Math.max(0, (u - 0.72) / 0.28) ** 2;   // under the nose, along the cheek, up to the sideburn
+						const ramp = Math.min(1, Math.max(0, (dy - top) / (full ? 9 : 13)));
+						const side = 1 - Math.min(1, Math.max(0, (u - 0.92) / 0.16));
+						const lip = full ? 1 : 1 - 0.6 * Math.exp(-(((px - 128) / 9) ** 2) - ((dy - 31) / 4) ** 2);   // stubble thins on the lip itself
+						const strap = fh === "chin" ? 1 - (1 - sm(37 - 14 * u * u, 43 - 14 * u * u, dy)) * (1 - sm(0.84, 0.98, u)) : 1;   // the chin strap: only along the line of the jaw
+						a = A * ramp * ramp * (3 - 2 * ramp) * side * lip * strap;
+					}
+					if (fh === "moustache" || fh === "goatee" || fh === "mstub") {   // over the lip, down to the corners of the mouth
+						const dr = 3.5 * (ax / 13) ** 2, th = 1 - 0.45 * (ax / 14) ** 2;   // drooping at the corners, thinning out to them
+						a = Math.max(a, 0.66 * sm(22 + dr, 24.5 + dr, dy) * (1 - sm(24.5 + dr + 2.6 * th, 27 + dr + 2.6 * th, dy)) * (1 - sm(10, 15, ax)));
+					}
+					if (fh === "goatee") { const r = Math.hypot(ax / 11, (dy - 39) / 8); a = Math.max(a, 0.66 * (1 - sm(0.7, 1.05, r)) * sm(31.5, 33.5, dy)); }   // and a rounded tuft on the chin
+					a *= n;
 					const o = (py * 256 + px) * 4; im.data[o] = 26; im.data[o + 1] = 16; im.data[o + 2] = 10; im.data[o + 3] = Math.round(255 * a);
 				}
 			}
@@ -12281,13 +12301,13 @@
 			sh.fragmentShader = skinLight3D(sh.fragmentShader, BODY_LIGHT3);
 		};
 		shirtMat.customProgramCacheKey = () => "ff-shirt";
-		// Faces: an atlas of eight, painted once (eyes, brows, a nose, a mouth, stubble or a beard on
-		// some), wrapped round the head sphere with the face at the front. Each figure picks its cell
+		// Faces: an atlas of sixteen, each also open-mouthed, painted once (eyes, brows, a nose, a mouth,
+		// facial hair on some), wrapped round the head sphere with the face at the front. Each figure picks its cell
 		// with an instanced attribute; the painted parts are laid over the skin colour, the rest is skin.
-		const fc = document.createElement("canvas"); fc.width = 1024; fc.height = 512;
+		const fc = document.createElement("canvas"); fc.width = 1024; fc.height = 1024;
 		const fg = fc.getContext && fc.getContext("2d");
 		if (fg) {
-			for (let v = 0; v < 16; v++) { paintFace3D(fg, (v % 4) * 256, Math.floor(v / 4) * 128, v % 8, v >= 8); }
+			for (let v = 0; v < FACES3 * 2; v++) { paintFace3D(fg, (v % 4) * 256, Math.floor(v / 4) * 128, v % FACES3, v >= FACES3); }
 		}
 		const faceTex = tex3D(fc);
 		faceTex.minFilter = T.LinearMipmapLinearFilter; faceTex.magFilter = T.LinearFilter; faceTex.generateMipmaps = true;   // mipmaps: at mid distance the eyes and brows blur to dark marks rather than flicker out
@@ -12295,7 +12315,7 @@
 		headMat.onBeforeCompile = sh => {
 			sh.vertexShader = sh.vertexShader
 				.replace("#include <common>", "#include <common>\nattribute float aFace; attribute float aJaw; varying float vFaceD; varying float vFaceI;")
-				.replace("#include <uv_vertex>", "#include <uv_vertex>\nvMapUv = (uv + vec2(mod(max(aFace, 0.0), 4.0), 3.0 - floor(max(aFace, 0.0) / 4.0))) / vec2(4.0, 4.0); vFaceI = aFace;")
+				.replace("#include <uv_vertex>", "#include <uv_vertex>\nvMapUv = (uv + vec2(mod(max(aFace, 0.0), 4.0), 7.0 - floor(max(aFace, 0.0) / 4.0))) / vec2(4.0, 8.0); vFaceI = aFace;")
 				.replace("#include <begin_vertex>", "#include <begin_vertex>\ntransformed.z *= mix(1.0, aJaw, pow(clamp((2.25 - transformed.y) / 2.4, 0.0, 1.0), 2.0));")
 				.replace("#include <project_vertex>", "#include <project_vertex>\nvFaceD = -mvPosition.z;");
 			sh.fragmentShader = sh.fragmentShader
@@ -12825,7 +12845,7 @@
 	const trim3D = kit => (kit.second && kit.second !== kit.shirt ? kit.second : kit.ink || kit.shirt);
 	// Commit one posed rig to the instanced parts.
 	// Which cell of the face atlas: his own face, open-mouthed when celebrating; -1 (none) with his shirt over his head.
-	const faceCell3D = (lk, rig) => (rig.shirtHead ? -1 : ((lk.face || 0) % 8 + 8) % 8 + ((rig.cel || 0) > 0.3 ? 8 : 0));
+	const faceCell3D = (lk, rig) => (rig.shirtHead ? -1 : ((lk.face || 0) % FACES3 + FACES3) % FACES3 + ((rig.cel || 0) > 0.3 ? FACES3 : 0));
 	function commitFigure3D (rig, lk, kit, num) {
 		const F = G3.fig, M = F.M, C = F.C;
 		if (F.n >= MAXF3) { return; }
