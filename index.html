@@ -9722,24 +9722,72 @@
 	}
 
 	// Rain streaks and a darker sky, drawn on the screen; plus a conditions tag.
-	let drops = [];
+	let drops = [], splashes = [];
+	// Rain in three depths: far drops short, thin and faint; near ones long, a little wider and more
+	// transparent (out of focus, smeared by the shutter). Each streak is drawn as a faint tail and a
+	// brighter head, so it reads as a falling drop, not a scratch. The wind leans it. Splashes ring out
+	// on the grass where the camera can see it. A screen effect: its own random numbers, not the match's.
+	const RAIN_LAYERS = [ { n: 190, len: [ 9, 14 ], v: [ 10, 13 ], w: 0.6, a: 0.24 }, { n: 85, len: [ 20, 30 ], v: [ 17, 22 ], w: 0.9, a: 0.28 }, { n: 20, len: [ 44, 64 ], v: [ 30, 38 ], w: 1.6, a: 0.16 } ];
+	let rainSeed = 99;
+	const rainRnd = () => (rainSeed = (rainSeed * 16807) % 2147483647) / 2147483647;
+	// Where a spot on the grass is on the screen (and how many screen units a unit there spans), for the
+	// camera in use; null for the overhead camera (rain there falls straight at you: no splashes).
+	function rainGround (x, y) {
+		if (camMode === "3d" && G3.cam) { return proj3D(x, y, 0); }
+		if (camMode === "tv" && TV.camX != null) { const q = tvProj(x, y, 0); if (q && endsSwapped()) { q.x = VW - q.x; } return q; }
+		return null;
+	}
 	function drawRain () {
 		if (cond.wet) {
 			// A grey sky by day; at night the dark is already there, and a flat veil only greyed the pitch.
 			ctx.fillStyle = `rgba(12, 20, 30, ${(cond.ko === "day" ? 0.1 : 0.025) * cond.wet})`;
 			ctx.fillRect(0, 0, SW, SH);
-			const want = reduceMotion ? 0 : 90 * cond.wet;
-			while (drops.length < want) { drops.push({ x: Math.random() * SW, y: Math.random() * SH, v: 14 + Math.random() * 10 }); }
-			drops.length = Math.min(drops.length, want);
-			ctx.strokeStyle = "rgba(200, 220, 245, 0.35)";
-			ctx.lineWidth = 1.2;
-			ctx.beginPath();
-			for (const d of drops) {
-				d.x -= d.v * 0.18; d.y += d.v;
-				if (d.y > SH) { d.y = -20; d.x = Math.random() * (SW + 60); }
-				ctx.moveTo(d.x, d.y); ctx.lineTo(d.x + d.v * 0.18, d.y - d.v);
+			if (reduceMotion) { drops = []; splashes = []; } else {
+				const day = cond.ko === "day", tint = day ? "214, 222, 232" : "198, 214, 236";
+				const lean = (0.1 + 0.3 * clamp(cond.wind.s / 40, 0, 1)) * (Math.cos(cond.wind.a) * (endsSwapped() ? -1 : 1) < 0 ? -1 : 1);
+				const dt = clamp(frameDt / 16.7, 0.25, 3);
+				RAIN_LAYERS.forEach((L, li) => {
+					const list = drops[li] || (drops[li] = []), want = Math.round(L.n * cond.wet * (SW * SH) / (1072 * 648));
+					while (list.length < want) { list.push({ x: rainRnd() * (SW + 80) - 40, y: rainRnd() * SH, l: L.len[0] + rainRnd() * (L.len[1] - L.len[0]), v: L.v[0] + rainRnd() * (L.v[1] - L.v[0]) }); }
+					list.length = Math.min(list.length, want);
+					ctx.lineWidth = L.w; ctx.lineCap = "round";
+					// tails (fainter) in one pass, heads in another
+					for (const head of [ false, true ]) {
+						ctx.strokeStyle = `rgba(${tint}, ${L.a * (head ? 1 : 0.4)})`;
+						ctx.beginPath();
+						for (const d of list) {
+							if (head) { d.y += d.v * dt; d.x += d.v * lean * dt; if (d.y - d.l > SH) { d.y = -rainRnd() * 40; d.x = rainRnd() * (SW + 80) - 40 - lean * SH * 0.5; } }
+							const f = head ? 0.45 : 1, f0 = head ? 0 : 0.45;
+							ctx.moveTo(d.x - lean * d.l * f0, d.y - d.l * f0); ctx.lineTo(d.x - lean * d.l * f, d.y - d.l * f);
+						}
+						ctx.stroke();
+					}
+				});
+				// Splashes: a ring that opens and fades where a drop lands, at the grass's distance.
+				const wantS = Math.round(70 * cond.wet);
+				for (let tries = 0; splashes.length < wantS && tries < 12; tries++) {
+					const s = { x: rainRnd() * FW, y: rainRnd() * FH, t: 0, life: 9 + rainRnd() * 6 };
+					const q = rainGround(s.x, s.y);
+					if (q && q.x > 0 && q.x < SW && q.y > 0 && q.y < SH) { splashes.push(s); }
+				}
+				ctx.lineWidth = 0.8;
+				for (let b = 0; b < 3; b++) {
+					ctx.strokeStyle = `rgba(${tint}, ${[ 0.3, 0.18, 0.08 ][b]})`;
+					ctx.beginPath();
+					for (const s of splashes) {
+						const p = s.t / s.life;
+						if (Math.min(2, Math.floor(p * 3)) !== b) { continue; }
+						const q = rainGround(s.x, s.y);
+						if (!q) { continue; }
+						const r = (0.6 + 2.6 * p) * q.k, ry = r * 0.3;
+						if (r < 0.4) { continue; }
+						ctx.moveTo(q.x + r, q.y); ctx.ellipse(q.x, q.y, r, ry, 0, 0, Math.PI * 2);
+					}
+					ctx.stroke();
+				}
+				for (const s of splashes) { s.t += dt; }
+				splashes = splashes.filter(s => s.t < s.life);
 			}
-			ctx.stroke();
 		} else if (cond.snow) {
 			// Flakes drift down and sway; the near ones are bigger and quicker.
 			ctx.fillStyle = "rgba(220, 228, 236, 0.08)"; ctx.fillRect(0, 0, SW, SH);
@@ -9747,6 +9795,7 @@
 			while (drops.length < want) { const k = Math.random(); drops.push({ x: Math.random() * SW, y: Math.random() * SH, v: 0.8 + k * 2.2, s: 1 + k * 2.4, p: Math.random() * 6.3 }); }
 			ctx.fillStyle = "rgba(250, 252, 255, 0.8)";
 			ctx.beginPath();
+			if (!(drops[0] && drops[0].p !== undefined)) { drops = drops.filter(d => d && d.p !== undefined); }   // no rain layers left over
 			for (const d of drops) {
 				d.p += 0.03; d.y += d.v; d.x += Math.sin(d.p) * 0.6 - 0.25;
 				if (d.y > SH) { d.y = -6; d.x = Math.random() * (SW + 40); }
