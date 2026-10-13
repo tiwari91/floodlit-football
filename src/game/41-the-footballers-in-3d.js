@@ -279,6 +279,8 @@
 	}
 	// The ear: on the side of the head, its top level with the brows and its lobe with the nose.
 	const EAR3 = (() => { const q = headPoint3(-0.12, -0.04, Math.sqrt(1 - 0.12 * 0.12 - 0.04 * 0.04)); return [ q[0], q[1], q[2] + 0.05 ]; })();
+	// Where the nose meets the brow: each man's nose is scaled from here, so it never leaves the face.
+	const NOSE_ROOT3 = headPoint3(Math.sqrt(1 - 0.24 * 0.24), 0.24, 0);
 	// The nose: a ridge lofted down the middle of the face from between the eyes to the tip, widening into
 	// the wings over the nostrils, set into the face so only its front stands out.
 	function noseGeo3 () {
@@ -445,7 +447,8 @@
 					vec3 d = aDir;
 					// the hairline: high on the forehead, down to the top of the ear at the side (a narrow
 					// sideburn in front of it), low at the nape
-					float line = d.x > 0.0 ? mix(0.06, 0.5, pow(d.x, 0.85)) : mix(0.06, -0.46, pow(-d.x, 1.2));
+					float line = d.x > 0.0 ? mix(0.06, 0.57, pow(d.x, 0.85)) : mix(0.06, -0.46, pow(-d.x, 1.2));
+					line += 0.08 * smoothstep(0.35, 0.75, d.x) * exp(-pow((abs(d.z) - 0.4) / 0.16, 2.0));   // the corners of the forehead set back, so the hairline is rounded, not a fringe ruled across the brow
 					float earZone = exp(-pow((d.x + 0.04) / 0.22, 2.0)) * smoothstep(0.55, 0.9, abs(d.z));
 					float burn = exp(-pow((d.x - 0.2) / 0.06, 2.0)) * smoothstep(0.6, 0.9, abs(d.z));
 					line = mix(line, 0.22, earZone);
@@ -962,7 +965,7 @@
 		rig.root.updateMatrixWorld(true);
 		if (!HM3) { HM3 = [ new THREE.Matrix4(), new THREE.Matrix4(), new THREE.Matrix4() ]; }
 		// His head's own proportions (longer or rounder, a broader or narrower jaw), fixed by his look.
-		if (!lk.shape) { const h = hashStr(`${lk.skin}|${lk.hair}|${lk.style}|${lk.face}|${lk.name || ""}`), u = k => ((h >>> (k * 6)) % 41) / 40; lk.shape = [ 0.95 + 0.09 * u(0), 0.97 + 0.06 * u(1), 0.95 + 0.08 * u(2), 0.9 + 0.17 * u(3) ]; }
+		if (!lk.shape) { const h = hashStr(`${lk.skin}|${lk.hair}|${lk.style}|${lk.face}|${lk.name || ""}`), u = k => ((h >>> (k * 6)) % 41) / 40; lk.shape = [ 0.95 + 0.09 * u(0), 0.97 + 0.06 * u(1), 0.95 + 0.08 * u(2), 0.9 + 0.17 * u(3) ]; const h2 = hashStr(`${h}nose`), v = k => ((h2 >>> (k * 6)) % 41) / 40; lk.shape.push(-0.03 + 0.08 * v(0), 0.86 + 0.32 * v(1), 0.93 + 0.16 * v(2), 0.84 + 0.4 * v(3)); }   // and his hairline (higher or lower), his nose (how far it stands out, how long, how broad)
 		const HS = HM3[2].makeTranslation(HEAD_C3[0], HEAD_C3[1], 0).multiply(HM3[0].makeScale(lk.shape[0], lk.shape[1], lk.shape[2])).multiply(HM3[1].makeTranslation(-HEAD_C3[0], -HEAD_C3[1], 0));
 		const hairStyle = rig.shirtHead ? "afro" : HAIR_STYLES3[lk.style] ? lk.style : "short";
 		for (const [ name, joint, side ] of PART_PLAN3) {
@@ -971,8 +974,10 @@
 			if (name === "hair") {
 				if (hairStyle === "shaved") { continue; }
 				mtx = M.copy(HS).premultiply(node.matrixWorld);
-			} else if (name === "head" || name === "nose") {
+			} else if (name === "head") {
 				mtx = M.copy(HS).premultiply(node.matrixWorld);
+			} else if (name === "nose") {
+				mtx = M.makeTranslation(NOSE_ROOT3[0], NOSE_ROOT3[1], 0).multiply(HM3[0].makeScale(lk.shape[5], lk.shape[6], lk.shape[7])).multiply(HM3[1].makeTranslation(-NOSE_ROOT3[0], -NOSE_ROOT3[1], 0)).premultiply(HS).premultiply(node.matrixWorld);
 			} else if (name === "tail") {
 				const t = rig.shirtHead ? null : TAIL3[lk.style];
 				if (!t) { continue; }
@@ -996,7 +1001,7 @@
 				const g = mesh.geometry, pat = g.attributes.aPat, c2 = g.attributes.aCol2;
 				pat.setX(k, kit.pattern); C.set(kit.second); c2.setXYZ(k, C.r, C.g, C.b);
 			} else if (name === "head") { const ga = mesh.geometry.attributes; ga.aFace.setX(k, faceCell3D(lk, rig)); ga.aJaw.setX(k, lk.shape[3]); }
-			else if (name === "hair") { const ga = mesh.geometry.attributes, hs = HAIR_STYLES3[hairStyle]; ga.aHairA.setXYZW(k, hs[0], hs[1], hs[2], hs[3]); ga.aHairB.setX(k, hs[4]); ga.aJaw.setX(k, lk.shape[3]); }   // celebrating: the open-mouthed face
+			else if (name === "hair") { const ga = mesh.geometry.attributes, hs = HAIR_STYLES3[hairStyle]; ga.aHairA.setXYZW(k, hs[0], hs[1], hs[2], hs[3]); ga.aHairB.setX(k, hs[4] + lk.shape[4]); ga.aJaw.setX(k, lk.shape[3]); }   // celebrating: the open-mouthed face
 		}
 		const V = F.V.setFromMatrixPosition(rig.root.matrixWorld), x = V.x, z = V.z, air = Math.max(0, V.y);
 		const [ sux, suz ] = sunDir3D();
