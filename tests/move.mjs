@@ -576,13 +576,16 @@ const st3 = await page.evaluate(async () => {
 		const Fg = F.G3.fig; if (!Fg.medicRigs || !Fg.stretch || !Fg.stretch.visible) { s.push({ n: F.stretcher ? F.stretcher.n : -1, medics: 0 }); continue; }
 		const P = Fg.stretch.position, V = new P.constructor(); let worst = 0;
 		for (const r of Fg.medicRigs) { for (const k of [ 0, 1 ]) { r.ha[k].getWorldPosition(V); const dz = Math.abs(V.z - P.z); worst = Math.max(worst, Math.hypot(V.x - P.x - Math.sign(V.x - P.x) * 5, V.y - P.y, Math.max(0, dz - 19), Math.max(0, 14 - dz)));   /* on a pole, near its end */ } }
-		s.push({ n: F.stretcher ? F.stretcher.n : -1, medics: Fg.medicRigs.length, worst, h: P.y, shot: F.G3.shot });
+		let over = 0;   /* the man on it: head and feet within its length (only once he is on it, at full height) */
+		const rr = P.y > 14 && F.stretcher && F.stretcher.n > 110 ? Fg.rigOf.get(F.stretcher.p) : null;
+		if (rr) { for (const j of [ rr.head, rr.an[0], rr.an[1] ]) { j.getWorldPosition(V); over = Math.max(over, Math.abs(V.z - P.z) - 19); } }
+		s.push({ n: F.stretcher ? F.stretcher.n : -1, medics: Fg.medicRigs.length, worst, h: P.y, shot: F.G3.shot, over, rode: !!rr });
 	}
 	F.autoPilot = false;
 	const carried = s.filter(x => x.medics && x.h > 14);   // at full carrying height (not mid set-down)
-	return { n: s.length, drawn: s.filter(x => x.medics === 2).length, maxCarry: Math.max(...carried.map(x => x.worst)).toFixed(1), shot: s.filter(x => x.shot === "stretcher").length, carried: carried.length };
+	return { rode: s.filter(x => x.rode).length, over: Math.max(...s.map(x => x.over || 0)).toFixed(1), n: s.length, drawn: s.filter(x => x.medics === 2).length, maxCarry: Math.max(...carried.map(x => x.worst)).toFixed(1), shot: s.filter(x => x.shot === "stretcher").length, carried: carried.length };
 });
-check("stretcher (3D): two medics carry it with their hands at the handles, and the camera goes to it", !st3.skip && st3.drawn >= st3.n * 0.8 && st3.carried > 5 && Number(st3.maxCarry) < 3 && st3.shot > 5, JSON.stringify(st3));
+check("stretcher (3D): two medics carry it with their hands at the handles, he lies within it, and the camera goes to it", !st3.skip && st3.rode > 5 && Number(st3.over) <= 0 && st3.drawn >= st3.n * 0.8 && st3.carried > 5 && Number(st3.maxCarry) < 3 && st3.shot > 5, JSON.stringify(st3));
 check("no errors after the woodwork checks (and no 3D failure)", errs.length === 0 && !errs.some(e => /3D view failed/.test(e)), errs.join(" | "));
 await browser.close(); server.stop();
 process.exit(done() ? 1 : 0);
