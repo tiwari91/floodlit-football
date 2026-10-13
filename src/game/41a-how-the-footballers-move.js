@@ -195,6 +195,7 @@
 	function kickPose3 (r, p, G, x, z, dir) {
 		const k = kickClock3(p);
 		if (k === null || k > 15) { return null; }
+		if (p.role === "gk") { const h = gkHand3(p); if (h && h.kind !== "punt") { return null; } }   // thrown or rolled out: no swing of the leg
 		const kind = kickKind3(p), pow = p.kickPow || 0.5, n = p.windUp > 0 || (p.kickA > 0 && p.windN && KICK_T - p.kickA < 16) ? p.windN || 1 : 0;
 		const kf = p.build && p.build.left ? 0 : 1, pl = 1 - kf, sk = kf ? 1 : -1, sc = figScale3(p), S = KICK_SHAPE3[kind];
 		const m = r.mir || 1, c = Math.cos(dir), s = Math.sin(dir);
@@ -316,4 +317,36 @@
 		if (k === null || k > 15) { return null; }
 		const n = p.windUp > 0 || p.windN ? p.windN || 1 : 0, L = kickLeg3(k, kickKind3(p), p.kickPow || 0.5, n, [ 0.35, 0.1, -0.3 ]);
 		return { s: lerp3(L.hip, 0, L.w), bend: lerp3(L.knee, 0.3, L.w), w: L.w, bw: L.bw };
+	}
+	// Slides seen, so the getting up afterwards is his (the same countdown follows a challenge on his feet).
+	const SLID3 = new WeakMap();
+	// Challenges on his feet: your shoulder challenge (lungeCd fresh, no slide), a tackle just won (the ball
+	// just his, the loser held off it: kickCd 40), the man who lost it stumbling, and two men running
+	// shoulder to shoulder leaning into each other. Read from the simulation's own counters.
+	function challenge3 (p, x, z, dir, m) {
+		const me = players.indexOf(p) === ctrl, c = Math.cos(dir), s = Math.sin(dir);
+		let shove = 0, poke = 0, stumble = 0, lean = 0, side = 0, best = 1e9;
+		const since = p.gotAt !== undefined ? frame - p.gotAt : 99, spd = Math.hypot(p.vx || 0, p.vy || 0);
+		for (const q of players) {
+			if (q.team === p.team || q.role === "gk") { continue; }
+			const dx = (q.x - p.x) * m, dz = q.y - p.y, f = dx * c + dz * s, l = -dx * s + dz * c, d = Math.hypot(f, l);
+			if (d > 34 || d >= best) { continue; }
+			let hit = 0;
+			if (me && !(p.lunge > 0) && p.lungeCd > 33 && !SLID3.get(p) && ball.owner === q) { shove = Math.sin(Math.PI * clamp((45 - p.lungeCd) / 12, 0, 1)); hit = 1; }
+			if (ball.owner === p && since >= 0 && since < 10 && !p.recv && q.kickCd > 28) { poke = Math.sin(Math.PI * since / 10); hit = 1; }
+			if (ball.owner === q && p.kickCd > 30 && q.gotAt !== undefined && frame - q.gotAt < 10) { stumble = Math.sin(Math.PI * clamp((40 - p.kickCd) / 10, 0, 1)); hit = 1; }
+			const qs = Math.hypot(q.vx || 0, q.vy || 0);
+			if (spd > 1.2 && qs > 1.2 && Math.abs(f) < 10 && Math.abs(l) > 7 && Math.abs(l) < 22 && ((p.vx || 0) * (q.vx || 0) + (p.vy || 0) * (q.vy || 0)) / (spd * qs) > 0.6) { lean = clamp((22 - Math.abs(l)) / 9, 0, 1); hit = 1; }
+			if (hit) { best = d; side = Math.sign(l) || 1; }
+		}
+		return best < 1e9 ? { shove, poke, stumble, lean, side } : null;
+	}
+	// The keeper's distribution from his hands: he held it (in his area, not a goal kick) just before the
+	// kick, and the kind follows the ball: along the grass short a roll, lofted and soft a throw, else a punt.
+	const HELD3 = new WeakMap();
+	function gkHand3 (p) {
+		if (ball && ball.owner === p && inHands(p) && !(setPiece && setPiece.kind === "goalkick")) { HELD3.set(p, frame); }
+		const k = p.kickA > 0 ? kickClock3(p) : null, h = HELD3.get(p);
+		if (k === null || h === undefined || frame - h > KICK_T + 2) { return null; }
+		return { k, kind: p.kickLoft ? ((p.kickPow || 0.5) < 0.55 ? "throw" : "punt") : (p.kickPow || 0.5) < 0.7 ? "roll" : "punt" };
 	}

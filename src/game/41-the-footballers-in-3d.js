@@ -861,13 +861,52 @@
 			r.spine.rotation.z = 0.2 * jump - 0.35 * Math.max(0, jump - 0.75) * 4;
 			r.neck.rotation.z = 0.3 * jump - 0.9 * Math.max(0, jump - 0.8) * 5;
 		}
-		// Sliding in: on his side, one leg out at the ball, an arm on the turf.
+		// Sliding in: on his side, one leg out at the ball, an arm on the turf. He drops into it over the
+		// first frames, and once it is over (slideCd / lungeCd run on) he gets back up off the grass.
+		const slideT = p.slideAI > 0 ? 1 - p.slideAI / 12 : down ? 1 - p.lunge / 14 : -1;
+		if (down) { SLID3.set(p, true); }
+		else if (!(p.lungeCd > 17) && !(p.slideCd > 94)) { SLID3.delete(p); }
+		const getUp = !down && fall < 0 && dive < 0 && SLID3.get(p) ? (p.slideCd > 94 ? (p.slideCd - 94) / 14 : p.lungeCd > 17 && p.lungeCd <= 31 ? (p.lungeCd - 17) / 14 : 0) : 0;
 		if (down) {
-			r.root.rotation.z = 1.05; y -= 5.5;
-			r.hip[1].rotation.z = 1.25; r.kn[1].rotation.z = -0.05; r.hip[0].rotation.z = 0.35; r.kn[0].rotation.z = -1.7;
-			r.sh[0].rotation.z = -1.7; r.sh[0].rotation.x = -0.5; r.el[0].rotation.z = 0.2;
-			r.sh[1].rotation.z = 0.8; r.sh[1].rotation.x = 1.3; r.el[1].rotation.z = 0.5;
-			r.spine.rotation.z = -0.2; r.neck.rotation.z = 0.35;
+			const e = rm ? 1 : smooth3(clamp(slideT / 0.22, 0, 1)), L = (o, t) => lerp3(o, t, e);
+			r.root.rotation.z = L(0, 1.05); y -= 5.5 * e;
+			r.hip[1].rotation.z = L(r.hip[1].rotation.z, 1.25); r.kn[1].rotation.z = L(r.kn[1].rotation.z, -0.05); r.hip[0].rotation.z = L(r.hip[0].rotation.z, 0.35); r.kn[0].rotation.z = L(r.kn[0].rotation.z, -1.7);
+			r.hip[0].rotation.x = L(r.hip[0].rotation.x, 0); r.hip[1].rotation.x = L(r.hip[1].rotation.x, 0); r.an[1].rotation.z = L(r.an[1].rotation.z, 0.3);
+			r.sh[0].rotation.z = L(r.sh[0].rotation.z, -1.7); r.sh[0].rotation.x = L(r.sh[0].rotation.x, -0.5); r.el[0].rotation.z = L(r.el[0].rotation.z, 0.2);
+			r.sh[1].rotation.z = L(r.sh[1].rotation.z, 0.8); r.sh[1].rotation.x = L(r.sh[1].rotation.x, 1.3); r.el[1].rotation.z = L(r.el[1].rotation.z, 0.5);
+			r.spine.rotation.z = L(r.spine.rotation.z, -0.2); r.neck.rotation.z = L(r.neck.rotation.z, 0.35);
+		} else if (getUp > 0) {
+			const w = smooth3(clamp(getUp, 0, 1));
+			r.root.rotation.z = 0.75 * w * w; y -= 3.2 * w;
+			for (let i = 0; i < 2; i++) { r.kn[i].rotation.z -= (i ? 0.6 : 1.3) * w; r.hip[i].rotation.z += (i ? 0.3 : 0.8) * w; }
+			r.sh[0].rotation.z = lerp3(r.sh[0].rotation.z, -1.2, w); r.sh[0].rotation.x = lerp3(r.sh[0].rotation.x, -0.4, w); r.el[0].rotation.z = lerp3(r.el[0].rotation.z, 0.3, w);   // a hand pushing off the turf
+			r.spine.rotation.z -= 0.3 * w;
+		}
+		// Challenges on his feet, and shoulder to shoulder (challenge3): leaning in, the near leg poking at the
+		// ball; and the man who lost it stumbling.
+		if (!down && getUp <= 0 && fall < 0 && dive < 0 && !kp && !air && cel <= 0 && p.team >= 0 && p.role !== "staff" && !rm) {
+			const ch = challenge3(p, x, z, dir, r.mir || 1);
+			if (ch) {
+				const sd = ch.side, i = sd > 0 ? 1 : 0;
+				r.root.rotation.x += sd * (0.12 * ch.lean + 0.22 * ch.shove); r.chest.rotation.x += sd * 0.15 * (ch.lean + ch.shove);
+				r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, OUT3(i) * 0.55, Math.max(ch.lean, ch.shove)); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 1.1, ch.shove);
+				if (ch.poke > 0) { r.hip[i].rotation.z += 0.75 * ch.poke; r.kn[i].rotation.z = lerp3(r.kn[i].rotation.z, -0.2, ch.poke); r.an[i].rotation.z += 0.3 * ch.poke; r.spine.rotation.z -= 0.25 * ch.poke; y -= 1.2 * ch.poke; }
+				if (ch.stumble > 0) { r.spine.rotation.z -= 0.45 * ch.stumble; y -= 1.5 * ch.stumble; for (let k = 0; k < 2; k++) { r.kn[k].rotation.z -= 0.45 * ch.stumble; r.sh[k].rotation.x = lerp3(r.sh[k].rotation.x, OUT3(k) * 1.0, ch.stumble); r.sh[k].rotation.z = lerp3(r.sh[k].rotation.z, 0.6, ch.stumble); } }
+			}
+		}
+		// The keeper's distribution from his hands (gkHand3): an overarm throw, a roll along the grass, a punt.
+		const gh = gk && !rm && dive < 0 && fall < 0 ? gkHand3(p) : null;
+		if (gh) {
+			const t = gh.k, a2 = OUT3(1), thr = smooth3(clamp(t / 4, 0, 1)), back = 1 - thr, rel2 = 1 - smooth3(clamp((t - 6) / 8, 0, 1)) * (t >= 0 ? 1 : 0);
+			if (gh.kind === "throw") {
+				r.sh[1].rotation.z = lerp3(lerp3(r.sh[1].rotation.z, -2.4, back), 1.4, thr) * rel2 + r.sh[1].rotation.z * (1 - rel2); r.sh[1].rotation.x = a2 * 0.35 * rel2; r.el[1].rotation.z = 0.25 + 0.6 * back * (1 - thr);
+				r.sh[0].rotation.z = lerp3(r.sh[0].rotation.z, 0.9 * (back + thr * 0.5), rel2); r.chest.rotation.y += (0.45 * back - 0.4 * thr) * rel2; r.spine.rotation.z += (0.18 * back - 0.3 * thr) * rel2;
+			} else if (gh.kind === "roll") {
+				r.sh[1].rotation.z = lerp3(r.sh[1].rotation.z, lerp3(-0.9 * back, 0.7, thr), rel2); r.el[1].rotation.z = lerp3(r.el[1].rotation.z, 0.1, rel2);
+				r.spine.rotation.z -= 0.65 * Math.max(back, thr) * rel2; y -= 3 * Math.max(back, thr) * rel2; r.kn[0].rotation.z -= 1.0 * Math.max(back, thr) * rel2; r.hip[0].rotation.z += 0.9 * Math.max(back, thr) * rel2;
+			} else {
+				for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 0.9 * back * (1 - thr), rel2); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, OUT3(i) * (0.3 + 0.7 * thr), rel2); }   // the ball held out, dropped, arms out as he swings through it
+			}
 		}
 		// The keeper's dive (divePose3): laid out toward where the ball passes him, the gloves at it; the
 		// leg on that side drawn up, the other driving off; a catch gathered in to the chest.
