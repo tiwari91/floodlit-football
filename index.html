@@ -9666,6 +9666,8 @@
 			// A hot afternoon: a warm haze over everything.
 			if (cond.heat && cond.ko === "day") { ctx.fillStyle = "rgba(255, 214, 150, 0.07)"; ctx.fillRect(0, 0, SW, SH); }
 		}
+		// The weather and tactic tags stand down while the REPLAY badge or the line-ups card sits in their corner.
+		if (replayOn() || !$("bcLineups").hidden) { return; }
 		ctx.font = "700 11px Barlow, Arial, sans-serif";
 		ctx.textAlign = "left";
 		ctx.textBaseline = "middle";
