@@ -134,6 +134,9 @@
 		return { x, y, m: Math.min(1, m), sprint: keys.has("KeyE") || keys.has("ShiftLeft") || keys.has("ShiftRight") || padSprint || padSprintBtn };
 	}
 
+	// Frames your man has been left alone (no arrows, no A) while the other side has the ball.
+	let handsOff = 0;
+	const HANDS_OFF = 20;
 	function update () {
 		windUpBegin();   // a kick from a key press since the last frame
 		frame++;
@@ -372,6 +375,26 @@
 				const o = ball.owner;
 				const pressing = (pressHeld || touchPress || padPressBtn) && o !== p && p.lunge <= 0 && !setPiece && !inHands(o) && p !== receiver && state === "play";
 				let faceX = null, faceY = null;
+				// Hands off for a third of a second while they have it: he defends by himself, as his
+				// teammate covering would (goal-side of the carrier, or dropping off it on a low press,
+				// and after a loose ball of theirs), a touch under full pace. Any arrow or A gives him
+				// straight back to you.
+				const theirs = state === "play" && !setPiece && p !== receiver && p.lunge <= 0 && (o ? o.team === 1 && !inHands(o) : possTeam === 1);
+				handsOff = theirs && inp.m < 0.1 && !(pressHeld || touchPress || padPressBtn) ? handsOff + 1 : 0;
+				if (handsOff >= HANDS_OFF) {
+					const dp = dist(p, ball);
+					let tx, ty;
+					if (o) {
+						const goes = press[0] === "high" ? dp < 480 : press[0] === "low" ? dp < 90 || (rel(0, ball.x) < FW * 0.35 && dp < 200) : dp < 380 * Math.sqrt(S) || (rel(0, ball.x) < FW * 0.5 && dp < 200);
+						const k = press[0] === "high" ? 0.12 : press[0] === "low" ? 0.45 : 0.3;
+						[ tx, ty ] = goes ? goalSide(o, 0, dp > 70 ? 14 : 6) : [ ball.x + (0 - ball.x) * k, ball.y + (FH / 2 - ball.y) * k ];
+						faceX = o.x; faceY = o.y;
+					} else {
+						[ tx, ty ] = ball.z > 0 && ball.landX != null ? [ ball.landX, ball.landY ] : [ ball.x + ball.vx * 6, ball.y + ball.vy * 6 ];
+					}
+					const dx = tx - p.x, dy = ty - p.y, L = Math.hypot(dx, dy) || 1, m = clamp(L / 14, 0, 1) * 0.9;
+					inp.x = dx / L * m; inp.y = dy / L * m; inp.m = m;
+				}
 				if (pressing) {
 					let tx, ty, d;
 					if (o && o.team === 1) {

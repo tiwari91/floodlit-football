@@ -85,6 +85,32 @@ check("Assisted: a man far from the play is swapped within half a second while s
 // 7. No ping-pong: after the near switch, keep steering; control stays with d for a second.
 r = await scene({ mode: "assisted", kind: "loose", steer: true, frames: 75, keepGoing: true });
 check("After a near switch control stays put (no ping-pong in the next second)", r.to === "d" && r.involuntary <= 1 && r.humanIsD, JSON.stringify(r));
+// 8. Hands off while they have the ball: after a third of a second your man defends by himself
+// (goal-side of the carrier); the arrows take him straight back.
+const handsOff = (arrow) => page.evaluate((arrow) => {
+	const F = window.__ff, FW = F.FW, FH = F.FH;
+	F.timeLeft = 1e9; F.freeze = 0; F.autoSwitchMode = "manual"; F.manualLock = 0; F.switchCd = 0; F.autoHold = 0;
+	const q = F.outfield(1)[3], mine = F.outfield(0), m = mine[2];
+	for (const p of F.players) { p.vx = p.vy = 0; p.lunge = 0; p.lungeCd = 0; p.kickCd = 0; }
+	for (const p of F.outfield(1)) { if (p !== q) { p.x = FW - 60; p.y = 40 + 30 * F.outfield(1).indexOf(p); } }
+	for (const p of mine) { if (p !== m) { p.x = 60; p.y = 40 + 30 * mine.indexOf(p); } }
+	q.x = FW * 0.5; q.y = FH / 2; q.dir = Math.PI; m.x = q.x + 120; m.y = q.y + 60;
+	F.ball.owner = q; F.ball.x = q.x - 18; F.ball.y = q.y; F.ball.z = 0; F.ball.vz = 0; F.ball.vx = F.ball.vy = 0;
+	F.ctrl = F.players.indexOf(m); F.possTeam = 1;
+	if (arrow) { F.key(arrow, true); }
+	const x0 = m.x, y0 = m.y; let early = 0;
+	for (let i = 0; i < 150; i++) {
+		F.ball.owner = q; q.x = FW * 0.5; q.y = FH / 2; q.vx = q.vy = 0; F.ball.x = q.x - 18; F.ball.y = q.y;
+		F.step(1);
+		if (i === 14) { early = Math.hypot(m.x - x0, m.y - y0); }
+	}
+	if (arrow) { F.key(arrow, false); }
+	return { early: Math.round(early), gs: Math.round(Math.hypot(m.x - (q.x - 20), m.y - q.y)), dx: Math.round(m.x - q.x), dy: Math.round(m.y - y0), human: F.human() === m };
+}, arrow);
+r = await handsOff(null);
+check("Hands off while they have the ball: your man waits a moment, then goes goal-side of the carrier by himself", r.human && r.early < 6 && r.dx < 0 && r.gs < 40, JSON.stringify(r));
+r = await handsOff("ArrowUp");
+check("Hands off: an arrow held keeps him yours (he follows it, not the carrier)", r.human && r.dy < -100 && r.dx > 60, JSON.stringify(r));
 check("no console errors in the switch checks", errs.length === 0, errs.join(" | "));
 
 // 8. Sanity: a stretch of real play on auto-pilot runs clean (a goal right at the end plays out to the kick-off).
