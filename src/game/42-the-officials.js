@@ -151,7 +151,8 @@
 			const g = F.chestCv.getContext && F.chestCv.getContext("2d");
 			if (g) { paintChest3D(g, 0, KITS[0], YOU); paintChest3D(g, 1, KITS[1], opp); F.chestTex.needsUpdate = true; }
 		} F.rings.count = 0; F.blobs.count = 0; F.longs.count = 0;
-		const dt = frameDt / 16.7, st3 = state === "play" ? stretcher3() : null;
+		const dt = frameDt / 16.7, st3 = state === "play" ? stretcher3() : null, mirAll = WX(1) < WX(0) ? -1 : 1;
+		for (const rg of F.rigs) { rg.mir = mirAll; }   // everyone's left and right (and ground speed) follow the mirrored pitch
 		for (const p of players) {
 			if (F.n >= MAXF3) { break; }
 			const rig = F.rigs[F.n], pd = F.prevDir.get(p), wrapA = a => Math.atan2(Math.sin(a), Math.cos(a));

@@ -4,7 +4,7 @@
 	   build-up, in slow motion, from another angle (high behind the goal, or low at the side of it),
 	   then back to the scorer and the restart. Any key or tap skips it, as it does the celebration.
 	   The match clock is stopped throughout, as it is for any goal. */
-	const REC_F = [ "x", "y", "dir", "stride", "runAmt", "vx", "vy", "kickA", "kickPow", "jump", "slideAI", "fall", "dive", "diveSide", "throwA", "idlePh", "shuf", "celebA", "kneel", "sulk", "celebK", "hug" ];
+	const REC_F = [ "x", "y", "dir", "stride", "runAmt", "vx", "vy", "kickA", "kickPow", "jump", "slideAI", "fall", "dive", "diveSide", "throwA", "idlePh", "shuf", "celebA", "kneel", "sulk", "celebK", "hug", "windUp", "windN", "kickLoft", "lungeCd", "diveCd", "plant" ];
 	const REC_N = 360, REC_P = 24, REC_W = REC_P * REC_F.length + 5 + 15;   // frames kept, players, floats a frame
 	const REPLAY_AT = 230, REPLAY_BEFORE = 150, REPLAY_AFTER = 28, REPLAY_SPEED = 0.64;
 	const REPLAY_FR = Math.round((REPLAY_BEFORE + REPLAY_AFTER) / REPLAY_SPEED);   // frames on screen
@@ -48,6 +48,7 @@
 	// the function that puts everything back.
 	function applyReplay (clip = replay, f = replayPos(), spd = REPLAY_SPEED) {
 		const i0 = Math.floor(f), t = f - i0, NF = REC_F.length, b = rec.buf;
+		animLag = -t;   // the recorded timers are frame i0's: the picture is t of a frame on from them
 		const row = k => (clip.end - (clip.len - 1 - k) + REC_N * 2) % REC_N;
 		const r0 = row(i0), r1 = row(Math.min(clip.len - 1, i0 + 1)), who = rec.who[r0] || players;
 		const keep = [], keepPlayers = players, keepCtrl = ctrl;
@@ -71,6 +72,7 @@
 		officials3.forEach((o, k) => { const q = ob0 + 5 + k * 5, q1 = ob1 + 5 + k * 5; o.x = b[q] + (b[q1] - b[q]) * t; o.y = b[q + 1] + (b[q1 + 1] - b[q + 1]) * t; o.dir = b[q + 2]; o.stride = b[q + 3]; o.runAmt = b[q + 4]; });
 		players = who; ctrl = -1;
 		return () => {
+			animLag = 0;
 			for (const [ p, saved ] of keep) { Object.assign(p, saved); }
 			[ ball.x, ball.y, ball.z, ball.vx, ball.vy ] = keepBall;
 			officials3.forEach((o, k) => { [ o.x, o.y, o.dir, o.stride, o.runAmt ] = keepOff[k]; });

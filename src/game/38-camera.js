@@ -22,6 +22,7 @@
 	}
 	function drawPlain (alpha) {
 		if (window.__ffBeforeDraw) { window.__ffBeforeDraw(); }   // test harness only: pose players for a capture
+		if (!odr) { animLag = 1 - alpha; }   // the timers (a kick, a jump) are drawn this far behind, like the positions
 		// Swap in in-between positions for drawing, then put the real ones back.
 		const real = players.map(p => [ p.x, p.y, p.dir, p.stride ]), realBall = ball ? [ ball.x, ball.y, ball.z ] : null;
 		const lerp = (a, b) => (a === undefined ? b : a + (b - a) * alpha);

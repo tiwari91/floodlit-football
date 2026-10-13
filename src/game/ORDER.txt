@@ -43,6 +43,7 @@
 39-the-tv-camera.js
 40-the-3d-camera-three-js.js
 41-the-footballers-in-3d.js
+41a-how-the-footballers-move.js
 42-the-officials.js
 43-the-crowd-in-3d.js
 44-the-replay.js

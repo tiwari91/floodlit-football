@@ -615,17 +615,13 @@
 		const down = (p.lunge > 0 && players.indexOf(p) === ctrl) || p.slideAI > 0;
 		const fall = p.fall > 0 ? 1 - p.fall / FALL_T : -1, dive = p.dive > 0 ? 1 - p.dive / DIVE_T : -1, thr = p.throwA > 0 ? 1 - p.throwA / THROW_T : -1;
 		const idle = rm ? 0 : p.idlePh || 0, gk = p.role === "gk";
-		let y = 0;
+		let y = 0, ox = 0, oz = 0;   // ox, oz: the figure drawn off his spot for a moment (a dive stretching to the ball)
 		// The running cycle: hips swing the thighs, knees fold on the recovery, arms counter-swing.
 		// Each man runs his own way (gv): arm carriage, elbow bend, bounce, lean and twist.
 		const gv = p.build && p.build.arm !== undefined ? p.build : { arm: 1, elbow: 0, lean: 0, bounce: 1, twist: 1 };
-		const A = 0.22 + 0.62 * a * (1 - 0.4 * shuf), K = 0.5 + 1.3 * a, armA = (0.25 + 0.65 * a) * (1 - 0.5 * shuf) * gv.arm;
+		const armA = (0.25 + 0.65 * a) * (1 - 0.5 * shuf) * gv.arm;
 		for (let i = 0; i < 2; i++) {
-			const s = i ? 1 : -1, phi = ph + (i ? Math.PI : 0), sn = Math.sin(phi), cs = Math.cos(phi);
-			const limp = p.injured && i === 0 ? 0.55 : 1;
-			r.hip[i].rotation.z = A * sn * limp;
-			r.kn[i].rotation.z = -(K * clamp(cs, 0, 1) * clamp(a + 0.15, 0, 1) + 0.12 + 0.1 * a) * limp;
-			r.an[i].rotation.z = 0.25 * a * clamp(-sn, 0, 1) - 0.1 * clamp(cs, 0, 1) * a;
+			const phi = ph + (i ? Math.PI : 0), sn = Math.sin(phi);
 			// The arm: the upper arm swings further back than forward, and the forearm is steered to an angle
 			// (from hanging straight down) rather than the elbow to a fixed bend, so the hand comes through
 			// from beside the hip (about 0.95 rad) to chest height in front (about 1.85) with the elbow near
@@ -642,7 +638,8 @@
 			const fore = 0.42 + 1.18 * (sw + 1) / 2 + gv.elbow * 0.5;
 			r.el[i].rotation.z = lerp3(0.45 + gv.elbow + 0.5 * a, clamp(fore - r.sh[i].rotation.z, 0.75, 1.75), run);
 		}
-		r.hips.position.y = 15.6 - 0.5 * a + Math.abs(Math.cos(ph)) * 0.9 * a * gv.bounce + (a < 0.2 ? Math.sin(idle) * 0.12 : 0);
+		// The legs are placed once the crouches below are known (go: lower the hips, feet wider, one foot eased forward...).
+		const go = { crouch: 0, wide: 0, fwd: [ 0, 0 ], lift: [ 0, 0 ], toe: [ 0, 0 ] };
 		r.spine.rotation.z = -(0.06 + 0.2 * a * a + gv.lean * a);   // measured on the rig: -z on the spine leans him forward (forward is +x, the toe and the nose)
 		// The pelvis turns with the leading leg and the shoulders against it; the head stays steady.
 		// A little roll and sideways shift of the hips onto the standing leg.
@@ -661,25 +658,27 @@
 		if (still > 0 && !gk) {
 			const sd = p.build ? p.build.seed : 0.5, side = sd < 0.5 ? 0 : 1, sgn = side ? 1 : -1, free = 1 - side;
 			r.hips.position.z += sgn * 0.55 * still; r.hips.rotation.x -= sgn * 0.06 * still; r.chest.rotation.x += sgn * 0.05 * still;
-			r.kn[free].rotation.z -= 0.32 * still; r.hip[free].rotation.z += 0.1 * still; r.kn[side].rotation.z -= 0.05 * still;
+			go.fwd[free] += 1.3 * still; go.lift[free] += 0.25 * still; go.toe[free] -= 0.2 * still; go.crouch += 0.15 * still;   // the free foot eased forward, its knee soft and heel light
 			r.chest.rotation.y += (sd - 0.5) * 0.4 * still;
 			r.spine.rotation.z += Math.sin(idle * 1.3) * 0.015 * still;
 			for (let i = 0; i < 2; i++) { r.el[i].rotation.z += (0.1 + 0.3 * ((sd * 7.3 + i * 0.31) % 1)) * still; r.sh[i].rotation.x += OUT3(i) * 0.04 * still; }   // arms eased away from the sides
 			const calm = state !== "play" || freeze > 0;   // only at a stoppage: in open play a tired man stays upright
 			const w = p.team >= 0 && calm ? clamp((0.6 - staOf(p)) / 0.25, 0, 1) * still : 0;
 			if (w > 0) {
-				r.spine.rotation.z -= 0.5 * w; r.hips.position.y -= 1.1 * w; r.neck.rotation.z += 0.35 * w;
-				for (let i = 0; i < 2; i++) { r.kn[i].rotation.z -= 0.3 * w; r.hip[i].rotation.z += 0.25 * w; r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 0.32, w); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, (i ? 1 : -1) * 0.08, w); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.1, w); }
+				r.spine.rotation.z -= 0.5 * w; go.crouch += 1.1 * w; r.neck.rotation.z += 0.35 * w;
+				for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 0.32, w); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, (i ? 1 : -1) * 0.08, w); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.1, w); }
 			}
 		}
-		r.hips.rotation.x = clamp(turn * 1.4, -0.3, 0.3) * clamp(spd, 0, 1);
+		// Cornering he leans into the turn, the whole body from the feet (and the pelvis a little more).
+		const bank = rm ? 0 : clamp(turn * 6 * clamp(spd / 2, 0, 1.5), -0.32, 0.32);
+		r.root.rotation.x = 0.7 * bank; r.hips.rotation.x += 0.3 * bank;
 		r.neck.rotation.z = -r.spine.rotation.z * 0.85;   // the head stays near level, eyes up the pitch, whatever the lean
 		if (a < 0.2) { r.chest.rotation.y = Math.sin(idle * 0.5) * 0.05; r.sh[0].rotation.z += Math.sin(idle) * 0.03; r.sh[1].rotation.z -= Math.sin(idle) * 0.03; r.head.rotation.y = Math.sin(idle * 0.37) * 0.25; }
 		// Planting to stop or cut: knees bent, weight back, feet wide for a few frames.
 		const plant = !rm && p.plant > 0 && !down && jump <= 0 ? p.plant / 10 : 0;
 		if (plant > 0) {
-			r.spine.rotation.z += 0.28 * plant; r.hips.position.y -= 1.4 * plant;
-			for (let i = 0; i < 2; i++) { r.kn[i].rotation.z -= 0.35 * plant; r.hip[i].rotation.x += (i ? 1 : -1) * 0.14 * plant; r.hip[i].rotation.z += 0.18 * plant; }
+			r.spine.rotation.z += 0.28 * plant; go.crouch += 1.6 * plant; go.wide += 0.5 * plant;
+			for (let i = 0; i < 2; i++) { go.fwd[i] += 2.2 * plant; }   // the feet dug in ahead of him, weight back over them
 		}
 		// Flat out: leaning further in, the arms pumping higher and tighter.
 		const sp = clamp(p.sprintAmt || 0, 0, 1) * a;
@@ -704,9 +703,6 @@
 		if (!rm && ball && fall < 0 && dive < 0 && thr < 0 && cel <= 0 && !down) {
 			if (ball.owner === p) {
 				r.neck.rotation.z -= 0.2;
-				// Each touch: the boot comes through and flicks the ball on.
-				const tap = p.touchPh !== undefined && a > 0.2 ? Math.max(0, 1 - p.touchPh / 0.22) : 0;
-				if (tap > 0) { const kf = build(p).left ? 0 : 1; r.an[kf].rotation.z -= 0.4 * tap; r.kn[kf].rotation.z += 0.15 * tap; }
 			} else {
 				r.head.rotation.y += ballYaw;
 			}
@@ -740,8 +736,9 @@
 			p.jockW = (p.jockW || 0) + (jw - (p.jockW || 0)) * 0.15;
 			const J = p.jockW;
 			if (J > 0.02) {
-				r.hips.position.y -= 1.3 * J; r.spine.rotation.z -= 0.18 * J; r.hips.rotation.y += 0.32 * J; r.chest.rotation.y -= 0.18 * J;
-				for (let i = 0; i < 2; i++) { r.hip[i].rotation.z += 0.28 * J; r.kn[i].rotation.z -= 0.5 * J; r.sh[i].rotation.x += OUT3(i) * 0.32 * J; r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 0.25, J); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.7, J); }
+				r.spine.rotation.z -= 0.18 * J; r.hips.rotation.y += 0.32 * J; r.chest.rotation.y -= 0.18 * J;
+				go.crouch += 1.6 * J; go.wide += 1.0 * J; go.fwd[1] += 2.2 * J; go.fwd[0] -= 2.2 * J;   // low and side-on, feet apart, one foot ahead of the other
+				for (let i = 0; i < 2; i++) { r.sh[i].rotation.x += OUT3(i) * 0.32 * J; r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 0.25, J); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.7, J); }
 			}
 			// Shielding: on the ball, slow, a man at his shoulder or behind: low, and the arm on that side out to hold him off.
 			let sw = 0, side = 1;
@@ -759,10 +756,24 @@
 			const S2 = p.shieldW;
 			if (S2 > 0.02) {
 				const i = p.shieldSide;
-				r.hips.position.y -= 0.9 * S2; r.spine.rotation.z -= 0.12 * S2; r.chest.rotation.y += (i ? -1 : 1) * 0.25 * S2;
-				for (let k = 0; k < 2; k++) { r.kn[k].rotation.z -= 0.35 * S2; r.hip[k].rotation.z += 0.18 * S2; }
+				r.spine.rotation.z -= 0.12 * S2; r.chest.rotation.y += (i ? -1 : 1) * 0.25 * S2;
+				go.crouch += 1.1 * S2; go.wide += 0.7 * S2;
 				r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, OUT3(i) * 0.95, S2); r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 0.15, S2); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.35, S2);
 			}
+		}
+		// The keeper on his toes when the ball is near: knees bent, feet apart, hands ready (the arms below).
+		const gSet = gk && ballNear > 0 && !down && jump <= 0 && fall < 0 && dive < 0 && !(p.kickA > 0) ? ballNear * (1 - a) : 0;
+		if (gSet > 0) { go.crouch += 2.6 * gSet; go.wide += 1.3 * gSet; go.toe[0] -= 0.15 * gSet; go.toe[1] -= 0.15 * gSet; }   // up on the balls of his feet
+		// The legs: each foot set down and carried through (see gait3), the hips as high as the planted feet allow.
+		const G = r.gait = gait3(rm ? Object.assign(Object.create(p), { vx: 0, vy: 0 }) : p, ph, dir, r.mir || 1, go);
+		legsTo3(r, G);
+		// Each touch on the run: the foot coming through reaches on and flicks the ball ahead.
+		if (!rm && ball && ball.owner === p && !acting && p.touchPh !== undefined && a > 0.2) {
+			const tap = Math.max(0, 1 - p.touchPh / 0.22), i = G.feet[0].st ? 1 : 0, f = G.feet[i];
+			if (tap > 0 && !f.st) { footTo3(r, i, f.x + 2.4 * tap, Math.max(ANK3, f.y - 0.8 * tap), f.z, f.toe - 0.35 * tap); }
+		}
+		if (!rm && !acting && cel <= 0 && !down && p.team >= 0 && p.role !== "staff" && state === "play") {
+			const o = ball && ball.owner;
 			// Receiving: the first few frames after a pass reaches him (p.recvK, chosen in gainBall). On the
 			// chest he leans back, arms out; on the thigh the knee comes up to waist height; under the sole the
 			// foot reaches forward, toes up; with the inside of the foot the leg turns out to cushion it; turning,
@@ -799,42 +810,24 @@
 		}
 		// Turning: the head and then the chest come round first, the hips follow.
 		if (!rm && lead && fall < 0 && dive < 0 && !down) { r.chest.rotation.y += lead * 0.35; r.neck.rotation.y += lead * 0.3; }
-		// The keeper on his toes when the ball is near: knees bent, hands ready.
-		if (gk && ballNear > 0 && !down && jump <= 0 && fall < 0 && dive < 0 && !(p.kickA > 0)) {
-			const g = ballNear * (1 - a);
-			for (let i = 0; i < 2; i++) { r.hip[i].rotation.z += 0.42 * g; r.kn[i].rotation.z -= 0.75 * g; r.sh[i].rotation.z += 0.75 * g; r.sh[i].rotation.x += OUT3(i) * 0.35 * g; r.el[i].rotation.z += 0.6 * g; }
-			r.hips.position.y -= 2.6 * g; r.spine.rotation.z -= 0.3 * g;
+		if (gSet > 0) {
+			const g = gSet;
+			for (let i = 0; i < 2; i++) { r.sh[i].rotation.z += 0.75 * g; r.sh[i].rotation.x += OUT3(i) * 0.35 * g; r.el[i].rotation.z += 0.6 * g; }
+			r.spine.rotation.z -= 0.3 * g;
 		}
-		// Kicking: a backswing, the strike and the follow-through on the kicking leg; the other leg
-		// plants and the arms open for balance. Shots swing further than passes (kickPow).
-		const ks = rm || jump > 0 || down ? null : kickSwing(p);
-		if (ks) {
-			const kf = build(p).left ? 0 : 1, pl = 1 - kf, pw = p.kickPow || 0.5;
-			r.hip[kf].rotation.z = ks.s * 1.15; r.kn[kf].rotation.z = -ks.bend * 1.25; r.an[kf].rotation.z = 0.35;
-			r.hip[pl].rotation.z = -0.12; r.kn[pl].rotation.z = -0.38;
-			// Over the ball for a pass or a drive (-z leans him forward), easing up as the leg comes through;
-			// under a lofted ball he leans back a little as the leg rises.
-			r.spine.rotation.z = p.kickLoft ? -0.04 + 0.16 * Math.max(0, ks.s - 0.3) : -(0.12 + 0.12 * pw) * (1 - 0.5 * clamp(ks.s / 1.4, 0, 1)); r.hips.rotation.x += (kf ? -1 : 1) * 0.12;
-			r.neck.rotation.z -= 0.15;   // eyes down on the ball
-			r.sh[pl].rotation.z = 0.5 * ks.s + 0.2; r.sh[kf].rotation.z = -0.4 * ks.s; r.sh[kf].rotation.x = (kf ? 1 : -1) * (0.35 + 0.5 * Math.abs(ks.s) * (0.6 + pw)); r.sh[pl].rotation.x = (pl ? 1 : -1) * (0.4 + 0.3 * pw);
-			r.el[kf].rotation.z = 0.5; r.el[pl].rotation.z = 0.7;
-			// Winding up, the standing foot steps in beside the ball (a little behind it, a boot's width to
-			// its side) as the leg goes back: the leg aimed at that spot from the hip (measured on the rig:
-			// hip joint 1 below the hips and 2.45 out, thigh 7.3, shin 6.5, ankle 0.8 up; hip +z swings the
-			// leg forward, +x swings it toward -z, the knee folds the shin back), knee bent to fit, foot flat.
-			if (ks.wind !== undefined && ball && ball.owner === p) {
-				const m = r.mir || 1, dx = m * (ball.x - p.x), dz = ball.y - p.y, c = Math.cos(dir), s = Math.sin(dir), sp = pl ? 1 : -1;
-				const bf = dx * c + dz * s, bl = -dx * s + dz * c, w = ks.wind * clamp((bf - 2) / 4, 0, 1);   // not while he is still turning to a ball at his side
-				r.hips.position.y -= 2.2 * w;   // the standing knee gives
-				const A = 7.3, B = 6.5, hy = r.hips.position.y - 1, Dy = 1.1 - hy, Dz = clamp(bl + sp * 4.2 - sp * 2.45, -6, 6);
-				const reach = Math.sqrt(Math.max(0, (A + B - 0.15) ** 2 - Dy * Dy - Dz * Dz)), Dx = clamp(bf - 1.5, -2, reach);   // out of reach, the longest stride with the foot still down
-				const d = clamp(Math.hypot(Dx, Dy, Dz), 6, A + B - 0.05), lc = Math.hypot(Dy, Dz);
-				const ax = Math.atan2(-Dz, -Dy), fold = Math.PI - Math.acos(clamp((A * A + B * B - d * d) / (2 * A * B), -1, 1)), off = Math.acos(clamp((A * A + d * d - B * B) / (2 * A * d), -1, 1));
-				const az = Math.atan2(Dx, lc) + off;
-				r.hip[pl].rotation.x = lerp3(r.hip[pl].rotation.x, ax - r.hips.rotation.x, w);   // net of the pelvis tilt, which carries the leg with it
-				r.hip[pl].rotation.z = lerp3(-0.12, az, w);
-				r.kn[pl].rotation.z = lerp3(-0.38, -fold, w); r.an[pl].rotation.z = lerp3(r.an[pl].rotation.z, fold - az, w);
-			}
+		// Kicking (see kickPose3): the standing foot beside the ball, the leg back, through the ball on the
+		// frame it goes and up after it; the arms open for balance, the hips wind and unwind against the
+		// shoulders, over the ball for a drive, back under it for a chip or a clearance.
+		const kp = rm || jump > 0 || down ? null : kickPose3(r, p, G, x, z, dir);
+		if (kp) {
+			const { kf, pl, sk, pow, bw, fw, S } = kp, u = 1 - kp.w, sw = r.hip[kf].rotation.z;
+			r.hips.rotation.y += sk * (-0.34 * bw + 0.4 * fw) * u; r.chest.rotation.y -= sk * (-0.22 * bw + 0.3 * fw) * u;
+			r.spine.rotation.z = lerp3(r.spine.rotation.z, S.lean * (0.6 + 0.4 * pow) * (0.5 + 0.5 * Math.max(bw, fw)) - 0.08, u);
+			r.root.rotation.x -= sk * (S.side || 0) * 0.55 * fw * u;   // a volley: leaning away from the leg as it comes round
+			r.neck.rotation.z -= 0.18 * u;   // eyes down on the ball
+			r.sh[pl].rotation.z = lerp3(r.sh[pl].rotation.z, 0.25 + 0.45 * clamp(sw, -0.5, 1.5) * 0.6 + 0.35 * bw, u); r.sh[pl].rotation.x = lerp3(r.sh[pl].rotation.x, OUT3(pl) * (0.45 + 0.45 * pow), u);
+			r.sh[kf].rotation.z = lerp3(r.sh[kf].rotation.z, -0.35 * clamp(sw, 0, 1.6) - 0.1, u); r.sh[kf].rotation.x = lerp3(r.sh[kf].rotation.x, OUT3(kf) * (0.4 + 0.55 * pow * (0.5 + 0.5 * Math.max(bw, fw))), u);
+			r.el[kf].rotation.z = lerp3(r.el[kf].rotation.z, 0.5, u); r.el[pl].rotation.z = lerp3(r.el[pl].rotation.z, 0.75, u);
 		}
 		// A throw-in: ball over the head, arching back, then whipping forward.
 		if (thr >= 0) {
@@ -843,8 +836,26 @@
 			r.spine.rotation.z = 0.35 * back - 0.25 * (1 - back) * fwd;
 			r.hip[1].rotation.z = 0.3; r.kn[1].rotation.z = -0.3; r.hip[0].rotation.z = -0.3;
 		}
+		// Going up for a ball in the air (aerial3): he gathers, takes off to be at the top as it arrives,
+		// arms up and out for leverage, head cocked back, then snaps his neck through it (down at goal,
+		// up and away for a clearance) and lands on bent knees. A ball under his head, he stoops to it.
+		const air = rm || down || dive >= 0 || fall >= 0 || cel > 0 || state !== "play" && !replayOn() ? null : aerial3(p, figScale3(p));
+		if (air) {
+			const up = air.up, g = air.gather, l = air.land, st = air.stoop, sc = figScale3(p);
+			y += air.y * sc - (1.6 * g + 1.8 * l + 2.4 * st) * sc;
+			for (let i = 0; i < 2; i++) {
+				r.kn[i].rotation.z -= 0.75 * g + 0.8 * l + 0.6 * st + (0.55 + (i ? 0.45 : 0)) * up; r.hip[i].rotation.z += 0.35 * g + 0.4 * l + 0.3 * st + (i ? 0.55 : 0.12) * up;
+				r.an[i].rotation.z += 0.4 * g + 0.4 * l - 0.35 * up;
+				const armOut = 1.5 * up + 0.5 * st, armUp = 0.45 * up - 0.7 * g;
+				r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, OUT3(i) * armOut, Math.min(1, up + st + g)); r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, armUp, Math.min(1, up + g)); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.9, up);
+			}
+			const snap = smooth3(clamp((1.5 - air.t) / 3, 0, 1)) * (1 - smooth3(clamp((-air.t - 5) / 6, 0, 1))), cock = clamp(air.t / 6, 0, 1) * (up + st) * (1 - snap);
+			const goal = air.mine ? !!ball.shot : air.att;
+			r.spine.rotation.z += 0.22 * cock - (goal ? 0.45 : 0.28) * snap * Math.max(up, st, 0.5) - 0.85 * st;
+			r.neck.rotation.z += 0.32 * cock - (goal ? 0.55 : 0.05) * snap + 0.35 * st;
+		}
 		// Up for a header: legs tucked, arms out, the head snaps forward at the top.
-		if (jump > 0) {
+		if (jump > 0 && !air) {
 			y += jump * 13;
 			for (let i = 0; i < 2; i++) { r.hip[i].rotation.z = 0.35 * jump + (i ? 0.25 : -0.1) * jump; r.kn[i].rotation.z = -1.1 * jump; r.sh[i].rotation.x = OUT3(i) * 2.2 * jump; r.sh[i].rotation.z = -0.5 * jump; r.el[i].rotation.z = 0.35; }
 			r.spine.rotation.z = 0.2 * jump - 0.35 * Math.max(0, jump - 0.75) * 4;
@@ -858,13 +869,23 @@
 			r.sh[1].rotation.z = 0.8; r.sh[1].rotation.x = 1.3; r.el[1].rotation.z = 0.5;
 			r.spine.rotation.z = -0.2; r.neck.rotation.z = 0.35;
 		}
-		// The keeper's dive: flat out to one side, arms at full stretch.
+		// The keeper's dive (divePose3): laid out toward where the ball passes him, the gloves at it; the
+		// leg on that side drawn up, the other driving off; a catch gathered in to the chest.
 		if (dive >= 0) {
-			const side = p.diveSide || 1, arc = Math.sin(Math.PI * Math.min(1, dive * 1.15)), lay = smooth3(Math.min(1, dive * 1.6));
-			r.root.rotation.x = -side * 1.35 * lay; r.root.rotation.z = -0.25 * arc;
-			y += 9 * arc - 6 * lay + 4;
-			for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = -2.75; r.sh[i].rotation.x = (i ? 1 : -1) * 0.25; r.el[i].rotation.z = 0.1; r.hip[i].rotation.z = -0.15 + 0.15 * i; r.kn[i].rotation.z = -0.3 - 0.4 * i; }
-			r.spine.rotation.z = -0.15;
+			const dp = divePose3(r, p, dive, x, z, dir), sc = figScale3(p), lead = dp.side > 0 ? 1 : 0;
+			y += dp.yLift * sc; ox += (dp.fwd * Math.cos(dir) - dp.slide * Math.sin(dir)) * sc; oz += (dp.fwd * Math.sin(dir) + dp.slide * Math.cos(dir)) * sc;
+			const hold = dp.caught ? smooth3(clamp((dive - 0.35) / 0.25, 0, 1)) : 0;
+			for (let i = 0; i < 2; i++) {
+				r.sh[i].rotation.z = lerp3(lerp3(-0.4, -2.85, dp.go), 1.25, hold); r.sh[i].rotation.x = lerp3((i ? 1 : -1) * 0.22 * dp.go, -OUT3(i) * 0.25, hold); r.el[i].rotation.z = lerp3(0.12 + 0.5 * dp.sink, 1.75, hold);
+				r.hip[i].rotation.z = i === lead ? 0.15 + 0.5 * dp.go : -0.1 - 0.1 * dp.go; r.kn[i].rotation.z = i === lead ? -0.4 - 0.7 * dp.go : -0.15 - 0.6 * dp.sink;
+				r.hip[i].rotation.x = 0; r.an[i].rotation.z = -0.4 * dp.go;
+			}
+			r.spine.rotation.z = -0.1 - 0.15 * hold; r.neck.rotation.z = 0.15 * dp.go;
+		} else if (gk && p.diveCd > 28 && fall < 0) {
+			// Down after a dive: he gets up, pushing off the grass, knees under him.
+			const D = DIVE3.get(p), k = smooth3(clamp((p.diveCd - 28) / 16, 0, 1)), th = D ? D.th || 1.4 : 1.4, side = D ? D.side || 1 : -(p.diveSide || 1);
+			r.root.rotation.x = side * th * k * k; y += 1.2 * k;
+			for (let i = 0; i < 2; i++) { r.kn[i].rotation.z -= 1.1 * k; r.hip[i].rotation.z += 0.7 * k; r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, -0.4, k); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, OUT3(i) * 0.6, k); }
 		}
 		// Fouled: he goes down, lies there, then picks himself up.
 		if (fall >= 0) {
@@ -932,7 +953,7 @@
 			r.spine.rotation.z -= 0.28 * sulk; r.neck.rotation.z -= 0.6 * sulk;   // measured: -z on the spine bows him forward, -z on the neck drops the chin
 			for (let i = 0; i < 2; i++) { r.sh[i].rotation.z *= 1 - 0.7 * sulk; r.el[i].rotation.z *= 1 - 0.6 * sulk; }
 		}
-		r.root.position.set(x, y, z);
+		r.root.position.set(x + ox, y, z + oz);
 		r.root.rotation.y = -dir;
 	}
 	// What a figure wears. Keepers in their own colour with gloves and long sleeves.
