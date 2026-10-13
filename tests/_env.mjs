@@ -14,6 +14,7 @@ export const { chromium, devices } = createRequire(from)("playwright");
 export const CHROME = process.env.FF_CHROME || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 export const sleep = ms => new Promise(r => setTimeout(r, ms));
 export function serve (port) {
+	port += Number(process.env.FF_PORT_SHIFT || 0);   // a second checkout running its checks at the same time picks another port
 	const server = spawn("python3", [ "-m", "http.server", String(port), "--bind", "127.0.0.1", "--directory", root ], { stdio: "ignore" });
 	return { url: `http://127.0.0.1:${port}/index.html?test`, stop: () => server.kill() };
 }

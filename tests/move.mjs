@@ -73,6 +73,77 @@ await page.keyboard.down("ArrowRight"); await sleep(1200);
 await page.screenshot({ path: `${OUT}/3d-run.png` });
 await page.keyboard.up("ArrowRight");
 check("3D camera renders with the new poses, no errors", cam === "3d" && errs.length === 0, `cam=${cam} ${errs.join(" | ")}`);
+// Animation (drawing only), measured on the rig: planted feet don't slide, the boot meets the ball on the
+// frame it goes, a diving keeper's gloves and a header's head go to the ball.
+const anim = await page.evaluate(() => {
+	const F = window.__ff, W = n => n.getWorldPosition(n.position.clone()), out = {};
+	for (let i = 0; i < 3000 && F.state !== "play"; i++) { F.step(1); }
+	F.freeze = 0;
+	const p = F.outfield(0)[2], keep = [ p.x, p.y, p.vx, p.vy, p.dir, p.stride, p.runAmt, p.shuf ], owner = F.ball.owner;
+	Object.assign(p, { kickA: 0, windUp: 0, lunge: 0, slideAI: 0, fall: 0, celebA: 0, jump: 0, dive: 0, plant: 0, recv: 0, jockW: 0, shieldW: 0, sta: 1, sprintAmt: 0 });
+	F.ball.owner = null; F.ball.x = 30; F.ball.y = 30; F.ball.z = 0;
+	// Skating: a planted sole's ground speed against his own, running forward and backpedalling.
+	for (const [ name, vx, dir ] of [ [ "run", 2.6, 0 ], [ "back", 1.3, Math.PI ] ]) {
+		p.x = F.FW / 2; p.y = F.FH / 2; p.dir = dir; p.vx = vx; p.vy = 0; p.stride = 0; p.runAmt = 0.6; p.shuf = name === "back" ? 1 : 0;
+		const g = p.build, hist = [];
+		for (let f = 0; f < 90; f++) {
+			p.stride += Math.PI * 2 * (0.95 + 0.5 * vx) / g.stride * (1 + 0.35 * p.shuf) / 60; p.x += vx;
+			const r = F.poseProbe(p, 1);
+			hist.push([ 0, 1 ].map(i => { const v = r.an[i].position.clone().set(0.8, -0.8, 0); r.an[i].localToWorld(v); return [ v.x, v.y, v.z ]; }));
+		}
+		let n = 0, slip = 0;
+		for (let f = 31; f < hist.length; f++) { for (let i = 0; i < 2; i++) { if (hist[f][i][1] < 0.3 && hist[f - 1][i][1] < 0.3) { n++; slip += Math.hypot(hist[f][i][0] - hist[f - 1][i][0], hist[f][i][2] - hist[f - 1][i][2]); } } }
+		out[name] = { planted: n, slip: +(slip / Math.max(1, n) / vx).toFixed(2) };
+	}
+	[ p.x, p.y, p.vx, p.vy, p.dir, p.stride, p.runAmt, p.shuf ] = keep; F.ball.owner = owner;
+	return out;
+});
+check("running and backpedalling, a planted boot stays put (sliding under a sixth of his speed)", anim.run.planted > 10 && anim.run.slip < 0.17 && anim.back.planted > 10 && anim.back.slip < 0.17, JSON.stringify(anim));
+const strike = await page.evaluate(() => {
+	const F = window.__ff, out = {};
+	for (let i = 0; i < 3000 && F.state !== "play"; i++) { F.step(1); }
+	F.freeze = 0; F.timeLeft = 1e9; F.autoSwitchMode = "manual"; F.manualLock = 1e9;
+	const me = F.human(), FW = F.FW, FH = F.FH;
+	const park = () => { for (const q of F.players) { if (q !== me && q.role !== "gk") { q.x = q.team === 1 ? FW - 60 : 60; q.y = 30 + 20 * F.players.indexOf(q); q.vx = q.vy = 0; } } };
+	park(); me.x = FW * 0.62; me.y = FH / 2 + 30; me.dir = 0; me.vx = 1.5; me.vy = 0; me.kickCd = 0; me.windUp = 0; me.kickA = 0;
+	F.ball.owner = me; F.ball.x = me.x + 18; F.ball.y = me.y; F.ball.z = 0; F.possTeam = 0;
+	F.key("ArrowRight", true);
+	for (let i = 0; i < 30; i++) { park(); F.step(1); }
+	F.press("KeyD"); for (let i = 0; i < 25; i++) { park(); F.step(1); } F.release("KeyD");
+	const kf = me.build && me.build.left ? 0 : 1, rows = [];
+	for (let i = 0; i < 20; i++) {
+		park(); F.step(1);
+		const r = F.poseProbe(me, 1), br = F.G3.ballR || 2.6, b = { x: F.ball.x, y: (F.ball.z || 0) * 0.71 + br, z: F.ball.y };
+		let d = 1e9; for (const [ bx, by, bz ] of [ [ -1.2, -0.3, 0 ], [ 0, -0.3, 0 ], [ 1.2, -0.3, 0 ], [ 2.4, -0.3, 0 ], [ 3.3, -0.4, 0 ], [ 1, 0.2, 0.7 ], [ 1, 0.2, -0.7 ], [ 2, 0.1, 0.6 ], [ 2, 0.1, -0.6 ] ]) { const v = r.an[kf].position.clone().set(bx, by, bz); r.an[kf].localToWorld(v); d = Math.min(d, Math.hypot(v.x - b.x, v.y - b.y, v.z - b.z) - br); }
+		rows.push({ kickA: me.kickA || 0, own: F.ball.owner === me, d });
+	}
+	F.key("ArrowRight", false);
+	const ci = rows.findIndex(r => r.kickA === 15 && !r.own);
+	return { gap: ci > 0 ? +rows[ci - 1].d.toFixed(1) : null, wound: ci > 1 ? +rows[ci - 2].d.toFixed(1) : null };
+});
+check("a shot: the boot is at the ball on the last frame before it goes (and back from it the frame before)", strike.gap !== null && strike.gap < 2 && strike.wound > strike.gap + 2, JSON.stringify(strike));
+const save = await page.evaluate(() => {
+	const F = window.__ff, W = n => n.getWorldPosition(n.position.clone()), res = [];
+	for (const [ z, vz, side ] of [ [ 0, 0, -1 ], [ 14, 1.2, 1 ] ]) {
+		for (let i = 0; i < 3000 && F.state !== "play"; i++) { F.step(1); }
+		F.freeze = 0;
+		const gk = F.players.find(q => q.role === "gk" && q.team === 1), me = F.human(), FW = F.FW, FH = F.FH;
+		const park = () => { for (const q of F.players) { if (q !== gk) { q.x = q.team === 1 ? FW - 400 : 300; q.y = 30 + 20 * F.players.indexOf(q); q.vx = q.vy = 0; } } };
+		park(); gk.x = FW - 22; gk.y = FH / 2; gk.vx = gk.vy = 0; gk.dive = 0; gk.diveCd = 0; gk.kickCd = 0; gk.dir = Math.PI;
+		const B = F.ball, ty = FH / 2 + side * (F.GOAL_B - F.GOAL_T) * 0.2, x0 = FW - 230;
+		B.owner = null; B.x = x0; B.y = FH / 2; B.z = z; B.vz = vz; B.vx = 13; B.vy = (ty - FH / 2) / ((FW - 20 - x0) / 13); B.lastBy = me; B.shot = true; B.kickedAt = F.frame; B.curlT = 0; B.dipG = 0; B.beaten = null; B.pen = null;
+		let best = 1e9, dove = false;
+		for (let f = 0; f < 30 && F.state === "play" && B.owner !== gk; f++) {
+			F.step(1); park(); if (gk.dive > 0) { dove = true; }
+			const r = F.poseProbe(gk, 1), b = { x: B.x, y: (B.z || 0) * 0.71, z: B.y };
+			if (Math.abs(B.x - gk.x) < 30) { for (const k of [ 0, 1 ]) { const h = W(r.ha[k]); best = Math.min(best, Math.hypot(h.x - b.x, h.y - b.y, h.z - b.z)); } }
+		}
+		res.push({ dove, reach: +best.toFixed(1) });
+		for (let i = 0; i < 600 && F.state !== "play"; i++) { F.step(1); }
+	}
+	return res;
+});
+check("a diving keeper stretches to the ball: gloves within 24 of it as it reaches him (they stayed 34 to 40 away)", save.every(s => s.dove && s.reach < 24), JSON.stringify(save));
 // Faces: every player has a valid look (face cell 0-15, a hair colour, a known style), and it is
 // fixed by name: clearing the cached look rebuilds exactly the same one.
 const looks = await page.evaluate(async () => {

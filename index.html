@@ -10977,14 +10977,23 @@
 		if (!b) { return; }
 		const kit = KITS[p.team], L = look(p), k = b.k;
 		const down = (p.lunge > 0 && players.indexOf(p) === ctrl) || p.slideAI > 0;
-		const jump = reduceMotion ? 0 : jumpAmt(p);
-		const H = 34 * k, Y = b.y - jump * 34 * k * 0.32;   // full size even on the ground: a slide is a man low on the grass, not a smaller man
+		// In the air for a header the jump is timed from the ball, as in 3D (aerial3): at the top as it arrives.
+		const airTV = reduceMotion || down ? null : aerial3(p, 1);
+		const jump = airTV ? airTV.up : reduceMotion ? 0 : jumpAmt(p);
+		const H = 34 * k, Y = b.y - (airTV ? airTV.y * H / 32 : jump * 34 * k * 0.32);   // full size even on the ground: a slide is a man low on the grass, not a smaller man
 		let X = b.x;
 		// A soft shadow cast away from the floodlights, staying on the grass when he jumps.
 		ctx.fillStyle = "rgba(0, 0, 0, 0.16)";
 		ctx.beginPath(); ctx.ellipse(X + H * 0.12, b.y + H * 0.01, H * 0.36, H * 0.07, 0, 0, Math.PI * 2); ctx.fill();
 		ctx.fillStyle = "rgba(0, 0, 0, 0.22)";
 		ctx.beginPath(); ctx.ellipse(X + H * 0.05, b.y, H * 0.22, H * 0.05, 0, 0, Math.PI * 2); ctx.fill();
+		// A keeper's dive: the whole figure laid over toward the ball, up off the grass, then down on it.
+		const dvTV = p.dive > 0 && !reduceMotion ? 1 - p.dive / DIVE_T : -1;
+		ctx.save();
+		if (dvTV >= 0) {
+			const go = smooth3(clamp((dvTV - 0.08) / 0.3, 0, 1)), q = tvProj(ball.x, ball.y, 0), sd = q && q.x < X ? -1 : 1, up = Math.sin(Math.PI * clamp(dvTV / 0.75, 0, 1));
+			ctx.translate(X, b.y - up * H * 0.25); ctx.rotate(sd * 1.25 * go); ctx.translate(-X, -b.y);
+		}
 		const shirt = p.role === "gk" ? kit.gk : kit.outfield, shorts = kit.second || "#1f2a36";
 		const cd = Math.cos(p.dir);
 		if (!p.faceTV || Math.abs(cd) > 0.3) { p.faceTV = cd >= 0 ? 1 : -1; }
@@ -10996,7 +11005,7 @@
 		// legs, far-side limbs a shade darker. Walking is the same action, smaller and upright.
 		const a = down ? 0 : clamp(p.runAmt || 0, 0, 1), ph = reduceMotion ? 0 : p.stride || 0;
 		const vary = (((p.num || 0) * 37 + p.team * 11) % 10) / 10;   // each man stands a little differently
-		const shuf = down ? 0 : p.shuf || 0, ks = down || reduceMotion ? null : kickSwing(p), cel = p.celebA || 0;
+		const shuf = down ? 0 : p.shuf || 0, ks = down || reduceMotion || jump > 0 ? null : kickTV(p), cel = p.celebA || 0;
 		// Leaning into the run, back against a planted cut, upright when shuffling.
 		const lean = down ? -1.05 : a * a * 0.26 * (1 - 0.6 * shuf) - (p.plant > 0 ? 0.2 * p.plant / 10 : 0) + (ks ? 0.08 : 0);   // sliding: leaning right back
 		const bob = reduceMotion ? 0 : Math.abs(Math.cos(ph)) * a * H * 0.035;
@@ -11009,7 +11018,20 @@
 		// standing man's arms are at his sides rather than across his front.
 		const still = down ? 0 : 1 - clamp(a / 0.3, 0, 1);   // the side offsets are for a man standing; running, he is seen side-on
 		const armOff = i => (i ? 1 : -1) * face * H * 0.115 * still, legOff = i => (i ? 1 : -1) * face * H * 0.035 * still;
+		// Running, walking, shuffling: each foot set down on the grass and carried through (gait3, shared
+		// with 3D), the knee found from hip and foot, so the boots never slide along the turf.
+		const GT = down || jump > 0 || reduceMotion ? null : gait3(p, ph, p.dir, 1, {}), sc32 = H / 32;
+		const legGait = i => {
+			const f = GT.feet[i], ox = f.x * Math.cos(p.dir) - f.z * Math.sin(p.dir), q = tvProj(p.x + ox, p.y, 0);
+			const hx = hipX + legOff(i), hy = hipY + (LEG3 + ANK3 - GT.h) * sc32 * 0.6, fx = q ? q.x : X, fy = Y - (f.y - ANK3) * sc32 + H * 0.02;
+			const dx = fx - hx, dy = fy - hy, d = clamp(Math.hypot(dx, dy), 1e-3, Lt + Ls - 1e-3), ux = dx / Math.hypot(dx, dy) || 0, uy = dy / Math.hypot(dx, dy) || 1;
+			const al = Math.acos(clamp((Lt * Lt + d * d - Ls * Ls) / (2 * Lt * d), -1, 1)) * -face;   // the knee bends forward, the way he faces
+			const kx = hx + Lt * (ux * Math.cos(al) - uy * Math.sin(al)), ky = hipY + (hy - hipY) + Lt * (ux * Math.sin(al) + uy * Math.cos(al));
+			const fl = Math.hypot(fx - kx, fy - ky) || 1;
+			return [ [ kx, ky ], [ kx + (fx - kx) / fl * Ls, ky + (fy - ky) / fl * Ls ] ];
+		};
 		const legPts = i => {
+			if (GT && !(ks && (i === 0 || ks.w < 0.6) && ks.w < 0.95)) { return legGait(i); }
 			if (down) { return i ? [ [ X + face * H * 0.12, Y - H * 0.04 ], [ X - face * H * 0.06, Y - H * 0.01 ] ] : [ [ X + face * H * 0.3, Y - H * 0.07 ], [ X + face * H * 0.6, Y - H * 0.03 ] ]; }   // lead leg out along the grass, the other tucked under
 			const f = ph + i * Math.PI;
 			let th = jump > 0 ? (i ? -0.25 : 0.2) * jump : (0.06 + a * 0.62 * (1 - 0.45 * shuf)) * Math.sin(f) + (i ? -0.04 : 0.04);
@@ -11017,7 +11039,7 @@
 			// Standing: a natural stance, one foot a little ahead of the other, knees soft; how wide
 			// differs from man to man.
 			if (!jump && !shuf && a < 0.15) { const r = 1 - a / 0.15; th = th * (1 - r) + ((i ? -0.11 : 0.13) + (i ? -1 : 1) * vary * 0.07) * r; kn = kn * (1 - r) + (0.1 + vary * 0.06) * r; }
-			if (ks) { if (i === 0) { th = ks.s; kn = ks.bend; } else { th = -0.12; kn = 0.2; } }   // kicking leg, and the one planted beside the ball
+			if (ks) { if (i === 0) { th = ks.s; kn = ks.bend; } else { th = -0.12 - 0.1 * ks.bw; kn = 0.2 + 0.3 * ks.bw; } }   // kicking leg, and the one planted beside the ball
 			const kx = hipX + legOff(i) + face * Math.sin(th) * Lt, ky = hipY + Math.cos(th) * Lt;
 			return [ [ kx, ky ], [ kx + face * Math.sin(th - kn) * Ls, ky + Math.cos(th - kn) * Ls ] ];
 		};
@@ -11231,6 +11253,7 @@
 			if (p.name) { drawPlate(p, X, top - 2); }
 			else { ctx.fillStyle = "#f2b52e"; ctx.beginPath(); ctx.moveTo(X - 7, top - 12); ctx.lineTo(X + 7, top - 12); ctx.lineTo(X, top - 3); ctx.closePath(); ctx.fill(); }
 		}
+		ctx.restore();
 	}
 	// The ball, seen from the stand. Its panels turn with its spin along the way it is travelling, so a
 	// pass rolls rather than slides; a hard-hit ball leaves a faint streak behind it.
