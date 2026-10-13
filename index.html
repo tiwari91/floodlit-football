@@ -11759,7 +11759,7 @@
 				const [ bgc, fg ] = cols[i % cols.length];
 				ag.fillStyle = bgc; ag.fillRect(i * 128, 0, 128, 48);
 				ag.fillStyle = fg; ag.font = "800 22px 'Big Shoulders Display', 'Arial Narrow', Arial, sans-serif"; ag.textAlign = "center"; ag.textBaseline = "middle";
-				ag.fillText(words[i], i * 128 + 64, 25);
+				ag.fillText(words[i], i * 128 + 64, 25, 114);   // squeezed to fit its panel, never run over the edge
 			}
 			const tex = canvasTex3D(ac); tex.wrapS = THREE.RepeatWrapping;
 			const boardMat = new THREE.MeshBasicMaterial({ map: tex });
@@ -11767,8 +11767,10 @@
 			const board = (a0, a1, fixed, ry, alongX) => {
 				const w = a1 - a0;
 				if (w < 24) { return; }
-				const geo = new THREE.PlaneGeometry(w, 16), uv = geo.attributes.uv;
-				for (let i = 0; i < uv.count; i++) { uv.setX(i, (a0 + uv.getX(i) * w) / 300); }
+				// A whole number of panels on every run of boards, starting on a panel's edge, so a gap
+				// (the dugouts, the tunnel, the corners) never cuts a word in half.
+				const geo = new THREE.PlaneGeometry(w, 16), uv = geo.attributes.uv, n = Math.max(1, Math.round(w / 37.5)), c0 = ((Math.round(a0 / 37.5) % 8) + 8) % 8;
+				for (let i = 0; i < uv.count; i++) { uv.setX(i, (c0 + uv.getX(i) * n) / 8); }
 				const m = new THREE.Mesh(geo, boardMat);
 				if (alongX) { m.position.set(a0 + w / 2, 8, fixed); } else { m.position.set(fixed, 8, a0 + w / 2); }
 				m.rotation.y = ry;
@@ -11809,7 +11811,13 @@
 		const key1 = new THREE.DirectionalLight(0xfff1d6, (dayLit ? 0.9 : 0.75) * LI); key1.position.set(-FW * 0.2, FH * 1.6, FH * 1.6); key1.target.position.set(FW / 2, 0, FH / 2);
 		const key2 = new THREE.DirectionalLight(0xfff1d6, 0.45 * LI); key2.position.set(FW * 1.2, FH * 1.6, -FH * 0.5); key2.target.position.set(FW / 2, 0, FH / 2);
 		st.add(key1, key1.target, key2, key2.target);
-		G3.scene.fog = cond.snow ? new THREE.Fog(dayLit ? 0xc4cbd0 : 0x2a3036, FH * 1.6, FH * 5) : new THREE.Fog(dayLit ? (cond.wet ? 0x8d979e : cond.heat ? 0xd9ccb0 : 0xa9bfd0) : 0x070d13, FH * (cond.heat ? 2 : 2.6), FH * 7);   // snow and haze close in
+		// A little haze with distance, so the far stand and roof sit back behind the pitch: thicker in the
+		// heat, in rain (wet air, lit by the floodlights at night) and in snow. (There is no fog weather:
+		// heavy rain, snow and heat stand in for it.) At night the air is a lit blue-grey, never black,
+		// so the far crowd fades rather than darkens.
+		const hazeCol = cond.snow ? (dayLit ? 0xc4cbd0 : 0x2a3036) : dayLit ? (cond.wet ? 0x8d979e : cond.heat ? 0xd9ccb0 : 0xa9bfd0) : cond.wet ? 0x1a232c : 0x0d151d;
+		const hazeAt = cond.snow ? [ 1.1, 5 ] : cond.wet === 2 ? [ 0.9, 6 ] : cond.wet ? [ 1.1, 7.5 ] : cond.heat ? [ 1.1, 7 ] : dayLit ? [ 1.4, 9 ] : [ 1.6, 10 ];
+		G3.scene.fog = new THREE.Fog(hazeCol, FH * hazeAt[0], FH * hazeAt[1]);
 		G3.stadium = st;
 		G3.scene.add(st);
 	}
