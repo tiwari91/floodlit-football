@@ -274,6 +274,31 @@
 		};
 		mat.customProgramCacheKey = () => "ff-wet";
 	}
+	// An afternoon in the sun: the stands' shadow on the grass, painted into the pitch picture once (no cost
+	// per frame). The sun comes over the near stand (as the players' shadows say); the sunlit part of the pitch
+	// is the opening of the bowl (the roof's front edge, or the top of an open stand) carried down along the
+	// sun's rays, and everything outside it is in shade. Not under cloud (rain, snow) and not at night.
+	function standShadow (g, gs) {
+		if (!g || cond.ko !== "day" || cond.wet || cond.snow || !gs) { return; }
+		const A = ARCH3[gs.arch] || ARCH3.azteca, P = bowlProfile3(A), [ sx, sz ] = sunDir3D(), cot = 2.3;   // a low sun (about 23 degrees): a 3pm kick-off in the season
+		const r0 = bowlRing3(0, A.rc), rR = bowlRing3(P.back * A.roofIn, A.rc), rB = bowlRing3(P.back, A.rc);
+		const c = document.createElement("canvas"); c.width = g.canvas.width; c.height = g.canvas.height;
+		const s = c.getContext && c.getContext("2d");
+		if (!s || !s.fill) { return; }
+		const k = c.width / WW;
+		s.scale(k, k);
+		s.fillStyle = "rgb(4, 14, 22)"; s.fillRect(0, 0, WW, WH);
+		s.globalCompositeOperation = "destination-out";
+		try { s.filter = "blur(6px)"; } catch (e) { /* a hard edge, then */ }
+		s.beginPath();
+		r0.forEach((p, i) => {
+			const roofed = gs.roof && (A.ring || Math.abs(p.nz) > 0.92), q = roofed ? rR[i] : rB[i], h = roofed ? P.top + 36 : P.top + 12;
+			const x = q.x + sx * h * cot + MX, y = q.z + sz * h * cot + MY;
+			if (i) { s.lineTo(x, y); } else { s.moveTo(x, y); }
+		});
+		s.closePath(); s.fill();
+		g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = cond.heat ? 0.4 : 0.33; g.drawImage(c, 0, 0); g.restore();
+	}
 	function buildStadium3D () {
 		const gs = gstyle || { mow: "stripes", roof: true, lights: "roof", fill: 0.8, seat: "#3b4a58", concrete: "#1b2520", steps: "#262f21", arch: "azteca" };
 		const key = `${WW}x${WH}|${cond.label}|${cond.ko}|${cond.surfaceKey}|${gs.mow}${gs.roof}${gs.lights}${gs.fill}${gs.arch}${gs.mountains}|${gs.nat}${gs.seats}${gs.flags}${gs.bunting}${gs.concrete}|${KITS[0].outfield}${KITS[1].outfield}${homeSide}|${gfxLevel}`;
@@ -299,6 +324,7 @@
 			const keep = ctx, keepStands = stands;
 			ctx = pg; stands = null;
 			try { drawPitch(true); } finally { ctx = keep; stands = keepStands; }
+			standShadow(pg, gs);
 			const tex = canvasTex3D(pc);
 			const mat = new THREE.MeshBasicMaterial({ map: tex });
 			if (cond.wet > 0) { wetGround3D(mat); }
@@ -413,7 +439,7 @@
 					}
 				}
 			}
-			strip(T, j, P.back - 3, P.top + 12, P.back, P.top + 12, shade(conc, 1.2));
+			strip(T, j, P.back - 3, P.top + 12, P.back, P.top + 12, cond.snow ? [ 0.84, 0.87, 0.9 ] : shade(conc, 1.2));   // the parapet's top (snow on it)
 		}
 		// The roof: a ring round the whole bowl, or over the two long sides, on masts with stays; the
 		// floodlights in a line along its front edge at grounds lit that way.
@@ -421,7 +447,8 @@
 		const lines = [], nearLines = [];
 		if (gs.roof) {
 			const rIn = P.back * A.roofIn, rOut = P.back + 8, hIn = P.top + 36, hOut = P.top + 24;
-			const roofC = gs.roofCol || [ 0.11, 0.12, 0.14 ], under = roofC.map(v => v * 0.55 + 0.1);
+			const roofBase = gs.roofCol || [ 0.11, 0.12, 0.14 ], under = roofBase.map(v => v * 0.55 + 0.1);
+			const roofC = cond.snow ? [ 0.84, 0.87, 0.9 ] : roofBase;   // snow lies on the roof
 			for (let j = 0; j < N; j++) {
 				if (!A.ring && !longSide(j)) { continue; }
 				const T = isNear(j) ? near : main, TL = isNear(j) ? nearLamp : lamp, G = isNear(j) ? nearGlow : glow, Ln = isNear(j) ? nearLines : lines;
@@ -634,7 +661,10 @@
 		}
 		// The four merged meshes: the stands and roof (lit), the lamps and lit windows (unlit), each
 		// in a far and a near part, plus the stays and the floodlights' glow.
-		const solid = ownMat(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }));
+		// In the rain the seats, steps and roofs are wet: darker, with a gloss that catches the lights.
+		const solid = ownMat(cond.wet
+			? new THREE.MeshPhongMaterial({ vertexColors: true, side: THREE.DoubleSide, color: 0xd2d4d6, specular: cond.wet > 1 ? 0x4c545c : 0x3a4148, shininess: 55 })
+			: new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }));
 		const bright = ownMat(new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide, toneMapped: false }));
 		const mMain = meshAcc3(main, solid), mNear = meshAcc3(near, solid), mLamp = meshAcc3(lamp, bright), mNearLamp = meshAcc3(nearLamp, bright);
 		const mHills = meshAcc3(hills, ownMat(new THREE.MeshBasicMaterial({ vertexColors: true, fog: false })));

@@ -59,6 +59,7 @@
 		const keep = ctx;
 		ctx = g;
 		try { drawPitch(true); } finally { ctx = keep; }
+		if (typeof standShadow === "function" && gstyle) { standShadow(g, gstyle); }   // the stands' afternoon shadow
 		tvTex = { c, d, dg, stands, w: WW, h: WH, cond: cond.label + cond.ko, st: gstyle };
 	}
 	function drawSceneTV () {
