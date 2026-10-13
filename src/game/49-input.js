@@ -28,7 +28,7 @@
 		if (state !== "play" || freeze > 0) { return; }
 		if (e.code === "KeyS" || e.code === "Space") { passPress("pass"); }
 		if (e.code === "KeyD") { humanShootPress(); }
-		if (e.code === "KeyA") { pressHeld = true; humanTackle(); }
+		if (e.code === "KeyA") { pressHeld = true; tackleDown(); }
 		if (e.code === "KeyW") { passPress("through"); }
 		if (e.code === "KeyQ") { passPress("long"); }
 		if (e.code === "Tab" && ball.owner !== human()) { switchToNearest(true); }   // switch player: cycles to the next best placed
@@ -40,10 +40,10 @@
 		if (e.code === "KeyS" || e.code === "Space") { passRelease("pass"); }
 		if (e.code === "KeyW") { passRelease("through"); }
 		if (e.code === "KeyQ") { passRelease("long"); }
-		if (e.code === "KeyA") { pressHeld = false; }
+		if (e.code === "KeyA" && pressHeld) { pressHeld = false; tackleUp(); }
 	});
 
-	window.addEventListener("blur", () => { keys.clear(); charging = false; passCharge = null; padSprint = false; pressHeld = false; touchPress = false; });
+	window.addEventListener("blur", () => { keys.clear(); charging = false; passCharge = null; padSprint = false; pressHeld = false; touchPress = false; tackleDownAt = -1; });
 
 	// Touch joystick
 	const stick = $("stick"), knob = $("knob");
@@ -65,9 +65,10 @@
 	stick.addEventListener("pointerup", stickEnd);
 	stick.addEventListener("pointercancel", stickEnd);
 
-	// Tackle: a tap slides (or shoulders) as before; holding it is the press assist.
-	padTackle.addEventListener("pointerdown", e => { e.preventDefault(); skipCelebration(); touchPress = true; humanTackle(); });
-	for (const ev of [ "pointerup", "pointercancel", "pointerleave" ]) { padTackle.addEventListener(ev, () => { touchPress = false; }); }
+	// Tackle: a tap slides (or shoulders) when you let go; holding it is the press assist.
+	padTackle.addEventListener("pointerdown", e => { e.preventDefault(); skipCelebration(); touchPress = true; if (state === "play" && freeze <= 0) { tackleDown(); } });
+	padTackle.addEventListener("pointerup", () => { if (touchPress) { touchPress = false; tackleUp(); } });
+	for (const ev of [ "pointercancel", "pointerleave" ]) { padTackle.addEventListener(ev, () => { touchPress = false; tackleDownAt = -1; }); }
 	for (const [ id, kind ] of [ [ "padPass", "pass" ], [ "padLong", "long" ], [ "padThrough", "through" ] ]) {
 		const b = $(id);
 		b.addEventListener("pointerdown", e => { e.preventDefault(); skipCelebration(); try { b.setPointerCapture(e.pointerId); } catch (err) { /* not capturable */ } if (state === "play" && freeze <= 0) { passPress(kind); } });

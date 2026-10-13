@@ -368,12 +368,12 @@
 
 			if (isHuman) {
 				const inp = humanInput();
-				// Press assist: hold A (the Tackle button, or X on a pad) without the ball and your man
+				// Press assist: hold A (the Tackle button, or X on a pad; a tap is a tackle) without the ball and your man
 				// closes the carrier down by himself, goal-side, then stays tight and jockeys him; a
 				// loose ball he runs to meet. The arrows still bend the run, and he sprints by himself
 				// while the carrier is well away.
 				const o = ball.owner;
-				const pressing = (pressHeld || touchPress || padPressBtn) && o !== p && p.lunge <= 0 && !setPiece && !inHands(o) && p !== receiver && state === "play";
+				const pressing = pressOn() && o !== p && p.lunge <= 0 && !setPiece && !inHands(o) && p !== receiver && state === "play";
 				let faceX = null, faceY = null;
 				// Hands off for a third of a second while they have it: he defends by himself, as his
 				// teammate covering would (goal-side of the carrier, or dropping off it on a low press,

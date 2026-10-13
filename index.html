@@ -1512,7 +1512,7 @@
 		<h3>Controls</h3>
 		<div class="key"><kbd>Arrows</kbd><b>Move</b></div>
 		<div class="key"><kbd>E</kbd> or <kbd>Shift</kbd><b>Sprint</b>: hold it while you move. The bar under your player shows how much sprint is left; run it dry and you jog until it refills</div>
-		<div class="key"><kbd>A</kbd><b>Tackle</b>: a shoulder challenge when you're right alongside the carrier, a slide tackle (aimed for you) from further out. <b>Hold</b> it from further away and your man closes the carrier down by himself, goal-side, and jockeys him until you let go</div>
+		<div class="key"><kbd>A</kbd><b>Tackle</b>: tap it for a shoulder challenge when you're right alongside the carrier, a slide tackle (aimed for you) from further out. <b>Hold</b> it and your man closes the carrier down by himself, goal-side, from any distance, and jockeys him until you let go</div>
 		<div class="key"><kbd>S</kbd> or <kbd>Space</kbd><b>Pass</b>, or switch player without the ball (press again to cycle to the next best)</div>
 		<div class="key"><kbd>W</kbd><b>Through ball</b> into the space ahead of a teammate</div>
 		<div class="key"><kbd>Q</kbd><b>Long ball</b> to the striker marked Q, into space toward goal. Along the ground when the lane is open, over the top when it isn't.</div>
@@ -5334,6 +5334,15 @@
 		}
 	}
 
+	// A (Tackle, X on a pad) is decided when you let go: a tap (under TAP_FRAMES) is a challenge
+	// (right alongside, a shoulder; further out, a slide), and a hold is the press assist, at any
+	// distance, for as long as you hold it. He starts closing down as soon as it goes down, so a
+	// tap costs no ground on the way in.
+	const TAP_FRAMES = 8;
+	let tackleDownAt = -1;
+	function tackleDown () { if (odr) { endOdr(); return; } tackleDownAt = frame; }
+	function tackleUp () { const tap = tackleDownAt >= 0 && frame - tackleDownAt < TAP_FRAMES; tackleDownAt = -1; if (tap) { humanTackle(); } }
+	const pressOn = () => pressHeld || touchPress || padPressBtn;
 	function humanTackle () {
 		if (odr) { endOdr(); return; }
 		const p = human();
@@ -5363,8 +5372,7 @@
 				return;
 			}
 			// Further out: a slide tackle, aimed at where the carrier is heading
-			// rather than just the way you happen to face. Beyond slide range (or with the ball
-			// loose and far off) A is a press instead: hold it and he closes the ball down himself.
+			// rather than just the way you happen to face. Beyond slide range a tap does nothing.
 			const target = o && o.team === 1 ? o : null;
 			if (target ? dist(p, target) >= 95 : dist(p, ball) > 70) { return; }
 			if (target) { p.dir = Math.atan2(target.y + target.vy * 6 - p.y, target.x + target.vx * 6 - p.x); }
@@ -6301,12 +6309,12 @@
 
 			if (isHuman) {
 				const inp = humanInput();
-				// Press assist: hold A (the Tackle button, or X on a pad) without the ball and your man
+				// Press assist: hold A (the Tackle button, or X on a pad; a tap is a tackle) without the ball and your man
 				// closes the carrier down by himself, goal-side, then stays tight and jockeys him; a
 				// loose ball he runs to meet. The arrows still bend the run, and he sprints by himself
 				// while the carrier is well away.
 				const o = ball.owner;
-				const pressing = (pressHeld || touchPress || padPressBtn) && o !== p && p.lunge <= 0 && !setPiece && !inHands(o) && p !== receiver && state === "play";
+				const pressing = pressOn() && o !== p && p.lunge <= 0 && !setPiece && !inHands(o) && p !== receiver && state === "play";
 				let faceX = null, faceY = null;
 				// Hands off for a third of a second while they have it: he defends by himself, as his
 				// teammate covering would (goal-side of the carrier, or dropping off it on a low press,
@@ -7641,7 +7649,7 @@
 			if (near > (sliding ? 28 : 23)) { continue; }
 			// Staying tight to the carrier wins the ball back over time; a slide wins it fast.
 			const yours = isHuman && handsOff < HANDS_OFF;   // left alone, he tackles as the computer would
-			let chance = (q.team === 1 ? diff.tackle : yours ? (pressHeld || touchPress || padPressBtn ? 0.045 : 0.035) : 0.022) * mood(q.team, 0.4) * defMul(q) * (yours ? 1 : TACKLE_FX[tackling[q.team]].win) * (0.8 + 0.2 * staOf(q)) * (wobble(q.team) ? 0.82 : 1);
+			let chance = (q.team === 1 ? diff.tackle : yours ? (pressOn() ? 0.045 : 0.035) : 0.022) * mood(q.team, 0.4) * defMul(q) * (yours ? 1 : TACKLE_FX[tackling[q.team]].win) * (0.8 + 0.2 * staOf(q)) * (wobble(q.team) ? 0.82 : 1);
 			if (tr(q, "winner")) { chance *= 1.4; }
 			if (tr(o, "target") && !sliding) { chance *= 0.7; }
 			if (dist(o, ball) > 27) { chance *= 1.5; }   // a heavy touch: the ball is a step from his feet
@@ -8126,7 +8134,7 @@
 		{ title: "Long ball", text: `Press ${k("Q")} to hit a long ball to your striker (the amber Q marks who). From out wide it's a cross.`,
 			setup () { const h = human(); h.x = FW * 0.3; h.vx = h.vy = 0; giveBall(h); },
 			check: () => !!tut.flags.long },
-		{ title: "Tackle", text: `A red player is dribbling at you. Get close and press ${k("A")}: right alongside it's a shoulder tackle, from further out a slide.`,
+		{ title: "Tackle", text: `A red player is dribbling at you. Get close and tap ${k("A")}: right alongside it's a shoulder tackle, from further out a slide.`,
 			setup () {
 				const h = human(), c = outfield(1).reduce((a, b) => (dist(a, h) < dist(b, h) ? a : b));
 				c.x = clamp(h.x + 120 * S, 40, FW - 40); c.y = h.y; c.vx = c.vy = 0; c.kickCd = 0;
@@ -14834,7 +14842,8 @@
 		if (state === "play" && freeze <= 0) {
 			if (pressed(0)) { passPress("pass"); }
 			if (pressed(1)) { humanShootPress(); }
-			if (pressed(2)) { humanTackle(); }
+			if (pressed(2)) { tackleDown(); }
+			if (released(2)) { tackleUp(); }
 			if (pressed(3)) { passPress("through"); }
 			if (pressed(5)) { passPress("long"); }
 			if (pressed(8)) { startOdr(); }   // Back / Share / Select: replay the last six seconds
@@ -14881,7 +14890,7 @@
 		if (state !== "play" || freeze > 0) { return; }
 		if (e.code === "KeyS" || e.code === "Space") { passPress("pass"); }
 		if (e.code === "KeyD") { humanShootPress(); }
-		if (e.code === "KeyA") { pressHeld = true; humanTackle(); }
+		if (e.code === "KeyA") { pressHeld = true; tackleDown(); }
 		if (e.code === "KeyW") { passPress("through"); }
 		if (e.code === "KeyQ") { passPress("long"); }
 		if (e.code === "Tab" && ball.owner !== human()) { switchToNearest(true); }   // switch player: cycles to the next best placed
@@ -14893,10 +14902,10 @@
 		if (e.code === "KeyS" || e.code === "Space") { passRelease("pass"); }
 		if (e.code === "KeyW") { passRelease("through"); }
 		if (e.code === "KeyQ") { passRelease("long"); }
-		if (e.code === "KeyA") { pressHeld = false; }
+		if (e.code === "KeyA" && pressHeld) { pressHeld = false; tackleUp(); }
 	});
 
-	window.addEventListener("blur", () => { keys.clear(); charging = false; passCharge = null; padSprint = false; pressHeld = false; touchPress = false; });
+	window.addEventListener("blur", () => { keys.clear(); charging = false; passCharge = null; padSprint = false; pressHeld = false; touchPress = false; tackleDownAt = -1; });
 
 	// Touch joystick
 	const stick = $("stick"), knob = $("knob");
@@ -14918,9 +14927,10 @@
 	stick.addEventListener("pointerup", stickEnd);
 	stick.addEventListener("pointercancel", stickEnd);
 
-	// Tackle: a tap slides (or shoulders) as before; holding it is the press assist.
-	padTackle.addEventListener("pointerdown", e => { e.preventDefault(); skipCelebration(); touchPress = true; humanTackle(); });
-	for (const ev of [ "pointerup", "pointercancel", "pointerleave" ]) { padTackle.addEventListener(ev, () => { touchPress = false; }); }
+	// Tackle: a tap slides (or shoulders) when you let go; holding it is the press assist.
+	padTackle.addEventListener("pointerdown", e => { e.preventDefault(); skipCelebration(); touchPress = true; if (state === "play" && freeze <= 0) { tackleDown(); } });
+	padTackle.addEventListener("pointerup", () => { if (touchPress) { touchPress = false; tackleUp(); } });
+	for (const ev of [ "pointercancel", "pointerleave" ]) { padTackle.addEventListener(ev, () => { touchPress = false; tackleDownAt = -1; }); }
 	for (const [ id, kind ] of [ [ "padPass", "pass" ], [ "padLong", "long" ], [ "padThrough", "through" ] ]) {
 		const b = $(id);
 		b.addEventListener("pointerdown", e => { e.preventDefault(); skipCelebration(); try { b.setPointerCapture(e.pointerId); } catch (err) { /* not capturable */ } if (state === "play" && freeze <= 0) { passPress(kind); } });
@@ -15212,7 +15222,7 @@
 				row(K.sprint, "Sprint", "Hold while moving. The bar under your player is what is left; run it dry and he jogs until it refills.")
 			]),
 			sec("Without the ball", [
-				row(K.tackle, "Tackle", `Alongside the carrier: a shoulder challenge. From further out: a slide. ${cap(hold)} from further away and your man closes him down and jockeys him for you.`),
+				row(K.tackle, "Tackle", `Tap it: alongside the carrier a shoulder challenge, from further out a slide. ${cap(hold)} it and your man closes him down and jockeys him for you, from any distance, until you let go.`),
 				row(K.switch, "Switch player", `To the teammate under the S marker (the defender best placed to win it). Press again for the next best.${howScheme === "keys" ? " Tab does the same at any moment; with the ball in the air it picks whoever is nearest where it will land." : ""}`),
 				row(K.sprint, "Sprint", "Close the carrier down faster; the same bar drains."),
 				row(`${K.shoot} / ${K.pass} / ${K.long}`, "A ball in the air", "Coming down to your man: head it at goal, nod it on to a teammate, or head it clear.")
@@ -15285,7 +15295,7 @@
 			? [ [ "Stick", "Move" ], [ "A", "Pass" ], [ "Y", "Through" ], [ "B", "Shoot, hold" ], [ "RB", "Long" ], [ "X", "Tackle" ], [ "RT", "Sprint" ] ]
 			: coarse
 				? [ [ "Joystick", "Move" ], [ "Pass", "to the ringed teammate" ], [ "Shoot", "hold for power" ], [ "Tackle", "tap or hold" ], [ "Through", "runner" ], [ "Long", "striker" ], [ "Sprint", "hold" ] ]
-				: [ [ "← ↑ → ↓", "Move" ], [ "S", "Pass" ], [ "W", "Through" ], [ "D", "Shoot, hold" ], [ "Q", "Long" ], [ "A", "Tackle" ], [ "E", "Sprint" ], [ "H", "How to play" ] ];
+				: [ [ "← ↑ → ↓", "Move" ], [ "S", "Pass" ], [ "W", "Through" ], [ "D", "Shoot, hold" ], [ "Q", "Long" ], [ "A", "Tackle" ], [ "Tab", "Switch" ], [ "E", "Sprint" ], [ "H", "How to play" ] ];
 		el.replaceChildren(...items.map(([ key, label ]) => {
 			const s = document.createElement("span"), kb = document.createElement("kbd");
 			kb.textContent = key; s.append(kb, document.createTextNode(label));

@@ -489,7 +489,7 @@
 			if (near > (sliding ? 28 : 23)) { continue; }
 			// Staying tight to the carrier wins the ball back over time; a slide wins it fast.
 			const yours = isHuman && handsOff < HANDS_OFF;   // left alone, he tackles as the computer would
-			let chance = (q.team === 1 ? diff.tackle : yours ? (pressHeld || touchPress || padPressBtn ? 0.045 : 0.035) : 0.022) * mood(q.team, 0.4) * defMul(q) * (yours ? 1 : TACKLE_FX[tackling[q.team]].win) * (0.8 + 0.2 * staOf(q)) * (wobble(q.team) ? 0.82 : 1);
+			let chance = (q.team === 1 ? diff.tackle : yours ? (pressOn() ? 0.045 : 0.035) : 0.022) * mood(q.team, 0.4) * defMul(q) * (yours ? 1 : TACKLE_FX[tackling[q.team]].win) * (0.8 + 0.2 * staOf(q)) * (wobble(q.team) ? 0.82 : 1);
 			if (tr(q, "winner")) { chance *= 1.4; }
 			if (tr(o, "target") && !sliding) { chance *= 0.7; }
 			if (dist(o, ball) > 27) { chance *= 1.5; }   // a heavy touch: the ball is a step from his feet

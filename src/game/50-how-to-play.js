@@ -22,7 +22,7 @@
 				row(K.sprint, "Sprint", "Hold while moving. The bar under your player is what is left; run it dry and he jogs until it refills.")
 			]),
 			sec("Without the ball", [
-				row(K.tackle, "Tackle", `Alongside the carrier: a shoulder challenge. From further out: a slide. ${cap(hold)} from further away and your man closes him down and jockeys him for you.`),
+				row(K.tackle, "Tackle", `Tap it: alongside the carrier a shoulder challenge, from further out a slide. ${cap(hold)} it and your man closes him down and jockeys him for you, from any distance, until you let go.`),
 				row(K.switch, "Switch player", `To the teammate under the S marker (the defender best placed to win it). Press again for the next best.${howScheme === "keys" ? " Tab does the same at any moment; with the ball in the air it picks whoever is nearest where it will land." : ""}`),
 				row(K.sprint, "Sprint", "Close the carrier down faster; the same bar drains."),
 				row(`${K.shoot} / ${K.pass} / ${K.long}`, "A ball in the air", "Coming down to your man: head it at goal, nod it on to a teammate, or head it clear.")
@@ -95,7 +95,7 @@
 			? [ [ "Stick", "Move" ], [ "A", "Pass" ], [ "Y", "Through" ], [ "B", "Shoot, hold" ], [ "RB", "Long" ], [ "X", "Tackle" ], [ "RT", "Sprint" ] ]
 			: coarse
 				? [ [ "Joystick", "Move" ], [ "Pass", "to the ringed teammate" ], [ "Shoot", "hold for power" ], [ "Tackle", "tap or hold" ], [ "Through", "runner" ], [ "Long", "striker" ], [ "Sprint", "hold" ] ]
-				: [ [ "← ↑ → ↓", "Move" ], [ "S", "Pass" ], [ "W", "Through" ], [ "D", "Shoot, hold" ], [ "Q", "Long" ], [ "A", "Tackle" ], [ "E", "Sprint" ], [ "H", "How to play" ] ];
+				: [ [ "← ↑ → ↓", "Move" ], [ "S", "Pass" ], [ "W", "Through" ], [ "D", "Shoot, hold" ], [ "Q", "Long" ], [ "A", "Tackle" ], [ "Tab", "Switch" ], [ "E", "Sprint" ], [ "H", "How to play" ] ];
 		el.replaceChildren(...items.map(([ key, label ]) => {
 			const s = document.createElement("span"), kb = document.createElement("kbd");
 			kb.textContent = key; s.append(kb, document.createTextNode(label));

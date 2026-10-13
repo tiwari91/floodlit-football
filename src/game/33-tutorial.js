@@ -21,7 +21,7 @@
 		{ title: "Long ball", text: `Press ${k("Q")} to hit a long ball to your striker (the amber Q marks who). From out wide it's a cross.`,
 			setup () { const h = human(); h.x = FW * 0.3; h.vx = h.vy = 0; giveBall(h); },
 			check: () => !!tut.flags.long },
-		{ title: "Tackle", text: `A red player is dribbling at you. Get close and press ${k("A")}: right alongside it's a shoulder tackle, from further out a slide.`,
+		{ title: "Tackle", text: `A red player is dribbling at you. Get close and tap ${k("A")}: right alongside it's a shoulder tackle, from further out a slide.`,
 			setup () {
 				const h = human(), c = outfield(1).reduce((a, b) => (dist(a, h) < dist(b, h) ? a : b));
 				c.x = clamp(h.x + 120 * S, 40, FW - 40); c.y = h.y; c.vx = c.vy = 0; c.kickCd = 0;

@@ -264,6 +264,15 @@
 		}
 	}
 
+	// A (Tackle, X on a pad) is decided when you let go: a tap (under TAP_FRAMES) is a challenge
+	// (right alongside, a shoulder; further out, a slide), and a hold is the press assist, at any
+	// distance, for as long as you hold it. He starts closing down as soon as it goes down, so a
+	// tap costs no ground on the way in.
+	const TAP_FRAMES = 8;
+	let tackleDownAt = -1;
+	function tackleDown () { if (odr) { endOdr(); return; } tackleDownAt = frame; }
+	function tackleUp () { const tap = tackleDownAt >= 0 && frame - tackleDownAt < TAP_FRAMES; tackleDownAt = -1; if (tap) { humanTackle(); } }
+	const pressOn = () => pressHeld || touchPress || padPressBtn;
 	function humanTackle () {
 		if (odr) { endOdr(); return; }
 		const p = human();
@@ -293,8 +302,7 @@
 				return;
 			}
 			// Further out: a slide tackle, aimed at where the carrier is heading
-			// rather than just the way you happen to face. Beyond slide range (or with the ball
-			// loose and far off) A is a press instead: hold it and he closes the ball down himself.
+			// rather than just the way you happen to face. Beyond slide range a tap does nothing.
 			const target = o && o.team === 1 ? o : null;
 			if (target ? dist(p, target) >= 95 : dist(p, ball) > 70) { return; }
 			if (target) { p.dir = Math.atan2(target.y + target.vy * 6 - p.y, target.x + target.vx * 6 - p.x); }

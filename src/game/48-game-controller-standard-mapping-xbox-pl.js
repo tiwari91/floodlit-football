@@ -25,7 +25,8 @@
 		if (state === "play" && freeze <= 0) {
 			if (pressed(0)) { passPress("pass"); }
 			if (pressed(1)) { humanShootPress(); }
-			if (pressed(2)) { humanTackle(); }
+			if (pressed(2)) { tackleDown(); }
+			if (released(2)) { tackleUp(); }
 			if (pressed(3)) { passPress("through"); }
 			if (pressed(5)) { passPress("long"); }
 			if (pressed(8)) { startOdr(); }   // Back / Share / Select: replay the last six seconds

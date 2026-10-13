@@ -111,6 +111,35 @@ r = await handsOff(null);
 check("Hands off while they have the ball: your man waits a moment, then goes goal-side of the carrier by himself", r.human && r.early < 6 && r.dx < 0 && r.gs < 40, JSON.stringify(r));
 r = await handsOff("ArrowUp");
 check("Hands off: an arrow held keeps him yours (he follows it, not the carrier)", r.human && r.dy < -100 && r.dx > 60, JSON.stringify(r));
+// 9. A: a tap is decided on release (a challenge or a slide); a hold of 8 frames or more is the press, at any distance.
+const tackleKey = (gap, holdFor) => page.evaluate(async ([ gap, holdFor ]) => {
+	const F = window.__ff, FW = F.FW, FH = F.FH;
+	F.timeLeft = 1e9; F.freeze = 0; F.autoSwitchMode = "manual"; F.manualLock = 0; F.switchCd = 0; F.autoHold = 0;
+	const q = F.outfield(1)[3], mine = F.outfield(0), m = mine[2];
+	for (const p of F.players) { p.vx = p.vy = 0; p.lunge = 0; p.lungeCd = 0; p.kickCd = 0; }
+	for (const p of F.outfield(1)) { if (p !== q) { p.x = FW - 60; p.y = 40 + 30 * F.outfield(1).indexOf(p); } }
+	for (const p of mine) { if (p !== m) { p.x = 60; p.y = 40 + 30 * mine.indexOf(p); } }
+	q.x = FW * 0.5; q.y = FH / 2; q.dir = Math.PI; m.x = q.x - gap; m.y = q.y; m.dir = 0;
+	const pin = () => { F.ball.owner = q; q.x = FW * 0.5; q.y = FH / 2; q.vx = q.vy = 0; F.ball.x = q.x - 18; F.ball.y = q.y; F.ball.z = 0; F.ball.vz = 0; F.ball.vx = F.ball.vy = 0; };
+	pin(); F.ctrl = F.players.indexOf(m); F.possTeam = 1;
+	F.press("KeyA");
+	let actedEarly = false, slid = false;
+	for (let i = 0; i < holdFor; i++) { F.step(1); pin(); if (m.lungeCd > 0 || m.lunge > 0) { actedEarly = true; } }
+	const closed = Math.round(gap - Math.hypot(m.x - q.x, m.y - q.y));
+	F.release("KeyA");
+	const lunge0 = m.lunge;
+	F.step(1);
+	slid = lunge0 > 0 || m.lunge > 0;
+	return { actedEarly, acted: m.lungeCd > 0, slid, closed };
+}, [ gap, holdFor ]);
+r = await tackleKey(30, 4);
+check("A tapped alongside the carrier: a shoulder challenge when you let go, not before", !r.actedEarly && r.acted && !r.slid, JSON.stringify(r));
+r = await tackleKey(70, 4);
+check("A tapped from further out: a slide when you let go", !r.actedEarly && r.slid, JSON.stringify(r));
+r = await tackleKey(70, 30);
+check("A held inside slide range: the press (he closes him down), no slide, and nothing on letting go", !r.actedEarly && !r.acted && r.closed > 15, JSON.stringify(r));
+r = await tackleKey(300, 40);
+check("A held from far away: the press", !r.actedEarly && !r.acted && r.closed > 60, JSON.stringify(r));
 check("no console errors in the switch checks", errs.length === 0, errs.join(" | "));
 
 // 8. Sanity: a stretch of real play on auto-pilot runs clean (a goal right at the end plays out to the kick-off).
