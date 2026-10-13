@@ -545,7 +545,7 @@
 		if (G3.shot.startsWith("replay")) { for (const m of Object.values(G3.marks)) { m.visible = false; } return; }   // a clean picture for the replay
 		// The markers on the grass.
 		const mk = G3.marks, me = human(), playing = state === "play" && freeze <= 0;
-		const isHuman = me && state !== "intro" && G3.shot !== "intro";   // not during the kick-off sweep from over the ground
+		const isHuman = me && !cutaway3D();   // not during the kick-off sweep, a goal or the stretcher
 		for (const m of Object.values(mk)) { m.visible = false; }
 		if (isHuman) {
 			const x = WX(me.x), z = me.y;
@@ -605,6 +605,9 @@
 	}
 	const plate3 = { ctrl: -1, at: 0 }, PLATE_FULL3 = 90;
 	// The HUD over the 3D picture: everything the 2D cameras write in words and marks.
+	// Shots that are not about your man: the kick-off sweep, a goal and its celebration, the manager's run, the stretcher. His
+	// ring, cone, plate and the off-screen arrow stay off them (close in, they were drawn huge over the scene).
+	const cutaway3D = () => state === "intro" || state === "goal" || G3.shot === "intro" || G3.shot === "stretcher" || G3.shot === "celeb" || G3.shot === "boss";
 	function hud3D () {
 		ctx.setTransform(1, 0, 0, 1, 0, 0);
 		ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -624,7 +627,7 @@
 			}
 			if (p.injured) { ctx.fillStyle = "#ffffff"; ctx.fillRect(q.x - 13, q.y - 10, 7, 7); ctx.fillStyle = "#d8343f"; ctx.fillRect(q.x - 10.5, q.y - 9, 2, 5); ctx.fillRect(q.x - 12, q.y - 7.5, 5, 2); }
 		}
-		if (me && state !== "intro" && G3.shot !== "intro") {
+		if (me && !cutaway3D()) {
 			const foot = proj3D(me.x, me.y, 0), top = proj3D(me.x, me.y, 56);
 			if (foot) {
 				drawSprintBar(me, foot.x, foot.y + Math.max(5, 7 * foot.k), Math.max(22, 30 * foot.k));
@@ -729,7 +732,7 @@
 		ctx.globalAlpha = 1;
 		drawRain();
 		// An arrow at the screen edge when your player is out of the picture.
-		if (me && state !== "intro") {
+		if (me && !cutaway3D()) {
 			const q = proj3D(me.x, me.y, 16);
 			const sx = q ? q.x : VW / 2, sy = q ? q.y : VH + 100, pad = 26;
 			if (!q || sx < 0 || sx > VW || sy < 0 || sy > VH) {
