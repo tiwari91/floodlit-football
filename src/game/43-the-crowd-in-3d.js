@@ -63,10 +63,10 @@
 		};
 		if (kind === "hi") { box(0, 14.5, 0, 6, 6, 4, 0.2, 3); return finish(); }
 		if (lite) {
-			box(0, 4.2, 0, 5.0, 3.9, 7.2, 3.0, 0);    // body, sitting (the shader stands him up)
-			box(0, 9.7, 0, 2.9, 2.9, 3.2, 2.8, 1, 4);
-			box(0, 11.05, 1.44, 2.95, 2.95, 0.5, 0.12, 4);   // a fringe of hair over the brow
-			for (const ex of [ -0.6, 0.6 ]) { box(ex, 10.25, 1.47, 0.5, 0.5, 0.4, 0.12, 9); }
+			// Rounded, for the same triangles the boxes cost: a torso with shoulders and a round head with hair,
+			// the front halves only (eyes are below a pixel up here).
+			lathe(0, 0, [ [ 0.6, 2.0 ], [ 5.6, 2.45 ], [ 7.4, 1.7 ], [ 8.3, 0.75 ] ], 8, 0.62, 0);
+			lathe(0.05, 0, [ [ 8.4, 0.75 ], [ 9.1, 1.4 ], [ 10.4, 1.55 ], [ 11.2, 1.3 ], [ 11.9, 0.35 ] ], 8, 0.94, 1, 10.9);
 		} else {
 			// Rounded but light: a torso with shoulders and a round head, the front halves only.
 			lathe(0, 0, [ [ 0.6, 1.9 ], [ 4.0, 2.2 ], [ 6.6, 2.6 ], [ 7.8, 1.75 ], [ 8.35, 0.8 ] ], 6, 0.62, 0);
@@ -95,19 +95,26 @@
 					if (pt == 1 || pt == 5) { vColor.rgb = aSkin; }
 					if (pt == 4) { float hq = fract(aFan.x * 7.31); vColor.rgb = hq > 0.9 ? vec3(0.62, 0.5, 0.3) : hq > 0.8 ? vec3(0.45, 0.45, 0.45) : aSkin * 0.22 + vec3(0.02); }
 					if (pt == 9) { vColor.rgb = vec3(0.05, 0.04, 0.035); }
+					if (pt == 0 || pt == 7) { vColor.rgb *= 0.74 + 0.26 * clamp(position.y / 7.5, 0.0, 1.0); }   // a jacket or shirt in shade at the waist
 					if (pt == 6) { vColor.rgb = vColor.rgb * 0.12 + (fract(aFan.x * 3.7) > 0.5 ? vec3(0.1, 0.12, 0.18) : vec3(0.16, 0.15, 0.13)); }`)
 				.replace("#include <begin_vertex>", `
 					vec3 transformed = vec3(position);
 					float phase = aFan.x, side = aFan.y, standy = aFan.z, hasFlag = aFan.w;
+					float h1 = fract(phase * 37.13), h2 = fract(phase * 71.71), h3 = fract(phase * 13.37);   // each fan's own habits
 					float mood = side > 0.75 ? uHome : side < 0.25 ? uAway : 0.5 * uHome;
 					float up = max(mood, 0.0), down = max(-mood, 0.0);
 					float excite = clamp(uExcite + up * 0.7, 0.0, 1.0);
 					float stand = smoothstep(0.3, 0.7, excite * 0.85 + standy * 0.35 - 0.1 + uOoh * 0.4 * step(0.4, phase));
+					stand = max(stand, smoothstep(0.2, 0.6, up) * step(0.12, phase));   // a goal for them: up on their feet, nearly all of them
 					float t = uTime;
 					float sway = sin(t * (1.1 + phase * 0.8) + phase * 6.2832) * (0.35 + 1.4 * excite);
-					float bounce = up * abs(sin(t * (5.5 + phase * 2.5) + phase * 6.2832)) * (3.0 + 3.0 * phase) * step(0.35, standy + up * 0.5);
-					float ooh = uOoh * step(0.3, phase);
-					float armsUp = clamp(up * 1.3 * step(0.25, phase) + ooh * 1.2 + (excite - 0.75) * 2.0 * step(0.6, phase), 0.0, 1.0);
+					float bounce = up * abs(sin(t * (5.5 + phase * 2.5) + phase * 6.2832)) * (4.0 + 5.0 * phase) * step(0.25, standy + up * 0.8);
+					// The other side's goal: heads drop, and half of them hold their heads in their hands.
+					float dej = down * step(0.45, phase);
+					float ooh = max(uOoh * step(0.3, phase), dej);
+					float armsUp = clamp(up * 1.4 * step(0.15, phase) + ooh * 1.2 + (excite - 0.75) * 2.0 * step(0.6, phase), 0.0, 1.0);
+					// Sitting, not all alike: some with arms folded or on their knees, some leaning on, some back.
+					armsUp = max(armsUp, (h3 > 0.8 ? 0.3 : h3 > 0.62 ? 0.16 : 0.0) * (1.0 - stand));
 					// La Ola: the Mexican wave, a band of fans standing with their arms up that runs round the bowl.
 					#ifdef USE_INSTANCING
 					if (uOla > 0.001) {
@@ -119,7 +126,8 @@
 					#endif
 					int ptv = int(aPart + 0.5);
 					if (ptv == 0) { transformed.y *= 1.0 + 0.45 * stand; }
-					if (ptv == 1 || ptv == 4 || ptv == 7) { transformed.y += 3.3 * stand - down * 1.2; transformed.z += down * 0.8; }
+					if (ptv == 1 || ptv == 4 || ptv == 7 || ptv == 9) { transformed.y += 3.3 * stand - down * 1.2; transformed.z += down * 0.8; }
+					if (ptv == 1 || ptv == 4 || ptv == 9) { transformed.x += (h2 - 0.5) * 0.7 * (1.0 - up); transformed.z += (h1 - 0.5) * 0.5; }   // a head turned to a neighbour, or forward
 					if (ptv == 6) { transformed.y += 3.3 * stand; }
 					if (ptv == 5 || ptv == 8) {
 						// The rounded fans' arms swing about the shoulder: down by their sides, up, or hands to heads.
@@ -146,6 +154,8 @@
 					}
 					transformed.y += bounce;
 					transformed.x += sway * (0.4 + 0.6 * stand);
+					// leaning forward or back in the seat (and forward on the edge of it at a chance)
+					transformed.z += ((h1 - 0.5) * 0.22 * (1.0 - stand) + uOoh * 0.12 * step(0.3, phase) + dej * 0.08) * max(transformed.y - 1.0, 0.0);
 				`);
 		};
 		m.customProgramCacheKey = () => "ff-crowd";
@@ -189,7 +199,8 @@
 						const e = endRows[x < FW / 2 ? 0 : 1], r = e[i] || (e[i] = { x: 0, y, zMin: 1e9, zMax: -1e9, n: 0 });
 						r.x += x; r.n++; r.zMin = Math.min(r.zMin, z); r.zMax = Math.max(r.zMax, z);
 					}
-					const fan = { x, y, z, ry: Math.atan2(-nx, -nz) + (rnd() - 0.5) * 0.3, side, phase: rnd(), stand: end ? 0.75 + rnd() * 0.25 : terrace ? 0.7 + 0.3 * rnd() : rnd(), flag: rnd() < (end ? 0.2 : away ? 0.14 : 0.1) ? 1 : 0, skin: skins[Math.floor(rnd() * skins.length)], color, scale: 1.5 + rnd() * 0.2, wide: 0.88 + rnd() * 0.26, tall: 0.9 + rnd() * 0.2 };
+					const fan = { x, y, z, ry: Math.atan2(-nx, -nz) + (rnd() - 0.5) * 0.45, side, phase: rnd(), stand: end ? 0.75 + rnd() * 0.25 : terrace ? 0.7 + 0.3 * rnd() : rnd(), flag: rnd() < (end ? 0.2 : away ? 0.14 : 0.1) ? 1 : 0, skin: skins[Math.floor(rnd() * skins.length)], color, scale: 1.5 + rnd() * 0.2, wide: 0.86 + rnd() * 0.32, tall: 0.84 + rnd() * 0.32 };
+					if ((fan.phase * 91.7) % 1 < 0.05 && !end) { fan.scale *= 0.78; }   // a child
 					lists[nearSide ? (i < GQ.nearHiRows ? "nearHi" : "near") : i < GQ.hiRows && !away ? "hi" : i >= GQ.liteRow ? "lite" : "full"].push(fan);
 				}
 			}
@@ -202,7 +213,9 @@
 			const fa = new Float32Array(n * 4), sk = new Float32Array(n * 3);
 			fans.forEach((f, i) => {
 				M.compose(P.set(f.x, f.y, f.z), Q.setFromEuler(E.set(0, f.ry, 0)), Sc.set(f.scale * f.wide, f.scale * f.tall, f.scale));
-				mesh.setMatrixAt(i, M); mesh.setColorAt(i, C.set(f.color));
+				// The same colours, not the same shirt: a shade lighter or darker, a little more or less vivid.
+				const j1 = (f.phase * 53.17) % 1, j2 = (f.phase * 29.71) % 1;
+				mesh.setMatrixAt(i, M); mesh.setColorAt(i, C.set(f.color).offsetHSL(0, (j1 - 0.5) * 0.16, (j2 - 0.5) * 0.14));
 				fa.set([ f.phase, f.side, f.stand, f.flag ], i * 4);
 				C.set(f.skin); sk.set([ C.r, C.g, C.b ], i * 3);
 			});
