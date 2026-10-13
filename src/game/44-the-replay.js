@@ -88,7 +88,10 @@
 		} else {
 			out.eye.set(gx - side * 150, 24, FH + 4);
 		}
-		if (reduceMotion) { out.look.set(gx - side * 140, 8, FH / 2); } else { out.look.set(bx, 6 + bh * 0.5, by); }
+		if (reduceMotion) { out.look.set(gx - side * 140, 8, FH / 2); } else { out.look.set(bx, replay.angle === 0 ? 6 + bh * 0.5 : 26 + bh * 0.3, by); }   // the zoomed angle: the play in the lower half under the crowd, following a lofted ball less
+		// The low touchline angle zooms in on the ball (a lens about 200 units across where it is), so the play on the
+		// far side is not a strip on the horizon over a field of empty grass.
+		if (replay.angle !== 0) { out.fov = clamp(2 * Math.atan(100 / Math.max(1, out.eye.distanceTo(out.look))) * 180 / Math.PI, 16, 36); }
 		return out;
 	}
 

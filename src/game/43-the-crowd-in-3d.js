@@ -443,9 +443,9 @@
 	function camera3D () {
 		if (!shotWant.eye) { shotWant.eye = new THREE.Vector3(); shotWant.look = new THREE.Vector3(); }
 		G3.cam.aspect = VW / VH;
-		shot3D(shotWant);
-		// Open play uses a wider lens so the near touchline and corner flags fit; other shots keep 36.
-		G3.cam.fov = shotWant.kind === "follow" ? FOLLOW_FOV : 36;
+		shotWant.fov = 0; shot3D(shotWant);
+		// Open play uses a wider lens so the near touchline and corner flags fit; a shot may ask for its own; others keep 36.
+		G3.cam.fov = shotWant.fov || (shotWant.kind === "follow" ? FOLLOW_FOV : 36);
 		G3.cam.updateProjectionMatrix();
 		// A new shot is a cut; within a shot the camera glides, eased by elapsed time.
 		if (shotWant.kind !== G3.shot) { G3.shot = shotWant.kind; G3.eye.copy(shotWant.eye); G3.look.copy(shotWant.look); }

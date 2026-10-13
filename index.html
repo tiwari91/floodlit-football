@@ -13587,9 +13587,9 @@
 	function camera3D () {
 		if (!shotWant.eye) { shotWant.eye = new THREE.Vector3(); shotWant.look = new THREE.Vector3(); }
 		G3.cam.aspect = VW / VH;
-		shot3D(shotWant);
-		// Open play uses a wider lens so the near touchline and corner flags fit; other shots keep 36.
-		G3.cam.fov = shotWant.kind === "follow" ? FOLLOW_FOV : 36;
+		shotWant.fov = 0; shot3D(shotWant);
+		// Open play uses a wider lens so the near touchline and corner flags fit; a shot may ask for its own; others keep 36.
+		G3.cam.fov = shotWant.fov || (shotWant.kind === "follow" ? FOLLOW_FOV : 36);
 		G3.cam.updateProjectionMatrix();
 		// A new shot is a cut; within a shot the camera glides, eased by elapsed time.
 		if (shotWant.kind !== G3.shot) { G3.shot = shotWant.kind; G3.eye.copy(shotWant.eye); G3.look.copy(shotWant.look); }
@@ -14027,7 +14027,10 @@
 		} else {
 			out.eye.set(gx - side * 150, 24, FH + 4);
 		}
-		if (reduceMotion) { out.look.set(gx - side * 140, 8, FH / 2); } else { out.look.set(bx, 6 + bh * 0.5, by); }
+		if (reduceMotion) { out.look.set(gx - side * 140, 8, FH / 2); } else { out.look.set(bx, replay.angle === 0 ? 6 + bh * 0.5 : 26 + bh * 0.3, by); }   // the zoomed angle: the play in the lower half under the crowd, following a lofted ball less
+		// The low touchline angle zooms in on the ball (a lens about 200 units across where it is), so the play on the
+		// far side is not a strip on the horizon over a field of empty grass.
+		if (replay.angle !== 0) { out.fov = clamp(2 * Math.atan(100 / Math.max(1, out.eye.distanceTo(out.look))) * 180 / Math.PI, 16, 36); }
 		return out;
 	}
 
