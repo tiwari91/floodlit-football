@@ -565,6 +565,24 @@ check("fist pump: the fist up in front of him, the other arm in front", R2.fist.
 check("badge kiss: one hand at his mouth in front, the other arm up pointing forward", R2.badge.a[0].hx > 2 && R2.badge.a[0].hy > -6 && Math.abs(R2.badge.a[0].hout) < 3 && R2.badge.a[1].hx > 3 && R2.badge.a[1].hy > 1, JSON.stringify(R2.badge));
 check("throw-in: the ball behind his head with the hands together, then out in front", all2("throwBack", a => a.hy > 2 && a.hx < 0) && all2("throwFwd", a => a.hx > 5) && R2.throwBack.hd < 9, JSON.stringify({ b: R2.throwBack, f: R2.throwFwd }));
 check("shirt over the head: no face painted on it", R2.blank === -1 && R2.open === 11, JSON.stringify({ b: R2.blank, o: R2.open }));
+// The stretcher in 3D: two medics carry it (real figures, not the flat 2D marks), hands at the handles.
+const st3 = await page.evaluate(async () => {
+	const F = window.__ff; F.freeze = 0; F.timeLeft = 1e9; F.autoPilot = true;
+	if (F.state !== "play") { return { skip: F.state }; }
+	F.injureTest(0, true);
+	const s = [], wait = ms => new Promise(r => setTimeout(r, ms));
+	for (let i = 0; i < 60 && F.stretcher; i++) {
+		await wait(60);
+		const Fg = F.G3.fig; if (!Fg.medicRigs || !Fg.stretch || !Fg.stretch.visible) { s.push({ n: F.stretcher ? F.stretcher.n : -1, medics: 0 }); continue; }
+		const P = Fg.stretch.position, V = new P.constructor(); let worst = 0;
+		for (const r of Fg.medicRigs) { for (const k of [ 0, 1 ]) { r.ha[k].getWorldPosition(V); const dz = Math.abs(V.z - P.z); worst = Math.max(worst, Math.hypot(V.x - P.x - Math.sign(V.x - P.x) * 5, V.y - P.y, Math.max(0, dz - 19), Math.max(0, 14 - dz)));   /* on a pole, near its end */ } }
+		s.push({ n: F.stretcher ? F.stretcher.n : -1, medics: Fg.medicRigs.length, worst, h: P.y, shot: F.G3.shot });
+	}
+	F.autoPilot = false;
+	const carried = s.filter(x => x.medics && x.h > 14);   // at full carrying height (not mid set-down)
+	return { n: s.length, drawn: s.filter(x => x.medics === 2).length, maxCarry: Math.max(...carried.map(x => x.worst)).toFixed(1), shot: s.filter(x => x.shot === "stretcher").length, carried: carried.length };
+});
+check("stretcher (3D): two medics carry it with their hands at the handles, and the camera goes to it", !st3.skip && st3.drawn >= st3.n * 0.8 && st3.carried > 5 && Number(st3.maxCarry) < 3 && st3.shot > 5, JSON.stringify(st3));
 check("no errors after the woodwork checks (and no 3D failure)", errs.length === 0 && !errs.some(e => /3D view failed/.test(e)), errs.join(" | "));
 await browser.close(); server.stop();
 process.exit(done() ? 1 : 0);

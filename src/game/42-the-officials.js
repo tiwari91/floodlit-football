@@ -61,6 +61,65 @@
 			o.dir = Math.PI / 2;   // facing the pitch, running sideways
 		}
 	}
+	// The stretcher in 3D: two medics in green carry it on, one at each end, set it down beside him, roll him on
+	// and carry him off. Drawn only: the simulation's stretcher (stretcherPos, STRETCH_T) is unchanged.
+	const MEDIC_KIT3 = { shirt: "#1f8a4c", shorts: "#1d2330", socks: "#1d2330", second: "#e9ecea", pattern: 0, ink: "#e9ecea", gloves: null, sleeves: true, boots: "#15181a", ring: null };
+	const MEDIC_LOOK3 = [ { skin: "#c98e64", hair: "#2a1d14", style: "short", face: 2 }, { skin: "#f1c9a5", hair: "#6a4a2a", style: "buzz", face: 5 } ];
+	const medics3 = [ 0, 1 ].map(i => ({ x: 0, y: 0, vx: 0, vy: 0, dir: 0, stride: 0, runAmt: 0, idlePh: i * 1.7, role: "staff", team: -1 }));
+	const STRETCH_H3 = 14.2, STRETCH_L3 = 19;   // the height it is carried at (the medics' hands) and its half length
+	// Where the stretcher is this frame, how high, and where the injured man is drawn (null: where he fell).
+	function stretcher3 () {
+		const s = stretcher, q = s && stretcherPos();
+		if (!q) { return null; }
+		const [ a, b ] = STRETCH_T, n = s.n, ax = Math.sign(s.at.y - s.from.y) || 1;
+		const ox = 11;   // it comes on, is set down and goes off a stride to the side of where he fell
+		let h = STRETCH_H3, roll = -1;
+		if (n >= a && n < a + b) {
+			const u = (n - a) / b;
+			if (u < 0.3) { h = lerp3(STRETCH_H3, 1.4, smooth3(u / 0.3)); }
+			else if (u < 0.6) { h = 1.4; roll = smooth3((u - 0.3) / 0.3); }
+			else { h = lerp3(1.4, STRETCH_H3, smooth3((u - 0.6) / 0.4)); roll = 1; }
+		} else if (n >= a + b) { roll = 1; }
+		const x = q.x + ox, y = q.y;
+		const man = roll < 0 ? null : { x: lerp3(s.at.x, x, roll), y: lerp3(s.at.y, y, roll), h: roll * (h + 0.6) };
+		return { x, y, h, ax, man, down: n >= a && n < a + b ? 1 - (h - 1.4) / (STRETCH_H3 - 1.4) : 0, off: n >= a + b };
+	}
+	function medics3D (WX, WD, st, dt) {
+		const F = G3.fig, T = THREE;
+		if (!F.stretch || F.stretch.parent !== G3.scene) {
+			const g = new T.Group(), canvasM = mat3D("#e9ecea"), poleM = mat3D("#b8352f");
+			const c = new T.Mesh(new T.BoxGeometry(9.2, 0.7, STRETCH_L3 * 1.6), canvasM); g.add(c);
+			for (const sx of [ -5, 5 ]) { const pm = new T.Mesh(new T.BoxGeometry(0.9, 0.9, STRETCH_L3 * 2), poleM); pm.position.x = sx; g.add(pm); }
+			F.stretch = g; G3.scene.add(g);
+		}
+		F.stretch.visible = !!st;
+		F.medicRigs = null;
+		if (!st) { return; }
+		F.stretch.position.set(WX(st.x), st.h, st.y);
+		if (F.stretchFor !== stretcher) { F.stretchFor = stretcher; for (const m of medics3) { m.x = m.y = 0; m.runAmt = 0; } }   // a new stretcher: no speed carried over from the last one
+		F.medicRigs = [];
+		medics3.forEach((m, i) => {
+			if (F.n >= MAXF3) { return; }
+			const end = i ? 1 : -1, nx = st.x, ny = st.y + end * (STRETCH_L3 + 3.5 + 4.5 * st.down);
+			const vx = m.x ? (nx - m.x) / Math.max(dt, 0.25) : 0, vy = m.y ? (ny - m.y) / Math.max(dt, 0.25) : 0, v = Math.hypot(vx, vy);
+			m.x = nx; m.y = ny; m.vx = vx; m.vy = vy;
+			m.runAmt += (Math.min(1, v / 2.6) - m.runAmt) * Math.min(1, 0.2 * dt);
+			m.stride += Math.PI * 2 * (0.95 + 0.5 * v) / 60 * clamp(v / 0.4, 0, 1) * dt; m.idlePh += 0.028 * dt;
+			m.dir = v > 0.3 ? Math.atan2(vy, vx) : end > 0 ? -Math.PI / 2 : Math.PI / 2;   // on the move he faces the way they go; set down, he faces the stretcher
+			const r = F.rigs[F.n];
+			r.mir = WX(1) < WX(0) ? -1 : 1;
+			pose3D(r, m, WX(m.x), m.y, WD(m.dir), 0, 0);
+			// The handles: in front of him if the stretcher is ahead, behind him if he leads it. Bent over to set it down.
+			const ahead = Math.cos(m.dir) * (st.x - m.x) + Math.sin(m.dir) * (st.y - m.y) > 0;
+			for (let k = 0; k < 2; k++) { r.sh[k].rotation.z = ahead ? 0.32 : -0.3; r.sh[k].rotation.x = OUT3(k) * 0.12; r.el[k].rotation.z = ahead ? 0.35 : 0.15; r.ha[k].rotation.set(0, 0, 0); }
+			if (st.down > 0) {   // a squat to set it down: hips drop, knees bend, back over it
+				const d = st.down; r.hips.position.y -= 7 * d; r.spine.rotation.z -= 0.85 * d; r.neck.rotation.z += 0.4 * d;
+				for (let k = 0; k < 2; k++) { r.hip[k].rotation.z += 1.0 * d; r.kn[k].rotation.z -= 1.7 * d; r.an[k].rotation.z += 0.6 * d; r.sh[k].rotation.z += 0.45 * d; }
+			}
+			commitFigure3D(r, MEDIC_LOOK3[i], MEDIC_KIT3, null);
+			F.medicRigs.push(r);
+		});
+	}
 	// Every figure this frame: the players, then the officials.
 	function drawFigures3D (WX, WD) {
 		const F = G3.fig;
@@ -92,7 +151,7 @@
 			const g = F.chestCv.getContext && F.chestCv.getContext("2d");
 			if (g) { paintChest3D(g, 0, KITS[0], YOU); paintChest3D(g, 1, KITS[1], opp); F.chestTex.needsUpdate = true; }
 		} F.rings.count = 0; F.blobs.count = 0; F.longs.count = 0;
-		const dt = frameDt / 16.7;
+		const dt = frameDt / 16.7, st3 = state === "play" ? stretcher3() : null;
 		for (const p of players) {
 			if (F.n >= MAXF3) { break; }
 			const rig = F.rigs[F.n], pd = F.prevDir.get(p), wrapA = a => Math.atan2(Math.sin(a), Math.cos(a));
@@ -121,7 +180,9 @@
 			const yaw = -clamp(relB, -0.85, 0.85) * clamp(1 - dBall / (420 * S), 0, 1);
 			const mir = WX(1) < WX(0) ? -1 : 1;
 			rig.mir = mir;   // the pose needs it to tell his left from his right
-			pose3D(rig, p, WX(p.x), p.y, WD(face), mir * turn, near, mir * yaw, mir * lead);
+			const ride = st3 && st3.man && stretcher.p === p ? st3.man : null;   // on the stretcher: lying along it
+			if (ride) { pose3D(rig, p, WX(ride.x), ride.y, WD(st3.ax > 0 ? Math.PI / 2 : -Math.PI / 2), 0, 0); rig.root.position.y += ride.h; }
+			else { pose3D(rig, p, WX(p.x), p.y, WD(face), mir * turn, near, mir * yaw, mir * lead); }
 			{ const bd = build(p), ht = 0.95 + 0.1 * bd.seed + (p.role === "gk" ? 0.03 : 0), gth = p.team >= 0 ? bd.girth : 1; rig.root.scale.set(ht * gth, ht, ht * gth); }   // tall and short, broad and slight
 			F.rigOf.set(p, rig);
 			commitFigure3D(rig, look(p), kit3D(p), p.num);
@@ -144,6 +205,7 @@
 			if (k > 0 && F.flags.count < 2) { F.flags.setMatrixAt(F.flags.count++, rig.ha[1].matrixWorld); }
 		});
 		F.flags.instanceMatrix.needsUpdate = true;
+		medics3D(WX, WD, st3, dt);
 		staff3D(WX);
 		for (const k in F.parts) {
 			const m = F.parts[k];

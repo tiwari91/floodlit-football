@@ -410,10 +410,11 @@
 		}
 		if (stretcher && state === "play") {
 			// The stretcher: the camera goes to the injured man.
-			const q = stretcherPos() || stretcher.at;
+			// Framed between the medics and the man on the ground, so both are in the picture as they come on.
+			const q0 = stretcherPos() || stretcher.at, q = { x: (q0.x + stretcher.at.x) / 2, y: (q0.y + stretcher.at.y) / 2 };
 			out.kind = "stretcher";
-			out.eye.set(WX(q.x), 150, clamp(q.y + 320, 120, FH + MY * 0.8));
-			out.look.set(WX(q.x), 4, q.y);
+			out.eye.set(WX(q.x) + (q.x < FW / 2 ? 150 : -150), 150, clamp(q.y + 320, 120, FH + MY * 0.8));   // off to one side, so the stretcher is seen side-on
+			out.look.set(WX(q.x), 8, q.y);
 			return out;
 		}
 		if (setPiece && setPiece.taker && o === setPiece.taker && state === "play" && (setPiece.kind === "free" || setPiece.kind === "pen")) {
@@ -746,7 +747,6 @@
 		drawMinimap(); drawTouchlineCam();
 		drawPenAim(true);
 		drawReview(true);
-		drawStretcher(true);
 		drawHints();
 		drawPowerMeter();
 		drawToasts();
