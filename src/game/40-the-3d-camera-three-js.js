@@ -122,7 +122,7 @@
 			const gg = gc.getContext && gc.getContext("2d");
 			if (gg) {
 				const grad = gg.createRadialGradient(32, 32, 2, 32, 32, 32);
-				grad.addColorStop(0, "rgba(255, 244, 210, 0.9)"); grad.addColorStop(0.35, "rgba(255, 244, 210, 0.3)"); grad.addColorStop(1, "rgba(255, 244, 210, 0)");
+				grad.addColorStop(0, "rgba(255, 255, 255, 0.9)"); grad.addColorStop(0.35, "rgba(255, 255, 255, 0.3)"); grad.addColorStop(1, "rgba(255, 255, 255, 0)");   // white: each ground tints it to its lamps
 				gg.fillStyle = grad; gg.fillRect(0, 0, 64, 64);
 				G3.glowTex = tex3D(gc);
 			}
@@ -243,14 +243,15 @@
 	// tight and bright where water lies (low-frequency puddle noise), broken into glints by the blades
 	// everywhere else (a per-blade normal jitter), and stronger at grazing angles (Fresnel).
 	let WET_LAMPS3 = null;   // made once three.js is here
+	const wetLampCol3 = [ 1, 0.94, 0.82 ];   // the colour the wet grass mirrors: the ground's lamps
 	const wetLamps3 = () => WET_LAMPS3 || (WET_LAMPS3 = Array.from({ length: 8 }, () => new THREE.Vector3(0, -1e4, 0)));
 	function wetGround3D (mat) {
 		mat.onBeforeCompile = sh => {
-			sh.uniforms.ffLamps = { value: wetLamps3() }; sh.uniforms.ffWet = { value: Math.min(1.5, cond.wet) };
+			sh.uniforms.ffLamps = { value: wetLamps3() }; sh.uniforms.ffWet = { value: Math.min(1.5, cond.wet) }; sh.uniforms.ffLampCol = { value: wetLampCol3 };
 			sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nvarying vec3 vWp;").replace("#include <begin_vertex>", "#include <begin_vertex>\nvWp = (modelMatrix * vec4(transformed, 1.0)).xyz;");
 			sh.fragmentShader = sh.fragmentShader
 				.replace("#include <common>", `#include <common>
-					varying vec3 vWp; uniform vec3 ffLamps[8]; uniform float ffWet;
+					varying vec3 vWp; uniform vec3 ffLamps[8]; uniform float ffWet; uniform vec3 ffLampCol;
 					float ffH (vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 					float ffNz (vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(ffH(i), ffH(i + vec2(1.0, 0.0)), f.x), mix(ffH(i + vec2(0.0, 1.0)), ffH(i + vec2(1.0, 1.0)), f.x), f.y); }`)
 				.replace("#include <map_fragment>", `#include <map_fragment>
@@ -268,14 +269,14 @@
 						float sp = 0.0;
 						for (int i = 0; i < 8; i++) { vec3 L = normalize(ffLamps[i] - vWp); sp += pow(max(dot(n, normalize(L + V)), 0.0), shin); }
 						float blade = 0.55 + 0.45 * ffNz(q / 1.7);   // the blades break up the mirror, softly
-						diffuseColor.rgb = diffuseColor.rgb * (1.0 - 0.1 * pud * ffWet) + vec3(1.0, 0.94, 0.82) * 0.35 * (1.0 - exp(-sp * norm * fres * blade * ffWet * 0.08));   // soft roll-off, never a white patch
+						diffuseColor.rgb = diffuseColor.rgb * (1.0 - 0.1 * pud * ffWet) + ffLampCol * 0.35 * (1.0 - exp(-sp * norm * fres * blade * ffWet * 0.08));   // soft roll-off, never a white patch
 					}`);
 		};
 		mat.customProgramCacheKey = () => "ff-wet";
 	}
 	function buildStadium3D () {
 		const gs = gstyle || { mow: "stripes", roof: true, lights: "roof", fill: 0.8, seat: "#3b4a58", concrete: "#1b2520", steps: "#262f21", arch: "azteca" };
-		const key = `${WW}x${WH}|${cond.label}|${cond.ko}|${cond.surfaceKey}|${gs.mow}${gs.roof}${gs.lights}${gs.fill}${gs.arch}${gs.mountains}|${KITS[0].outfield}${KITS[1].outfield}${homeSide}|${gfxLevel}`;
+		const key = `${WW}x${WH}|${cond.label}|${cond.ko}|${cond.surfaceKey}|${gs.mow}${gs.roof}${gs.lights}${gs.fill}${gs.arch}${gs.mountains}|${gs.nat}${gs.seats}${gs.flags}${gs.bunting}${gs.concrete}|${KITS[0].outfield}${KITS[1].outfield}${homeSide}|${gfxLevel}`;
 		if (G3.stadium && G3.stadiumKey === key && G3.standsRef === stands) { return; }
 		if (G3.stadium) {
 			G3.nearStand = null;
@@ -324,8 +325,12 @@
 		const longSide = j => { const a = ring(0)[j], b = ring(0)[nxt(j)]; return Math.abs(a.nz + b.nz) / 2 > 0.92; };
 		const main = acc3(), near = acc3(), lamp = acc3(), nearLamp = acc3(), hills = acc3(), glow = [], nearGlow = [];
 		const shade = (c, k) => { const v = col3(c); return [ v[0] * k, v[1] * k, v[2] * k ]; };
-		const conc = col3(gs.concrete), step = shade(gs.steps, 1.35), riser = shade(gs.concrete, 0.8), seat = col3(gs.seat), seatTop = shade(gs.seat, 1.18);
+		const conc = col3(gs.concrete), step = shade(gs.steps, 1.35), riser = shade(gs.concrete, 0.8);
 		const club = col3(KITS[homeSide].outfield);
+		// The country's dress: its lamps (and the wet grass mirrors them), its roof's sheeting, its flags.
+		const lampC = gs.lamp || [ 1.3, 1.22, 1.02 ], lampM = Math.max(...lampC);
+		lampC.forEach((v, i) => { wetLampCol3[i] = 0.25 + 0.75 * v / lampM; });
+		const natCols = (gs.natCols || [ "#ffffff", "#c8102e", "#ffffff" ]).map(col3);
 		// Along segment j at distance d: the point a fraction u of the way.
 		const at = (j, d, u, y) => { const a = ring(d)[j], b = ring(d)[nxt(j)]; return [ a.x + (b.x - a.x) * u, y, a.z + (b.z - a.z) * u ]; };
 		const inward = j => { const a = ring(0)[j], b = ring(0)[nxt(j)]; return [ -(a.nx + b.nx) / 2, 0, -(a.nz + b.nz) / 2 ]; };
@@ -343,15 +348,21 @@
 		}
 		const aislesOf = j => aisles.filter(a => a[0] === j).map(a => a[1]);
 		const lastRow = P.rows[P.rows.length - 1];
+		// Seats: one by one (a pan and a back, in the ground's colours) where the Graphics level allows, built
+		// with the crowd so that every empty place has a seat and none sits inside a fan; none on a terrace.
+		const seatsMode = gs.seats || "club", seatEach = !!stands && gfxLevel !== "low" && seatsMode !== "terrace";
 		for (let j = 0; j < N; j++) {
 			const T = isNear(j) ? near : main, TL = isNear(j) ? nearLamp : lamp, ai = aislesOf(j);
 			// The front wall, with a painted band in the club's colour.
 			strip(T, j, 0, 0, 0, P.rows[0].h, shade(conc, 0.7));
 			strip(T, j, 0, P.rows[0].h - 1.6, 0, P.rows[0].h - 0.4, shade(club, 0.75));
-			for (const r of P.rows) {
+			for (const [ ri, r ] of P.rows.entries()) {
 				strip(T, j, r.d, r.h, r.d + r.rd, r.h, step);                                   // the tread
-				strip(T, j, r.d + r.rd * 0.48, r.h, r.d + r.rd * 0.48, r.h + 2.4, seat);           // the seats
-				strip(T, j, r.d + r.rd * 0.48, r.h + 2.4, r.d + r.rd * 0.86, r.h + 2.4, seatTop);
+				if (!seatEach && seatsMode !== "terrace") {   // the seats as a bench along the row (Low graphics); otherwise one by one, with the crowd
+					const sc = seatsMode === "multi" ? [ 0.2, 0.21, 0.23 ] : col3(seatColOf(gs, ri / P.rows.length, j) || gs.seat);
+					strip(T, j, r.d + r.rd * 0.48, r.h, r.d + r.rd * 0.48, r.h + 2.4, sc);
+					strip(T, j, r.d + r.rd * 0.48, r.h + 2.4, r.d + r.rd * 0.86, r.h + 2.4, shade(sc, 1.18));
+				}
 				if (!r.last) { strip(T, j, r.d + r.rd, r.h, r.d + r.rd, r.h + r.rh, riser); }  // the riser up to the next row
 				const L = segLen(j, r.d + r.rd * 0.5);
 				for (const u of ai) {   // the aisle's steps, lighter, over the seats
@@ -410,7 +421,7 @@
 		const lines = [], nearLines = [];
 		if (gs.roof) {
 			const rIn = P.back * A.roofIn, rOut = P.back + 8, hIn = P.top + 36, hOut = P.top + 24;
-			const roofC = [ 0.11, 0.12, 0.14 ], under = [ 0.2, 0.21, 0.23 ];
+			const roofC = gs.roofCol || [ 0.11, 0.12, 0.14 ], under = roofC.map(v => v * 0.55 + 0.1);
 			for (let j = 0; j < N; j++) {
 				if (!A.ring && !longSide(j)) { continue; }
 				const T = isNear(j) ? near : main, TL = isNear(j) ? nearLamp : lamp, G = isNear(j) ? nearGlow : glow, Ln = isNear(j) ? nearLines : lines;
@@ -420,7 +431,7 @@
 				// along the back edge, and under it steel trusses from the front edge to the back wall, one
 				// to a bay, each a top and bottom chord with zig-zag web.
 				{
-					const L = segLen(j, rIn), nr = Math.max(2, Math.round(L / 9)), seam = [ 0.3, 0.32, 0.35 ], steel = [ 0.26, 0.27, 0.3 ];
+					const L = segLen(j, rIn), nr = Math.max(2, Math.round(L / 9)), seam = roofC.map(v => Math.min(1, v * 1.25 + 0.17)), steel = [ 0.26, 0.27, 0.3 ];
 					for (let k = 0; k <= nr; k++) { const u = k / nr; accBeam3(T, at(j, rIn, u, hIn + 0.5), at(j, rOut, u, hOut + 0.5), 0.45, seam); }
 					accBeam3(T, at(j, rOut + 1, 0, hOut - 0.5), at(j, rOut + 1, 1, hOut - 0.5), 2.2, [ 0.2, 0.21, 0.23 ]);   // the gutter
 					accBeam3(T, at(j, rOut + 0.3, 0, hOut - 3), at(j, rOut + 0.3, 1, hOut - 3), 1.2, [ 0.32, 0.33, 0.36 ]);   // the fascia under it
@@ -436,7 +447,7 @@
 					}
 				}
 				if (roofLights) {
-					strip(TL, j, rIn + 1, hIn - 10.4, rIn + 4.5, hIn - 10.4, [ 1.25, 1.18, 1.0 ]);
+					strip(TL, j, rIn + 1, hIn - 10.4, rIn + 4.5, hIn - 10.4, lampC);
 					const L = segLen(j, rIn), n = Math.max(1, Math.round(L / 120));
 					for (let k = 0; k < n; k++) { glow.length < 400 && G.push(...at(j, rIn + 2, (k + 0.5) / n, hIn - 13)); }
 				}
@@ -452,6 +463,41 @@
 			G3.signAt = { y: hIn - 6, z: -F_SIDE3 - rIn + 1.2 };
 		} else {
 			G3.signAt = { y: P.top + 20, z: -F_SIDE3 - P.back + 2 };
+		}
+		// Flags along the top of the stands, the nation's and the club's in turn, on poles at the back of the
+		// roof (or the stand's parapet where there is none); at some grounds a string of pennants in the
+		// national colours across the stands' front. All merged into the stand meshes: no extra draw calls.
+		{
+			const clubCols = [ KITS[homeSide].outfield, KITS[homeSide].second || "#ffffff", KITS[homeSide].outfield ].map(col3);
+			if (gs.flags) {
+				let k = 0;
+				for (let j = 0; j < N; j += 2) {
+					const roofed = gs.roof && (A.ring || longSide(j)), d = roofed ? P.back + 6 : P.back - 1.5, y0 = roofed ? P.top + 24 : P.top + 12;
+					const T = isNear(j) ? near : main, base = at(j, d, 0.5, y0), top = [ base[0], y0 + 40, base[2] ];
+					accBeam3(T, base, top, 1.1, [ 0.55, 0.57, 0.6 ]);
+					// the cloth flies along the stand, three bands across it
+					const a0 = at(j, d, 0, 0), a1 = at(j, d, 1, 0), tx = a1[0] - a0[0], tz = a1[2] - a0[2], tl = Math.hypot(tx, tz) || 1, ux = tx / tl, uz = tz / tl;
+					const fc = k++ % 2 ? clubCols : natCols, fw = 32, fh = 20, wave = 2.6;
+					for (let b = 0; b < 3; b++) {
+						const f0 = b / 3, f1 = (b + 1) / 3, w0 = Math.sin(f0 * 5) * wave, w1 = Math.sin(f1 * 5) * wave, inw = inward(j);
+						const p = (f, w, y) => [ top[0] + ux * fw * f + inw[0] * w, y, top[2] + uz * fw * f + inw[2] * w ];
+						accQuad3(T, p(f0, w0, top[1] - fh), p(f1, w1, top[1] - fh), p(f1, w1, top[1]), p(f0, w0, top[1]), fc[b], inw);
+					}
+				}
+			}
+			if (gs.bunting) {
+				const dB = P.band ? P.upper.d - 0.6 : P.back - 1.2, yB = P.band ? P.upper.h - 0.5 : P.top + 11;
+				let c = 0;
+				for (let j = 0; j < N; j++) {
+					const T = isNear(j) ? near : main, L = segLen(j, dB), n = Math.max(2, Math.floor(L / 9)), inw = inward(j);
+					for (let q = 0; q < n; q++) {
+						const u0 = (q + 0.1) / n, u1 = (q + 0.9) / n, um = (u0 + u1) / 2, sag = Math.sin(Math.PI * (q + 0.5) / n) * 2.5;
+						const A0 = at(j, dB, u0, yB - sag), A1 = at(j, dB, u1, yB - sag), M0 = at(j, dB - 0.6, um, yB - sag - 8);
+						const k3 = natCols[c++ % 3];
+						for (const v of [ A0, A1, M0 ]) { T.pos.push(v[0], v[1], v[2]); T.nor.push(inw[0], 0.3, inw[2]); T.col.push(k3[0], k3[1], k3[2]); }
+					}
+				}
+			}
 		}
 		// A roof mast: a three-legged steel lattice tapering up from the ground (chords, rings and zig-zag
 		// bracing), capped with a head plate and a warning lamp, rather than a bare pole. A plain tapered
@@ -480,8 +526,15 @@
 				const cx = FW / 2 + sx * (ax - r0) + sx * R * 0.7071, cz = FH / 2 + sz * (az - r0) + sz * R * 0.7071;
 				const leg = (h, i) => { const w = 15 - 10 * h / PH; return [ cx + (i & 1 ? w : -w), h, cz + (i & 2 ? w : -w) ]; };
 				const order = [ 0, 1, 3, 2 ];
-				for (let i = 0; i < 4; i++) { accBeam3(T, leg(0, i), leg(PH, i), 2.2, steel); }
-				if (Q.lattice) {
+				if (gs.pylon === "pole") {
+					// A slim steel pole (the newer grounds'): a tapering tube in three sections, a collar at each joint.
+					for (let k = 0; k < 3; k++) {
+						const h0 = PH * k / 3, h1 = PH * (k + 1) / 3, w = 7 - 1.6 * k;
+						accBeam3(T, [ cx, h0, cz ], [ cx, h1 + 0.5, cz ], w, steel);
+						accBox3(T, cx, h1, cz, w + 1.4, 1.6, w + 1.4, steel.map(v => v * 0.8));
+					}
+				} else { for (let i = 0; i < 4; i++) { accBeam3(T, leg(0, i), leg(PH, i), 2.2, steel); } }
+				if (Q.lattice && gs.pylon !== "pole") {
 					for (let h = 26; h < PH - 4; h += 26) {
 						for (let k = 0; k < 4; k++) {
 							const a = order[k], b = order[(k + 1) % 4];
@@ -498,7 +551,7 @@
 						const lx = (b - 2.5) * 11.5, ly = (a - 1) * 11.5, tilt = 0.42, cy = PH + 14 + ly * Math.cos(tilt), off = 3 - ly * Math.sin(tilt);
 						const px = cx + Math.cos(ry) * lx + fx * off, pz = cz - Math.sin(ry) * lx + fz * off;
 						const rx = Math.cos(ry) * 4.4, rz = -Math.sin(ry) * 4.4, up = 4.4 * Math.cos(tilt), back = -4.4 * Math.sin(tilt);
-						accQuad3(TL, [ px - rx, cy - up, pz - rz - fz * back ], [ px + rx, cy - up, pz + rz - fz * back ], [ px + rx, cy + up, pz + rz + fz * back ], [ px - rx, cy + up, pz - rz + fz * back ], [ 1.3, 1.22, 1.02 ], [ fx, 0, fz ]);
+						accQuad3(TL, [ px - rx, cy - up, pz - rz - fz * back ], [ px + rx, cy - up, pz + rz - fz * back ], [ px + rx, cy + up, pz + rz + fz * back ], [ px - rx, cy + up, pz - rz + fz * back ], lampC, [ fx, 0, fz ]);
 					}
 				}
 				G.push(cx + fx * 9, PH + 14, cz + fz * 9);
@@ -510,7 +563,7 @@
 			const tz = FH + F_SIDE3, r = 16, z1 = FH + 5, n = 12, white = [ 0.92, 0.93, 0.94 ], dark = [ 0.03, 0.035, 0.04 ];
 			accBox3(near, FW / 2, 13, tz + 3, 48, 26, 6, conc);
 			accQuad3(near, [ FW / 2 - 15, 0, tz - 0.2 ], [ FW / 2 + 15, 0, tz - 0.2 ], [ FW / 2 + 15, 19, tz - 0.2 ], [ FW / 2 - 15, 19, tz - 0.2 ], dark, [ 0, 0, 1 ]);
-			accBox3(nearLamp, FW / 2, 21.5, tz - 0.4, 26, 1.4, 0.6, [ 1.25, 1.18, 1.0 ]);
+			accBox3(nearLamp, FW / 2, 21.5, tz - 0.4, 26, 1.4, 0.6, lampC);
 			for (let k = 0; k < n; k++) {
 				const a0 = Math.PI * k / n, a1 = Math.PI * (k + 1) / n, am = (a0 + a1) / 2;
 				const P0 = z => [ FW / 2 + Math.cos(a0) * r, Math.sin(a0) * r, z ], P1 = z => [ FW / 2 + Math.cos(a1) * r, Math.sin(a1) * r, z ];
@@ -564,6 +617,21 @@
 				}
 			}
 		}
+		if (stands) {
+			// The ground's name, white on black, across the far side.
+			const nc = document.createElement("canvas"); nc.width = 1024; nc.height = 64;
+			const ng = nc.getContext && nc.getContext("2d");
+			if (ng && ng.fillText) {
+				const name = (leagueMatch ? (leagueMatch.home ? YOU : TEAMS[leagueMatch.opp]).ground : YOU.ground).toUpperCase();
+				ng.fillStyle = "#0d1216"; ng.fillRect(0, 0, 1024, 64);
+				ng.font = "900 46px 'Big Shoulders Display', 'Arial Narrow', Arial, sans-serif"; ng.textAlign = "center"; ng.textBaseline = "middle";
+				ng.fillStyle = "#eef2ec"; ng.fillText(name, 512, 34);
+				const sign = new THREE.Mesh(new THREE.PlaneGeometry(400, 25), new THREE.MeshBasicMaterial({ map: canvasTex3D(nc) }));
+				sign.position.set(FW / 2, G3.signAt.y, G3.signAt.z);
+				st.add(own(sign, true));
+			}
+			buildCrowd3D(st, { ring, N, nxt, isNear, aisles: aislesOf, rows: P.rows, segLen, seats: seatEach ? { main, near, at } : null });
+		}
 		// The four merged meshes: the stands and roof (lit), the lamps and lit windows (unlit), each
 		// in a far and a near part, plus the stays and the floodlights' glow.
 		const solid = ownMat(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }));
@@ -584,28 +652,14 @@
 		const glowPts = (pts, isNearSide) => {
 			if (!pts.length || !G3.glowTex) { return; }
 			const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
-			const p = own(new THREE.Points(g, new THREE.PointsMaterial({ map: G3.glowTex, size: roofLights ? 110 : 260, sizeAttenuation: true, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.75, fog: false })), true);
+			const haze = cond.wet || cond.snow ? 1.45 : 1;   // the wet air (or the snow) catches the light: a wider halo
+			const p = own(new THREE.Points(g, new THREE.PointsMaterial({ map: G3.glowTex, color: new THREE.Color(...wetLampCol3), size: (roofLights ? 110 : 260) * haze, sizeAttenuation: true, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.75, fog: false })), true);
 			st.add(p); if (isNearSide) { G3.nearRoof.push(p); }
 		};
 		glowPts(glow, false); glowPts(nearGlow, true);
 		// The wet pitch reflects these lamps: up to eight, spread along the lists.
 		const lampsAll = [ ...glow, ...nearGlow ], nL = lampsAll.length / 3;
 		wetLamps3().forEach((v, i) => { if (nL) { const k = Math.floor((i + 0.5) * nL / 8) * 3; v.set(lampsAll[k], lampsAll[k + 1], lampsAll[k + 2]); } else { v.set(0, -1e4, 0); } });
-		if (stands) {
-			// The ground's name, white on black, across the far side.
-			const nc = document.createElement("canvas"); nc.width = 1024; nc.height = 64;
-			const ng = nc.getContext && nc.getContext("2d");
-			if (ng && ng.fillText) {
-				const name = (leagueMatch ? (leagueMatch.home ? YOU : TEAMS[leagueMatch.opp]).ground : YOU.ground).toUpperCase();
-				ng.fillStyle = "#0d1216"; ng.fillRect(0, 0, 1024, 64);
-				ng.font = "900 46px 'Big Shoulders Display', 'Arial Narrow', Arial, sans-serif"; ng.textAlign = "center"; ng.textBaseline = "middle";
-				ng.fillStyle = "#eef2ec"; ng.fillText(name, 512, 34);
-				const sign = new THREE.Mesh(new THREE.PlaneGeometry(400, 25), new THREE.MeshBasicMaterial({ map: canvasTex3D(nc) }));
-				sign.position.set(FW / 2, G3.signAt.y, G3.signAt.z);
-				st.add(own(sign, true));
-			}
-			buildCrowd3D(st, { ring, N, nxt, isNear, aisles: aislesOf, rows: P.rows, segLen });
-		}
 		// 3. The goals: frames merged into one white mesh, and the nets (both in one mesh) with give.
 		const cb = 55 * Z3, bb = cb * 0.72, gmid = (GOAL_T + GOAL_B) / 2, gw = GOAL_B - GOAL_T;
 		const frame = acc3(), M = new THREE.Matrix4(), Qn = new THREE.Quaternion(), V = new THREE.Vector3(), Sc = new THREE.Vector3(1, 1, 1), E = new THREE.Euler();
@@ -638,8 +692,10 @@
 		const ac = document.createElement("canvas"); ac.width = 1024; ac.height = 48;
 		const ag = ac.getContext && ac.getContext("2d");
 		if (ag) {
-			const words = [ "FLOODLIT", "MATCHDAY", "LIGA", "KICK OFF", "PREMIER", "NIGHT GAME", "90 MINUTOS", "GOL" ];
-			const cols = [ [ "#102a4a", "#ffffff" ], [ "#ffffff", "#0d1b2a" ], [ KITS[homeSide].outfield, lum(KITS[homeSide].outfield) < 0.3 ? "#ffffff" : "#0b0f12" ], [ "#1d1d1d", "#f2b52e" ] ];
+			// The words in the country's language; one panel in each four in the club's colour, one in the flag's.
+			const words = gs.words || [ "FLOODLIT", "MATCHDAY", "LIGA", "KICK OFF", "PREMIER", "NIGHT GAME", "90 MINUTOS", "GOL" ];
+			const nc = (gs.natCols || [ "#c8102e" ]).find(c => lum(c) < 0.75 && lum(c) > 0.04) || "#c8102e";
+			const cols = [ [ "#102a4a", "#ffffff" ], [ "#ffffff", "#0d1b2a" ], [ KITS[homeSide].outfield, lum(KITS[homeSide].outfield) < 0.3 ? "#ffffff" : "#0b0f12" ], [ "#1d1d1d", "#f2b52e" ], [ "#ffffff", "#0d1b2a" ], [ nc, lum(nc) < 0.45 ? "#ffffff" : "#0b0f12" ], [ KITS[homeSide].outfield, lum(KITS[homeSide].outfield) < 0.3 ? "#ffffff" : "#0b0f12" ], [ "#102a4a", "#f2b52e" ] ];
 			for (let i = 0; i < 8; i++) {
 				const [ bgc, fg ] = cols[i % cols.length];
 				ag.fillStyle = bgc; ag.fillRect(i * 128, 0, 128, 48);

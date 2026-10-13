@@ -164,7 +164,7 @@
 		let h = 7919;
 		const rnd = () => (h = (h * 48271) % 2147483647) / 2147483647;
 		const lists = { full: [], lite: [], near: [], hi: [], nearHi: [] };
-		const fill = clamp(gs.fill * GQ.fill, 0.2, 1);
+		const fill = clamp(gs.fill * GQ.fill, 0.2, 1), terrace = gs.seats === "terrace";   // on a bare terrace they stand
 		const endRows = [ [], [] ];
 		B.rows.forEach((row, i) => {
 			const dS = row.d + row.rd * 0.66, ring = B.ring(dS), y = row.h + 1.5;
@@ -176,8 +176,9 @@
 					const x = a.x + (b.x - a.x) * u, z = a.z + (b.z - a.z) * u;
 					if (nearSide && row.h < 20 && Math.abs(x - FW / 2) < 190 * Math.sqrt(S) * 1.24 + 26 && Math.abs(x - FW / 2) > 14) { continue; }   // the dugouts
 					const away = x > FW * 0.8 && z < FH * 0.22 && !nearSide;
-					if (!(away ? rnd() < 0.9 : rnd() < fill)) { continue; }   // an empty seat
-					const nx = a.nx + (b.nx - a.nx) * u, nz = a.nz + (b.nz - a.nz) * u, q = rnd();
+					const nx = a.nx + (b.nx - a.nx) * u, nz = a.nz + (b.nz - a.nz) * u;
+					if (!(away ? rnd() < 0.9 : rnd() < fill)) { if (B.seats) { seat3D(B.seats[nearSide ? "near" : "main"], x, y - 1.5, z, nx, nz, SEAT, seatColOf(gs, i / B.rows.length, x * 0.37 + z * 0.91)); } continue; }   // an empty seat
+					const q = rnd();
 					// Behind the goals: the home ends, a standing, flag-waving block striped in the club's two colours.
 					const end = !away && !nearSide && (x < -10 || x > FW + 10) && z > FH * 0.12 && z < FH * 0.88;
 					const color = away ? (q < 0.75 ? awayC : neutrals[Math.floor(rnd() * neutrals.length)])
@@ -188,7 +189,7 @@
 						const e = endRows[x < FW / 2 ? 0 : 1], r = e[i] || (e[i] = { x: 0, y, zMin: 1e9, zMax: -1e9, n: 0 });
 						r.x += x; r.n++; r.zMin = Math.min(r.zMin, z); r.zMax = Math.max(r.zMax, z);
 					}
-					const fan = { x, y, z, ry: Math.atan2(-nx, -nz) + (rnd() - 0.5) * 0.3, side, phase: rnd(), stand: end ? 0.75 + rnd() * 0.25 : rnd(), flag: rnd() < (end ? 0.2 : away ? 0.14 : 0.1) ? 1 : 0, skin: skins[Math.floor(rnd() * skins.length)], color, scale: 1.5 + rnd() * 0.2, wide: 0.88 + rnd() * 0.26, tall: 0.9 + rnd() * 0.2 };
+					const fan = { x, y, z, ry: Math.atan2(-nx, -nz) + (rnd() - 0.5) * 0.3, side, phase: rnd(), stand: end ? 0.75 + rnd() * 0.25 : terrace ? 0.7 + 0.3 * rnd() : rnd(), flag: rnd() < (end ? 0.2 : away ? 0.14 : 0.1) ? 1 : 0, skin: skins[Math.floor(rnd() * skins.length)], color, scale: 1.5 + rnd() * 0.2, wide: 0.88 + rnd() * 0.26, tall: 0.9 + rnd() * 0.2 };
 					lists[nearSide ? (i < GQ.nearHiRows ? "nearHi" : "near") : i < GQ.hiRows && !away ? "hi" : i >= GQ.liteRow ? "lite" : "full"].push(fan);
 				}
 			}
@@ -215,6 +216,18 @@
 		G3.crowd = { full: make(lists.full, "full"), lite: make(lists.lite, "lite"), near: make(lists.near, "full"), hi: make(lists.hi, "hi"), nearHi: make(lists.nearHi, "hi") };
 		G3.crowd.count = Object.values(lists).reduce((n, l) => n + l.length, 0);
 		dressEnds3D(st, endRows, homeC, homeC2);
+	}
+	// An empty seat, merged into the stand's mesh: a pan and a back with a gap to the next, facing the pitch.
+	// (x, y, z): the middle of the place on the tread; (nx, nz): out from the pitch.
+	function seat3D (T, x, y, z, nx, nz, pitch, hex) {
+		if (!hex) { return; }
+		const c = col3(hex), lit = c.map(v => Math.min(1, v * 1.18 + 0.03)), dark = c.map(v => v * 0.72);
+		const hw = Math.min(8, pitch * 0.82) / 2, tx = -nz * hw, tz = nx * hw, P = (o, h) => [ x + nx * o, y + h, z + nz * o ], f = [ -nx, 0, -nz ];
+		const Q = (o0, h0, o1, h1, col, want) => { const a = P(o0, h0), b = P(o1, h1); accQuad3(T, [ a[0] - tx, a[1], a[2] - tz ], [ a[0] + tx, a[1], a[2] + tz ], [ b[0] + tx, b[1], b[2] + tz ], [ b[0] - tx, b[1], b[2] - tz ], col, want); };
+		Q(-2.2, 0, -2.2, 2.6, dark, f);        // the pan's front edge
+		Q(-2.2, 2.6, 1.4, 2.6, lit, [ 0, 1, 0 ]);   // the pan
+		Q(1.4, 2.6, 1.9, 7.2, c, f);           // the back, leaning a little
+		Q(1.9, 7.2, 2.5, 7.2, lit, [ 0, 1, 0 ]);    // its top edge
 	}
 	// The home ends on a matchday: a supporters' banner with the club's name along the front, big flags
 	// on poles waving over the middle rows, and ticker tape thrown when the home side scores.

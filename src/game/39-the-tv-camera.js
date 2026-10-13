@@ -121,10 +121,10 @@
 			if (st.roof) {
 				const r1 = tvProj(xl, -14 - standD * 1.05, standH * 1.12), r2 = tvProj(xr, -14 - standD * 1.05, standH * 1.12);
 				if (r1 && r2) {
-					ctx.fillStyle = "#0a0d10";
+					ctx.fillStyle = roofCss(st, 1);
 					ctx.fillRect(r1.x, r1.y, r2.x - r1.x, back.y - r1.y + 1);
 					if (st.lights === "roof") {
-						ctx.fillStyle = "#fff6d8";
+						ctx.fillStyle = lampCss(st, 1);
 						for (let x = xl + 30; x < xr; x += 70) { const q = tvProj(x, -14 - standD * 0.2, standH * 1.1); if (q) { ctx.fillRect(q.x, back.y - 5, 30 * q.k, 3); } }
 					}
 				}
@@ -135,12 +135,13 @@
 			for (const px of [ -MX * 0.6, FW + MX * 0.6 ]) {
 				const foot = tvProj(px, -40, 0), head = tvProj(px, -40, standH * 2.3);
 				if (!foot || !head) { continue; }
-				ctx.strokeStyle = "#39434a"; ctx.lineWidth = Math.max(2, 5 * head.k);
+				ctx.strokeStyle = "#39434a"; ctx.lineWidth = Math.max(2, (st.pylon === "pole" ? 3 : 5) * head.k);
 				ctx.beginPath(); ctx.moveTo(foot.x, foot.y); ctx.lineTo(head.x, head.y); ctx.stroke();
-				const glow = ctx.createRadialGradient(head.x, head.y, 2, head.x, head.y, 90 * head.k + 30);
-				glow.addColorStop(0, "rgba(255, 244, 210, 0.55)"); glow.addColorStop(1, "rgba(255, 244, 210, 0)");
-				ctx.fillStyle = glow; ctx.fillRect(head.x - 140, head.y - 140, 280, 280);
-				ctx.fillStyle = "#fff6d8"; ctx.fillRect(head.x - 22 * head.k, head.y - 12 * head.k, 44 * head.k, 16 * head.k);
+				// the glow round the lamps, wider in rain or snow (the wet air catches the light)
+				const haze = cond.wet || cond.snow ? 1.5 : 1, glow = ctx.createRadialGradient(head.x, head.y, 2, head.x, head.y, (90 * head.k + 30) * haze);
+				glow.addColorStop(0, lampCss(st, 0.55)); glow.addColorStop(1, lampCss(st, 0));
+				ctx.fillStyle = glow; ctx.fillRect(head.x - 140 * haze, head.y - 140 * haze, 280 * haze, 280 * haze);
+				ctx.fillStyle = lampCss(st, 1); ctx.fillRect(head.x - 22 * head.k, head.y - 12 * head.k, 44 * head.k, 16 * head.k);
 			}
 		}
 		// 3. The pitch, strip by strip in perspective.

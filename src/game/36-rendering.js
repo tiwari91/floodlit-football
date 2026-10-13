@@ -274,8 +274,100 @@
 			lights: r() < 0.5 ? "pylons" : "roof",
 			boards: [ club.color || "#f2b52e", "#eef2ec", club.color2 || "#1f2a36", "#1f2a36" ],
 			arch: pick([ "azteca", "akron", "monterrey" ]),   // the 3D stadium's shape
-			mountains: r() < 0.4
+			mountains: r() < 0.4,
+			...dressFor(groundNat(), r)   // the country's way of building a ground (drawn after the rest, so those stay as they were)
 		};
+	}
+	// The country the ground is in: the league's (abroad), else home. countryTest (a test hook) can set it.
+	let countryOverride = null;
+	const groundNat = () => countryOverride || (league && league.ident && league.ident.country) || "ENG";
+	// How each country dresses a ground: the stadium's shape and roof, the floodlights (lattice pylons,
+	// slim poles or lamps along the roof; warm or cold white), the seats (the club's colour, one colour,
+	// a mosaic of many, the flag's colours, or bare terraces), the advertising in the local language, the
+	// national flags and bunting. A region's pattern with each country's own colours and words.
+	const NAT_COLS = {
+		ENG: [ "#ffffff", "#c8102e", "#ffffff" ], ESP: [ "#c60b1e", "#ffc400", "#c60b1e" ], FRA: [ "#0055a4", "#ffffff", "#ef4135" ], GER: [ "#15171a", "#dd0000", "#ffce00" ],
+		ITA: [ "#009246", "#ffffff", "#ce2b37" ], NED: [ "#ae1c28", "#ffffff", "#21468b" ], POR: [ "#006600", "#ff0000", "#ff0000" ], BEL: [ "#15171a", "#fae042", "#ed2939" ],
+		CRO: [ "#ff0000", "#ffffff", "#171796" ], DEN: [ "#c8102e", "#ffffff", "#c8102e" ], SWE: [ "#006aa7", "#fecc00", "#006aa7" ], POL: [ "#ffffff", "#dc143c", "#dc143c" ],
+		SRB: [ "#c6363c", "#0c4076", "#ffffff" ], BRA: [ "#009c3b", "#ffdf00", "#002776" ], ARG: [ "#74acdf", "#ffffff", "#74acdf" ], URU: [ "#7bafd4", "#ffffff", "#fcd116" ],
+		COL: [ "#fcd116", "#003893", "#ce1126" ], CHI: [ "#0039a6", "#ffffff", "#d52b1e" ], NGA: [ "#008751", "#ffffff", "#008751" ], GHA: [ "#ce1126", "#fcd116", "#006b3f" ],
+		SEN: [ "#00853f", "#fdef42", "#e31b23" ], CIV: [ "#f77f00", "#ffffff", "#009e60" ], CMR: [ "#007a5e", "#ce1126", "#fcd116" ], MAR: [ "#c1272d", "#006233", "#c1272d" ],
+		JPN: [ "#ffffff", "#bc002d", "#ffffff" ], KOR: [ "#ffffff", "#cd2e3a", "#0047a0" ], AUS: [ "#00843d", "#ffcd00", "#00843d" ], USA: [ "#b22234", "#ffffff", "#3c3b6e" ],
+		MEX: [ "#006847", "#ffffff", "#ce1126" ]
+	};
+	const BOARD_WORDS = {
+		en: [ "FLOODLIT", "MATCHDAY", "KICK OFF", "LEAGUE", "PREMIER", "FULL TIME", "SEASON TICKETS", "GOAL" ],
+		es: [ "FLOODLIT", "JORNADA", "LIGA", "AFICIÓN", "PARTIDO", "90 MINUTOS", "GOLAZO", "GOL" ],
+		pt: [ "FLOODLIT", "RODADA", "FUTEBOL", "TORCIDA", "JOGO", "90 MINUTOS", "GOLAÇO", "GOL" ],
+		fr: [ "FLOODLIT", "JOURNÉE", "LIGUE", "SUPPORTERS", "MATCH", "90 MINUTES", "ALLEZ", "BUT" ],
+		de: [ "FLOODLIT", "SPIELTAG", "ANSTOSS", "FANKURVE", "FLUTLICHT", "90 MINUTEN", "STADION", "TOR" ],
+		it: [ "FLOODLIT", "GIORNATA", "CALCIO", "CURVA", "PARTITA", "90 MINUTI", "FORZA", "GOL" ],
+		nl: [ "FLOODLIT", "SPEELDAG", "AFTRAP", "SUPPORTERS", "WEDSTRIJD", "90 MINUTEN", "STADION", "DOELPUNT" ],
+		nordic: [ "FLOODLIT", "MATCHDAG", "AVSPARK", "SUPPORTERS", "LIGA", "90 MINUTER", "ARENA", "MÅL" ],
+		slav: [ "FLOODLIT", "KOLO", "LIGA", "NAVIJAČI", "MECZ", "90 MINUTA", "STADION", "GOL" ]
+	};
+	const LANG_OF = { ESP: "es", ARG: "es", URU: "es", COL: "es", CHI: "es", MEX: "es", POR: "pt", BRA: "pt", FRA: "fr", BEL: "fr", SEN: "fr", CIV: "fr", CMR: "fr", MAR: "fr", GER: "de", ITA: "it", NED: "nl", DEN: "nordic", SWE: "nordic", POL: "slav", CRO: "slav", SRB: "slav" };
+	// Lamps: a warm white (older halide), a cold LED white, or the orange-tinged sodium of an old bowl.
+	const LAMP_WARM = [ 1.3, 1.22, 1.02 ], LAMP_COLD = [ 1.08, 1.18, 1.34 ], LAMP_SODIUM = [ 1.36, 1.14, 0.78 ];
+	const ROOF_DARK = [ 0.11, 0.12, 0.14 ], ROOF_WHITE = [ 0.78, 0.8, 0.82 ], ROOF_SILVER = [ 0.45, 0.47, 0.5 ], ROOF_RUST = [ 0.32, 0.22, 0.17 ];
+	const DRESS_REGION = {
+		// British grounds: tight boxes, dark steel roofs over the sides, lattice pylons or roof lights, the club's seats.
+		home: { arch: [ "monterrey", "monterrey", "azteca" ], roof: 0.85, lights: 0.5, pylon: "lattice", lamp: LAMP_WARM, roofCol: ROOF_DARK, seats: "club", flags: 0.5, bunting: 0 },
+		// Northern Europe: modern bowls under white or silver roofs lit from the rim in cold LED white.
+		north: { arch: [ "azteca", "akron" ], roof: 0.95, lights: 0.85, pylon: "pole", lamp: LAMP_COLD, roofCol: ROOF_WHITE, seats: "club", flags: 1, bunting: 0 },
+		// Southern Europe: concrete ovals, often open, tall lattice pylons, warm lamps, seats in one colour or the flag's.
+		south: { arch: [ "akron", "akron", "azteca" ], roof: 0.45, lights: 0.25, pylon: "lattice", lamp: LAMP_WARM, roofCol: ROOF_SILVER, seats: "mono", flags: 1, bunting: 0.4, concrete: [ "#3a332b", "#463e34" ] },
+		// Eastern Europe: concrete bowls, rusting roofs over the main stand, old sodium lamps on pylons.
+		east: { arch: [ "monterrey", "akron" ], roof: 0.6, lights: 0.2, pylon: "lattice", lamp: LAMP_SODIUM, roofCol: ROOF_RUST, seats: "national", flags: 1, bunting: 0.3 },
+		// South America: open concrete bowls with bare terraces, streamers and flags everywhere, sodium pylons.
+		samerica: { arch: [ "akron", "azteca" ], roof: 0.25, lights: 0.15, pylon: "lattice", lamp: LAMP_SODIUM, roofCol: ROOF_SILVER, seats: "terrace", flags: 1, bunting: 1, concrete: [ "#3b3a36", "#4a4842" ] },
+		// Africa: bowls in bright mosaic seating, part-roofed, bunting in the national colours, cold LED pylons.
+		africa: { arch: [ "azteca", "monterrey" ], roof: 0.5, lights: 0.3, pylon: "pole", lamp: LAMP_COLD, roofCol: ROOF_WHITE, seats: "multi", flags: 1, bunting: 1, concrete: [ "#3a3128", "#463b30" ] },
+		// Japan and Korea: white membrane rings, lit from the roof, mosaic seats in quiet colours.
+		asia: { arch: [ "akron", "azteca" ], roof: 1, lights: 0.9, pylon: "pole", lamp: LAMP_COLD, roofCol: ROOF_WHITE, seats: "multi", flags: 0.6, bunting: 0 },
+		// The USA and Australia: big open bowls, tall slim light poles, cold light, the club's seats.
+		newworld: { arch: [ "akron", "akron", "azteca" ], roof: 0.4, lights: 0.15, pylon: "pole", lamp: LAMP_COLD, roofCol: ROOF_WHITE, seats: "club", flags: 1, bunting: 0 },
+		// Mexico: the Azteca itself, its seats a mosaic, flags and streamers.
+		mexico: { arch: [ "azteca", "azteca", "monterrey" ], roof: 0.7, lights: 0.4, pylon: "lattice", lamp: LAMP_WARM, roofCol: ROOF_SILVER, seats: "multi", flags: 1, bunting: 1 }
+	};
+	const REGION_OF = {
+		ENG: "home", GER: "north", NED: "north", DEN: "north", SWE: "north", BEL: "north", FRA: "north",
+		ESP: "south", ITA: "south", POR: "south", CRO: "east", POL: "east", SRB: "east",
+		BRA: "samerica", ARG: "samerica", URU: "samerica", COL: "samerica", CHI: "samerica",
+		NGA: "africa", GHA: "africa", SEN: "africa", CIV: "africa", CMR: "africa", MAR: "africa",
+		JPN: "asia", KOR: "asia", USA: "newworld", AUS: "newworld", MEX: "mexico"
+	};
+	// One-colour seats where a country is known for them.
+	const MONO_SEAT = { ITA: "#2a4f9a", ESP: "#a8262b", POR: "#1f6b3a" };
+	// The roof's sheeting and the lamps' light as CSS colours, for the 2D cameras (snow lies white on a roof).
+	const css3 = (c, a) => `rgba(${c.map(v => Math.round(clamp(v, 0, 1) * 255)).join(", ")}, ${a})`;
+	const roofCss = (st, a) => css3(cond.snow ? [ 0.86, 0.88, 0.9 ] : st.roofCol ? st.roofCol.map(v => v * 0.8) : [ 0.03, 0.04, 0.05 ], a);
+	const lampCss = (st, a) => { const l = st.lamp || [ 1.3, 1.22, 1.02 ], m = Math.max(...l); return css3(l.map(v => 0.55 + 0.45 * v / m), a); };
+	// An empty seat's colour under the ground's scheme: f is how far back its row is (0 front, 1 back),
+	// k any number that differs from seat to seat. Null on a bare terrace.
+	const MULTI_SEATS = [ "#c8102e", "#f2b52e", "#1d4fa0", "#1f7a45", "#e0662f", "#d9dcdf", "#2fb8b0", "#6a3d9a" ];
+	function seatColOf (st, f, k) {
+		const h = Math.abs(Math.sin(k * 12.9898) * 43758.5453) % 1;
+		switch (st.seats) {
+		case "terrace": return null;
+		case "mono": return st.monoSeat;
+		case "national": return st.natCols[Math.min(2, Math.floor(clamp(f, 0, 0.999) * 3))];
+		case "multi": return MULTI_SEATS[Math.floor(h * MULTI_SEATS.length)];
+		default: return st.seat;
+		}
+	}
+	function dressFor (nat, r) {
+		const D = DRESS_REGION[REGION_OF[nat]] || DRESS_REGION.home, cols = NAT_COLS[nat] || NAT_COLS.ENG;
+		const words = (BOARD_WORDS[LANG_OF[nat] || "en"]).slice();
+		if (FOREIGN[nat]) { words[4] = FOREIGN[nat][0].toUpperCase(); }   // the league's own name on one board
+		const out = {
+			nat, region: REGION_OF[nat] || "home", arch: D.arch[Math.floor(r() * D.arch.length)], roof: r() < D.roof,
+			lights: r() < D.lights ? "roof" : "pylons", pylon: D.pylon, lamp: D.lamp, roofCol: D.roofCol, seats: D.seats, monoSeat: MONO_SEAT[nat] || cols[0],
+			natCols: cols, words, flags: r() < D.flags, bunting: r() < D.bunting
+		};
+		if (D.concrete) { out.concrete = D.concrete[0]; out.steps = D.concrete[1]; }
+		if (!out.roof && out.lights === "roof") { out.lights = "pylons"; }
+		return out;
 	}
 	function buildCrowd () {
 		const R = 2;
@@ -294,8 +386,9 @@
 		let h = 11;
 		const rnd = () => { h = (h * 16807) % 2147483647; return h / 2147483647; };
 		const fan = (g, x, y, away) => {
-			if (!away && rnd() > st.fill) {   // an empty seat
-				g.fillStyle = st.seat; g.globalAlpha = 0.55; g.fillRect(x - 2.4, y - 1.5, 4.8, 4.5); g.globalAlpha = 1;
+			if (!away && rnd() > st.fill) {   // an empty seat (none on a bare terrace)
+				const sc = seatColOf(st, (y % MY) / MY, x * 7.1 + y * 3.3);
+				if (sc) { g.fillStyle = sc; g.globalAlpha = 0.55; g.fillRect(x - 2.4, y - 1.5, 4.8, 4.5); g.globalAlpha = 1; }
 				return;
 			}
 			const r = rnd();
@@ -328,10 +421,9 @@
 			boards(gt, WW, MY - 8); boards(gb, WW, 1);
 			// A roof over the main stands, with the floodlights along its edge at some grounds.
 			if (st.roof) {
-				gt.fillStyle = "rgba(8, 10, 12, 0.85)"; gt.fillRect(0, 0, WW, 5);
-				gb.fillStyle = "rgba(8, 10, 12, 0.85)"; gb.fillRect(0, MY - 5, WW, 5);
+				gt.fillStyle = gb.fillStyle = roofCss(st, 0.85); gt.fillRect(0, 0, WW, 5); gb.fillRect(0, MY - 5, WW, 5);
 				if (st.lights === "roof") {
-					gt.fillStyle = "#fff3cf"; gb.fillStyle = "#fff3cf";
+					gt.fillStyle = gb.fillStyle = lampCss(st, 1);
 					for (let x = 20; x < WW; x += 60) { gt.fillRect(x, 1, 18, 2.5); gb.fillRect(x, MY - 3.5, 18, 2.5); }
 				}
 			}

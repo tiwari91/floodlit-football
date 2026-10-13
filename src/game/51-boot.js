@@ -97,6 +97,7 @@
 			get officials () { return officials3; }, get flagCall () { return flagCall; }, refKit, deltaE,
 			proj (x, y, z) { return G3.cam ? proj3D(x, y, z) : null; }, get viewScale () { return scale; },
 			groundTest (o) { if (gstyle) { Object.assign(gstyle, o); } },
+			countryTest (nat) { countryOverride = nat || null; },   // the next ground is dressed as this country's
 			olaTest () { crowdMood.olaT = 15; crowdMood.olaLast = performance.now(); },
 			raiseFlagTest (kind) { raiseFlag(ball.x, kind === "offside" ? "off" : "out"); flagCall.t = 600; },
 			step (n = 1) { for (let i = 0; i < n; i++) { snapshotPrev(); update(); } },

@@ -8870,8 +8870,100 @@
 			lights: r() < 0.5 ? "pylons" : "roof",
 			boards: [ club.color || "#f2b52e", "#eef2ec", club.color2 || "#1f2a36", "#1f2a36" ],
 			arch: pick([ "azteca", "akron", "monterrey" ]),   // the 3D stadium's shape
-			mountains: r() < 0.4
+			mountains: r() < 0.4,
+			...dressFor(groundNat(), r)   // the country's way of building a ground (drawn after the rest, so those stay as they were)
 		};
+	}
+	// The country the ground is in: the league's (abroad), else home. countryTest (a test hook) can set it.
+	let countryOverride = null;
+	const groundNat = () => countryOverride || (league && league.ident && league.ident.country) || "ENG";
+	// How each country dresses a ground: the stadium's shape and roof, the floodlights (lattice pylons,
+	// slim poles or lamps along the roof; warm or cold white), the seats (the club's colour, one colour,
+	// a mosaic of many, the flag's colours, or bare terraces), the advertising in the local language, the
+	// national flags and bunting. A region's pattern with each country's own colours and words.
+	const NAT_COLS = {
+		ENG: [ "#ffffff", "#c8102e", "#ffffff" ], ESP: [ "#c60b1e", "#ffc400", "#c60b1e" ], FRA: [ "#0055a4", "#ffffff", "#ef4135" ], GER: [ "#15171a", "#dd0000", "#ffce00" ],
+		ITA: [ "#009246", "#ffffff", "#ce2b37" ], NED: [ "#ae1c28", "#ffffff", "#21468b" ], POR: [ "#006600", "#ff0000", "#ff0000" ], BEL: [ "#15171a", "#fae042", "#ed2939" ],
+		CRO: [ "#ff0000", "#ffffff", "#171796" ], DEN: [ "#c8102e", "#ffffff", "#c8102e" ], SWE: [ "#006aa7", "#fecc00", "#006aa7" ], POL: [ "#ffffff", "#dc143c", "#dc143c" ],
+		SRB: [ "#c6363c", "#0c4076", "#ffffff" ], BRA: [ "#009c3b", "#ffdf00", "#002776" ], ARG: [ "#74acdf", "#ffffff", "#74acdf" ], URU: [ "#7bafd4", "#ffffff", "#fcd116" ],
+		COL: [ "#fcd116", "#003893", "#ce1126" ], CHI: [ "#0039a6", "#ffffff", "#d52b1e" ], NGA: [ "#008751", "#ffffff", "#008751" ], GHA: [ "#ce1126", "#fcd116", "#006b3f" ],
+		SEN: [ "#00853f", "#fdef42", "#e31b23" ], CIV: [ "#f77f00", "#ffffff", "#009e60" ], CMR: [ "#007a5e", "#ce1126", "#fcd116" ], MAR: [ "#c1272d", "#006233", "#c1272d" ],
+		JPN: [ "#ffffff", "#bc002d", "#ffffff" ], KOR: [ "#ffffff", "#cd2e3a", "#0047a0" ], AUS: [ "#00843d", "#ffcd00", "#00843d" ], USA: [ "#b22234", "#ffffff", "#3c3b6e" ],
+		MEX: [ "#006847", "#ffffff", "#ce1126" ]
+	};
+	const BOARD_WORDS = {
+		en: [ "FLOODLIT", "MATCHDAY", "KICK OFF", "LEAGUE", "PREMIER", "FULL TIME", "SEASON TICKETS", "GOAL" ],
+		es: [ "FLOODLIT", "JORNADA", "LIGA", "AFICIÓN", "PARTIDO", "90 MINUTOS", "GOLAZO", "GOL" ],
+		pt: [ "FLOODLIT", "RODADA", "FUTEBOL", "TORCIDA", "JOGO", "90 MINUTOS", "GOLAÇO", "GOL" ],
+		fr: [ "FLOODLIT", "JOURNÉE", "LIGUE", "SUPPORTERS", "MATCH", "90 MINUTES", "ALLEZ", "BUT" ],
+		de: [ "FLOODLIT", "SPIELTAG", "ANSTOSS", "FANKURVE", "FLUTLICHT", "90 MINUTEN", "STADION", "TOR" ],
+		it: [ "FLOODLIT", "GIORNATA", "CALCIO", "CURVA", "PARTITA", "90 MINUTI", "FORZA", "GOL" ],
+		nl: [ "FLOODLIT", "SPEELDAG", "AFTRAP", "SUPPORTERS", "WEDSTRIJD", "90 MINUTEN", "STADION", "DOELPUNT" ],
+		nordic: [ "FLOODLIT", "MATCHDAG", "AVSPARK", "SUPPORTERS", "LIGA", "90 MINUTER", "ARENA", "MÅL" ],
+		slav: [ "FLOODLIT", "KOLO", "LIGA", "NAVIJAČI", "MECZ", "90 MINUTA", "STADION", "GOL" ]
+	};
+	const LANG_OF = { ESP: "es", ARG: "es", URU: "es", COL: "es", CHI: "es", MEX: "es", POR: "pt", BRA: "pt", FRA: "fr", BEL: "fr", SEN: "fr", CIV: "fr", CMR: "fr", MAR: "fr", GER: "de", ITA: "it", NED: "nl", DEN: "nordic", SWE: "nordic", POL: "slav", CRO: "slav", SRB: "slav" };
+	// Lamps: a warm white (older halide), a cold LED white, or the orange-tinged sodium of an old bowl.
+	const LAMP_WARM = [ 1.3, 1.22, 1.02 ], LAMP_COLD = [ 1.08, 1.18, 1.34 ], LAMP_SODIUM = [ 1.36, 1.14, 0.78 ];
+	const ROOF_DARK = [ 0.11, 0.12, 0.14 ], ROOF_WHITE = [ 0.78, 0.8, 0.82 ], ROOF_SILVER = [ 0.45, 0.47, 0.5 ], ROOF_RUST = [ 0.32, 0.22, 0.17 ];
+	const DRESS_REGION = {
+		// British grounds: tight boxes, dark steel roofs over the sides, lattice pylons or roof lights, the club's seats.
+		home: { arch: [ "monterrey", "monterrey", "azteca" ], roof: 0.85, lights: 0.5, pylon: "lattice", lamp: LAMP_WARM, roofCol: ROOF_DARK, seats: "club", flags: 0.5, bunting: 0 },
+		// Northern Europe: modern bowls under white or silver roofs lit from the rim in cold LED white.
+		north: { arch: [ "azteca", "akron" ], roof: 0.95, lights: 0.85, pylon: "pole", lamp: LAMP_COLD, roofCol: ROOF_WHITE, seats: "club", flags: 1, bunting: 0 },
+		// Southern Europe: concrete ovals, often open, tall lattice pylons, warm lamps, seats in one colour or the flag's.
+		south: { arch: [ "akron", "akron", "azteca" ], roof: 0.45, lights: 0.25, pylon: "lattice", lamp: LAMP_WARM, roofCol: ROOF_SILVER, seats: "mono", flags: 1, bunting: 0.4, concrete: [ "#3a332b", "#463e34" ] },
+		// Eastern Europe: concrete bowls, rusting roofs over the main stand, old sodium lamps on pylons.
+		east: { arch: [ "monterrey", "akron" ], roof: 0.6, lights: 0.2, pylon: "lattice", lamp: LAMP_SODIUM, roofCol: ROOF_RUST, seats: "national", flags: 1, bunting: 0.3 },
+		// South America: open concrete bowls with bare terraces, streamers and flags everywhere, sodium pylons.
+		samerica: { arch: [ "akron", "azteca" ], roof: 0.25, lights: 0.15, pylon: "lattice", lamp: LAMP_SODIUM, roofCol: ROOF_SILVER, seats: "terrace", flags: 1, bunting: 1, concrete: [ "#3b3a36", "#4a4842" ] },
+		// Africa: bowls in bright mosaic seating, part-roofed, bunting in the national colours, cold LED pylons.
+		africa: { arch: [ "azteca", "monterrey" ], roof: 0.5, lights: 0.3, pylon: "pole", lamp: LAMP_COLD, roofCol: ROOF_WHITE, seats: "multi", flags: 1, bunting: 1, concrete: [ "#3a3128", "#463b30" ] },
+		// Japan and Korea: white membrane rings, lit from the roof, mosaic seats in quiet colours.
+		asia: { arch: [ "akron", "azteca" ], roof: 1, lights: 0.9, pylon: "pole", lamp: LAMP_COLD, roofCol: ROOF_WHITE, seats: "multi", flags: 0.6, bunting: 0 },
+		// The USA and Australia: big open bowls, tall slim light poles, cold light, the club's seats.
+		newworld: { arch: [ "akron", "akron", "azteca" ], roof: 0.4, lights: 0.15, pylon: "pole", lamp: LAMP_COLD, roofCol: ROOF_WHITE, seats: "club", flags: 1, bunting: 0 },
+		// Mexico: the Azteca itself, its seats a mosaic, flags and streamers.
+		mexico: { arch: [ "azteca", "azteca", "monterrey" ], roof: 0.7, lights: 0.4, pylon: "lattice", lamp: LAMP_WARM, roofCol: ROOF_SILVER, seats: "multi", flags: 1, bunting: 1 }
+	};
+	const REGION_OF = {
+		ENG: "home", GER: "north", NED: "north", DEN: "north", SWE: "north", BEL: "north", FRA: "north",
+		ESP: "south", ITA: "south", POR: "south", CRO: "east", POL: "east", SRB: "east",
+		BRA: "samerica", ARG: "samerica", URU: "samerica", COL: "samerica", CHI: "samerica",
+		NGA: "africa", GHA: "africa", SEN: "africa", CIV: "africa", CMR: "africa", MAR: "africa",
+		JPN: "asia", KOR: "asia", USA: "newworld", AUS: "newworld", MEX: "mexico"
+	};
+	// One-colour seats where a country is known for them.
+	const MONO_SEAT = { ITA: "#2a4f9a", ESP: "#a8262b", POR: "#1f6b3a" };
+	// The roof's sheeting and the lamps' light as CSS colours, for the 2D cameras (snow lies white on a roof).
+	const css3 = (c, a) => `rgba(${c.map(v => Math.round(clamp(v, 0, 1) * 255)).join(", ")}, ${a})`;
+	const roofCss = (st, a) => css3(cond.snow ? [ 0.86, 0.88, 0.9 ] : st.roofCol ? st.roofCol.map(v => v * 0.8) : [ 0.03, 0.04, 0.05 ], a);
+	const lampCss = (st, a) => { const l = st.lamp || [ 1.3, 1.22, 1.02 ], m = Math.max(...l); return css3(l.map(v => 0.55 + 0.45 * v / m), a); };
+	// An empty seat's colour under the ground's scheme: f is how far back its row is (0 front, 1 back),
+	// k any number that differs from seat to seat. Null on a bare terrace.
+	const MULTI_SEATS = [ "#c8102e", "#f2b52e", "#1d4fa0", "#1f7a45", "#e0662f", "#d9dcdf", "#2fb8b0", "#6a3d9a" ];
+	function seatColOf (st, f, k) {
+		const h = Math.abs(Math.sin(k * 12.9898) * 43758.5453) % 1;
+		switch (st.seats) {
+		case "terrace": return null;
+		case "mono": return st.monoSeat;
+		case "national": return st.natCols[Math.min(2, Math.floor(clamp(f, 0, 0.999) * 3))];
+		case "multi": return MULTI_SEATS[Math.floor(h * MULTI_SEATS.length)];
+		default: return st.seat;
+		}
+	}
+	function dressFor (nat, r) {
+		const D = DRESS_REGION[REGION_OF[nat]] || DRESS_REGION.home, cols = NAT_COLS[nat] || NAT_COLS.ENG;
+		const words = (BOARD_WORDS[LANG_OF[nat] || "en"]).slice();
+		if (FOREIGN[nat]) { words[4] = FOREIGN[nat][0].toUpperCase(); }   // the league's own name on one board
+		const out = {
+			nat, region: REGION_OF[nat] || "home", arch: D.arch[Math.floor(r() * D.arch.length)], roof: r() < D.roof,
+			lights: r() < D.lights ? "roof" : "pylons", pylon: D.pylon, lamp: D.lamp, roofCol: D.roofCol, seats: D.seats, monoSeat: MONO_SEAT[nat] || cols[0],
+			natCols: cols, words, flags: r() < D.flags, bunting: r() < D.bunting
+		};
+		if (D.concrete) { out.concrete = D.concrete[0]; out.steps = D.concrete[1]; }
+		if (!out.roof && out.lights === "roof") { out.lights = "pylons"; }
+		return out;
 	}
 	function buildCrowd () {
 		const R = 2;
@@ -8890,8 +8982,9 @@
 		let h = 11;
 		const rnd = () => { h = (h * 16807) % 2147483647; return h / 2147483647; };
 		const fan = (g, x, y, away) => {
-			if (!away && rnd() > st.fill) {   // an empty seat
-				g.fillStyle = st.seat; g.globalAlpha = 0.55; g.fillRect(x - 2.4, y - 1.5, 4.8, 4.5); g.globalAlpha = 1;
+			if (!away && rnd() > st.fill) {   // an empty seat (none on a bare terrace)
+				const sc = seatColOf(st, (y % MY) / MY, x * 7.1 + y * 3.3);
+				if (sc) { g.fillStyle = sc; g.globalAlpha = 0.55; g.fillRect(x - 2.4, y - 1.5, 4.8, 4.5); g.globalAlpha = 1; }
 				return;
 			}
 			const r = rnd();
@@ -8924,10 +9017,9 @@
 			boards(gt, WW, MY - 8); boards(gb, WW, 1);
 			// A roof over the main stands, with the floodlights along its edge at some grounds.
 			if (st.roof) {
-				gt.fillStyle = "rgba(8, 10, 12, 0.85)"; gt.fillRect(0, 0, WW, 5);
-				gb.fillStyle = "rgba(8, 10, 12, 0.85)"; gb.fillRect(0, MY - 5, WW, 5);
+				gt.fillStyle = gb.fillStyle = roofCss(st, 0.85); gt.fillRect(0, 0, WW, 5); gb.fillRect(0, MY - 5, WW, 5);
 				if (st.lights === "roof") {
-					gt.fillStyle = "#fff3cf"; gb.fillStyle = "#fff3cf";
+					gt.fillStyle = gb.fillStyle = lampCss(st, 1);
 					for (let x = 20; x < WW; x += 60) { gt.fillRect(x, 1, 18, 2.5); gb.fillRect(x, MY - 3.5, 18, 2.5); }
 				}
 			}
@@ -10689,10 +10781,10 @@
 			if (st.roof) {
 				const r1 = tvProj(xl, -14 - standD * 1.05, standH * 1.12), r2 = tvProj(xr, -14 - standD * 1.05, standH * 1.12);
 				if (r1 && r2) {
-					ctx.fillStyle = "#0a0d10";
+					ctx.fillStyle = roofCss(st, 1);
 					ctx.fillRect(r1.x, r1.y, r2.x - r1.x, back.y - r1.y + 1);
 					if (st.lights === "roof") {
-						ctx.fillStyle = "#fff6d8";
+						ctx.fillStyle = lampCss(st, 1);
 						for (let x = xl + 30; x < xr; x += 70) { const q = tvProj(x, -14 - standD * 0.2, standH * 1.1); if (q) { ctx.fillRect(q.x, back.y - 5, 30 * q.k, 3); } }
 					}
 				}
@@ -10703,12 +10795,13 @@
 			for (const px of [ -MX * 0.6, FW + MX * 0.6 ]) {
 				const foot = tvProj(px, -40, 0), head = tvProj(px, -40, standH * 2.3);
 				if (!foot || !head) { continue; }
-				ctx.strokeStyle = "#39434a"; ctx.lineWidth = Math.max(2, 5 * head.k);
+				ctx.strokeStyle = "#39434a"; ctx.lineWidth = Math.max(2, (st.pylon === "pole" ? 3 : 5) * head.k);
 				ctx.beginPath(); ctx.moveTo(foot.x, foot.y); ctx.lineTo(head.x, head.y); ctx.stroke();
-				const glow = ctx.createRadialGradient(head.x, head.y, 2, head.x, head.y, 90 * head.k + 30);
-				glow.addColorStop(0, "rgba(255, 244, 210, 0.55)"); glow.addColorStop(1, "rgba(255, 244, 210, 0)");
-				ctx.fillStyle = glow; ctx.fillRect(head.x - 140, head.y - 140, 280, 280);
-				ctx.fillStyle = "#fff6d8"; ctx.fillRect(head.x - 22 * head.k, head.y - 12 * head.k, 44 * head.k, 16 * head.k);
+				// the glow round the lamps, wider in rain or snow (the wet air catches the light)
+				const haze = cond.wet || cond.snow ? 1.5 : 1, glow = ctx.createRadialGradient(head.x, head.y, 2, head.x, head.y, (90 * head.k + 30) * haze);
+				glow.addColorStop(0, lampCss(st, 0.55)); glow.addColorStop(1, lampCss(st, 0));
+				ctx.fillStyle = glow; ctx.fillRect(head.x - 140 * haze, head.y - 140 * haze, 280 * haze, 280 * haze);
+				ctx.fillStyle = lampCss(st, 1); ctx.fillRect(head.x - 22 * head.k, head.y - 12 * head.k, 44 * head.k, 16 * head.k);
 			}
 		}
 		// 3. The pitch, strip by strip in perspective.
@@ -11237,7 +11330,7 @@
 			const gg = gc.getContext && gc.getContext("2d");
 			if (gg) {
 				const grad = gg.createRadialGradient(32, 32, 2, 32, 32, 32);
-				grad.addColorStop(0, "rgba(255, 244, 210, 0.9)"); grad.addColorStop(0.35, "rgba(255, 244, 210, 0.3)"); grad.addColorStop(1, "rgba(255, 244, 210, 0)");
+				grad.addColorStop(0, "rgba(255, 255, 255, 0.9)"); grad.addColorStop(0.35, "rgba(255, 255, 255, 0.3)"); grad.addColorStop(1, "rgba(255, 255, 255, 0)");   // white: each ground tints it to its lamps
 				gg.fillStyle = grad; gg.fillRect(0, 0, 64, 64);
 				G3.glowTex = tex3D(gc);
 			}
@@ -11358,14 +11451,15 @@
 	// tight and bright where water lies (low-frequency puddle noise), broken into glints by the blades
 	// everywhere else (a per-blade normal jitter), and stronger at grazing angles (Fresnel).
 	let WET_LAMPS3 = null;   // made once three.js is here
+	const wetLampCol3 = [ 1, 0.94, 0.82 ];   // the colour the wet grass mirrors: the ground's lamps
 	const wetLamps3 = () => WET_LAMPS3 || (WET_LAMPS3 = Array.from({ length: 8 }, () => new THREE.Vector3(0, -1e4, 0)));
 	function wetGround3D (mat) {
 		mat.onBeforeCompile = sh => {
-			sh.uniforms.ffLamps = { value: wetLamps3() }; sh.uniforms.ffWet = { value: Math.min(1.5, cond.wet) };
+			sh.uniforms.ffLamps = { value: wetLamps3() }; sh.uniforms.ffWet = { value: Math.min(1.5, cond.wet) }; sh.uniforms.ffLampCol = { value: wetLampCol3 };
 			sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nvarying vec3 vWp;").replace("#include <begin_vertex>", "#include <begin_vertex>\nvWp = (modelMatrix * vec4(transformed, 1.0)).xyz;");
 			sh.fragmentShader = sh.fragmentShader
 				.replace("#include <common>", `#include <common>
-					varying vec3 vWp; uniform vec3 ffLamps[8]; uniform float ffWet;
+					varying vec3 vWp; uniform vec3 ffLamps[8]; uniform float ffWet; uniform vec3 ffLampCol;
 					float ffH (vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 					float ffNz (vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(ffH(i), ffH(i + vec2(1.0, 0.0)), f.x), mix(ffH(i + vec2(0.0, 1.0)), ffH(i + vec2(1.0, 1.0)), f.x), f.y); }`)
 				.replace("#include <map_fragment>", `#include <map_fragment>
@@ -11383,14 +11477,14 @@
 						float sp = 0.0;
 						for (int i = 0; i < 8; i++) { vec3 L = normalize(ffLamps[i] - vWp); sp += pow(max(dot(n, normalize(L + V)), 0.0), shin); }
 						float blade = 0.55 + 0.45 * ffNz(q / 1.7);   // the blades break up the mirror, softly
-						diffuseColor.rgb = diffuseColor.rgb * (1.0 - 0.1 * pud * ffWet) + vec3(1.0, 0.94, 0.82) * 0.35 * (1.0 - exp(-sp * norm * fres * blade * ffWet * 0.08));   // soft roll-off, never a white patch
+						diffuseColor.rgb = diffuseColor.rgb * (1.0 - 0.1 * pud * ffWet) + ffLampCol * 0.35 * (1.0 - exp(-sp * norm * fres * blade * ffWet * 0.08));   // soft roll-off, never a white patch
 					}`);
 		};
 		mat.customProgramCacheKey = () => "ff-wet";
 	}
 	function buildStadium3D () {
 		const gs = gstyle || { mow: "stripes", roof: true, lights: "roof", fill: 0.8, seat: "#3b4a58", concrete: "#1b2520", steps: "#262f21", arch: "azteca" };
-		const key = `${WW}x${WH}|${cond.label}|${cond.ko}|${cond.surfaceKey}|${gs.mow}${gs.roof}${gs.lights}${gs.fill}${gs.arch}${gs.mountains}|${KITS[0].outfield}${KITS[1].outfield}${homeSide}|${gfxLevel}`;
+		const key = `${WW}x${WH}|${cond.label}|${cond.ko}|${cond.surfaceKey}|${gs.mow}${gs.roof}${gs.lights}${gs.fill}${gs.arch}${gs.mountains}|${gs.nat}${gs.seats}${gs.flags}${gs.bunting}${gs.concrete}|${KITS[0].outfield}${KITS[1].outfield}${homeSide}|${gfxLevel}`;
 		if (G3.stadium && G3.stadiumKey === key && G3.standsRef === stands) { return; }
 		if (G3.stadium) {
 			G3.nearStand = null;
@@ -11439,8 +11533,12 @@
 		const longSide = j => { const a = ring(0)[j], b = ring(0)[nxt(j)]; return Math.abs(a.nz + b.nz) / 2 > 0.92; };
 		const main = acc3(), near = acc3(), lamp = acc3(), nearLamp = acc3(), hills = acc3(), glow = [], nearGlow = [];
 		const shade = (c, k) => { const v = col3(c); return [ v[0] * k, v[1] * k, v[2] * k ]; };
-		const conc = col3(gs.concrete), step = shade(gs.steps, 1.35), riser = shade(gs.concrete, 0.8), seat = col3(gs.seat), seatTop = shade(gs.seat, 1.18);
+		const conc = col3(gs.concrete), step = shade(gs.steps, 1.35), riser = shade(gs.concrete, 0.8);
 		const club = col3(KITS[homeSide].outfield);
+		// The country's dress: its lamps (and the wet grass mirrors them), its roof's sheeting, its flags.
+		const lampC = gs.lamp || [ 1.3, 1.22, 1.02 ], lampM = Math.max(...lampC);
+		lampC.forEach((v, i) => { wetLampCol3[i] = 0.25 + 0.75 * v / lampM; });
+		const natCols = (gs.natCols || [ "#ffffff", "#c8102e", "#ffffff" ]).map(col3);
 		// Along segment j at distance d: the point a fraction u of the way.
 		const at = (j, d, u, y) => { const a = ring(d)[j], b = ring(d)[nxt(j)]; return [ a.x + (b.x - a.x) * u, y, a.z + (b.z - a.z) * u ]; };
 		const inward = j => { const a = ring(0)[j], b = ring(0)[nxt(j)]; return [ -(a.nx + b.nx) / 2, 0, -(a.nz + b.nz) / 2 ]; };
@@ -11458,15 +11556,21 @@
 		}
 		const aislesOf = j => aisles.filter(a => a[0] === j).map(a => a[1]);
 		const lastRow = P.rows[P.rows.length - 1];
+		// Seats: one by one (a pan and a back, in the ground's colours) where the Graphics level allows, built
+		// with the crowd so that every empty place has a seat and none sits inside a fan; none on a terrace.
+		const seatsMode = gs.seats || "club", seatEach = !!stands && gfxLevel !== "low" && seatsMode !== "terrace";
 		for (let j = 0; j < N; j++) {
 			const T = isNear(j) ? near : main, TL = isNear(j) ? nearLamp : lamp, ai = aislesOf(j);
 			// The front wall, with a painted band in the club's colour.
 			strip(T, j, 0, 0, 0, P.rows[0].h, shade(conc, 0.7));
 			strip(T, j, 0, P.rows[0].h - 1.6, 0, P.rows[0].h - 0.4, shade(club, 0.75));
-			for (const r of P.rows) {
+			for (const [ ri, r ] of P.rows.entries()) {
 				strip(T, j, r.d, r.h, r.d + r.rd, r.h, step);                                   // the tread
-				strip(T, j, r.d + r.rd * 0.48, r.h, r.d + r.rd * 0.48, r.h + 2.4, seat);           // the seats
-				strip(T, j, r.d + r.rd * 0.48, r.h + 2.4, r.d + r.rd * 0.86, r.h + 2.4, seatTop);
+				if (!seatEach && seatsMode !== "terrace") {   // the seats as a bench along the row (Low graphics); otherwise one by one, with the crowd
+					const sc = seatsMode === "multi" ? [ 0.2, 0.21, 0.23 ] : col3(seatColOf(gs, ri / P.rows.length, j) || gs.seat);
+					strip(T, j, r.d + r.rd * 0.48, r.h, r.d + r.rd * 0.48, r.h + 2.4, sc);
+					strip(T, j, r.d + r.rd * 0.48, r.h + 2.4, r.d + r.rd * 0.86, r.h + 2.4, shade(sc, 1.18));
+				}
 				if (!r.last) { strip(T, j, r.d + r.rd, r.h, r.d + r.rd, r.h + r.rh, riser); }  // the riser up to the next row
 				const L = segLen(j, r.d + r.rd * 0.5);
 				for (const u of ai) {   // the aisle's steps, lighter, over the seats
@@ -11525,7 +11629,7 @@
 		const lines = [], nearLines = [];
 		if (gs.roof) {
 			const rIn = P.back * A.roofIn, rOut = P.back + 8, hIn = P.top + 36, hOut = P.top + 24;
-			const roofC = [ 0.11, 0.12, 0.14 ], under = [ 0.2, 0.21, 0.23 ];
+			const roofC = gs.roofCol || [ 0.11, 0.12, 0.14 ], under = roofC.map(v => v * 0.55 + 0.1);
 			for (let j = 0; j < N; j++) {
 				if (!A.ring && !longSide(j)) { continue; }
 				const T = isNear(j) ? near : main, TL = isNear(j) ? nearLamp : lamp, G = isNear(j) ? nearGlow : glow, Ln = isNear(j) ? nearLines : lines;
@@ -11535,7 +11639,7 @@
 				// along the back edge, and under it steel trusses from the front edge to the back wall, one
 				// to a bay, each a top and bottom chord with zig-zag web.
 				{
-					const L = segLen(j, rIn), nr = Math.max(2, Math.round(L / 9)), seam = [ 0.3, 0.32, 0.35 ], steel = [ 0.26, 0.27, 0.3 ];
+					const L = segLen(j, rIn), nr = Math.max(2, Math.round(L / 9)), seam = roofC.map(v => Math.min(1, v * 1.25 + 0.17)), steel = [ 0.26, 0.27, 0.3 ];
 					for (let k = 0; k <= nr; k++) { const u = k / nr; accBeam3(T, at(j, rIn, u, hIn + 0.5), at(j, rOut, u, hOut + 0.5), 0.45, seam); }
 					accBeam3(T, at(j, rOut + 1, 0, hOut - 0.5), at(j, rOut + 1, 1, hOut - 0.5), 2.2, [ 0.2, 0.21, 0.23 ]);   // the gutter
 					accBeam3(T, at(j, rOut + 0.3, 0, hOut - 3), at(j, rOut + 0.3, 1, hOut - 3), 1.2, [ 0.32, 0.33, 0.36 ]);   // the fascia under it
@@ -11551,7 +11655,7 @@
 					}
 				}
 				if (roofLights) {
-					strip(TL, j, rIn + 1, hIn - 10.4, rIn + 4.5, hIn - 10.4, [ 1.25, 1.18, 1.0 ]);
+					strip(TL, j, rIn + 1, hIn - 10.4, rIn + 4.5, hIn - 10.4, lampC);
 					const L = segLen(j, rIn), n = Math.max(1, Math.round(L / 120));
 					for (let k = 0; k < n; k++) { glow.length < 400 && G.push(...at(j, rIn + 2, (k + 0.5) / n, hIn - 13)); }
 				}
@@ -11567,6 +11671,41 @@
 			G3.signAt = { y: hIn - 6, z: -F_SIDE3 - rIn + 1.2 };
 		} else {
 			G3.signAt = { y: P.top + 20, z: -F_SIDE3 - P.back + 2 };
+		}
+		// Flags along the top of the stands, the nation's and the club's in turn, on poles at the back of the
+		// roof (or the stand's parapet where there is none); at some grounds a string of pennants in the
+		// national colours across the stands' front. All merged into the stand meshes: no extra draw calls.
+		{
+			const clubCols = [ KITS[homeSide].outfield, KITS[homeSide].second || "#ffffff", KITS[homeSide].outfield ].map(col3);
+			if (gs.flags) {
+				let k = 0;
+				for (let j = 0; j < N; j += 2) {
+					const roofed = gs.roof && (A.ring || longSide(j)), d = roofed ? P.back + 6 : P.back - 1.5, y0 = roofed ? P.top + 24 : P.top + 12;
+					const T = isNear(j) ? near : main, base = at(j, d, 0.5, y0), top = [ base[0], y0 + 40, base[2] ];
+					accBeam3(T, base, top, 1.1, [ 0.55, 0.57, 0.6 ]);
+					// the cloth flies along the stand, three bands across it
+					const a0 = at(j, d, 0, 0), a1 = at(j, d, 1, 0), tx = a1[0] - a0[0], tz = a1[2] - a0[2], tl = Math.hypot(tx, tz) || 1, ux = tx / tl, uz = tz / tl;
+					const fc = k++ % 2 ? clubCols : natCols, fw = 32, fh = 20, wave = 2.6;
+					for (let b = 0; b < 3; b++) {
+						const f0 = b / 3, f1 = (b + 1) / 3, w0 = Math.sin(f0 * 5) * wave, w1 = Math.sin(f1 * 5) * wave, inw = inward(j);
+						const p = (f, w, y) => [ top[0] + ux * fw * f + inw[0] * w, y, top[2] + uz * fw * f + inw[2] * w ];
+						accQuad3(T, p(f0, w0, top[1] - fh), p(f1, w1, top[1] - fh), p(f1, w1, top[1]), p(f0, w0, top[1]), fc[b], inw);
+					}
+				}
+			}
+			if (gs.bunting) {
+				const dB = P.band ? P.upper.d - 0.6 : P.back - 1.2, yB = P.band ? P.upper.h - 0.5 : P.top + 11;
+				let c = 0;
+				for (let j = 0; j < N; j++) {
+					const T = isNear(j) ? near : main, L = segLen(j, dB), n = Math.max(2, Math.floor(L / 9)), inw = inward(j);
+					for (let q = 0; q < n; q++) {
+						const u0 = (q + 0.1) / n, u1 = (q + 0.9) / n, um = (u0 + u1) / 2, sag = Math.sin(Math.PI * (q + 0.5) / n) * 2.5;
+						const A0 = at(j, dB, u0, yB - sag), A1 = at(j, dB, u1, yB - sag), M0 = at(j, dB - 0.6, um, yB - sag - 8);
+						const k3 = natCols[c++ % 3];
+						for (const v of [ A0, A1, M0 ]) { T.pos.push(v[0], v[1], v[2]); T.nor.push(inw[0], 0.3, inw[2]); T.col.push(k3[0], k3[1], k3[2]); }
+					}
+				}
+			}
 		}
 		// A roof mast: a three-legged steel lattice tapering up from the ground (chords, rings and zig-zag
 		// bracing), capped with a head plate and a warning lamp, rather than a bare pole. A plain tapered
@@ -11595,8 +11734,15 @@
 				const cx = FW / 2 + sx * (ax - r0) + sx * R * 0.7071, cz = FH / 2 + sz * (az - r0) + sz * R * 0.7071;
 				const leg = (h, i) => { const w = 15 - 10 * h / PH; return [ cx + (i & 1 ? w : -w), h, cz + (i & 2 ? w : -w) ]; };
 				const order = [ 0, 1, 3, 2 ];
-				for (let i = 0; i < 4; i++) { accBeam3(T, leg(0, i), leg(PH, i), 2.2, steel); }
-				if (Q.lattice) {
+				if (gs.pylon === "pole") {
+					// A slim steel pole (the newer grounds'): a tapering tube in three sections, a collar at each joint.
+					for (let k = 0; k < 3; k++) {
+						const h0 = PH * k / 3, h1 = PH * (k + 1) / 3, w = 7 - 1.6 * k;
+						accBeam3(T, [ cx, h0, cz ], [ cx, h1 + 0.5, cz ], w, steel);
+						accBox3(T, cx, h1, cz, w + 1.4, 1.6, w + 1.4, steel.map(v => v * 0.8));
+					}
+				} else { for (let i = 0; i < 4; i++) { accBeam3(T, leg(0, i), leg(PH, i), 2.2, steel); } }
+				if (Q.lattice && gs.pylon !== "pole") {
 					for (let h = 26; h < PH - 4; h += 26) {
 						for (let k = 0; k < 4; k++) {
 							const a = order[k], b = order[(k + 1) % 4];
@@ -11613,7 +11759,7 @@
 						const lx = (b - 2.5) * 11.5, ly = (a - 1) * 11.5, tilt = 0.42, cy = PH + 14 + ly * Math.cos(tilt), off = 3 - ly * Math.sin(tilt);
 						const px = cx + Math.cos(ry) * lx + fx * off, pz = cz - Math.sin(ry) * lx + fz * off;
 						const rx = Math.cos(ry) * 4.4, rz = -Math.sin(ry) * 4.4, up = 4.4 * Math.cos(tilt), back = -4.4 * Math.sin(tilt);
-						accQuad3(TL, [ px - rx, cy - up, pz - rz - fz * back ], [ px + rx, cy - up, pz + rz - fz * back ], [ px + rx, cy + up, pz + rz + fz * back ], [ px - rx, cy + up, pz - rz + fz * back ], [ 1.3, 1.22, 1.02 ], [ fx, 0, fz ]);
+						accQuad3(TL, [ px - rx, cy - up, pz - rz - fz * back ], [ px + rx, cy - up, pz + rz - fz * back ], [ px + rx, cy + up, pz + rz + fz * back ], [ px - rx, cy + up, pz - rz + fz * back ], lampC, [ fx, 0, fz ]);
 					}
 				}
 				G.push(cx + fx * 9, PH + 14, cz + fz * 9);
@@ -11625,7 +11771,7 @@
 			const tz = FH + F_SIDE3, r = 16, z1 = FH + 5, n = 12, white = [ 0.92, 0.93, 0.94 ], dark = [ 0.03, 0.035, 0.04 ];
 			accBox3(near, FW / 2, 13, tz + 3, 48, 26, 6, conc);
 			accQuad3(near, [ FW / 2 - 15, 0, tz - 0.2 ], [ FW / 2 + 15, 0, tz - 0.2 ], [ FW / 2 + 15, 19, tz - 0.2 ], [ FW / 2 - 15, 19, tz - 0.2 ], dark, [ 0, 0, 1 ]);
-			accBox3(nearLamp, FW / 2, 21.5, tz - 0.4, 26, 1.4, 0.6, [ 1.25, 1.18, 1.0 ]);
+			accBox3(nearLamp, FW / 2, 21.5, tz - 0.4, 26, 1.4, 0.6, lampC);
 			for (let k = 0; k < n; k++) {
 				const a0 = Math.PI * k / n, a1 = Math.PI * (k + 1) / n, am = (a0 + a1) / 2;
 				const P0 = z => [ FW / 2 + Math.cos(a0) * r, Math.sin(a0) * r, z ], P1 = z => [ FW / 2 + Math.cos(a1) * r, Math.sin(a1) * r, z ];
@@ -11679,6 +11825,21 @@
 				}
 			}
 		}
+		if (stands) {
+			// The ground's name, white on black, across the far side.
+			const nc = document.createElement("canvas"); nc.width = 1024; nc.height = 64;
+			const ng = nc.getContext && nc.getContext("2d");
+			if (ng && ng.fillText) {
+				const name = (leagueMatch ? (leagueMatch.home ? YOU : TEAMS[leagueMatch.opp]).ground : YOU.ground).toUpperCase();
+				ng.fillStyle = "#0d1216"; ng.fillRect(0, 0, 1024, 64);
+				ng.font = "900 46px 'Big Shoulders Display', 'Arial Narrow', Arial, sans-serif"; ng.textAlign = "center"; ng.textBaseline = "middle";
+				ng.fillStyle = "#eef2ec"; ng.fillText(name, 512, 34);
+				const sign = new THREE.Mesh(new THREE.PlaneGeometry(400, 25), new THREE.MeshBasicMaterial({ map: canvasTex3D(nc) }));
+				sign.position.set(FW / 2, G3.signAt.y, G3.signAt.z);
+				st.add(own(sign, true));
+			}
+			buildCrowd3D(st, { ring, N, nxt, isNear, aisles: aislesOf, rows: P.rows, segLen, seats: seatEach ? { main, near, at } : null });
+		}
 		// The four merged meshes: the stands and roof (lit), the lamps and lit windows (unlit), each
 		// in a far and a near part, plus the stays and the floodlights' glow.
 		const solid = ownMat(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }));
@@ -11699,28 +11860,14 @@
 		const glowPts = (pts, isNearSide) => {
 			if (!pts.length || !G3.glowTex) { return; }
 			const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
-			const p = own(new THREE.Points(g, new THREE.PointsMaterial({ map: G3.glowTex, size: roofLights ? 110 : 260, sizeAttenuation: true, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.75, fog: false })), true);
+			const haze = cond.wet || cond.snow ? 1.45 : 1;   // the wet air (or the snow) catches the light: a wider halo
+			const p = own(new THREE.Points(g, new THREE.PointsMaterial({ map: G3.glowTex, color: new THREE.Color(...wetLampCol3), size: (roofLights ? 110 : 260) * haze, sizeAttenuation: true, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.75, fog: false })), true);
 			st.add(p); if (isNearSide) { G3.nearRoof.push(p); }
 		};
 		glowPts(glow, false); glowPts(nearGlow, true);
 		// The wet pitch reflects these lamps: up to eight, spread along the lists.
 		const lampsAll = [ ...glow, ...nearGlow ], nL = lampsAll.length / 3;
 		wetLamps3().forEach((v, i) => { if (nL) { const k = Math.floor((i + 0.5) * nL / 8) * 3; v.set(lampsAll[k], lampsAll[k + 1], lampsAll[k + 2]); } else { v.set(0, -1e4, 0); } });
-		if (stands) {
-			// The ground's name, white on black, across the far side.
-			const nc = document.createElement("canvas"); nc.width = 1024; nc.height = 64;
-			const ng = nc.getContext && nc.getContext("2d");
-			if (ng && ng.fillText) {
-				const name = (leagueMatch ? (leagueMatch.home ? YOU : TEAMS[leagueMatch.opp]).ground : YOU.ground).toUpperCase();
-				ng.fillStyle = "#0d1216"; ng.fillRect(0, 0, 1024, 64);
-				ng.font = "900 46px 'Big Shoulders Display', 'Arial Narrow', Arial, sans-serif"; ng.textAlign = "center"; ng.textBaseline = "middle";
-				ng.fillStyle = "#eef2ec"; ng.fillText(name, 512, 34);
-				const sign = new THREE.Mesh(new THREE.PlaneGeometry(400, 25), new THREE.MeshBasicMaterial({ map: canvasTex3D(nc) }));
-				sign.position.set(FW / 2, G3.signAt.y, G3.signAt.z);
-				st.add(own(sign, true));
-			}
-			buildCrowd3D(st, { ring, N, nxt, isNear, aisles: aislesOf, rows: P.rows, segLen });
-		}
 		// 3. The goals: frames merged into one white mesh, and the nets (both in one mesh) with give.
 		const cb = 55 * Z3, bb = cb * 0.72, gmid = (GOAL_T + GOAL_B) / 2, gw = GOAL_B - GOAL_T;
 		const frame = acc3(), M = new THREE.Matrix4(), Qn = new THREE.Quaternion(), V = new THREE.Vector3(), Sc = new THREE.Vector3(1, 1, 1), E = new THREE.Euler();
@@ -11753,8 +11900,10 @@
 		const ac = document.createElement("canvas"); ac.width = 1024; ac.height = 48;
 		const ag = ac.getContext && ac.getContext("2d");
 		if (ag) {
-			const words = [ "FLOODLIT", "MATCHDAY", "LIGA", "KICK OFF", "PREMIER", "NIGHT GAME", "90 MINUTOS", "GOL" ];
-			const cols = [ [ "#102a4a", "#ffffff" ], [ "#ffffff", "#0d1b2a" ], [ KITS[homeSide].outfield, lum(KITS[homeSide].outfield) < 0.3 ? "#ffffff" : "#0b0f12" ], [ "#1d1d1d", "#f2b52e" ] ];
+			// The words in the country's language; one panel in each four in the club's colour, one in the flag's.
+			const words = gs.words || [ "FLOODLIT", "MATCHDAY", "LIGA", "KICK OFF", "PREMIER", "NIGHT GAME", "90 MINUTOS", "GOL" ];
+			const nc = (gs.natCols || [ "#c8102e" ]).find(c => lum(c) < 0.75 && lum(c) > 0.04) || "#c8102e";
+			const cols = [ [ "#102a4a", "#ffffff" ], [ "#ffffff", "#0d1b2a" ], [ KITS[homeSide].outfield, lum(KITS[homeSide].outfield) < 0.3 ? "#ffffff" : "#0b0f12" ], [ "#1d1d1d", "#f2b52e" ], [ "#ffffff", "#0d1b2a" ], [ nc, lum(nc) < 0.45 ? "#ffffff" : "#0b0f12" ], [ KITS[homeSide].outfield, lum(KITS[homeSide].outfield) < 0.3 ? "#ffffff" : "#0b0f12" ], [ "#102a4a", "#f2b52e" ] ];
 			for (let i = 0; i < 8; i++) {
 				const [ bgc, fg ] = cols[i % cols.length];
 				ag.fillStyle = bgc; ag.fillRect(i * 128, 0, 128, 48);
@@ -13343,7 +13492,7 @@
 		let h = 7919;
 		const rnd = () => (h = (h * 48271) % 2147483647) / 2147483647;
 		const lists = { full: [], lite: [], near: [], hi: [], nearHi: [] };
-		const fill = clamp(gs.fill * GQ.fill, 0.2, 1);
+		const fill = clamp(gs.fill * GQ.fill, 0.2, 1), terrace = gs.seats === "terrace";   // on a bare terrace they stand
 		const endRows = [ [], [] ];
 		B.rows.forEach((row, i) => {
 			const dS = row.d + row.rd * 0.66, ring = B.ring(dS), y = row.h + 1.5;
@@ -13355,8 +13504,9 @@
 					const x = a.x + (b.x - a.x) * u, z = a.z + (b.z - a.z) * u;
 					if (nearSide && row.h < 20 && Math.abs(x - FW / 2) < 190 * Math.sqrt(S) * 1.24 + 26 && Math.abs(x - FW / 2) > 14) { continue; }   // the dugouts
 					const away = x > FW * 0.8 && z < FH * 0.22 && !nearSide;
-					if (!(away ? rnd() < 0.9 : rnd() < fill)) { continue; }   // an empty seat
-					const nx = a.nx + (b.nx - a.nx) * u, nz = a.nz + (b.nz - a.nz) * u, q = rnd();
+					const nx = a.nx + (b.nx - a.nx) * u, nz = a.nz + (b.nz - a.nz) * u;
+					if (!(away ? rnd() < 0.9 : rnd() < fill)) { if (B.seats) { seat3D(B.seats[nearSide ? "near" : "main"], x, y - 1.5, z, nx, nz, SEAT, seatColOf(gs, i / B.rows.length, x * 0.37 + z * 0.91)); } continue; }   // an empty seat
+					const q = rnd();
 					// Behind the goals: the home ends, a standing, flag-waving block striped in the club's two colours.
 					const end = !away && !nearSide && (x < -10 || x > FW + 10) && z > FH * 0.12 && z < FH * 0.88;
 					const color = away ? (q < 0.75 ? awayC : neutrals[Math.floor(rnd() * neutrals.length)])
@@ -13367,7 +13517,7 @@
 						const e = endRows[x < FW / 2 ? 0 : 1], r = e[i] || (e[i] = { x: 0, y, zMin: 1e9, zMax: -1e9, n: 0 });
 						r.x += x; r.n++; r.zMin = Math.min(r.zMin, z); r.zMax = Math.max(r.zMax, z);
 					}
-					const fan = { x, y, z, ry: Math.atan2(-nx, -nz) + (rnd() - 0.5) * 0.3, side, phase: rnd(), stand: end ? 0.75 + rnd() * 0.25 : rnd(), flag: rnd() < (end ? 0.2 : away ? 0.14 : 0.1) ? 1 : 0, skin: skins[Math.floor(rnd() * skins.length)], color, scale: 1.5 + rnd() * 0.2, wide: 0.88 + rnd() * 0.26, tall: 0.9 + rnd() * 0.2 };
+					const fan = { x, y, z, ry: Math.atan2(-nx, -nz) + (rnd() - 0.5) * 0.3, side, phase: rnd(), stand: end ? 0.75 + rnd() * 0.25 : terrace ? 0.7 + 0.3 * rnd() : rnd(), flag: rnd() < (end ? 0.2 : away ? 0.14 : 0.1) ? 1 : 0, skin: skins[Math.floor(rnd() * skins.length)], color, scale: 1.5 + rnd() * 0.2, wide: 0.88 + rnd() * 0.26, tall: 0.9 + rnd() * 0.2 };
 					lists[nearSide ? (i < GQ.nearHiRows ? "nearHi" : "near") : i < GQ.hiRows && !away ? "hi" : i >= GQ.liteRow ? "lite" : "full"].push(fan);
 				}
 			}
@@ -13394,6 +13544,18 @@
 		G3.crowd = { full: make(lists.full, "full"), lite: make(lists.lite, "lite"), near: make(lists.near, "full"), hi: make(lists.hi, "hi"), nearHi: make(lists.nearHi, "hi") };
 		G3.crowd.count = Object.values(lists).reduce((n, l) => n + l.length, 0);
 		dressEnds3D(st, endRows, homeC, homeC2);
+	}
+	// An empty seat, merged into the stand's mesh: a pan and a back with a gap to the next, facing the pitch.
+	// (x, y, z): the middle of the place on the tread; (nx, nz): out from the pitch.
+	function seat3D (T, x, y, z, nx, nz, pitch, hex) {
+		if (!hex) { return; }
+		const c = col3(hex), lit = c.map(v => Math.min(1, v * 1.18 + 0.03)), dark = c.map(v => v * 0.72);
+		const hw = Math.min(8, pitch * 0.82) / 2, tx = -nz * hw, tz = nx * hw, P = (o, h) => [ x + nx * o, y + h, z + nz * o ], f = [ -nx, 0, -nz ];
+		const Q = (o0, h0, o1, h1, col, want) => { const a = P(o0, h0), b = P(o1, h1); accQuad3(T, [ a[0] - tx, a[1], a[2] - tz ], [ a[0] + tx, a[1], a[2] + tz ], [ b[0] + tx, b[1], b[2] + tz ], [ b[0] - tx, b[1], b[2] - tz ], col, want); };
+		Q(-2.2, 0, -2.2, 2.6, dark, f);        // the pan's front edge
+		Q(-2.2, 2.6, 1.4, 2.6, lit, [ 0, 1, 0 ]);   // the pan
+		Q(1.4, 2.6, 1.9, 7.2, c, f);           // the back, leaning a little
+		Q(1.9, 7.2, 2.5, 7.2, lit, [ 0, 1, 0 ]);    // its top edge
 	}
 	// The home ends on a matchday: a supporters' banner with the club's name along the front, big flags
 	// on poles waving over the middle rows, and ticker tape thrown when the home side scores.
@@ -15241,6 +15403,7 @@
 			get officials () { return officials3; }, get flagCall () { return flagCall; }, refKit, deltaE,
 			proj (x, y, z) { return G3.cam ? proj3D(x, y, z) : null; }, get viewScale () { return scale; },
 			groundTest (o) { if (gstyle) { Object.assign(gstyle, o); } },
+			countryTest (nat) { countryOverride = nat || null; },   // the next ground is dressed as this country's
 			olaTest () { crowdMood.olaT = 15; crowdMood.olaLast = performance.now(); },
 			raiseFlagTest (kind) { raiseFlag(ball.x, kind === "offside" ? "off" : "out"); flagCall.t = 600; },
 			step (n = 1) { for (let i = 0; i < n; i++) { snapshotPrev(); update(); } },
