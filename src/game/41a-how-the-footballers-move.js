@@ -378,3 +378,35 @@
 		else if (!(p.lungeCd > 17) && !(p.slideCd > 94)) { SLID3.delete(p); }
 		return !down && SLID3.get(p) ? (p.slideCd > 94 ? (p.slideCd - 94) / 14 : p.lungeCd > 17 && p.lungeCd <= 31 ? (p.lungeCd - 17) / 14 : 0) : 0;
 	}
+	// The goal huddle: team-mates run in to the scorer and can end up drawn inside each other. Drawn
+	// apart (never moved in the simulation): any two men closer than HUDDLE_GAP3 are eased out to that
+	// gap, the scorer held where he is. Worked out once per simulation frame; eases back to nothing after.
+	const HUDDLE_GAP3 = 15, HUD3 = { at: -1, off: new Map() };
+	function huddleOff3 (p) {
+		if (HUD3.at !== frame) {
+			HUD3.at = frame;
+			const on = state === "goal" && !replayOn() && !odr, hero = on && typeof celeb !== "undefined" && celeb ? celeb.hero : null, want = new Map();
+			if (on) {
+				for (let i = 0; i < players.length; i++) {
+					const a = players[i];
+					for (let j = i + 1; j < players.length; j++) {
+						const b = players[j], dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
+						if (d >= HUDDLE_GAP3) { continue; }
+						const ux = d > 0.01 ? dx / d : Math.cos(i * 2.4), uy = d > 0.01 ? dy / d : Math.sin(i * 2.4), push = HUDDLE_GAP3 - d;
+						const wa = a === hero ? 0 : b === hero ? 1 : 0.5, wb = 1 - wa;
+						const A = want.get(a) || [ 0, 0 ], B = want.get(b) || [ 0, 0 ];
+						A[0] -= ux * push * wa; A[1] -= uy * push * wa; B[0] += ux * push * wb; B[1] += uy * push * wb;
+						want.set(a, A); want.set(b, B);
+					}
+				}
+			}
+			for (const q of players) {
+				const w = want.get(q), o = HUD3.off.get(q);
+				if (!w && !o) { continue; }
+				const t = w || [ 0, 0 ], c = o || [ 0, 0 ], k = reduceMotion ? 1 : 0.25;
+				c[0] += (t[0] - c[0]) * k; c[1] += (t[1] - c[1]) * k;
+				if (!w && Math.abs(c[0]) + Math.abs(c[1]) < 0.05) { HUD3.off.delete(q); } else { HUD3.off.set(q, c); }
+			}
+		}
+		return HUD3.off.get(p) || null;
+	}

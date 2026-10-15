@@ -190,6 +190,7 @@
 		ovTitle.textContent = title;
 		ovText.textContent = text;
 		ovText.classList.remove("lines");
+		ovTitle.closest(".card").classList.toggle("roomy", text.length > 220);   // a long report (full time: injuries, ratings, the review) gets a wider card, so none of it is cut off below
 		ovButton.textContent = btn;
 		$("ovSim").hidden = true;
 		$("ovFix").hidden = true;

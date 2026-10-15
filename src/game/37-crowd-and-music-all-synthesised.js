@@ -509,8 +509,11 @@
 	let hintsOn = true, padOn = false;
 	let highContrast = false;   // Kit contrast: the other side in white or black with a dashed ring
 	const coarse = (() => { try { return window.matchMedia("(pointer: coarse)").matches; } catch (e) { return false; } })();
-	function drawHints () {
-		if (!hintsOn || coarse || state !== "play" || freeze > 0) { return; }
+	// proj (x, y) -> screen point, from the camera drawing them: with it, the hints fade back while a
+	// player stands under them (judged against last frame's box), so they never hide a man in the corner.
+	let hintsBox = null, hintsFade = 1;
+	function drawHints (proj) {
+		if (!hintsOn || coarse || state !== "play" || freeze > 0) { hintsBox = null; return; }
 		const me = human();
 		if (!me) { return; }
 		const P = padOn;   // show controller buttons once a controller is in use
@@ -546,6 +549,12 @@
 		ctx.textAlign = "left";
 		let x = 12;
 		const y = SH - 22 - tickerUp(), maxX = radarShown() ? (SW - RADAR_W) / 2 - 16 : SW - 12;   // stay clear of the minimap when it's shown
+		let under = false;
+		if (proj && hintsBox) {
+			for (const q of players) { const s = proj(q.x, q.y); if (s && s.x > -10 && s.x < hintsBox.x1 + 10 && s.y > hintsBox.y0 - 4 && s.y < SH + 60) { under = true; break; } }
+		}
+		hintsFade += ((under ? 0.28 : 1) - hintsFade) * (reduceMotion ? 1 : 0.2);
+		ctx.save(); ctx.globalAlpha = hintsFade;
 		for (const [ key, label ] of items) {
 			ctx.font = "800 11px Barlow, Arial, sans-serif";
 			const kw = ctx.measureText(key).width + 10;
@@ -564,6 +573,8 @@
 			ctx.fillText(label, x + kw + 5, y + 0.5);
 			x += kw + lw + 20;
 		}
+		ctx.restore();
+		hintsBox = { x1: x - 8, y0: y - 11 };
 	}
 
 	// Shot power, big enough to read from any camera: a bar along the bottom while you hold Shoot.
@@ -702,10 +713,14 @@
 		ctx.textAlign = "center";
 		ctx.textBaseline = "middle";
 		ctx.font = "900 120px 'Big Shoulders Display', 'Arial Narrow', Arial, sans-serif";
+		// Under the kick-off line-ups card while it is up (it sits over the canvas), not hidden behind it.
+		let cy = 174;
+		const lu = $("bcLineups");
+		if (lu && !lu.hidden) { const r = lu.getBoundingClientRect(), c = ctx.canvas.getBoundingClientRect(); if (r.height && c.height) { cy = clamp(Math.max(cy, (r.bottom - c.top) * SH / c.height + 66), 174, SH - 64); } }
 		ctx.fillStyle = "rgba(0, 0, 0, 0.45)";
-		ctx.fillText(text.toUpperCase(), SW / 2 + 3, 179);
+		ctx.fillText(text.toUpperCase(), SW / 2 + 3, cy + 5);
 		ctx.fillStyle = "#eef6ea";
-		ctx.fillText(text.toUpperCase(), SW / 2, 174);
+		ctx.fillText(text.toUpperCase(), SW / 2, cy);
 		ctx.restore();
 	}
 

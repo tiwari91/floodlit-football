@@ -176,7 +176,7 @@
 		ctx.setTransform(scale, 0, 0, scale, 0, 0);
 		drawRain();
 		drawMinimap(); drawTouchlineCam();
-		drawHints();
+		drawHints((x, y) => tvProj(x, y, 0));
 		drawPowerMeter();
 		drawToasts();
 		drawCountdown();
@@ -231,7 +231,7 @@
 	}
 	// A footballer seen from the stand: boots, legs, shorts, shirt, arms and head, running.
 	function drawPlayerTV (p) {
-		const b = tvProj(p.x, p.y, 0);
+		const ho = huddleOff3(p), b = tvProj(p.x + (ho ? ho[0] : 0), p.y + (ho ? ho[1] : 0), 0);   // drawn apart in the goal huddle
 		if (!b) { return; }
 		const kit = KITS[p.team], L = look(p), k = b.k;
 		const down = (p.lunge > 0 && players.indexOf(p) === ctrl) || p.slideAI > 0;

@@ -183,7 +183,7 @@
 			rig.mir = mir;   // the pose needs it to tell his left from his right
 			const ride = st3 && st3.man && stretcher.p === p ? st3.man : null;   // on the stretcher: lying along it
 			if (ride) { pose3D(rig, p, WX(ride.x), ride.y - st3.ax * 12.5, WD(st3.ax > 0 ? Math.PI / 2 : -Math.PI / 2), 0, 0); rig.root.position.y += ride.h; }   // the figure's root is at his feet: set back half his length so he lies within it
-			else { pose3D(rig, p, WX(p.x), p.y, WD(face), mir * turn, near, mir * yaw, mir * lead); }
+			else { const ho = huddleOff3(p); pose3D(rig, p, WX(p.x + (ho ? ho[0] : 0)), p.y + (ho ? ho[1] : 0), WD(face), mir * turn, near, mir * yaw, mir * lead); }   // (ho: drawn apart in the goal huddle)
 			{ const bd = build(p), ht = 0.95 + 0.1 * bd.seed + (p.role === "gk" ? 0.03 : 0), gth = p.team >= 0 ? bd.girth : 1; rig.root.scale.set(ht * gth, ht, ht * gth); }   // tall and short, broad and slight
 			F.rigOf.set(p, rig);
 			commitFigure3D(rig, look(p), kit3D(p), p.num);

@@ -370,6 +370,7 @@
 	/* The title and the buttons stay put; only the words in between scroll on a short screen. */
 	.card-body { display: grid; gap: 10px; justify-items: center; width: 100%; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 	.card > .actions, .card > .quick { flex: none; }
+	.card.roomy { max-width: min(62ch, 100%); }
 	@keyframes card-in {
 		from { transform: translateY(8px) scale(0.98); opacity: 0; }
 		to { transform: none; opacity: 1; }
@@ -501,11 +502,13 @@
 
 	.banner small { display: block; font-size: 0.2em; letter-spacing: 0.14em; font-weight: 700; opacity: 0.9; }
 	/* A referee's call (corner, goal kick, offside): read at a glance, not a headline over the play. */
-	.banner.call { font-size: clamp(30px, 5vw, 58px); top: 26%; letter-spacing: 0.06em; }
+	.banner.call { font-size: clamp(30px, 5vw, 58px); top: 26%; letter-spacing: 0.06em; line-height: 1.1; padding: 2px 18px 4px; background: rgba(9, 13, 16, 0.72); border-radius: 4px; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08); text-shadow: 0 2px 0 rgba(0, 0, 0, 0.5); }   /* on a dark plate: a dark kit's colour still reads over dark stands */
 	/* A foul note (who was booked, who is hurt): a compact strip near the top, not a headline over play. */
 	.banner.note { font-size: clamp(14px, 1.5vw, 18px); font-weight: 700; letter-spacing: 0.03em; text-transform: none; width: auto; max-width: min(80%, 640px); top: 26%; text-align: center; line-height: 1.3; padding: 7px 14px; background: rgba(9, 13, 16, 0.84); border-left: 4px solid currentColor; border-radius: 4px; text-shadow: none; }
 	.banner.home { color: var(--amber); }
 	.banner.away { color: var(--opp-text); }
+	.banner.call.home { border-bottom: 4px solid var(--amber); }
+	.banner.call.away { color: #f2f5f0; border-bottom: 4px solid var(--opp-text); }   /* white on the plate: a dark kit only underlines it */
 
 	@keyframes pop {
 		from { transform: translate(-50%, -50%) scale(0.6); opacity: 0; }

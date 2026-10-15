@@ -391,6 +391,7 @@
 	/* The title and the buttons stay put; only the words in between scroll on a short screen. */
 	.card-body { display: grid; gap: 10px; justify-items: center; width: 100%; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 	.card > .actions, .card > .quick { flex: none; }
+	.card.roomy { max-width: min(62ch, 100%); }
 	@keyframes card-in {
 		from { transform: translateY(8px) scale(0.98); opacity: 0; }
 		to { transform: none; opacity: 1; }
@@ -522,11 +523,13 @@
 
 	.banner small { display: block; font-size: 0.2em; letter-spacing: 0.14em; font-weight: 700; opacity: 0.9; }
 	/* A referee's call (corner, goal kick, offside): read at a glance, not a headline over the play. */
-	.banner.call { font-size: clamp(30px, 5vw, 58px); top: 26%; letter-spacing: 0.06em; }
+	.banner.call { font-size: clamp(30px, 5vw, 58px); top: 26%; letter-spacing: 0.06em; line-height: 1.1; padding: 2px 18px 4px; background: rgba(9, 13, 16, 0.72); border-radius: 4px; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08); text-shadow: 0 2px 0 rgba(0, 0, 0, 0.5); }   /* on a dark plate: a dark kit's colour still reads over dark stands */
 	/* A foul note (who was booked, who is hurt): a compact strip near the top, not a headline over play. */
 	.banner.note { font-size: clamp(14px, 1.5vw, 18px); font-weight: 700; letter-spacing: 0.03em; text-transform: none; width: auto; max-width: min(80%, 640px); top: 26%; text-align: center; line-height: 1.3; padding: 7px 14px; background: rgba(9, 13, 16, 0.84); border-left: 4px solid currentColor; border-radius: 4px; text-shadow: none; }
 	.banner.home { color: var(--amber); }
 	.banner.away { color: var(--opp-text); }
+	.banner.call.home { border-bottom: 4px solid var(--amber); }
+	.banner.call.away { color: #f2f5f0; border-bottom: 4px solid var(--opp-text); }   /* white on the plate: a dark kit only underlines it */
 
 	@keyframes pop {
 		from { transform: translate(-50%, -50%) scale(0.6); opacity: 0; }
@@ -8442,6 +8445,7 @@
 		ovTitle.textContent = title;
 		ovText.textContent = text;
 		ovText.classList.remove("lines");
+		ovTitle.closest(".card").classList.toggle("roomy", text.length > 220);   // a long report (full time: injuries, ratings, the review) gets a wider card, so none of it is cut off below
 		ovButton.textContent = btn;
 		$("ovSim").hidden = true;
 		$("ovFix").hidden = true;
@@ -10411,8 +10415,11 @@
 	let hintsOn = true, padOn = false;
 	let highContrast = false;   // Kit contrast: the other side in white or black with a dashed ring
 	const coarse = (() => { try { return window.matchMedia("(pointer: coarse)").matches; } catch (e) { return false; } })();
-	function drawHints () {
-		if (!hintsOn || coarse || state !== "play" || freeze > 0) { return; }
+	// proj (x, y) -> screen point, from the camera drawing them: with it, the hints fade back while a
+	// player stands under them (judged against last frame's box), so they never hide a man in the corner.
+	let hintsBox = null, hintsFade = 1;
+	function drawHints (proj) {
+		if (!hintsOn || coarse || state !== "play" || freeze > 0) { hintsBox = null; return; }
 		const me = human();
 		if (!me) { return; }
 		const P = padOn;   // show controller buttons once a controller is in use
@@ -10448,6 +10455,12 @@
 		ctx.textAlign = "left";
 		let x = 12;
 		const y = SH - 22 - tickerUp(), maxX = radarShown() ? (SW - RADAR_W) / 2 - 16 : SW - 12;   // stay clear of the minimap when it's shown
+		let under = false;
+		if (proj && hintsBox) {
+			for (const q of players) { const s = proj(q.x, q.y); if (s && s.x > -10 && s.x < hintsBox.x1 + 10 && s.y > hintsBox.y0 - 4 && s.y < SH + 60) { under = true; break; } }
+		}
+		hintsFade += ((under ? 0.28 : 1) - hintsFade) * (reduceMotion ? 1 : 0.2);
+		ctx.save(); ctx.globalAlpha = hintsFade;
 		for (const [ key, label ] of items) {
 			ctx.font = "800 11px Barlow, Arial, sans-serif";
 			const kw = ctx.measureText(key).width + 10;
@@ -10466,6 +10479,8 @@
 			ctx.fillText(label, x + kw + 5, y + 0.5);
 			x += kw + lw + 20;
 		}
+		ctx.restore();
+		hintsBox = { x1: x - 8, y0: y - 11 };
 	}
 
 	// Shot power, big enough to read from any camera: a bar along the bottom while you hold Shoot.
@@ -10604,10 +10619,14 @@
 		ctx.textAlign = "center";
 		ctx.textBaseline = "middle";
 		ctx.font = "900 120px 'Big Shoulders Display', 'Arial Narrow', Arial, sans-serif";
+		// Under the kick-off line-ups card while it is up (it sits over the canvas), not hidden behind it.
+		let cy = 174;
+		const lu = $("bcLineups");
+		if (lu && !lu.hidden) { const r = lu.getBoundingClientRect(), c = ctx.canvas.getBoundingClientRect(); if (r.height && c.height) { cy = clamp(Math.max(cy, (r.bottom - c.top) * SH / c.height + 66), 174, SH - 64); } }
 		ctx.fillStyle = "rgba(0, 0, 0, 0.45)";
-		ctx.fillText(text.toUpperCase(), SW / 2 + 3, 179);
+		ctx.fillText(text.toUpperCase(), SW / 2 + 3, cy + 5);
 		ctx.fillStyle = "#eef6ea";
-		ctx.fillText(text.toUpperCase(), SW / 2, 174);
+		ctx.fillText(text.toUpperCase(), SW / 2, cy);
 		ctx.restore();
 	}
 
@@ -10944,7 +10963,7 @@
 		ctx.setTransform(scale, 0, 0, scale, 0, 0);
 		drawRain();
 		drawMinimap(); drawTouchlineCam();
-		drawHints();
+		drawHints((x, y) => tvProj(x, y, 0));
 		drawPowerMeter();
 		drawToasts();
 		drawCountdown();
@@ -10999,7 +11018,7 @@
 	}
 	// A footballer seen from the stand: boots, legs, shorts, shirt, arms and head, running.
 	function drawPlayerTV (p) {
-		const b = tvProj(p.x, p.y, 0);
+		const ho = huddleOff3(p), b = tvProj(p.x + (ho ? ho[0] : 0), p.y + (ho ? ho[1] : 0), 0);   // drawn apart in the goal huddle
 		if (!b) { return; }
 		const kit = KITS[p.team], L = look(p), k = b.k;
 		const down = (p.lunge > 0 && players.indexOf(p) === ctrl) || p.slideAI > 0;
@@ -13741,6 +13760,38 @@
 		else if (!(p.lungeCd > 17) && !(p.slideCd > 94)) { SLID3.delete(p); }
 		return !down && SLID3.get(p) ? (p.slideCd > 94 ? (p.slideCd - 94) / 14 : p.lungeCd > 17 && p.lungeCd <= 31 ? (p.lungeCd - 17) / 14 : 0) : 0;
 	}
+	// The goal huddle: team-mates run in to the scorer and can end up drawn inside each other. Drawn
+	// apart (never moved in the simulation): any two men closer than HUDDLE_GAP3 are eased out to that
+	// gap, the scorer held where he is. Worked out once per simulation frame; eases back to nothing after.
+	const HUDDLE_GAP3 = 15, HUD3 = { at: -1, off: new Map() };
+	function huddleOff3 (p) {
+		if (HUD3.at !== frame) {
+			HUD3.at = frame;
+			const on = state === "goal" && !replayOn() && !odr, hero = on && typeof celeb !== "undefined" && celeb ? celeb.hero : null, want = new Map();
+			if (on) {
+				for (let i = 0; i < players.length; i++) {
+					const a = players[i];
+					for (let j = i + 1; j < players.length; j++) {
+						const b = players[j], dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
+						if (d >= HUDDLE_GAP3) { continue; }
+						const ux = d > 0.01 ? dx / d : Math.cos(i * 2.4), uy = d > 0.01 ? dy / d : Math.sin(i * 2.4), push = HUDDLE_GAP3 - d;
+						const wa = a === hero ? 0 : b === hero ? 1 : 0.5, wb = 1 - wa;
+						const A = want.get(a) || [ 0, 0 ], B = want.get(b) || [ 0, 0 ];
+						A[0] -= ux * push * wa; A[1] -= uy * push * wa; B[0] += ux * push * wb; B[1] += uy * push * wb;
+						want.set(a, A); want.set(b, B);
+					}
+				}
+			}
+			for (const q of players) {
+				const w = want.get(q), o = HUD3.off.get(q);
+				if (!w && !o) { continue; }
+				const t = w || [ 0, 0 ], c = o || [ 0, 0 ], k = reduceMotion ? 1 : 0.25;
+				c[0] += (t[0] - c[0]) * k; c[1] += (t[1] - c[1]) * k;
+				if (!w && Math.abs(c[0]) + Math.abs(c[1]) < 0.05) { HUD3.off.delete(q); } else { HUD3.off.set(q, c); }
+			}
+		}
+		return HUD3.off.get(p) || null;
+	}
 	/* ---------- the officials ----------
 	   Not part of the simulation: the referee keeps a diagonal to the ball, the assistants run the
 	   far touchline level with the second-last defender. */
@@ -13926,7 +13977,7 @@
 			rig.mir = mir;   // the pose needs it to tell his left from his right
 			const ride = st3 && st3.man && stretcher.p === p ? st3.man : null;   // on the stretcher: lying along it
 			if (ride) { pose3D(rig, p, WX(ride.x), ride.y - st3.ax * 12.5, WD(st3.ax > 0 ? Math.PI / 2 : -Math.PI / 2), 0, 0); rig.root.position.y += ride.h; }   // the figure's root is at his feet: set back half his length so he lies within it
-			else { pose3D(rig, p, WX(p.x), p.y, WD(face), mir * turn, near, mir * yaw, mir * lead); }
+			else { const ho = huddleOff3(p); pose3D(rig, p, WX(p.x + (ho ? ho[0] : 0)), p.y + (ho ? ho[1] : 0), WD(face), mir * turn, near, mir * yaw, mir * lead); }   // (ho: drawn apart in the goal huddle)
 			{ const bd = build(p), ht = 0.95 + 0.1 * bd.seed + (p.role === "gk" ? 0.03 : 0), gth = p.team >= 0 ? bd.girth : 1; rig.root.scale.set(ht * gth, ht, ht * gth); }   // tall and short, broad and slight
 			F.rigOf.set(p, rig);
 			commitFigure3D(rig, look(p), kit3D(p), p.num);
@@ -14759,7 +14810,7 @@
 		drawMinimap(); drawTouchlineCam();
 		drawPenAim(true);
 		drawReview(true);
-		drawHints();
+		drawHints((x, y) => proj3D(x, y, 0));
 		drawPowerMeter();
 		drawToasts();
 		drawCountdown();

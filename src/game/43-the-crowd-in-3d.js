@@ -793,7 +793,7 @@
 		drawMinimap(); drawTouchlineCam();
 		drawPenAim(true);
 		drawReview(true);
-		drawHints();
+		drawHints((x, y) => proj3D(x, y, 0));
 		drawPowerMeter();
 		drawToasts();
 		drawCountdown();
