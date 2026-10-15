@@ -1369,8 +1369,8 @@
 			<label class="field" for="length">Match
 				<select id="length">
 					<option value="120">2 minutes</option>
-					<option value="180" selected>3 minutes</option>
-					<option value="300">5 minutes</option>
+					<option value="180">3 minutes</option>
+					<option value="300" selected>5 minutes</option>
 					<option value="420">7 minutes</option>
 					<option value="600">10 minutes</option>
 					<option value="900">15 minutes</option>
@@ -2188,7 +2188,7 @@
 	const padTackle = $("padTackle"), ovStats = $("ovStats");
 
 	/* ---------- state ---------- */
-	let players = [], ball, score = [ 0, 0 ], matchLen = 180, timeLeft = 180;
+	let players = [], ball, score = [ 0, 0 ], matchLen = 300, timeLeft = 300;
 	let state = "intro";  // intro | play | goal | paused | full
 	let ctrl = 3;          // index of the human-controlled player in team 0
 	let frame = 0, freeze = 0, goalTimer = 0, switchCd = 0, manualLock = 0, goFlash = 0;

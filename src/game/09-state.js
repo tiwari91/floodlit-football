@@ -1,5 +1,5 @@
 	/* ---------- state ---------- */
-	let players = [], ball, score = [ 0, 0 ], matchLen = 180, timeLeft = 180;
+	let players = [], ball, score = [ 0, 0 ], matchLen = 300, timeLeft = 300;
 	let state = "intro";  // intro | play | goal | paused | full
 	let ctrl = 3;          // index of the human-controlled player in team 0
 	let frame = 0, freeze = 0, goalTimer = 0, switchCd = 0, manualLock = 0, goFlash = 0;
