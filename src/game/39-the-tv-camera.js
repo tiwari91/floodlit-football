@@ -174,7 +174,7 @@
 		}
 		ctx.globalAlpha = 1;
 		ctx.setTransform(scale, 0, 0, scale, 0, 0);
-		drawRain();
+		drawFog2D(true); drawRain();
 		drawMinimap(); drawTouchlineCam();
 		drawHints((x, y) => tvProj(x, y, 0));
 		drawPowerMeter();
@@ -266,7 +266,7 @@
 		const shuf = down ? 0 : p.shuf || 0, ks = down || reduceMotion || jump > 0 ? null : kickTV(p), cel = p.celebA || 0;
 		// As in 3D: getting up after a slide (getUp3), the ball held to his chest (holdW3), a shot blocked
 		// (block3), and the challenges on his feet (challenge3: a shoulder in, a poke at the ball, a stumble).
-		const gu = getUp3(p, down), blk0 = block3(p), gk = p.role === "gk";
+		const gu = getUp3(p, down), blk0 = block3(p), gk = p.role === "gk", prTV = dvTV < 0 && !down ? prep3(p) : null;
 		const upW = reduceMotion || dvTV >= 0 ? 0 : smooth3(clamp(gu, 0, 1)), hw = gk && dvTV < 0 ? holdW3(p) : 0;
 		const blkT = !gk && !down && !reduceMotion ? blk0 : 0, bW = blkT > 0 ? (blkT < 0.2 ? smooth3(blkT / 0.2) : 1 - smooth3((blkT - 0.2) / 0.8)) : 0;
 		const ch = !down && upW <= 0 && !ks && !jump && cel <= 0 && bW <= 0 && !gk && p.team >= 0 && !reduceMotion ? challenge3(p, p.x, p.y, p.dir, 1) : null;
@@ -305,6 +305,7 @@
 			// differs from man to man.
 			if (!jump && !shuf && a < 0.15) { const r = 1 - a / 0.15; th = th * (1 - r) + ((i ? -0.11 : 0.13) + (i ? -1 : 1) * vary * 0.07) * r; kn = kn * (1 - r) + (0.1 + vary * 0.06) * r; }
 			if (ks) { if (i === 0) { th = ks.s; kn = ks.bend; } else { th = -0.12 - 0.1 * ks.bw; kn = 0.2 + 0.3 * ks.bw; } }   // kicking leg, and the one planted beside the ball
+			if (prTV && prTV.kick) { if (i === 0) { th = th * (1 - prTV.e) - 0.5 * prTV.e; kn = kn * (1 - prTV.e) + 1.45 * prTV.e; } else { kn += 0.3 * prTV.e; } }   // the wind-up: kicking leg back, standing knee giving
 			const crouch = Math.max(upW, 0.5 * stum, 0.4 * bW);   // knees under him: getting up, stumbling, braced for the block
 			if (crouch > 0) { th += (i ? 0.45 : 0.75) * crouch; kn += (i ? 1.1 : 1.5) * crouch; }
 			if (poke > 0 && i === 0) { th = th * (1 - poke) + 0.8 * poke; kn = kn * (1 - poke) + 0.1 * poke; }   // the near leg out, poking at the ball
@@ -331,7 +332,10 @@
 			if (a < 0.15 && !jump && !ks && !cel && !shuf) { const r = 1 - a / 0.15; ua = ua * (1 - r) + ((i ? 0.1 : -0.16) - vary * 0.05) * r; eb = eb * (1 - r) + (0.08 + vary * 0.06) * r; }
 			if (!reduceMotion && a < 0.15 && !jump && !ks && !cel) { ua += Math.sin((p.idlePh || 0) + i) * 0.04; }
 			if (upW > 0 && i === 1) { ua = ua * (1 - upW) + 0.35 * upW; eb = eb * (1 - upW); }   // a hand pushing off the turf
-			if (hw > 0) { ua = ua * (1 - hw) + 0.45 * hw; eb = eb * (1 - hw) + 1.15 * hw; }   // forearms up under the ball at his chest
+			if (prTV && prTV.K === "throw-in") { ua = ua * (1 - prTV.e) + Math.PI * 1.05 * prTV.e; eb = eb * (1 - prTV.e) + 0.9 * prTV.e; }   // the ball taken back behind his head
+			const cock = prTV && prTV.K === "keeper-short" && i === 1;   // the throwing arm cocked back
+			if (cock) { ua = ua * (1 - prTV.e) - 1.5 * prTV.e; eb = eb * (1 - prTV.e) + 0.6 * prTV.e; }
+			if (hw > 0 && !cock) { ua = ua * (1 - hw) + 0.45 * hw; eb = eb * (1 - hw) + 1.15 * hw; }   // forearms up under the ball at his chest
 			if (bW > 0) { ua = ua * (1 - bW) + 0.2 * bW; eb = eb * (1 - bW) + 2.0 * bW; }   // arms tucked in to his body
 			if (shove > 0 && i === 0) { ua = ua * (1 - shove) + 1.0 * shove; eb = eb * (1 - shove) + 1.0 * shove; }   // the near arm bracing into him
 			if (stum > 0) { ua = ua * (1 - stum) + (i ? 1.3 : -0.9) * stum; eb = eb * (1 - stum) + 0.3 * stum; }   // arms out, catching his balance
@@ -465,7 +469,8 @@
 		}
 		if (hw > 0) {   // the ball in his hands, in front of his chest (drawn over his body, under the near arm)
 			const h0 = armPts(0)[1], h1 = armPts(1)[1], g = tvProj(ball.x, ball.y, 3.2), rB = Math.max(3.6, 5.4 * k);
-			const cx = (h0[0] + h1[0]) / 2 - face * rB * 0.3, cy = (h0[1] + h1[1]) / 2 - rB * 0.55;
+			const ck = prTV && prTV.K === "keeper-short" ? prTV.e : 0;   // cocking a throw: in his throwing hand
+			const cx = lerp3((h0[0] + h1[0]) / 2 - face * rB * 0.3, h1[0], ck), cy = lerp3((h0[1] + h1[1]) / 2 - rB * 0.55, h1[1] - rB * 0.4, ck);
 			const bx = g ? g.x + (cx - g.x) * hw : cx, by = g ? g.y + (cy - g.y) * hw : cy;
 			ctx.fillStyle = cond.snow ? "#ff7d22" : "#ffffff"; ctx.beginPath(); ctx.arc(bx, by, rB, 0, Math.PI * 2); ctx.fill();
 			ctx.fillStyle = "#1a1a1a"; ctx.beginPath(); ctx.arc(bx - rB * 0.25, by - rB * 0.2, rB * 0.3, 0, Math.PI * 2); ctx.fill();

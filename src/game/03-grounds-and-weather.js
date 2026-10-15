@@ -15,7 +15,10 @@
 		// Snow: a slow, low-bouncing ball (an orange one, to see it), poor footing, keepers who spill.
 		snow: { label: "Snow", wet: 0, snow: 1, speed: 0.95, grip: 0.8, handling: 0.84 },
 		// Heat: a hard, quick pitch under a hazy sky.
-		hot: { label: "Heat", wet: 0, heat: 1, speed: 1.01, grip: 1, handling: 1 }
+		hot: { label: "Heat", wet: 0, heat: 1, speed: 1.01, grip: 1, handling: 1 },
+		// Fog: only the picture changes (the far side of the pitch and the stands fade into it); the ball
+		// and the players behave exactly as on a clear night.
+		fog: { label: "Fog", wet: 0, fog: 1, speed: 1, grip: 1, handling: 1 }
 	};
 	// Wind: km/h and the way it blows, as an angle in pitch coordinates (0 blows towards the goal
 	// on the right, the one you attack first). It pushes the ball only while it is in the air.
@@ -31,7 +34,7 @@
 			wind: { s: ws, a: wa, ax: Math.cos(wa) * wk, ay: Math.sin(wa) * wk }, ko: ko === "day" ? "day" : "night",
 			surfaceKey: SURFACES[surfaceKey] ? surfaceKey : "grass", weatherKey: WEATHER[weatherKey] ? weatherKey : "clear",
 			roll, speed: sf.speed * w.speed, grip: sf.grip * w.grip, bounce: sf.bounce * (1 - 0.15 * w.wet) * (w.snow ? 0.8 : 1),
-			land: sf.land * (1 - 0.06 * w.wet), handling: w.handling, wet: w.wet, snow: w.snow || 0, heat: w.heat || 0,
+			land: sf.land * (1 - 0.06 * w.wet), handling: w.handling, wet: w.wet, snow: w.snow || 0, heat: w.heat || 0, fog: w.fog || 0,
 			// Passes are hit harder on a slow pitch and softer on a quick one, but not all the way.
 			passComp: Math.pow((1 - roll) / 0.015, 0.8),
 			label: `${w.wet || ws < 20 ? (weatherKey === "windy" ? "Clear" : w.label) : "Windy"} · ${sf.label}`
@@ -39,7 +42,7 @@
 	}
 	// The kick-off card's line on the conditions: the time, the rain, the wind and which way it blows for you.
 	function conditionsText () {
-		const w = cond.wind, rain = cond.snow ? "snow (a slow, dead ball, an orange one, poor footing and keepers who spill more)" : cond.heat ? "heat haze (a hard, quick pitch)" : cond.wet === 2 ? "heavy rain (the ball holds up in the puddles and keepers spill more)" : cond.wet ? "rain (a slower, skiddy ball and keepers who spill more)" : "dry";
+		const w = cond.wind, rain = cond.snow ? "snow (a slow, dead ball, an orange one, poor footing and keepers who spill more)" : cond.heat ? "heat haze (a hard, quick pitch)" : cond.wet === 2 ? "heavy rain (the ball holds up in the puddles and keepers spill more)" : cond.wet ? "rain (a slower, skiddy ball and keepers who spill more)" : cond.fog ? "fog (hard to see the far side; the ball plays as on a dry night)" : "dry";
 		let wind = "";
 		if (w.s >= 6) {
 			const along = Math.cos(w.a);

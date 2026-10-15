@@ -100,7 +100,7 @@
 		}
 		drawFx();
 		ctx.setTransform(scale, 0, 0, scale, 0, 0);
-		drawRain();
+		drawFog2D(false); drawRain();
 		drawOffscreenMarker();
 		drawMinimap(); drawTouchlineCam();
 		drawHints();

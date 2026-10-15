@@ -522,7 +522,8 @@
 		const F = G3.fig, w = ow ? holdW3(ow) : 0, r = ow && F && F.rigOf ? F.rigOf.get(ow) : null;
 		if (w > 0 && r) {
 			const V = G3.heldV || (G3.heldV = [ new THREE.Vector3(), new THREE.Vector3() ]), a = r.ha[0].getWorldPosition(V[0]), b = r.ha[1].getWorldPosition(V[1]), e = r.root.matrixWorld.elements, fl = Math.hypot(e[0], e[2]) || 1;
-			const hx = (a.x + b.x) / 2 + e[0] / fl * br * 0.55, hy = (a.y + b.y) / 2 + br * 0.45, hz = (a.z + b.z) / 2 + e[2] / fl * br * 0.55;
+			const pr = prep3(ow), s = pr && pr.K === "keeper-short" ? pr.e : 0;   // cocking a throw: in his throwing hand
+			const hx = lerp3((a.x + b.x) / 2 + e[0] / fl * br * 0.55, b.x, s), hy = lerp3((a.y + b.y) / 2 + br * 0.45, b.y + br * 0.6, s), hz = lerp3((a.z + b.z) / 2 + e[2] / fl * br * 0.55, b.z, s);
 			G3.heldLast = { p: ow, at: frame, x: hx, y: hy, z: hz };
 			return { x: lerp3(sim[0], hx, w), y: lerp3(sim[1], hy, w), z: lerp3(sim[2], hz, w), w };
 		}

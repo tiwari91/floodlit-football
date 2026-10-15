@@ -410,3 +410,11 @@
 		}
 		return HUD3.off.get(p) || null;
 	}
+	// The wind-up before a computer keeper's release or a computer set piece (the simulation's marker:
+	// p.prepKind, p.prepT counting prepN..1, then 0 as it goes). e: how far into the gather, 0..1, eased,
+	// full a frame before the release so the swing is at the top when the ball goes. Live play only.
+	function prep3 (p) {
+		if (!p.prepKind || !(p.prepT > 0) || replayOn() || odr || reduceMotion) { return null; }
+		const u = 1 - p.prepT / (p.prepN || 8);
+		return { K: p.prepKind, e: smooth3(clamp(u / 0.85, 0, 1)), kick: p.prepKind === "keeper-long" || p.prepKind === "corner" || p.prepKind === "free-kick" || p.prepKind === "penalty" };
+	}

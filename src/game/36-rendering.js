@@ -1141,6 +1141,14 @@
 		if (camMode === "tv" && TV.camX != null) { const q = tvProj(x, y, 0); if (q && endsSwapped()) { q.x = VW - q.x; } return q; }
 		return null;
 	}
+	// Fog on the 2D cameras: a veil thickening toward the far side and the stands (top of the picture),
+	// thin over the near touchline. Picture only.
+	function drawFog2D (tv) {
+		if (!cond.fog) { return; }
+		const day = cond.ko === "day", c = day ? "180, 186, 190" : "40, 48, 55", g = ctx.createLinearGradient(0, 0, 0, SH);
+		g.addColorStop(0, `rgba(${c}, ${tv ? 0.86 : 0.5})`); g.addColorStop(tv ? 0.45 : 0.5, `rgba(${c}, ${tv ? 0.5 : 0.38})`); g.addColorStop(1, `rgba(${c}, ${tv ? 0.16 : 0.3})`);
+		ctx.fillStyle = g; ctx.fillRect(0, 0, SW, SH);
+	}
 	function drawRain () {
 		if (cond.wet) {
 			// A grey sky by day; at night the dark is already there, and a flat veil only greyed the pitch.

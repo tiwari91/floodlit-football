@@ -930,6 +930,23 @@
 			for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 0.75, hw); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, -OUT3(i) * 0.2, hw); r.sh[i].rotation.y = lerp3(r.sh[i].rotation.y, 0, hw); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 1.6, hw); }
 			r.spine.rotation.z = lerp3(r.spine.rotation.z, -0.06, hw);
 		}
+		// The wind-up (prep3): a kick's gather and backswing (the kicking thigh back, heel up, the standing knee
+		// giving, the other arm out); a keeper's throw cocked back; a throw-in taken back behind the head.
+		const pr = dive < 0 && fall < 0 && !down ? prep3(p) : null;
+		if (pr) {
+			const e = pr.e, kf = p.build && p.build.left ? 0 : 1, pl = 1 - kf;
+			if (pr.kick) {
+				r.hip[kf].rotation.z = lerp3(r.hip[kf].rotation.z, -0.55, e); r.kn[kf].rotation.z = lerp3(r.kn[kf].rotation.z, -1.55, e); r.an[kf].rotation.z = lerp3(r.an[kf].rotation.z, -0.5, e);
+				r.hip[pl].rotation.z += 0.12 * e; r.kn[pl].rotation.z -= 0.35 * e; r.hips.position.y -= 1.1 * e; r.spine.rotation.z -= 0.08 * e;
+				if (pr.K !== "keeper-long") { r.sh[pl].rotation.x = lerp3(r.sh[pl].rotation.x, OUT3(pl) * 0.9, e); r.sh[kf].rotation.z = lerp3(r.sh[kf].rotation.z, 0.5, e); }
+			} else if (pr.K === "keeper-short") {
+				r.sh[1].rotation.z = lerp3(r.sh[1].rotation.z, -1.9, e); r.sh[1].rotation.x = lerp3(r.sh[1].rotation.x, OUT3(1) * 0.3, e); r.el[1].rotation.z = lerp3(r.el[1].rotation.z, 1.1, e);
+				r.sh[0].rotation.z = lerp3(r.sh[0].rotation.z, 1.0, e); r.el[0].rotation.z = lerp3(r.el[0].rotation.z, 0.4, e); r.chest.rotation.y += 0.4 * e; r.spine.rotation.z += 0.1 * e;
+			} else if (pr.K === "throw-in") {
+				for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 3.1, e); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, -OUT3(i) * 0.2, e); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 1.5, e); r.kn[i].rotation.z -= 0.25 * e; }
+				r.spine.rotation.z += 0.3 * e; r.neck.rotation.z += 0.15 * e;
+			}
+		}
 		// A shot blocked (block3): he flinches into it, turning a shoulder, arms tucked in to his sides, knees giving.
 		const blk = !gk && !down && fall < 0 && !rm ? block3(p) : 0;
 		if (blk > 0) {

@@ -338,7 +338,7 @@
 		// clear colour behind everything is the haze too, so there is never a black void under a day sky.
 		const dayLand = cond.ko === "day";
 		const landCol = !dayLand ? (cond.surfaceKey === "turf" ? "#13311f" : "#0f2416") : cond.snow ? "#c3c9cc" : cond.wet ? "#3f5843" : cond.heat ? "#6f6c4e" : "#4a6542";
-		if (G3.renderer) { G3.renderer.setClearColor(dayLand ? (cond.snow ? 0xc4cbd0 : cond.wet ? 0x8d979e : cond.heat ? 0xd9ccb0 : 0xa9bfd0) : 0x070c12, 1); }
+		if (G3.renderer) { G3.renderer.setClearColor(cond.fog ? (dayLand ? 0xb4babe : 0x343c43) : dayLand ? (cond.snow ? 0xc4cbd0 : cond.wet ? 0x8d979e : cond.heat ? 0xd9ccb0 : 0xa9bfd0) : 0x070c12, 1); }
 		// By night as by day it runs out past where the fog has closed in: a smaller sheet ended in plain view,
 		// a lighter slab with an edge round the stadium in the kick-off and half-time sweeps.
 		const apron = new THREE.Mesh(new THREE.PlaneGeometry(WW * 14, WH * 14), mat3D(landCol, false));
@@ -682,7 +682,7 @@
 		const glowPts = (pts, isNearSide) => {
 			if (!pts.length || !G3.glowTex) { return; }
 			const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
-			const haze = cond.wet || cond.snow ? 1.45 : 1;   // the wet air (or the snow) catches the light: a wider halo
+			const haze = cond.fog ? 1.9 : cond.wet || cond.snow ? 1.45 : 1;   // the wet air (or the snow) catches the light: a wider halo
 			const p = own(new THREE.Points(g, new THREE.PointsMaterial({ map: G3.glowTex, color: new THREE.Color(...wetLampCol3), size: (roofLights ? 110 : 260) * haze, sizeAttenuation: true, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.75, fog: false })), true);
 			st.add(p); if (isNearSide) { G3.nearRoof.push(p); }
 		};
@@ -759,7 +759,7 @@
 		if (sg) {
 			const grad = sg.createLinearGradient(0, 0, 0, 128);
 			const day = cond.ko === "day";
-			const stops = day ? (cond.snow ? [ "#6f7880", "#a0a8ae", "#d6dadd" ] : cond.wet ? [ "#454f58", "#6b7680", "#a2abb2" ] : cond.heat ? [ "#2a6fb4", "#86b3d6", "#eadbbd" ] : [ "#2f639a", "#6e9cc6", "#c3d6e4" ]) : [ "#010206", "#060b11", "#121d26" ];
+			const stops = cond.fog ? (day ? [ "#9aa1a6", "#aeb4b8", "#b4babe" ] : [ "#151a1f", "#2a3238", "#343c43" ]) : day ? (cond.snow ? [ "#6f7880", "#a0a8ae", "#d6dadd" ] : cond.wet ? [ "#454f58", "#6b7680", "#a2abb2" ] : cond.heat ? [ "#2a6fb4", "#86b3d6", "#eadbbd" ] : [ "#2f639a", "#6e9cc6", "#c3d6e4" ]) : [ "#010206", "#060b11", "#121d26" ];
 			grad.addColorStop(0, stops[0]); grad.addColorStop(0.55, stops[1]); grad.addColorStop(1, stops[2]);
 			sg.fillStyle = grad; sg.fillRect(0, 0, 2, 128);
 			const sky = new THREE.Mesh(new THREE.SphereGeometry(FH * 9, 24, 12, 0, Math.PI * 2, 0, Math.PI * 0.52), new THREE.MeshBasicMaterial({ map: tex3D(sc), side: THREE.BackSide, fog: false }));
@@ -784,10 +784,10 @@
 		st.add(key1, key1.target, key2, key2.target);
 		// A little haze with distance, so the far stand and roof sit back behind the pitch: thicker in the
 		// heat, in rain (wet air, lit by the floodlights at night) and in snow. (There is no fog weather:
-		// heavy rain, snow and heat stand in for it.) At night the air is a lit blue-grey, never black,
+		// fog thickest of all, closing in over the pitch itself.) At night the air is a lit blue-grey, never black,
 		// so the far crowd fades rather than darkens.
-		const hazeCol = cond.snow ? (dayLit ? 0xc4cbd0 : 0x2a3036) : dayLit ? (cond.wet ? 0x8d979e : cond.heat ? 0xd9ccb0 : 0xa9bfd0) : cond.wet ? 0x1a232c : 0x0d151d;
-		const hazeAt = cond.snow ? [ 1.1, 5 ] : cond.wet === 2 ? [ 0.9, 6 ] : cond.wet ? [ 1.1, 7.5 ] : cond.heat ? [ 1.1, 7 ] : dayLit ? [ 1.4, 9 ] : [ 1.6, 10 ];
+		const hazeCol = cond.fog ? (dayLit ? 0xb4babe : 0x343c43) : cond.snow ? (dayLit ? 0xc4cbd0 : 0x2a3036) : dayLit ? (cond.wet ? 0x8d979e : cond.heat ? 0xd9ccb0 : 0xa9bfd0) : cond.wet ? 0x1a232c : 0x0d151d;
+		const hazeAt = cond.fog ? [ 0.1, 2.0 ] : cond.snow ? [ 1.1, 5 ] : cond.wet === 2 ? [ 0.9, 6 ] : cond.wet ? [ 1.1, 7.5 ] : cond.heat ? [ 1.1, 7 ] : dayLit ? [ 1.4, 9 ] : [ 1.6, 10 ];
 		G3.scene.fog = new THREE.Fog(hazeCol, FH * hazeAt[0], FH * hazeAt[1]);
 		G3.stadium = st;
 		G3.scene.add(st);

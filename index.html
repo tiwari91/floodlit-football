@@ -1360,6 +1360,7 @@
 					<option value="windy">Windy</option>
 					<option value="snow">Snow</option>
 					<option value="hot">Heat</option>
+					<option value="fog">Fog</option>
 				</select>
 			</label>
 			<label class="field" for="ground" id="groundField">Ground
@@ -1532,7 +1533,7 @@
 		<p class="fine"><b>Pass and they wilt.</b> String passes together and your side grows in confidence: sharper passing and touches, and the momentum bar swings your way (5 in a row gets a mention, 10 gets an Olé). The side chasing the ball gets tense: stray passes, heavy first touches, late and rash challenges, shakier keeping. It works both ways, so if the computer keeps it off you, your players get nervy too. Win the ball back, keep it for a few passes or score, and the nerves settle; a goal against the run of play flips the game.</p>
 		<p class="fine"><b>Crowd and music.</b> The crowd swells as the ball nears a goal, the home end sings with a drum beating under it, goals get a roar (or a groan from the home fans), and hard saves get an "ooh". After a long quiet spell, or with the home side cruising, the 3D crowd starts a Mexican wave that runs round the bowl. The menus play a stadium anthem: strings, a horn carrying the tune with a choir under it, bass, timpani and snare, in a hall; turn it off with Music.</p>
 		<p class="fine"><b>Goals.</b> The scorer wheels away to the corner, slides on his knees in front of the fans and is mobbed by his teammates while the other side trudges back and their keeper fetches the ball out of the net, which bulges and swings where the ball hit it. A caption names the scorer and the minute, and the score bug flashes. In the 3D view the celebration then gives way to an instant replay of the build-up in slow motion, from high behind the goal or low beside it, before the camera goes back to the scorer and cuts wide for the restart. The match clock is stopped throughout. Any key, button or tap skips the celebration and the replay. Cards and substitutions get captions too.</p>
-		<p class="fine"><b>Weather and grounds.</b> Every club has a home ground: grass, muddy or artificial turf. Mud slows the ball and the players and kills the bounce. Turf is quick and true. Rain holds the ball up (heavy rain and mud most of all), costs players grip on the turn, sends passes a little astray and makes shots harder for keepers to hold, so they spill more. Wind pushes the ball while it is in the air: long balls, crosses, corners and lofted shots carry with it and hang against it; the arrow and speed at the top left of the pitch show which way it blows. League fixtures kick off in the afternoon or at night under the floodlights, with the stands dark around a lit pitch. In the league, matchdays 10 to 26 are the rainy season, windier and mostly at night, and the forecast is shown in advance (☾ night, ☀ afternoon, ≈ windy); the kick-off card gives the time, the rain and which way the wind blows for you. In a friendly, pick the weather (including Windy) and ground yourself.</p>
+		<p class="fine"><b>Weather and grounds.</b> Every club has a home ground: grass, muddy or artificial turf. Mud slows the ball and the players and kills the bounce. Turf is quick and true. Rain holds the ball up (heavy rain and mud most of all), costs players grip on the turn, sends passes a little astray and makes shots harder for keepers to hold, so they spill more. Wind pushes the ball while it is in the air: long balls, crosses, corners and lofted shots carry with it and hang against it; the arrow and speed at the top left of the pitch show which way it blows. League fixtures kick off in the afternoon or at night under the floodlights, with the stands dark around a lit pitch. In the league, matchdays 10 to 26 are the rainy season, windier and mostly at night, and the forecast is shown in advance (☾ night, ☀ afternoon, ≈ windy); the kick-off card gives the time, the rain and which way the wind blows for you. In a friendly, pick the weather (including Windy, and Fog, which only thickens the air: the far side fades but the ball plays as on a dry night) and ground yourself.</p>
 		<p class="fine"><b>Your season, backed up.</b> Your league saves in this browser. Export league saves it to a file; Import league loads a file back (press twice to confirm, since it replaces the season you have). Use it to keep a backup or carry your season to another browser or device.</p>
 		<p class="fine"><b>Assistant.</b> Under Your team, the Assistant setting hands the club's paperwork to your assistant manager. Contracts: between matches he offers a new deal to every player in the last year of his contract, the most valuable first, as far as the money allows above the £0.4m wage reserve; only a player too unhappy to talk is left, and the notes say who. When the money runs short he puts it to you under the setting: renew anyway and spend the £0.4m wage reserve, or leave them for now, and he asks again when the money changes. Transfers: when a window is open he answers bids (cashing in only well over a player's value, or on anyone past 31 at a fair price, never the only keeper), and signs at most two players a window where a known quantity, scouted or from home, is a clear step up on your weakest starter in that position. Everything he does appears in the notes on the League panel. Off by default.</p>
 		<p class="fine"><b>The transfer window.</b> The market opens on the For you tab: a shortlist of the players who would improve your eleven, each with the gain over the starter he would replace (an estimate until he is scouted). "Sign the best for me" lets the assistant buy up to two known step-ups at the asking price, keeping money for wages; "Scout the shortlist" spends the window's reports on it, best first. The line above the tabs says where the eleven is thinnest. The other tabs show every market as before.</p>
@@ -1814,7 +1815,10 @@
 		// Snow: a slow, low-bouncing ball (an orange one, to see it), poor footing, keepers who spill.
 		snow: { label: "Snow", wet: 0, snow: 1, speed: 0.95, grip: 0.8, handling: 0.84 },
 		// Heat: a hard, quick pitch under a hazy sky.
-		hot: { label: "Heat", wet: 0, heat: 1, speed: 1.01, grip: 1, handling: 1 }
+		hot: { label: "Heat", wet: 0, heat: 1, speed: 1.01, grip: 1, handling: 1 },
+		// Fog: only the picture changes (the far side of the pitch and the stands fade into it); the ball
+		// and the players behave exactly as on a clear night.
+		fog: { label: "Fog", wet: 0, fog: 1, speed: 1, grip: 1, handling: 1 }
 	};
 	// Wind: km/h and the way it blows, as an angle in pitch coordinates (0 blows towards the goal
 	// on the right, the one you attack first). It pushes the ball only while it is in the air.
@@ -1830,7 +1834,7 @@
 			wind: { s: ws, a: wa, ax: Math.cos(wa) * wk, ay: Math.sin(wa) * wk }, ko: ko === "day" ? "day" : "night",
 			surfaceKey: SURFACES[surfaceKey] ? surfaceKey : "grass", weatherKey: WEATHER[weatherKey] ? weatherKey : "clear",
 			roll, speed: sf.speed * w.speed, grip: sf.grip * w.grip, bounce: sf.bounce * (1 - 0.15 * w.wet) * (w.snow ? 0.8 : 1),
-			land: sf.land * (1 - 0.06 * w.wet), handling: w.handling, wet: w.wet, snow: w.snow || 0, heat: w.heat || 0,
+			land: sf.land * (1 - 0.06 * w.wet), handling: w.handling, wet: w.wet, snow: w.snow || 0, heat: w.heat || 0, fog: w.fog || 0,
 			// Passes are hit harder on a slow pitch and softer on a quick one, but not all the way.
 			passComp: Math.pow((1 - roll) / 0.015, 0.8),
 			label: `${w.wet || ws < 20 ? (weatherKey === "windy" ? "Clear" : w.label) : "Windy"} · ${sf.label}`
@@ -1838,7 +1842,7 @@
 	}
 	// The kick-off card's line on the conditions: the time, the rain, the wind and which way it blows for you.
 	function conditionsText () {
-		const w = cond.wind, rain = cond.snow ? "snow (a slow, dead ball, an orange one, poor footing and keepers who spill more)" : cond.heat ? "heat haze (a hard, quick pitch)" : cond.wet === 2 ? "heavy rain (the ball holds up in the puddles and keepers spill more)" : cond.wet ? "rain (a slower, skiddy ball and keepers who spill more)" : "dry";
+		const w = cond.wind, rain = cond.snow ? "snow (a slow, dead ball, an orange one, poor footing and keepers who spill more)" : cond.heat ? "heat haze (a hard, quick pitch)" : cond.wet === 2 ? "heavy rain (the ball holds up in the puddles and keepers spill more)" : cond.wet ? "rain (a slower, skiddy ball and keepers who spill more)" : cond.fog ? "fog (hard to see the far side; the ball plays as on a dry night)" : "dry";
 		let wind = "";
 		if (w.s >= 6) {
 			const along = Math.cos(w.a);
@@ -9799,6 +9803,14 @@
 		if (camMode === "tv" && TV.camX != null) { const q = tvProj(x, y, 0); if (q && endsSwapped()) { q.x = VW - q.x; } return q; }
 		return null;
 	}
+	// Fog on the 2D cameras: a veil thickening toward the far side and the stands (top of the picture),
+	// thin over the near touchline. Picture only.
+	function drawFog2D (tv) {
+		if (!cond.fog) { return; }
+		const day = cond.ko === "day", c = day ? "180, 186, 190" : "40, 48, 55", g = ctx.createLinearGradient(0, 0, 0, SH);
+		g.addColorStop(0, `rgba(${c}, ${tv ? 0.86 : 0.5})`); g.addColorStop(tv ? 0.45 : 0.5, `rgba(${c}, ${tv ? 0.5 : 0.38})`); g.addColorStop(1, `rgba(${c}, ${tv ? 0.16 : 0.3})`);
+		ctx.fillStyle = g; ctx.fillRect(0, 0, SW, SH);
+	}
 	function drawRain () {
 		if (cond.wet) {
 			// A grey sky by day; at night the dark is already there, and a flat veil only greyed the pitch.
@@ -10776,7 +10788,7 @@
 		}
 		drawFx();
 		ctx.setTransform(scale, 0, 0, scale, 0, 0);
-		drawRain();
+		drawFog2D(false); drawRain();
 		drawOffscreenMarker();
 		drawMinimap(); drawTouchlineCam();
 		drawHints();
@@ -10961,7 +10973,7 @@
 		}
 		ctx.globalAlpha = 1;
 		ctx.setTransform(scale, 0, 0, scale, 0, 0);
-		drawRain();
+		drawFog2D(true); drawRain();
 		drawMinimap(); drawTouchlineCam();
 		drawHints((x, y) => tvProj(x, y, 0));
 		drawPowerMeter();
@@ -11053,7 +11065,7 @@
 		const shuf = down ? 0 : p.shuf || 0, ks = down || reduceMotion || jump > 0 ? null : kickTV(p), cel = p.celebA || 0;
 		// As in 3D: getting up after a slide (getUp3), the ball held to his chest (holdW3), a shot blocked
 		// (block3), and the challenges on his feet (challenge3: a shoulder in, a poke at the ball, a stumble).
-		const gu = getUp3(p, down), blk0 = block3(p), gk = p.role === "gk";
+		const gu = getUp3(p, down), blk0 = block3(p), gk = p.role === "gk", prTV = dvTV < 0 && !down ? prep3(p) : null;
 		const upW = reduceMotion || dvTV >= 0 ? 0 : smooth3(clamp(gu, 0, 1)), hw = gk && dvTV < 0 ? holdW3(p) : 0;
 		const blkT = !gk && !down && !reduceMotion ? blk0 : 0, bW = blkT > 0 ? (blkT < 0.2 ? smooth3(blkT / 0.2) : 1 - smooth3((blkT - 0.2) / 0.8)) : 0;
 		const ch = !down && upW <= 0 && !ks && !jump && cel <= 0 && bW <= 0 && !gk && p.team >= 0 && !reduceMotion ? challenge3(p, p.x, p.y, p.dir, 1) : null;
@@ -11092,6 +11104,7 @@
 			// differs from man to man.
 			if (!jump && !shuf && a < 0.15) { const r = 1 - a / 0.15; th = th * (1 - r) + ((i ? -0.11 : 0.13) + (i ? -1 : 1) * vary * 0.07) * r; kn = kn * (1 - r) + (0.1 + vary * 0.06) * r; }
 			if (ks) { if (i === 0) { th = ks.s; kn = ks.bend; } else { th = -0.12 - 0.1 * ks.bw; kn = 0.2 + 0.3 * ks.bw; } }   // kicking leg, and the one planted beside the ball
+			if (prTV && prTV.kick) { if (i === 0) { th = th * (1 - prTV.e) - 0.5 * prTV.e; kn = kn * (1 - prTV.e) + 1.45 * prTV.e; } else { kn += 0.3 * prTV.e; } }   // the wind-up: kicking leg back, standing knee giving
 			const crouch = Math.max(upW, 0.5 * stum, 0.4 * bW);   // knees under him: getting up, stumbling, braced for the block
 			if (crouch > 0) { th += (i ? 0.45 : 0.75) * crouch; kn += (i ? 1.1 : 1.5) * crouch; }
 			if (poke > 0 && i === 0) { th = th * (1 - poke) + 0.8 * poke; kn = kn * (1 - poke) + 0.1 * poke; }   // the near leg out, poking at the ball
@@ -11118,7 +11131,10 @@
 			if (a < 0.15 && !jump && !ks && !cel && !shuf) { const r = 1 - a / 0.15; ua = ua * (1 - r) + ((i ? 0.1 : -0.16) - vary * 0.05) * r; eb = eb * (1 - r) + (0.08 + vary * 0.06) * r; }
 			if (!reduceMotion && a < 0.15 && !jump && !ks && !cel) { ua += Math.sin((p.idlePh || 0) + i) * 0.04; }
 			if (upW > 0 && i === 1) { ua = ua * (1 - upW) + 0.35 * upW; eb = eb * (1 - upW); }   // a hand pushing off the turf
-			if (hw > 0) { ua = ua * (1 - hw) + 0.45 * hw; eb = eb * (1 - hw) + 1.15 * hw; }   // forearms up under the ball at his chest
+			if (prTV && prTV.K === "throw-in") { ua = ua * (1 - prTV.e) + Math.PI * 1.05 * prTV.e; eb = eb * (1 - prTV.e) + 0.9 * prTV.e; }   // the ball taken back behind his head
+			const cock = prTV && prTV.K === "keeper-short" && i === 1;   // the throwing arm cocked back
+			if (cock) { ua = ua * (1 - prTV.e) - 1.5 * prTV.e; eb = eb * (1 - prTV.e) + 0.6 * prTV.e; }
+			if (hw > 0 && !cock) { ua = ua * (1 - hw) + 0.45 * hw; eb = eb * (1 - hw) + 1.15 * hw; }   // forearms up under the ball at his chest
 			if (bW > 0) { ua = ua * (1 - bW) + 0.2 * bW; eb = eb * (1 - bW) + 2.0 * bW; }   // arms tucked in to his body
 			if (shove > 0 && i === 0) { ua = ua * (1 - shove) + 1.0 * shove; eb = eb * (1 - shove) + 1.0 * shove; }   // the near arm bracing into him
 			if (stum > 0) { ua = ua * (1 - stum) + (i ? 1.3 : -0.9) * stum; eb = eb * (1 - stum) + 0.3 * stum; }   // arms out, catching his balance
@@ -11252,7 +11268,8 @@
 		}
 		if (hw > 0) {   // the ball in his hands, in front of his chest (drawn over his body, under the near arm)
 			const h0 = armPts(0)[1], h1 = armPts(1)[1], g = tvProj(ball.x, ball.y, 3.2), rB = Math.max(3.6, 5.4 * k);
-			const cx = (h0[0] + h1[0]) / 2 - face * rB * 0.3, cy = (h0[1] + h1[1]) / 2 - rB * 0.55;
+			const ck = prTV && prTV.K === "keeper-short" ? prTV.e : 0;   // cocking a throw: in his throwing hand
+			const cx = lerp3((h0[0] + h1[0]) / 2 - face * rB * 0.3, h1[0], ck), cy = lerp3((h0[1] + h1[1]) / 2 - rB * 0.55, h1[1] - rB * 0.4, ck);
 			const bx = g ? g.x + (cx - g.x) * hw : cx, by = g ? g.y + (cy - g.y) * hw : cy;
 			ctx.fillStyle = cond.snow ? "#ff7d22" : "#ffffff"; ctx.beginPath(); ctx.arc(bx, by, rB, 0, Math.PI * 2); ctx.fill();
 			ctx.fillStyle = "#1a1a1a"; ctx.beginPath(); ctx.arc(bx - rB * 0.25, by - rB * 0.2, rB * 0.3, 0, Math.PI * 2); ctx.fill();
@@ -11721,7 +11738,7 @@
 		// clear colour behind everything is the haze too, so there is never a black void under a day sky.
 		const dayLand = cond.ko === "day";
 		const landCol = !dayLand ? (cond.surfaceKey === "turf" ? "#13311f" : "#0f2416") : cond.snow ? "#c3c9cc" : cond.wet ? "#3f5843" : cond.heat ? "#6f6c4e" : "#4a6542";
-		if (G3.renderer) { G3.renderer.setClearColor(dayLand ? (cond.snow ? 0xc4cbd0 : cond.wet ? 0x8d979e : cond.heat ? 0xd9ccb0 : 0xa9bfd0) : 0x070c12, 1); }
+		if (G3.renderer) { G3.renderer.setClearColor(cond.fog ? (dayLand ? 0xb4babe : 0x343c43) : dayLand ? (cond.snow ? 0xc4cbd0 : cond.wet ? 0x8d979e : cond.heat ? 0xd9ccb0 : 0xa9bfd0) : 0x070c12, 1); }
 		// By night as by day it runs out past where the fog has closed in: a smaller sheet ended in plain view,
 		// a lighter slab with an edge round the stadium in the kick-off and half-time sweeps.
 		const apron = new THREE.Mesh(new THREE.PlaneGeometry(WW * 14, WH * 14), mat3D(landCol, false));
@@ -12065,7 +12082,7 @@
 		const glowPts = (pts, isNearSide) => {
 			if (!pts.length || !G3.glowTex) { return; }
 			const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
-			const haze = cond.wet || cond.snow ? 1.45 : 1;   // the wet air (or the snow) catches the light: a wider halo
+			const haze = cond.fog ? 1.9 : cond.wet || cond.snow ? 1.45 : 1;   // the wet air (or the snow) catches the light: a wider halo
 			const p = own(new THREE.Points(g, new THREE.PointsMaterial({ map: G3.glowTex, color: new THREE.Color(...wetLampCol3), size: (roofLights ? 110 : 260) * haze, sizeAttenuation: true, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.75, fog: false })), true);
 			st.add(p); if (isNearSide) { G3.nearRoof.push(p); }
 		};
@@ -12142,7 +12159,7 @@
 		if (sg) {
 			const grad = sg.createLinearGradient(0, 0, 0, 128);
 			const day = cond.ko === "day";
-			const stops = day ? (cond.snow ? [ "#6f7880", "#a0a8ae", "#d6dadd" ] : cond.wet ? [ "#454f58", "#6b7680", "#a2abb2" ] : cond.heat ? [ "#2a6fb4", "#86b3d6", "#eadbbd" ] : [ "#2f639a", "#6e9cc6", "#c3d6e4" ]) : [ "#010206", "#060b11", "#121d26" ];
+			const stops = cond.fog ? (day ? [ "#9aa1a6", "#aeb4b8", "#b4babe" ] : [ "#151a1f", "#2a3238", "#343c43" ]) : day ? (cond.snow ? [ "#6f7880", "#a0a8ae", "#d6dadd" ] : cond.wet ? [ "#454f58", "#6b7680", "#a2abb2" ] : cond.heat ? [ "#2a6fb4", "#86b3d6", "#eadbbd" ] : [ "#2f639a", "#6e9cc6", "#c3d6e4" ]) : [ "#010206", "#060b11", "#121d26" ];
 			grad.addColorStop(0, stops[0]); grad.addColorStop(0.55, stops[1]); grad.addColorStop(1, stops[2]);
 			sg.fillStyle = grad; sg.fillRect(0, 0, 2, 128);
 			const sky = new THREE.Mesh(new THREE.SphereGeometry(FH * 9, 24, 12, 0, Math.PI * 2, 0, Math.PI * 0.52), new THREE.MeshBasicMaterial({ map: tex3D(sc), side: THREE.BackSide, fog: false }));
@@ -12167,10 +12184,10 @@
 		st.add(key1, key1.target, key2, key2.target);
 		// A little haze with distance, so the far stand and roof sit back behind the pitch: thicker in the
 		// heat, in rain (wet air, lit by the floodlights at night) and in snow. (There is no fog weather:
-		// heavy rain, snow and heat stand in for it.) At night the air is a lit blue-grey, never black,
+		// fog thickest of all, closing in over the pitch itself.) At night the air is a lit blue-grey, never black,
 		// so the far crowd fades rather than darkens.
-		const hazeCol = cond.snow ? (dayLit ? 0xc4cbd0 : 0x2a3036) : dayLit ? (cond.wet ? 0x8d979e : cond.heat ? 0xd9ccb0 : 0xa9bfd0) : cond.wet ? 0x1a232c : 0x0d151d;
-		const hazeAt = cond.snow ? [ 1.1, 5 ] : cond.wet === 2 ? [ 0.9, 6 ] : cond.wet ? [ 1.1, 7.5 ] : cond.heat ? [ 1.1, 7 ] : dayLit ? [ 1.4, 9 ] : [ 1.6, 10 ];
+		const hazeCol = cond.fog ? (dayLit ? 0xb4babe : 0x343c43) : cond.snow ? (dayLit ? 0xc4cbd0 : 0x2a3036) : dayLit ? (cond.wet ? 0x8d979e : cond.heat ? 0xd9ccb0 : 0xa9bfd0) : cond.wet ? 0x1a232c : 0x0d151d;
+		const hazeAt = cond.fog ? [ 0.1, 2.0 ] : cond.snow ? [ 1.1, 5 ] : cond.wet === 2 ? [ 0.9, 6 ] : cond.wet ? [ 1.1, 7.5 ] : cond.heat ? [ 1.1, 7 ] : dayLit ? [ 1.4, 9 ] : [ 1.6, 10 ];
 		G3.scene.fog = new THREE.Fog(hazeCol, FH * hazeAt[0], FH * hazeAt[1]);
 		G3.stadium = st;
 		G3.scene.add(st);
@@ -13185,6 +13202,23 @@
 			for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 0.75, hw); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, -OUT3(i) * 0.2, hw); r.sh[i].rotation.y = lerp3(r.sh[i].rotation.y, 0, hw); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 1.6, hw); }
 			r.spine.rotation.z = lerp3(r.spine.rotation.z, -0.06, hw);
 		}
+		// The wind-up (prep3): a kick's gather and backswing (the kicking thigh back, heel up, the standing knee
+		// giving, the other arm out); a keeper's throw cocked back; a throw-in taken back behind the head.
+		const pr = dive < 0 && fall < 0 && !down ? prep3(p) : null;
+		if (pr) {
+			const e = pr.e, kf = p.build && p.build.left ? 0 : 1, pl = 1 - kf;
+			if (pr.kick) {
+				r.hip[kf].rotation.z = lerp3(r.hip[kf].rotation.z, -0.55, e); r.kn[kf].rotation.z = lerp3(r.kn[kf].rotation.z, -1.55, e); r.an[kf].rotation.z = lerp3(r.an[kf].rotation.z, -0.5, e);
+				r.hip[pl].rotation.z += 0.12 * e; r.kn[pl].rotation.z -= 0.35 * e; r.hips.position.y -= 1.1 * e; r.spine.rotation.z -= 0.08 * e;
+				if (pr.K !== "keeper-long") { r.sh[pl].rotation.x = lerp3(r.sh[pl].rotation.x, OUT3(pl) * 0.9, e); r.sh[kf].rotation.z = lerp3(r.sh[kf].rotation.z, 0.5, e); }
+			} else if (pr.K === "keeper-short") {
+				r.sh[1].rotation.z = lerp3(r.sh[1].rotation.z, -1.9, e); r.sh[1].rotation.x = lerp3(r.sh[1].rotation.x, OUT3(1) * 0.3, e); r.el[1].rotation.z = lerp3(r.el[1].rotation.z, 1.1, e);
+				r.sh[0].rotation.z = lerp3(r.sh[0].rotation.z, 1.0, e); r.el[0].rotation.z = lerp3(r.el[0].rotation.z, 0.4, e); r.chest.rotation.y += 0.4 * e; r.spine.rotation.z += 0.1 * e;
+			} else if (pr.K === "throw-in") {
+				for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 3.1, e); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, -OUT3(i) * 0.2, e); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 1.5, e); r.kn[i].rotation.z -= 0.25 * e; }
+				r.spine.rotation.z += 0.3 * e; r.neck.rotation.z += 0.15 * e;
+			}
+		}
 		// A shot blocked (block3): he flinches into it, turning a shoulder, arms tucked in to his sides, knees giving.
 		const blk = !gk && !down && fall < 0 && !rm ? block3(p) : 0;
 		if (blk > 0) {
@@ -13791,6 +13825,14 @@
 			}
 		}
 		return HUD3.off.get(p) || null;
+	}
+	// The wind-up before a computer keeper's release or a computer set piece (the simulation's marker:
+	// p.prepKind, p.prepT counting prepN..1, then 0 as it goes). e: how far into the gather, 0..1, eased,
+	// full a frame before the release so the swing is at the top when the ball goes. Live play only.
+	function prep3 (p) {
+		if (!p.prepKind || !(p.prepT > 0) || replayOn() || odr || reduceMotion) { return null; }
+		const u = 1 - p.prepT / (p.prepN || 8);
+		return { K: p.prepKind, e: smooth3(clamp(u / 0.85, 0, 1)), kick: p.prepKind === "keeper-long" || p.prepKind === "corner" || p.prepKind === "free-kick" || p.prepKind === "penalty" };
 	}
 	/* ---------- the officials ----------
 	   Not part of the simulation: the referee keeps a diagonal to the ball, the assistants run the
@@ -14539,7 +14581,8 @@
 		const F = G3.fig, w = ow ? holdW3(ow) : 0, r = ow && F && F.rigOf ? F.rigOf.get(ow) : null;
 		if (w > 0 && r) {
 			const V = G3.heldV || (G3.heldV = [ new THREE.Vector3(), new THREE.Vector3() ]), a = r.ha[0].getWorldPosition(V[0]), b = r.ha[1].getWorldPosition(V[1]), e = r.root.matrixWorld.elements, fl = Math.hypot(e[0], e[2]) || 1;
-			const hx = (a.x + b.x) / 2 + e[0] / fl * br * 0.55, hy = (a.y + b.y) / 2 + br * 0.45, hz = (a.z + b.z) / 2 + e[2] / fl * br * 0.55;
+			const pr = prep3(ow), s = pr && pr.K === "keeper-short" ? pr.e : 0;   // cocking a throw: in his throwing hand
+			const hx = lerp3((a.x + b.x) / 2 + e[0] / fl * br * 0.55, b.x, s), hy = lerp3((a.y + b.y) / 2 + br * 0.45, b.y + br * 0.6, s), hz = lerp3((a.z + b.z) / 2 + e[2] / fl * br * 0.55, b.z, s);
 			G3.heldLast = { p: ow, at: frame, x: hx, y: hy, z: hz };
 			return { x: lerp3(sim[0], hx, w), y: lerp3(sim[1], hy, w), z: lerp3(sim[2], hz, w), w };
 		}
