@@ -168,9 +168,11 @@ check("first-match coach mark is stored as shown and dismissable", coach.stored 
 const feel = await page.evaluate(() => new Promise(res => {
 	const F = window.__ff; for (let i = 0; i < 3000 && F.state !== "play"; i++) { F.step(1); }
 	F.freeze = 0;
-	const prev = new Map(); let max = 0, n = 0, last = performance.now(), snaps = 0;
+	const prev = new Map(); let max = 0, n = 0, snaps = 0;
 	const tick = () => {
-		const now = performance.now(), dts = (now - last) / 1000; last = now;
+		// Per drawn frame: the game's own frame time for the frame whose facing we read (wall-clock gaps
+		// between these callbacks jitter on a busy machine and made this flaky).
+		const dts = F.frameDt / 1000;
 		const st = F.G3 && F.G3.fig && F.G3.fig.yawSt;
 		for (const p of F.players) {
 			const y = st && st.get(p) ? st.get(p).yaw : null;
