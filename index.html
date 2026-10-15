@@ -5802,12 +5802,34 @@
 	// When the computer plays your side's pass (autopilot, a test harness), the ball is handed on the way
 	// your own passes are: the man it is meant for runs onto it and control goes with it. Without this
 	// nobody of yours went to meet the pass (the passer chased his own ball) and it was not counted.
+	/* Wind-up hook for the drawing. A computer keeper, or a computer taker over a free kick, penalty,
+	   throw-in or corner, holds the ball for a set count of frames before he lets it go; over the last
+	   PREP_N of them he is marked as winding up, so the figure can draw the arm back or the leg back
+	   before the release. Purely a marker: the release frame and the choice of pass are unchanged.
+	     p.prepKind  "keeper-short" (a roll or throw to a man nearby), "keeper-long" (a punt or lofted throw),
+	                 "throw-in", "corner", "free-kick" or "penalty"; null when he is not winding up
+	     p.prepT     frames left before the ball goes (PREP_N .. 1); 0 on the frame of release
+	     p.prepN     PREP_N, so progress = 1 - p.prepT / p.prepN
+	     p.prepF     the frame it was last set (stale after a frame: the move was cut short) */
+	const PREP_N = 8;
+	function prepRelease (p, left, kind) {
+		if (left > PREP_N) { return; }
+		p.prepKind = typeof kind === "function" ? kind() : kind; p.prepT = left; p.prepN = PREP_N; p.prepF = frame;
+	}
+	const prepDone = p => { p.prepKind = null; p.prepT = 0; };
+	// Which way the keeper will play it (see gkDistribute): short to an open man, else long.
+	const gkPrepKind = p => {
+		const m = outfield(p.team).filter(q => dist(q, p) > 90 && !(offsideOn() && isOffside(q, offsideLine(p.team)))).sort((a, b) => openness(b) - openness(a))[0];
+		return m && openness(m) > 45 ? "keeper-short" : "keeper-long";
+	};
 	function aiHandOff (p, m, t) { if (p.team === 0 && m && m !== p) { handOff(m, t); } }
 	function aiOwnerAct (p) {
 		const cfg = p.team === 1 ? diff : DIFF.normal;
 		if (setPiece && (setPiece.kind === "free" || setPiece.kind === "pen") && setPiece.taker === p) {
 			// The computer's free kick: a moment over the ball, then a shot if it's close, else find a man.
-			if (++p.hold < (setPiece.kind === "pen" ? 60 : 40)) { return null; }
+			const H = setPiece.kind === "pen" ? 60 : 40;
+			if (++p.hold < H) { prepRelease(p, H - p.hold, setPiece.kind === "pen" ? "penalty" : "free-kick"); return null; }
+			prepDone(p);
 			if (setPiece.kind === "pen") { takePenalty(p); return null; }
 			const ind = setPiece.indirect, lay = setPiece.layoff && players.includes(setPiece.layoff.p) ? setPiece.layoff.p : null;
 			setPiece = null;
@@ -5826,7 +5848,8 @@
 		}
 		if (setPiece && setPiece.kind === "throw" && setPiece.taker === p) {
 			// The computer's throw: find an open teammate within range.
-			if (++p.hold < 25) { return null; }
+			if (++p.hold < 25) { prepRelease(p, 25 - p.hold, "throw-in"); return null; }
+			prepDone(p);
 			const mates = outfield(p.team).filter(m => m !== p && dist(m, p) < 330 * Math.sqrt(S));
 			const m = mates.sort((a, b) => (openness(b) - dist(b, p) * 0.2) - (openness(a) - dist(a, p) * 0.2))[0];
 			throwIn(p, m || null, m ? dist(m, p) > 190 * Math.sqrt(S) : false); aiHandOff(p, m, 140);
@@ -5834,7 +5857,8 @@
 		}
 		if (setPiece && setPiece.kind === "corner" && setPiece.taker === p) {
 			// The computer's corner: a moment to set, then a cross to one of the runners in the box.
-			if (++p.hold < 30) { return null; }
+			if (++p.hold < 30) { prepRelease(p, 30 - p.hold, "corner"); return null; }
+			prepDone(p);
 			const r = Math.random();
 			cornerCross(p, null, r < 0.4 ? "near" : r < 0.75 ? "far" : "spot", Math.random() < 0.6 ? "in" : "out");
 			return null;
@@ -5842,7 +5866,9 @@
 		if (p.role === "gk") {
 			p.hold++;
 			// A second or so with the ball, so the team can spread out before he plays it.
-			if (p.hold < (p.holdFor || (p.holdFor = 60 + Math.floor(Math.random() * 30)))) { return null; }
+			const H = p.holdFor || (p.holdFor = 60 + Math.floor(Math.random() * 30));
+			if (p.hold < H) { prepRelease(p, H - p.hold, () => gkPrepKind(p)); return null; }
+			prepDone(p);
 			gkDistribute(p);
 			return null;
 		}
@@ -6082,7 +6108,7 @@
 		windUpBegin();   // a kick from a key press since the last frame
 		frame++;
 		stepReplay();
-		for (const p of players) { if (p.fall > 0) { p.fall--; } if (p.dive > 0) { p.dive--; } if (p.diveCd > 0) { p.diveCd--; } if (p.throwA > 0) { p.throwA--; } }
+		for (const p of players) { if (p.fall > 0) { p.fall--; } if (p.dive > 0) { p.dive--; } if (p.diveCd > 0) { p.diveCd--; } if (p.throwA > 0) { p.throwA--; } if (p.prepKind && frame - p.prepF > 1) { p.prepKind = null; p.prepT = 0; } }
 		if (flagCall && --flagCall.t <= 0) { flagCall = null; }
 		// The crowd gets louder as the ball nears either goal, and goes up for goals.
 		if (ball) {

@@ -141,7 +141,7 @@
 		windUpBegin();   // a kick from a key press since the last frame
 		frame++;
 		stepReplay();
-		for (const p of players) { if (p.fall > 0) { p.fall--; } if (p.dive > 0) { p.dive--; } if (p.diveCd > 0) { p.diveCd--; } if (p.throwA > 0) { p.throwA--; } }
+		for (const p of players) { if (p.fall > 0) { p.fall--; } if (p.dive > 0) { p.dive--; } if (p.diveCd > 0) { p.diveCd--; } if (p.throwA > 0) { p.throwA--; } if (p.prepKind && frame - p.prepF > 1) { p.prepKind = null; p.prepT = 0; } }
 		if (flagCall && --flagCall.t <= 0) { flagCall = null; }
 		// The crowd gets louder as the ball nears either goal, and goes up for goals.
 		if (ball) {
