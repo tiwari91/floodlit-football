@@ -11006,21 +11006,28 @@
 		const a = down ? 0 : clamp(p.runAmt || 0, 0, 1), ph = reduceMotion ? 0 : p.stride || 0;
 		const vary = (((p.num || 0) * 37 + p.team * 11) % 10) / 10;   // each man stands a little differently
 		const shuf = down ? 0 : p.shuf || 0, ks = down || reduceMotion || jump > 0 ? null : kickTV(p), cel = p.celebA || 0;
+		// As in 3D: getting up after a slide (getUp3), the ball held to his chest (holdW3), a shot blocked
+		// (block3), and the challenges on his feet (challenge3: a shoulder in, a poke at the ball, a stumble).
+		const gu = getUp3(p, down), blk0 = block3(p), gk = p.role === "gk";
+		const upW = reduceMotion || dvTV >= 0 ? 0 : smooth3(clamp(gu, 0, 1)), hw = gk && dvTV < 0 ? holdW3(p) : 0;
+		const blkT = !gk && !down && !reduceMotion ? blk0 : 0, bW = blkT > 0 ? (blkT < 0.2 ? smooth3(blkT / 0.2) : 1 - smooth3((blkT - 0.2) / 0.8)) : 0;
+		const ch = !down && upW <= 0 && !ks && !jump && cel <= 0 && bW <= 0 && !gk && p.team >= 0 && !reduceMotion ? challenge3(p, p.x, p.y, p.dir, 1) : null;
+		const shove = ch ? ch.shove : 0, poke = ch ? ch.poke : 0, stum = ch ? ch.stumble : 0;
 		// Leaning into the run, back against a planted cut, upright when shuffling.
-		const lean = down ? -1.05 : a * a * 0.26 * (1 - 0.6 * shuf) - (p.plant > 0 ? 0.2 * p.plant / 10 : 0) + (ks ? 0.08 : 0);   // sliding: leaning right back
+		const lean = down ? -1.05 : a * a * 0.26 * (1 - 0.6 * shuf) - (p.plant > 0 ? 0.2 * p.plant / 10 : 0) + (ks ? 0.08 : 0) + 0.75 * upW + 0.22 * shove + 0.4 * stum - 0.1 * poke + 0.2 * bW + (ch ? 0.06 * ch.lean : 0);   // sliding: leaning right back
 		const bob = reduceMotion ? 0 : Math.abs(Math.cos(ph)) * a * H * 0.035;
 		if (!reduceMotion && a < 0.15 && !down && !jump) { X += Math.sin(p.idlePh || 0) * H * 0.012; }   // standing: shifting his weight
-		const hipX = X, hipY = down ? Y - H * 0.11 : Y - H * 0.5 - bob + shuf * H * 0.035;
+		const hipX = X, hipY = down ? Y - H * 0.11 : Y - H * 0.5 - bob + shuf * H * 0.035 + H * (0.2 * upW + 0.04 * stum + 0.035 * bW + 0.02 * poke);
 		const shX = hipX + face * Math.sin(lean) * H * 0.32, shY = hipY - Math.cos(lean) * H * 0.32;
 		const shade = (hex, f) => { const n = parseInt(hex.slice(1), 16); return `rgb(${[ n >> 16, (n >> 8) & 255, n & 255 ].map(v => Math.round(v * f)).join(",")})`; };
 		const Lt = H * 0.26, Ls = H * 0.26, Lu = H * 0.16, Lf = H * 0.15;
 		// The arms hang from the edges of the shirt and the legs from either side of the hips, so a
 		// standing man's arms are at his sides rather than across his front.
-		const still = down ? 0 : 1 - clamp(a / 0.3, 0, 1);   // the side offsets are for a man standing; running, he is seen side-on
+		const still = down ? 0 : (1 - clamp(a / 0.3, 0, 1)) * (1 - 0.8 * hw);   // the side offsets are for a man standing; running, he is seen side-on
 		const armOff = i => (i ? 1 : -1) * face * H * 0.115 * still, legOff = i => (i ? 1 : -1) * face * H * 0.035 * still;
 		// Running, walking, shuffling: each foot set down on the grass and carried through (gait3, shared
 		// with 3D), the knee found from hip and foot, so the boots never slide along the turf.
-		const GT = down || jump > 0 || reduceMotion ? null : gait3(p, ph, p.dir, 1, {}), sc32 = H / 32;
+		const GT = down || jump > 0 || reduceMotion || upW > 0.05 || poke > 0.05 || stum > 0.05 || bW > 0.05 ? null : gait3(p, ph, p.dir, 1, {}), sc32 = H / 32;
 		const legGait = i => {
 			const f = GT.feet[i], ox = f.x * Math.cos(p.dir) - f.z * Math.sin(p.dir), q = tvProj(p.x + ox, p.y, 0);
 			const hx = hipX + legOff(i), hy = hipY + (LEG3 + ANK3 - GT.h) * sc32 * 0.6, fx = q ? q.x : X, fy = Y - (f.y - ANK3) * sc32 + H * 0.02;
@@ -11040,6 +11047,9 @@
 			// differs from man to man.
 			if (!jump && !shuf && a < 0.15) { const r = 1 - a / 0.15; th = th * (1 - r) + ((i ? -0.11 : 0.13) + (i ? -1 : 1) * vary * 0.07) * r; kn = kn * (1 - r) + (0.1 + vary * 0.06) * r; }
 			if (ks) { if (i === 0) { th = ks.s; kn = ks.bend; } else { th = -0.12 - 0.1 * ks.bw; kn = 0.2 + 0.3 * ks.bw; } }   // kicking leg, and the one planted beside the ball
+			const crouch = Math.max(upW, 0.5 * stum, 0.4 * bW);   // knees under him: getting up, stumbling, braced for the block
+			if (crouch > 0) { th += (i ? 0.45 : 0.75) * crouch; kn += (i ? 1.1 : 1.5) * crouch; }
+			if (poke > 0 && i === 0) { th = th * (1 - poke) + 0.8 * poke; kn = kn * (1 - poke) + 0.1 * poke; }   // the near leg out, poking at the ball
 			const kx = hipX + legOff(i) + face * Math.sin(th) * Lt, ky = hipY + Math.cos(th) * Lt;
 			return [ [ kx, ky ], [ kx + face * Math.sin(th - kn) * Ls, ky + Math.cos(th - kn) * Ls ] ];
 		};
@@ -11062,6 +11072,11 @@
 			// touch ahead, elbows nearly straight, so they never fold across his front.
 			if (a < 0.15 && !jump && !ks && !cel && !shuf) { const r = 1 - a / 0.15; ua = ua * (1 - r) + ((i ? 0.1 : -0.16) - vary * 0.05) * r; eb = eb * (1 - r) + (0.08 + vary * 0.06) * r; }
 			if (!reduceMotion && a < 0.15 && !jump && !ks && !cel) { ua += Math.sin((p.idlePh || 0) + i) * 0.04; }
+			if (upW > 0 && i === 1) { ua = ua * (1 - upW) + 0.35 * upW; eb = eb * (1 - upW); }   // a hand pushing off the turf
+			if (hw > 0) { ua = ua * (1 - hw) + 0.45 * hw; eb = eb * (1 - hw) + 1.15 * hw; }   // forearms up under the ball at his chest
+			if (bW > 0) { ua = ua * (1 - bW) + 0.2 * bW; eb = eb * (1 - bW) + 2.0 * bW; }   // arms tucked in to his body
+			if (shove > 0 && i === 0) { ua = ua * (1 - shove) + 1.0 * shove; eb = eb * (1 - shove) + 1.0 * shove; }   // the near arm bracing into him
+			if (stum > 0) { ua = ua * (1 - stum) + (i ? 1.3 : -0.9) * stum; eb = eb * (1 - stum) + 0.3 * stum; }   // arms out, catching his balance
 			const ex = shX + armOff(i) + face * Math.sin(ua) * Lu, ey = shY + Math.cos(ua) * Lu;
 			return [ [ ex, ey ], [ ex + face * Math.sin(ua + eb) * Lf, ey + Math.cos(ua + eb) * Lf ] ];
 		};
@@ -11190,6 +11205,14 @@
 			ctx.strokeStyle = shorts; ctx.lineWidth = Math.max(0.8, H * 0.035);
 			ctx.beginPath(); ctx.moveTo(hipX + face * Math.sin(lean) * H * 0.06, hipY - H * 0.05); ctx.lineTo(shX, shY + H * 0.04); ctx.stroke();
 		}
+		if (hw > 0) {   // the ball in his hands, in front of his chest (drawn over his body, under the near arm)
+			const h0 = armPts(0)[1], h1 = armPts(1)[1], g = tvProj(ball.x, ball.y, 3.2), rB = Math.max(3.6, 5.4 * k);
+			const cx = (h0[0] + h1[0]) / 2 - face * rB * 0.3, cy = (h0[1] + h1[1]) / 2 - rB * 0.55;
+			const bx = g ? g.x + (cx - g.x) * hw : cx, by = g ? g.y + (cy - g.y) * hw : cy;
+			ctx.fillStyle = cond.snow ? "#ff7d22" : "#ffffff"; ctx.beginPath(); ctx.arc(bx, by, rB, 0, Math.PI * 2); ctx.fill();
+			ctx.fillStyle = "#1a1a1a"; ctx.beginPath(); ctx.arc(bx - rB * 0.25, by - rB * 0.2, rB * 0.3, 0, Math.PI * 2); ctx.fill();
+			ctx.strokeStyle = "rgba(0, 0, 0, 0.3)"; ctx.lineWidth = Math.max(0.6, 0.8 * k); ctx.beginPath(); ctx.arc(bx, by, rB, 0, Math.PI * 2); ctx.stroke();
+		}
 		drawArm(0, false);
 		// Neck and collar, then the head carried forward with the lean.
 		const hx = shX + face * Math.sin(lean) * H * 0.09, hy = shY - H * 0.1;
@@ -11259,6 +11282,7 @@
 	// pass rolls rather than slides; a hard-hit ball leaves a faint streak behind it.
 	let tvBallPrev = null, tvBallAng = -0.6;
 	function drawBallTV () {
+		if (ball.owner && holdW3(ball.owner) > 0) { tvBallPrev = null; return; }   // in the keeper's hands: drawn with him (drawPlayerTV)
 		const q = tvProj(ball.x, ball.y, Math.max(0, ball.z) * Z_W + 3.2);
 		if (!q) { return; }
 		const r = Math.max(3.6, 5.4 * q.k);   // big enough to find at a glance
@@ -13050,9 +13074,7 @@
 		// Sliding in: on his side, one leg out at the ball, an arm on the turf. He drops into it over the
 		// first frames, and once it is over (slideCd / lungeCd run on) he gets back up off the grass.
 		const slideT = p.slideAI > 0 ? 1 - p.slideAI / 12 : down ? 1 - p.lunge / 14 : -1;
-		if (down) { SLID3.set(p, true); }
-		else if (!(p.lungeCd > 17) && !(p.slideCd > 94)) { SLID3.delete(p); }
-		const getUp = !down && fall < 0 && dive < 0 && SLID3.get(p) ? (p.slideCd > 94 ? (p.slideCd - 94) / 14 : p.lungeCd > 17 && p.lungeCd <= 31 ? (p.lungeCd - 17) / 14 : 0) : 0;
+		const gu = getUp3(p, down), getUp = fall < 0 && dive < 0 ? gu : 0;
 		if (down) {
 			const e = rm ? 1 : smooth3(clamp(slideT / 0.22, 0, 1)), L = (o, t) => lerp3(o, t, e);
 			r.root.rotation.z = L(0, 1.05); y -= 5.5 * e;
@@ -13111,6 +13133,19 @@
 			const D = DIVE3.get(p), k = smooth3(clamp((p.diveCd - 28) / 16, 0, 1)), th = D ? D.th || 1.4 : 1.4, side = D ? D.side || 1 : -(p.diveSide || 1);
 			r.root.rotation.x = side * th * k * k; y += 1.2 * k;
 			for (let i = 0; i < 2; i++) { r.kn[i].rotation.z -= 1.1 * k; r.hip[i].rotation.z += 0.7 * k; r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, -0.4, k); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, OUT3(i) * 0.6, k); }
+		}
+		// The ball in his hands (holdW3): gathered in to his chest, forearms up under it, elbows in.
+		const hw = gk && dive < 0 && fall < 0 && !gh ? holdW3(p) : 0;
+		if (hw > 0) {
+			for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 0.75, hw); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, -OUT3(i) * 0.2, hw); r.sh[i].rotation.y = lerp3(r.sh[i].rotation.y, 0, hw); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 1.6, hw); }
+			r.spine.rotation.z = lerp3(r.spine.rotation.z, -0.06, hw);
+		}
+		// A shot blocked (block3): he flinches into it, turning a shoulder, arms tucked in to his sides, knees giving.
+		const blk = !gk && !down && fall < 0 && !rm ? block3(p) : 0;
+		if (blk > 0) {
+			const b = blk < 0.2 ? smooth3(blk / 0.2) : 1 - smooth3((blk - 0.2) / 0.8);
+			r.chest.rotation.y += 0.5 * b; r.spine.rotation.z -= 0.16 * b; r.neck.rotation.z -= 0.25 * b; y -= 1.2 * b;
+			for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 0.15, b); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, -OUT3(i) * 0.12, b); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 1.9, b); r.kn[i].rotation.z -= 0.35 * b; r.hip[i].rotation.z += 0.2 * b; }
 		}
 		// Fouled: he goes down, lies there, then picks himself up.
 		if (fall >= 0) {
@@ -13651,6 +13686,34 @@
 		const k = p.kickA > 0 ? kickClock3(p) : null, h = HELD3.get(p);
 		if (k === null || h === undefined || frame - h > KICK_T + 2) { return null; }
 		return { k, kind: p.kickLoft ? ((p.kickPow || 0.5) < 0.55 ? "throw" : "punt") : (p.kickPow || 0.5) < 0.7 ? "roll" : "punt" };
+	}
+	// The keeper with the ball in his hands (in his area, not a goal kick off the grass): how far it is
+	// gathered up to his chest, 0..1. Up over the first frames after he takes it; down to his feet again
+	// as he winds up to kick it out (the boot meets it on the grass, where the simulation has it).
+	function holdW3 (p) {
+		if (!p || p.role !== "gk" || !ball || ball.owner !== p || !inHands(p) || (setPiece && setPiece.kind === "goalkick") || p.dive > 0 || p.fall > 0) { return 0; }
+		const since = p.gotAt !== undefined ? frame - p.gotAt : 99;
+		let w = smooth3(clamp((since + 1) / 6, 0, 1));
+		if (p.windUp > 0) { w *= smooth3(clamp((p.windUp - 1) / Math.max(1, (p.windN || 1) - 1), 0, 1)); }
+		return w;
+	}
+	// A shot blocked by an outfield man: blockShot sends the ball back off him and sets his kickCd to 12,
+	// the shooter still the ball's last touch. Seen as that rise in kickCd (to 9..12, allowing for skipped
+	// draws) with the ball loose off a shot from the other side; posed for BLOCK_T3 frames from then.
+	const BLOCK_T3 = 14, BLK3 = new WeakMap();
+	function block3 (p) {
+		if (p.role === "gk" || p.team < 0 || replayOn() || odr) { return 0; }
+		const s = BLK3.get(p) || { cd: 0, at: -99 }, cd = p.kickCd || 0;
+		if (cd > s.cd && cd <= 12 && cd >= 9 && !(p.kickA > 0) && !ball.owner && ball.shot && ball.lastBy && ball.lastBy.team !== p.team && Math.hypot(ball.x - p.x, ball.y - p.y) < 60) { s.at = frame - (12 - cd); }
+		s.cd = cd; BLK3.set(p, s);
+		const t = (frame - s.at) / BLOCK_T3;
+		return t >= 0 && t < 1 ? t : 0;
+	}
+	// Slides seen, so the getting up afterwards is his: both cameras keep this up to date every frame.
+	function getUp3 (p, down) {
+		if (down) { SLID3.set(p, true); }
+		else if (!(p.lungeCd > 17) && !(p.slideCd > 94)) { SLID3.delete(p); }
+		return !down && SLID3.get(p) ? (p.slideCd > 94 ? (p.slideCd - 94) / 14 : p.lungeCd > 17 && p.lungeCd <= 31 ? (p.lungeCd - 17) / 14 : 0) : 0;
 	}
 	/* ---------- the officials ----------
 	   Not part of the simulation: the referee keeps a diagonal to the ball, the assistants run the
@@ -14391,6 +14454,22 @@
 		S.tex.needsUpdate = true;
 	}
 	const BALL_R_PER_DIST = 0.003;   // ball radius per unit of camera distance, between the clamps
+	// Where the ball is drawn while the keeper holds it: between his gloves (the rig as just posed), a
+	// little in front of them, blended from where the simulation has it by how far he has gathered it
+	// (holdW3). After he lets it go (a throw or a punt) it eases from the last held spot onto its path.
+	const HELD_EASE3 = 6;
+	function heldBall3D (ow, br, sim) {
+		const F = G3.fig, w = ow ? holdW3(ow) : 0, r = ow && F && F.rigOf ? F.rigOf.get(ow) : null;
+		if (w > 0 && r) {
+			const V = G3.heldV || (G3.heldV = [ new THREE.Vector3(), new THREE.Vector3() ]), a = r.ha[0].getWorldPosition(V[0]), b = r.ha[1].getWorldPosition(V[1]), e = r.root.matrixWorld.elements, fl = Math.hypot(e[0], e[2]) || 1;
+			const hx = (a.x + b.x) / 2 + e[0] / fl * br * 0.55, hy = (a.y + b.y) / 2 + br * 0.45, hz = (a.z + b.z) / 2 + e[2] / fl * br * 0.55;
+			G3.heldLast = { p: ow, at: frame, x: hx, y: hy, z: hz };
+			return { x: lerp3(sim[0], hx, w), y: lerp3(sim[1], hy, w), z: lerp3(sim[2], hz, w), w };
+		}
+		const L = G3.heldLast, t = L && !ball.owner && ball.lastBy === L.p ? (frame - L.at) / HELD_EASE3 : 1;
+		if (t >= 0 && t < 1 && !replayOn()) { const k = 1 - smooth3(t); return { x: lerp3(sim[0], L.x, k), y: lerp3(sim[1], L.y, k), z: lerp3(sim[2], L.z, k), w: 0 }; }
+		return null;
+	}
 	function sync3D () {
 		buildStadium3D();
 		screen3D();
@@ -14411,12 +14490,16 @@
 		// never shrinks to a speck from the gantry.
 		// Taken on the chest or the thigh, the ball is drawn dropping from where he met it to his feet.
 		const ow = ball.owner, rs = ow && (ow.recvK === "chest" || ow.recvK === "thigh") && ow.gotAt !== undefined ? frame - ow.gotAt : 99;
-		const h = Math.max(0, ball.z || 0, rs >= 0 && rs < 14 ? (ow.recvZ || 0) * Math.pow(1 - rs / 14, 2) : 0), bx = WX(ball.x), bz = ball.y;
+		let h = Math.max(0, ball.z || 0, rs >= 0 && rs < 14 ? (ow.recvZ || 0) * Math.pow(1 - rs / 14, 2) : 0), bx = WX(ball.x), bz = ball.y;
 		const br = G3.ballR = clamp(G3.cam.position.distanceTo(G3.v.set(bx, h * Z3, bz)) * BALL_R_PER_DIST, 2.4, 5);
+		// In the keeper's hands it is drawn between his gloves (heldBall3D), coming up from the grass as he
+		// gathers it, and for a few frames after he lets it go it eases from there onto its true path.
+		const held = heldBall3D(ow, br, [ bx, h * Z3 + br, bz ]);
+		if (held) { bx = held.x; bz = held.z; h = Math.max(0, held.y - br) / Z3; }
 		G3.ball.scale.setScalar(br / 5);
 		G3.ball.position.set(bx, h * Z3 + br, bz);
 		if (G3.ball.material.color) { G3.ball.material.color.setHex(cond.snow ? 0xff8a30 : 0xffffff); }   // an orange ball in the snow
-		const spd = Math.hypot(ball.vx, ball.vy);
+		const spd = held && held.w > 0.5 ? 0 : Math.hypot(ball.vx, ball.vy);
 		if (spd > 0.01 && !reduceMotion) {
 			G3.v.set(ball.vy, 0, -(sw ? -ball.vx : ball.vx)).normalize();
 			G3.ball.rotateOnWorldAxis(G3.v, spd / br * frameDt / 16.7);

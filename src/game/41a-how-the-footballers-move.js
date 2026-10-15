@@ -350,3 +350,31 @@
 		if (k === null || h === undefined || frame - h > KICK_T + 2) { return null; }
 		return { k, kind: p.kickLoft ? ((p.kickPow || 0.5) < 0.55 ? "throw" : "punt") : (p.kickPow || 0.5) < 0.7 ? "roll" : "punt" };
 	}
+	// The keeper with the ball in his hands (in his area, not a goal kick off the grass): how far it is
+	// gathered up to his chest, 0..1. Up over the first frames after he takes it; down to his feet again
+	// as he winds up to kick it out (the boot meets it on the grass, where the simulation has it).
+	function holdW3 (p) {
+		if (!p || p.role !== "gk" || !ball || ball.owner !== p || !inHands(p) || (setPiece && setPiece.kind === "goalkick") || p.dive > 0 || p.fall > 0) { return 0; }
+		const since = p.gotAt !== undefined ? frame - p.gotAt : 99;
+		let w = smooth3(clamp((since + 1) / 6, 0, 1));
+		if (p.windUp > 0) { w *= smooth3(clamp((p.windUp - 1) / Math.max(1, (p.windN || 1) - 1), 0, 1)); }
+		return w;
+	}
+	// A shot blocked by an outfield man: blockShot sends the ball back off him and sets his kickCd to 12,
+	// the shooter still the ball's last touch. Seen as that rise in kickCd (to 9..12, allowing for skipped
+	// draws) with the ball loose off a shot from the other side; posed for BLOCK_T3 frames from then.
+	const BLOCK_T3 = 14, BLK3 = new WeakMap();
+	function block3 (p) {
+		if (p.role === "gk" || p.team < 0 || replayOn() || odr) { return 0; }
+		const s = BLK3.get(p) || { cd: 0, at: -99 }, cd = p.kickCd || 0;
+		if (cd > s.cd && cd <= 12 && cd >= 9 && !(p.kickA > 0) && !ball.owner && ball.shot && ball.lastBy && ball.lastBy.team !== p.team && Math.hypot(ball.x - p.x, ball.y - p.y) < 60) { s.at = frame - (12 - cd); }
+		s.cd = cd; BLK3.set(p, s);
+		const t = (frame - s.at) / BLOCK_T3;
+		return t >= 0 && t < 1 ? t : 0;
+	}
+	// Slides seen, so the getting up afterwards is his: both cameras keep this up to date every frame.
+	function getUp3 (p, down) {
+		if (down) { SLID3.set(p, true); }
+		else if (!(p.lungeCd > 17) && !(p.slideCd > 94)) { SLID3.delete(p); }
+		return !down && SLID3.get(p) ? (p.slideCd > 94 ? (p.slideCd - 94) / 14 : p.lungeCd > 17 && p.lungeCd <= 31 ? (p.lungeCd - 17) / 14 : 0) : 0;
+	}

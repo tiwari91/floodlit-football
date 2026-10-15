@@ -514,6 +514,22 @@
 		S.tex.needsUpdate = true;
 	}
 	const BALL_R_PER_DIST = 0.003;   // ball radius per unit of camera distance, between the clamps
+	// Where the ball is drawn while the keeper holds it: between his gloves (the rig as just posed), a
+	// little in front of them, blended from where the simulation has it by how far he has gathered it
+	// (holdW3). After he lets it go (a throw or a punt) it eases from the last held spot onto its path.
+	const HELD_EASE3 = 6;
+	function heldBall3D (ow, br, sim) {
+		const F = G3.fig, w = ow ? holdW3(ow) : 0, r = ow && F && F.rigOf ? F.rigOf.get(ow) : null;
+		if (w > 0 && r) {
+			const V = G3.heldV || (G3.heldV = [ new THREE.Vector3(), new THREE.Vector3() ]), a = r.ha[0].getWorldPosition(V[0]), b = r.ha[1].getWorldPosition(V[1]), e = r.root.matrixWorld.elements, fl = Math.hypot(e[0], e[2]) || 1;
+			const hx = (a.x + b.x) / 2 + e[0] / fl * br * 0.55, hy = (a.y + b.y) / 2 + br * 0.45, hz = (a.z + b.z) / 2 + e[2] / fl * br * 0.55;
+			G3.heldLast = { p: ow, at: frame, x: hx, y: hy, z: hz };
+			return { x: lerp3(sim[0], hx, w), y: lerp3(sim[1], hy, w), z: lerp3(sim[2], hz, w), w };
+		}
+		const L = G3.heldLast, t = L && !ball.owner && ball.lastBy === L.p ? (frame - L.at) / HELD_EASE3 : 1;
+		if (t >= 0 && t < 1 && !replayOn()) { const k = 1 - smooth3(t); return { x: lerp3(sim[0], L.x, k), y: lerp3(sim[1], L.y, k), z: lerp3(sim[2], L.z, k), w: 0 }; }
+		return null;
+	}
 	function sync3D () {
 		buildStadium3D();
 		screen3D();
@@ -534,12 +550,16 @@
 		// never shrinks to a speck from the gantry.
 		// Taken on the chest or the thigh, the ball is drawn dropping from where he met it to his feet.
 		const ow = ball.owner, rs = ow && (ow.recvK === "chest" || ow.recvK === "thigh") && ow.gotAt !== undefined ? frame - ow.gotAt : 99;
-		const h = Math.max(0, ball.z || 0, rs >= 0 && rs < 14 ? (ow.recvZ || 0) * Math.pow(1 - rs / 14, 2) : 0), bx = WX(ball.x), bz = ball.y;
+		let h = Math.max(0, ball.z || 0, rs >= 0 && rs < 14 ? (ow.recvZ || 0) * Math.pow(1 - rs / 14, 2) : 0), bx = WX(ball.x), bz = ball.y;
 		const br = G3.ballR = clamp(G3.cam.position.distanceTo(G3.v.set(bx, h * Z3, bz)) * BALL_R_PER_DIST, 2.4, 5);
+		// In the keeper's hands it is drawn between his gloves (heldBall3D), coming up from the grass as he
+		// gathers it, and for a few frames after he lets it go it eases from there onto its true path.
+		const held = heldBall3D(ow, br, [ bx, h * Z3 + br, bz ]);
+		if (held) { bx = held.x; bz = held.z; h = Math.max(0, held.y - br) / Z3; }
 		G3.ball.scale.setScalar(br / 5);
 		G3.ball.position.set(bx, h * Z3 + br, bz);
 		if (G3.ball.material.color) { G3.ball.material.color.setHex(cond.snow ? 0xff8a30 : 0xffffff); }   // an orange ball in the snow
-		const spd = Math.hypot(ball.vx, ball.vy);
+		const spd = held && held.w > 0.5 ? 0 : Math.hypot(ball.vx, ball.vy);
 		if (spd > 0.01 && !reduceMotion) {
 			G3.v.set(ball.vy, 0, -(sw ? -ball.vx : ball.vx)).normalize();
 			G3.ball.rotateOnWorldAxis(G3.v, spd / br * frameDt / 16.7);

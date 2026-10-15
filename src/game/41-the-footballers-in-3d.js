@@ -864,9 +864,7 @@
 		// Sliding in: on his side, one leg out at the ball, an arm on the turf. He drops into it over the
 		// first frames, and once it is over (slideCd / lungeCd run on) he gets back up off the grass.
 		const slideT = p.slideAI > 0 ? 1 - p.slideAI / 12 : down ? 1 - p.lunge / 14 : -1;
-		if (down) { SLID3.set(p, true); }
-		else if (!(p.lungeCd > 17) && !(p.slideCd > 94)) { SLID3.delete(p); }
-		const getUp = !down && fall < 0 && dive < 0 && SLID3.get(p) ? (p.slideCd > 94 ? (p.slideCd - 94) / 14 : p.lungeCd > 17 && p.lungeCd <= 31 ? (p.lungeCd - 17) / 14 : 0) : 0;
+		const gu = getUp3(p, down), getUp = fall < 0 && dive < 0 ? gu : 0;
 		if (down) {
 			const e = rm ? 1 : smooth3(clamp(slideT / 0.22, 0, 1)), L = (o, t) => lerp3(o, t, e);
 			r.root.rotation.z = L(0, 1.05); y -= 5.5 * e;
@@ -925,6 +923,19 @@
 			const D = DIVE3.get(p), k = smooth3(clamp((p.diveCd - 28) / 16, 0, 1)), th = D ? D.th || 1.4 : 1.4, side = D ? D.side || 1 : -(p.diveSide || 1);
 			r.root.rotation.x = side * th * k * k; y += 1.2 * k;
 			for (let i = 0; i < 2; i++) { r.kn[i].rotation.z -= 1.1 * k; r.hip[i].rotation.z += 0.7 * k; r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, -0.4, k); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, OUT3(i) * 0.6, k); }
+		}
+		// The ball in his hands (holdW3): gathered in to his chest, forearms up under it, elbows in.
+		const hw = gk && dive < 0 && fall < 0 && !gh ? holdW3(p) : 0;
+		if (hw > 0) {
+			for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 0.75, hw); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, -OUT3(i) * 0.2, hw); r.sh[i].rotation.y = lerp3(r.sh[i].rotation.y, 0, hw); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 1.6, hw); }
+			r.spine.rotation.z = lerp3(r.spine.rotation.z, -0.06, hw);
+		}
+		// A shot blocked (block3): he flinches into it, turning a shoulder, arms tucked in to his sides, knees giving.
+		const blk = !gk && !down && fall < 0 && !rm ? block3(p) : 0;
+		if (blk > 0) {
+			const b = blk < 0.2 ? smooth3(blk / 0.2) : 1 - smooth3((blk - 0.2) / 0.8);
+			r.chest.rotation.y += 0.5 * b; r.spine.rotation.z -= 0.16 * b; r.neck.rotation.z -= 0.25 * b; y -= 1.2 * b;
+			for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 0.15, b); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, -OUT3(i) * 0.12, b); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 1.9, b); r.kn[i].rotation.z -= 0.35 * b; r.hip[i].rotation.z += 0.2 * b; }
 		}
 		// Fouled: he goes down, lies there, then picks himself up.
 		if (fall >= 0) {

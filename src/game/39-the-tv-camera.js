@@ -264,21 +264,28 @@
 		const a = down ? 0 : clamp(p.runAmt || 0, 0, 1), ph = reduceMotion ? 0 : p.stride || 0;
 		const vary = (((p.num || 0) * 37 + p.team * 11) % 10) / 10;   // each man stands a little differently
 		const shuf = down ? 0 : p.shuf || 0, ks = down || reduceMotion || jump > 0 ? null : kickTV(p), cel = p.celebA || 0;
+		// As in 3D: getting up after a slide (getUp3), the ball held to his chest (holdW3), a shot blocked
+		// (block3), and the challenges on his feet (challenge3: a shoulder in, a poke at the ball, a stumble).
+		const gu = getUp3(p, down), blk0 = block3(p), gk = p.role === "gk";
+		const upW = reduceMotion || dvTV >= 0 ? 0 : smooth3(clamp(gu, 0, 1)), hw = gk && dvTV < 0 ? holdW3(p) : 0;
+		const blkT = !gk && !down && !reduceMotion ? blk0 : 0, bW = blkT > 0 ? (blkT < 0.2 ? smooth3(blkT / 0.2) : 1 - smooth3((blkT - 0.2) / 0.8)) : 0;
+		const ch = !down && upW <= 0 && !ks && !jump && cel <= 0 && bW <= 0 && !gk && p.team >= 0 && !reduceMotion ? challenge3(p, p.x, p.y, p.dir, 1) : null;
+		const shove = ch ? ch.shove : 0, poke = ch ? ch.poke : 0, stum = ch ? ch.stumble : 0;
 		// Leaning into the run, back against a planted cut, upright when shuffling.
-		const lean = down ? -1.05 : a * a * 0.26 * (1 - 0.6 * shuf) - (p.plant > 0 ? 0.2 * p.plant / 10 : 0) + (ks ? 0.08 : 0);   // sliding: leaning right back
+		const lean = down ? -1.05 : a * a * 0.26 * (1 - 0.6 * shuf) - (p.plant > 0 ? 0.2 * p.plant / 10 : 0) + (ks ? 0.08 : 0) + 0.75 * upW + 0.22 * shove + 0.4 * stum - 0.1 * poke + 0.2 * bW + (ch ? 0.06 * ch.lean : 0);   // sliding: leaning right back
 		const bob = reduceMotion ? 0 : Math.abs(Math.cos(ph)) * a * H * 0.035;
 		if (!reduceMotion && a < 0.15 && !down && !jump) { X += Math.sin(p.idlePh || 0) * H * 0.012; }   // standing: shifting his weight
-		const hipX = X, hipY = down ? Y - H * 0.11 : Y - H * 0.5 - bob + shuf * H * 0.035;
+		const hipX = X, hipY = down ? Y - H * 0.11 : Y - H * 0.5 - bob + shuf * H * 0.035 + H * (0.2 * upW + 0.04 * stum + 0.035 * bW + 0.02 * poke);
 		const shX = hipX + face * Math.sin(lean) * H * 0.32, shY = hipY - Math.cos(lean) * H * 0.32;
 		const shade = (hex, f) => { const n = parseInt(hex.slice(1), 16); return `rgb(${[ n >> 16, (n >> 8) & 255, n & 255 ].map(v => Math.round(v * f)).join(",")})`; };
 		const Lt = H * 0.26, Ls = H * 0.26, Lu = H * 0.16, Lf = H * 0.15;
 		// The arms hang from the edges of the shirt and the legs from either side of the hips, so a
 		// standing man's arms are at his sides rather than across his front.
-		const still = down ? 0 : 1 - clamp(a / 0.3, 0, 1);   // the side offsets are for a man standing; running, he is seen side-on
+		const still = down ? 0 : (1 - clamp(a / 0.3, 0, 1)) * (1 - 0.8 * hw);   // the side offsets are for a man standing; running, he is seen side-on
 		const armOff = i => (i ? 1 : -1) * face * H * 0.115 * still, legOff = i => (i ? 1 : -1) * face * H * 0.035 * still;
 		// Running, walking, shuffling: each foot set down on the grass and carried through (gait3, shared
 		// with 3D), the knee found from hip and foot, so the boots never slide along the turf.
-		const GT = down || jump > 0 || reduceMotion ? null : gait3(p, ph, p.dir, 1, {}), sc32 = H / 32;
+		const GT = down || jump > 0 || reduceMotion || upW > 0.05 || poke > 0.05 || stum > 0.05 || bW > 0.05 ? null : gait3(p, ph, p.dir, 1, {}), sc32 = H / 32;
 		const legGait = i => {
 			const f = GT.feet[i], ox = f.x * Math.cos(p.dir) - f.z * Math.sin(p.dir), q = tvProj(p.x + ox, p.y, 0);
 			const hx = hipX + legOff(i), hy = hipY + (LEG3 + ANK3 - GT.h) * sc32 * 0.6, fx = q ? q.x : X, fy = Y - (f.y - ANK3) * sc32 + H * 0.02;
@@ -298,6 +305,9 @@
 			// differs from man to man.
 			if (!jump && !shuf && a < 0.15) { const r = 1 - a / 0.15; th = th * (1 - r) + ((i ? -0.11 : 0.13) + (i ? -1 : 1) * vary * 0.07) * r; kn = kn * (1 - r) + (0.1 + vary * 0.06) * r; }
 			if (ks) { if (i === 0) { th = ks.s; kn = ks.bend; } else { th = -0.12 - 0.1 * ks.bw; kn = 0.2 + 0.3 * ks.bw; } }   // kicking leg, and the one planted beside the ball
+			const crouch = Math.max(upW, 0.5 * stum, 0.4 * bW);   // knees under him: getting up, stumbling, braced for the block
+			if (crouch > 0) { th += (i ? 0.45 : 0.75) * crouch; kn += (i ? 1.1 : 1.5) * crouch; }
+			if (poke > 0 && i === 0) { th = th * (1 - poke) + 0.8 * poke; kn = kn * (1 - poke) + 0.1 * poke; }   // the near leg out, poking at the ball
 			const kx = hipX + legOff(i) + face * Math.sin(th) * Lt, ky = hipY + Math.cos(th) * Lt;
 			return [ [ kx, ky ], [ kx + face * Math.sin(th - kn) * Ls, ky + Math.cos(th - kn) * Ls ] ];
 		};
@@ -320,6 +330,11 @@
 			// touch ahead, elbows nearly straight, so they never fold across his front.
 			if (a < 0.15 && !jump && !ks && !cel && !shuf) { const r = 1 - a / 0.15; ua = ua * (1 - r) + ((i ? 0.1 : -0.16) - vary * 0.05) * r; eb = eb * (1 - r) + (0.08 + vary * 0.06) * r; }
 			if (!reduceMotion && a < 0.15 && !jump && !ks && !cel) { ua += Math.sin((p.idlePh || 0) + i) * 0.04; }
+			if (upW > 0 && i === 1) { ua = ua * (1 - upW) + 0.35 * upW; eb = eb * (1 - upW); }   // a hand pushing off the turf
+			if (hw > 0) { ua = ua * (1 - hw) + 0.45 * hw; eb = eb * (1 - hw) + 1.15 * hw; }   // forearms up under the ball at his chest
+			if (bW > 0) { ua = ua * (1 - bW) + 0.2 * bW; eb = eb * (1 - bW) + 2.0 * bW; }   // arms tucked in to his body
+			if (shove > 0 && i === 0) { ua = ua * (1 - shove) + 1.0 * shove; eb = eb * (1 - shove) + 1.0 * shove; }   // the near arm bracing into him
+			if (stum > 0) { ua = ua * (1 - stum) + (i ? 1.3 : -0.9) * stum; eb = eb * (1 - stum) + 0.3 * stum; }   // arms out, catching his balance
 			const ex = shX + armOff(i) + face * Math.sin(ua) * Lu, ey = shY + Math.cos(ua) * Lu;
 			return [ [ ex, ey ], [ ex + face * Math.sin(ua + eb) * Lf, ey + Math.cos(ua + eb) * Lf ] ];
 		};
@@ -448,6 +463,14 @@
 			ctx.strokeStyle = shorts; ctx.lineWidth = Math.max(0.8, H * 0.035);
 			ctx.beginPath(); ctx.moveTo(hipX + face * Math.sin(lean) * H * 0.06, hipY - H * 0.05); ctx.lineTo(shX, shY + H * 0.04); ctx.stroke();
 		}
+		if (hw > 0) {   // the ball in his hands, in front of his chest (drawn over his body, under the near arm)
+			const h0 = armPts(0)[1], h1 = armPts(1)[1], g = tvProj(ball.x, ball.y, 3.2), rB = Math.max(3.6, 5.4 * k);
+			const cx = (h0[0] + h1[0]) / 2 - face * rB * 0.3, cy = (h0[1] + h1[1]) / 2 - rB * 0.55;
+			const bx = g ? g.x + (cx - g.x) * hw : cx, by = g ? g.y + (cy - g.y) * hw : cy;
+			ctx.fillStyle = cond.snow ? "#ff7d22" : "#ffffff"; ctx.beginPath(); ctx.arc(bx, by, rB, 0, Math.PI * 2); ctx.fill();
+			ctx.fillStyle = "#1a1a1a"; ctx.beginPath(); ctx.arc(bx - rB * 0.25, by - rB * 0.2, rB * 0.3, 0, Math.PI * 2); ctx.fill();
+			ctx.strokeStyle = "rgba(0, 0, 0, 0.3)"; ctx.lineWidth = Math.max(0.6, 0.8 * k); ctx.beginPath(); ctx.arc(bx, by, rB, 0, Math.PI * 2); ctx.stroke();
+		}
 		drawArm(0, false);
 		// Neck and collar, then the head carried forward with the lean.
 		const hx = shX + face * Math.sin(lean) * H * 0.09, hy = shY - H * 0.1;
@@ -517,6 +540,7 @@
 	// pass rolls rather than slides; a hard-hit ball leaves a faint streak behind it.
 	let tvBallPrev = null, tvBallAng = -0.6;
 	function drawBallTV () {
+		if (ball.owner && holdW3(ball.owner) > 0) { tvBallPrev = null; return; }   // in the keeper's hands: drawn with him (drawPlayerTV)
 		const q = tvProj(ball.x, ball.y, Math.max(0, ball.z) * Z_W + 3.2);
 		if (!q) { return; }
 		const r = Math.max(3.6, 5.4 * q.k);   // big enough to find at a glance
