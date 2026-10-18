@@ -5,7 +5,7 @@
 	   then back to the scorer and the restart. Any key or tap skips it, as it does the celebration.
 	   The match clock is stopped throughout, as it is for any goal. */
 	const REC_F = [ "x", "y", "dir", "stride", "runAmt", "vx", "vy", "kickA", "kickPow", "jump", "slideAI", "fall", "dive", "diveSide", "throwA", "idlePh", "shuf", "celebA", "kneel", "sulk", "celebK", "hug", "windUp", "windN", "kickLoft", "lungeCd", "diveCd", "plant" ];
-	const REC_N = 360, REC_P = 24, REC_W = REC_P * REC_F.length + 5 + 15;   // frames kept, players, floats a frame
+	const REC_N = 360, REC_P = 24, REC_W = REC_P * REC_F.length + 5 + 15 + 2;   // frames kept, players, floats a frame (the ball, the officials, who has it and who last touched it)
 	const REPLAY_AT = 230, REPLAY_BEFORE = 150, REPLAY_AFTER = 28, REPLAY_SPEED = 0.64;
 	const REPLAY_FR = Math.round((REPLAY_BEFORE + REPLAY_AFTER) / REPLAY_SPEED);   // frames on screen
 	const rec = { buf: null, who: new Array(REC_N), head: 0, n: 0 };
@@ -22,6 +22,7 @@
 		const ob = o0 + REC_P * NF;
 		b[ob] = ball.x; b[ob + 1] = ball.y; b[ob + 2] = ball.z || 0; b[ob + 3] = ball.vx; b[ob + 4] = ball.vy;
 		officials3.forEach((f, k) => { const q = ob + 5 + k * 5; b[q] = f.x; b[q + 1] = f.y; b[q + 2] = f.dir; b[q + 3] = f.stride; b[q + 4] = f.runAmt; });
+		b[ob + 20] = players.indexOf(ball.owner); b[ob + 21] = players.indexOf(ball.lastBy);   // -1: nobody
 		rec.head = (rec.head + 1) % REC_N;
 		rec.n = Math.min(REC_N, rec.n + 1);
 	}
@@ -65,16 +66,19 @@
 			p.lunge = 0;
 		});
 		const ob0 = r0 * REC_W + REC_P * NF, ob1 = r1 * REC_W + REC_P * NF;
-		const keepBall = [ ball.x, ball.y, ball.z, ball.vx, ball.vy ];
+		const keepBall = [ ball.x, ball.y, ball.z, ball.vx, ball.vy, ball.owner, ball.lastBy ];
 		ball.x = b[ob0] + (b[ob1] - b[ob0]) * t; ball.y = b[ob0 + 1] + (b[ob1 + 1] - b[ob0 + 1]) * t; ball.z = b[ob0 + 2] + (b[ob1 + 2] - b[ob0 + 2]) * t;
 		ball.vx = b[ob0 + 3] * spd; ball.vy = b[ob0 + 4] * spd;
+		// Who had it then, not now: the ball is drawn at the feet or in the gloves of the man holding it, so the
+		// keeper picking it out of the net must not carry it through the replay.
+		ball.owner = who[b[ob0 + 20]] || null; ball.lastBy = who[b[ob0 + 21]] || null;
 		const keepOff = officials3.map(o => [ o.x, o.y, o.dir, o.stride, o.runAmt ]);
 		officials3.forEach((o, k) => { const q = ob0 + 5 + k * 5, q1 = ob1 + 5 + k * 5; o.x = b[q] + (b[q1] - b[q]) * t; o.y = b[q + 1] + (b[q1 + 1] - b[q + 1]) * t; o.dir = b[q + 2]; o.stride = b[q + 3]; o.runAmt = b[q + 4]; });
 		players = who; ctrl = -1;
 		return () => {
 			animLag = 0;
 			for (const [ p, saved ] of keep) { Object.assign(p, saved); }
-			[ ball.x, ball.y, ball.z, ball.vx, ball.vy ] = keepBall;
+			[ ball.x, ball.y, ball.z, ball.vx, ball.vy, ball.owner, ball.lastBy ] = keepBall;
 			officials3.forEach((o, k) => { [ o.x, o.y, o.dir, o.stride, o.runAmt ] = keepOff[k]; });
 			players = keepPlayers; ctrl = keepCtrl;
 		};

@@ -661,6 +661,42 @@ const st3 = await page.evaluate(async () => {
 	return { rode: s.filter(x => x.rode).length, over: Math.max(...s.map(x => x.over || 0)).toFixed(1), n: s.length, drawn: s.filter(x => x.medics === 2).length, maxCarry: Math.max(...carried.map(x => x.worst)).toFixed(1), shot: s.filter(x => x.shot === "stretcher").length, carried: carried.length };
 });
 check("stretcher (3D): two medics carry it with their hands at the handles, he lies within it, and the camera goes to it", !st3.skip && st3.rode > 5 && Number(st3.over) <= 0 && st3.drawn >= st3.n * 0.8 && st3.carried > 5 && Number(st3.maxCarry) < 3 && st3.shot > 5, JSON.stringify(st3));
+// Replays: the ball is drawn where it was then (not in the hands of whoever holds it now), on screen and
+// standing out from the grass, in both goal-replay angles and in each kind of weather, and in a replay on demand.
+const rpBall = await page.evaluate(async () => {
+	const F = window.__ff, G = F.G3, out = [];
+	if (F.camMode !== "3d" || !G.renderer) { return { skip: true }; }
+	const look = (tag) => {
+		const b = G.ball, gl = G.renderer.getContext(), p = b.position.clone().project(G.cam);
+		G.renderer.render(G.scene, G.cam);
+		const W = gl.drawingBufferWidth, H = gl.drawingBufferHeight, px = Math.round((p.x + 1) / 2 * W), py = Math.round((p.y + 1) / 2 * H);
+		const rad = Math.max(2, Math.round(b.scale.x * 5 / Math.tan(G.cam.fov * Math.PI / 360) / b.position.distanceTo(G.cam.position) * H / 2));
+		const at = (x, y) => { const a = new Uint8Array(4); gl.readPixels(clamp(Math.round(x), 0, W - 1), clamp(Math.round(y), 0, H - 1), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, a); return a; };
+		const ringPx = [ 0, 1, 2, 3, 4, 5, 6, 7 ].map(k => at(px + Math.cos(k * 0.785) * rad * 4, py + Math.sin(k * 0.785) * rad * 4));
+		const med = [ 0, 1, 2 ].map(c => ringPx.map(a => a[c]).sort((a, b) => a - b)[4]), cd = a => Math.hypot(a[0] - med[0], a[1] - med[1], a[2] - med[2]);
+		let hi = 0; for (let dx = -1; dx <= 1; dx++) { for (let dy = -1; dy <= 1; dy++) { hi = Math.max(hi, cd(at(px + dx * (rad >> 1), py + dy * (rad >> 1)))); } }
+		const ring = 0;   // (colour distance from the grass around it)
+		// the drawn ball against the replayed one (ends may be swapped: compare across the pitch, and its depth)
+		const near = Math.min(Math.abs(b.position.x - F.ball.x), Math.abs(b.position.x - (F.FW - F.ball.x))) < 30 && Math.abs(b.position.z - F.ball.y) < 30;
+		out.push({ tag, on: Math.abs(p.x) < 0.95 && Math.abs(p.y) < 0.95 && p.z < 1, near, vis: b.visible, pop: Math.round(hi - ring), rad });
+	};
+	const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+	const weathers = [ {}, { fog: true }, { snow: true }, {} ];
+	for (let g = 0; g < 4; g++) {
+		const w = weathers[g], keep = {}; for (const k of [ "fog", "snow" ]) { keep[k] = F.cond[k]; F.cond[k] = !!w[k]; } G.stadiumKey = "";
+		for (let i = 0; i < 3000 && F.state !== "play"; i++) { F.step(1); }
+		F.timeLeft = 1e9; F.autoPilot = true; F.step(240); F.autoPilot = false; F.freeze = 0;
+		F.forceGoal(g % 2);
+		for (let i = 0; i < 600 && !F.replayOn; i++) { F.step(1); }
+		window.__ffCam3D = () => { window.__ffCam3D = null; look(`goal${g}`); };
+		for (let n = 0; n < 6 && F.replayOn; n++) { await new Promise(r => setTimeout(r, 300)); window.__ffCam3D = window.__ffCam3D || (() => { window.__ffCam3D = null; look(`goal${g}${JSON.stringify(w)}`); }); }
+		window.__ffCam3D = null;
+		for (let i = 0; i < 3000 && F.state !== "play"; i++) { F.step(1); }
+		Object.assign(F.cond, keep); G.stadiumKey = "";
+	}
+	return { n: out.length, bad: out.filter(o => !o.on || !o.near || !o.vis || o.pop < 60) };
+});
+check("replay (3D): the ball is drawn where it was in the clip, on screen and standing out, in both angles and any weather", !rpBall.skip && rpBall.n >= 12 && rpBall.bad.length === 0, JSON.stringify(rpBall));
 check("no errors after the woodwork checks (and no 3D failure)", errs.length === 0 && !errs.some(e => /3D view failed/.test(e)), errs.join(" | "));
 await browser.close(); server.stop();
 process.exit(done() ? 1 : 0);
