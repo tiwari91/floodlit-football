@@ -17,6 +17,7 @@
 		subNo = [ 0, 0 ]; stall = 0; addedDone = [ false, false ];
 		planOthers(leagueMatch);
 		oppSquad = cpuSquad(leagueMatch ? leagueMatch.opp : 99, oppStr);
+		youSquad = leagueMatch ? null : cpuSquad(99, friendlyYouStr());
 		$("fmtName").textContent = FMT.label;
 		score = [ 0, 0 ];
 		stats = { passes: 0, completed: 0, shots: 0, tackles: 0, aiTackles: 0, corners: 0, fouls: 0, cards: 0 };
@@ -43,9 +44,11 @@
 				style[1] = alts[leagueMatch.opp % alts.length];
 			}
 		} else {
-			const ss = Object.keys(STYLES).filter(k => k !== style[0]), ps = Object.keys(PRESSES);
+			// Any style and any press, as a league club may play, but never both the same as yours.
+			const ss = Object.keys(STYLES), ps = Object.keys(PRESSES);
 			style[1] = ss[Math.floor(Math.random() * ss.length)];
 			press[1] = ps[Math.floor(Math.random() * ps.length)];
+			if (style[1] === style[0] && press[1] === press[0]) { const alts = ss.filter(k => k !== style[0]); style[1] = alts[Math.floor(Math.random() * alts.length)]; }
 		}
 		// The computer's line follows its press, and each club has its own way of tackling.
 		line[1] = press[1] === "high" ? "high" : press[1] === "low" ? "deep" : "normal";

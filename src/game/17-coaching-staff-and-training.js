@@ -691,6 +691,11 @@
 	// A computer club's players: the same squad every time you meet them in a season,
 	// better all round the stronger the club, with defenders who defend and strikers who finish.
 	const cpuOvr = s => 50 + s * 7;   // rating 1 -> 57 overall, 3 -> 71, 5 -> 85
+	// In a friendly your side is a squad of its own at a normal club's strength (3: about 71 overall), drawn the
+	// same way as the opponent's, so a normal friendly is an even match and the difficulty sets the gap.
+	const FRIENDLY_YOU_STR = 3;
+	let youSquad = null;
+	const friendlyYouStr = () => { const t = /[?&]test\b/.test(location.search) ? Number(store.get("ff-test-you")) : 0; return t >= 1 && t <= 5 ? t : FRIENDLY_YOU_STR; };   // (a test can set it)
 	function cpuSquad (clubId, str) {
 		let h = (clubId * 7919 + (league ? league.season : 1) * 104729) % 2147483647 || 1;
 		const rnd = () => { h = (h * 48271) % 2147483647; return h / 2147483647; };

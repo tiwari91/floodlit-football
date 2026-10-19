@@ -245,6 +245,7 @@
 		return true;
 	}
 	function kick (p, tx, ty, speed, snd = "kick") {
+		ball.intended = null;   // aiHandOff names the man a computer-run pass is for, after the kick
 		p.kickLoft = false;   // loftTo, the chip and the lifted shot set it after: he leans back under those
 		const owned = ball.owner === p;
 		lastTouch = p.team;
@@ -279,12 +280,12 @@
 	function passTo (p, m) {
 		notePass(p);
 		// A rattled side's passes stray (yours a little, the computer-run ones more).
-		const err = Math.max(0, p.team === 0 && players.indexOf(p) === ctrl ? passErr(p) : (45 * edge(1 - p.team) + cond.wet * 8 + 30 * Math.max(0, 0.75 - staOf(p)) + 18 * wobble(p.team)) * (tr(p, "playmaker") ? 0.55 : 1) * (p.team === 1 ? lv.pass : 1) + (p.team === 1 ? lv.passAdd : 0));
+		const err = Math.max(0, steered(p) ? passErr(p) : (aiPassErr(p) + 45 * edge(1 - p.team) + cond.wet * 8 + 30 * Math.max(0, 0.75 - staOf(p)) + 18 * wobble(p.team)) * (tr(p, "playmaker") ? 0.55 : 1) * (p.team === 1 ? lv.pass : 1) + (p.team === 1 ? lv.passAdd : 0));
 		const lx = m.x + m.vx * 10 + (Math.random() * 2 - 1) * err;
 		const ly = m.y + m.vy * 10 + (Math.random() * 2 - 1) * err;
 		const d = Math.hypot(lx - ball.x, ly - ball.y);
 		// Your passes are zipped in a little firmer, so they beat the man in between.
-		const firm = p.team === 0 ? 1.18 : 1;
+		const firm = steered(p) ? 1.18 : passZip(p);
 		kick(p, lx, ly, clamp((d / 58 + 1.6) * cond.passComp * firm * passMul(), 4.2, 19));
 	}
 

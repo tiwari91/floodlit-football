@@ -357,8 +357,8 @@
 			}
 			const spdMul = (p.team === 1 ? diff.spd : 1) * (ball.owner === p ? 0.88 : 1) * (p.injured ? 0.8 : 1) * mood(p.team, 0.07) * paceMul(p) * cond.speed * (0.8 + 0.2 * staOf(p)) * (tr(p, "pace") ? 1.05 : 1);
 
-			// The receiver runs onto the pass by itself; the arrows take over on the first touch.
-			if (p === receiver && !ball.owner) {
+			// The man a pass is for runs onto it by himself, on either side; for yours the arrows take over on the first touch.
+			if ((p === receiver || p === ball.intended) && !ball.owner) {
 				const [ tx, ty ] = ball.z > 0 ? meetPoint() : interceptPoint(p);
 				const [ dvx, dvy ] = steer(p, tx, ty, BASE_SPD * 1.08);
 				movePlayer(p, dvx, dvy, cond.grip, ACC_YOU);
@@ -475,7 +475,7 @@
 			}
 			const carrier = ball.owner;
 			if (carrier && carrier.team !== p.team && p.role !== "gk" && !inHands(carrier) && !(p.slideCd > 0) && dist(p, carrier) < 42 &&
-				!(carrier.team === 0 && frame - (carrier.gotAt || 0) < 22) && Math.random() < 0.008 * defMul(p) * (p.role === "def" ? 1.4 : 1) * TACKLE_FX[tackling[p.team]].slide * (tr(p, "winner") ? 1.6 : 1)) {
+				!(steered(carrier) && frame - (carrier.gotAt || 0) < 22) && Math.random() < 0.008 * defMul(p) * (p.role === "def" ? 1.4 : 1) * TACKLE_FX[tackling[p.team]].slide * (tr(p, "winner") ? 1.6 : 1)) {
 				p.dir = Math.atan2(carrier.y + carrier.vy * 6 - p.y, carrier.x + carrier.vx * 6 - p.x);
 				p.slideAI = 12;
 				p.slideCd = 120;

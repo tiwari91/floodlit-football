@@ -103,11 +103,11 @@
 			if (p.team === 0 && club) { p.num = FORMATS["11"].nums[slots[p.idx]]; }
 			p.look = null;
 			p.cam = !!(FMT.shape && FMT.shape.cam === slots[p.idx]);
-			const cpu = p.team === 1 ? oppSquad[slots[p.idx]] : null;
+			const cpu = p.team === 1 ? oppSquad[slots[p.idx]] : !club && youSquad ? youSquad[slots[p.idx]] : null;
 			p.sqi = slots[p.idx];
 			p.attr = p.team === 0 && club ? effective(club.squad[slots[p.idx]], FMT.roles[p.idx])
 				: cpu ? { pac: cpu.pac, sho: cpu.sho, pas: cpu.pas, def: cpu.def } : null;
-			p.name = p.team === 0 && club ? club.squad[slots[p.idx]].name : cpu ? cpu.name : "";
+			p.name = p.team === 0 && club ? club.squad[slots[p.idx]].name : cpu && p.team === 1 ? cpu.name : "";   // (your friendly side stays nameless)
 			const pl = p.team === 0 && club ? club.squad[slots[p.idx]] : cpu;
 			ensureTraitP(p, pl || (p.team === 0 && !club ? { name: `you${p.idx}`, pos: FMT.roles[p.idx] } : null));
 			p.sta = p.team === 0 && club ? clamp(fitOf(pl) / 100, 0.45, 1) : 0.96 + Math.random() * 0.04;
@@ -119,8 +119,22 @@
 	function ensureTraitP (p, pl) { p.trait = pl ? traitOf(pl) : ""; }
 	// Young legs last longer; a good fitness coach helps yours a little more.
 	const endureOf = pl => { const a = Number.isFinite(pl.age) ? pl.age : 26; const fc = league && league.club && [ ...league.club.squad, ...league.club.bench ].includes(pl) ? staffLvl(league.club, "fitness") * 0.025 : 0; return (a <= 23 ? 0.9 : a <= 29 ? 1 : a <= 32 ? 1.1 : 1.2) - fc; };
-	const paceMul = p => 1 + (A(p, "pac") - 65) * 0.0025;
+	const paceMul = p => 1 + (A(p, "pac") - 65) * 0.008;
 	const defMul = p => 1 + (A(p, "def") - 65) * 0.012;
+	// The man you are steering (not the autopilot): only he gets the helping hand with passes and a settling touch.
+	const steered = p => !!p && p.team === 0 && !autoPilot && players.indexOf(p) === ctrl;
+	// Ratings at work, the same for both sides (a normal club's keeper is about 79, its outfielders about 71 at passing, 66 at shooting):
+	// a keeper's handling from his rating,
+	// a duel: his handling against the shooter's finishing (a normal club's keeper is about 4 up on its forwards),
+	const KEEP_SAVE = 0.84;
+	const keeperSave = (p, by) => clamp(KEEP_SAVE + (A(p, "def") - (by ? A(by, "sho") : 75) - 4) * 0.02, 0.3, 0.88);
+	// a carrier's close control (passing and pace) against a challenge,
+	const shieldMul = o => clamp(1 - ((A(o, "pas") + A(o, "pac")) / 2 - 71) * 0.04, 0.5, 1.6);
+	// how far a computer-run pass strays (everyone takes the same beat to make up his mind: a quicker one for good passers only rushed them).
+	const thinkOf = () => 8;
+	const aiPassErr = p => Math.max(0, 90 - A(p, "pas")) * 1.4;
+	// and how crisply he strikes a pass (a zipped pass is harder to cut out).
+	const passZip = p => clamp(1 + (A(p, "pas") - 71) * 0.01, 0.85, 1.18);
 	// Poor passers drift a little off target, and everyone does in the rain.
 	const passErr = p => (Math.max(0, 70 - A(p, "pas")) * 0.6 + cond.wet * 5) * (style[p.team] === "possession" ? 0.6 : 1) * (1 - 0.25 * edge(p.team)) + 22 * edge(1 - p.team) + 26 * Math.max(0, 0.75 - staOf(p)) - (tr(p, "playmaker") ? 9 : 0) + 14 * wobble(p.team);
 

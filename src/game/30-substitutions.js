@@ -435,10 +435,10 @@
 				if (p.kickCd > 0) { continue; }
 				const d = dist(p, ball);
 				const isGk = p.role === "gk" && rel(p.team, p.x) < 160 * GH;
-				const isReceiver = p === receiver;
-				// Cutting out one of your passes takes a defender really in the lane.
-				const cutIn = receiver && p.team === 1 && speed > 3.5 ? -3 : 0;
-				const reach = isGk ? (shotAt(p) ? 28 : 24) * (p.team === 1 ? lv.gk : 1) : isReceiver ? 26 : 19 + cutIn + clamp((A(p, "def") - 65) * 0.12, -3, 4);   // a diving keeper stretches
+				const aimed = receiver || ball.intended, isReceiver = p === aimed;
+				// Cutting out a pass takes a defender really in the lane.
+				const cutIn = aimed && p.team !== aimed.team && speed > 3.5 ? -3 : 0;
+				const reach = isGk ? (shotAt(p) ? 36 : 27) * Math.min(1.03, 1 + (A(p, "def") - 79) * 0.012) * (p.team === 1 ? lv.gk : 1) : isReceiver ? 26 : 19 + cutIn + clamp((A(p, "def") - 68) * 0.4, -6, 8);   // a diving keeper stretches (a good one only so far: past that the ball would jump to his gloves)
 				if (d > reach || d >= td) { continue; }
 				// A ball just struck is past the man closing the kicker down before he can react:
 				// pressing you forces a pass, it doesn't win it off your boot.
@@ -447,14 +447,14 @@
 				// The intended receiver always controls a firm pass.
 				if (speed > 11 && !isReceiver) {
 					// Your keeper holds most of what he reaches; theirs is set by the opponent level.
-					let save = (p.team === 1 ? diff.save : 0.58 * defMul(p)) * (1 - 0.35 * edge(1 - p.team)) * cond.handling;   // wet balls slip
+					let save = keeperSave(p, ball.lastBy && ball.lastBy.team !== p.team ? ball.lastBy : null) * (1 - 0.35 * edge(1 - p.team)) * cond.handling;   // wet balls slip
 					// One save attempt per shot: beaten once, the keeper stays beaten for that shot.
 					if (isGk) {
 						if (ball.lift) { save = Math.min(0.9, save * 1.9); }
 						if (ball.headed) { save = Math.min(0.9, save * 1.35); }
 						if (ball.pen && ball.pen.gk === p) { if (!ball.pen.saved) { continue; } }
 						else if (ball.beaten === p) { continue; }
-						if (!(ball.pen && ball.pen.gk === p) && Math.random() > save * 1.6) { ball.beaten = p; continue; }
+						if (!(ball.pen && ball.pen.gk === p) && Math.random() > save * 1.2) { ball.beaten = p; continue; }
 					}
 					else {
 						// Outfielders don't catch a hard ball; defenders may get in the way of it.
@@ -478,10 +478,10 @@
 		// Your player gets a moment to take a touch before the computer can nick it,
 		// and only one challenger gets a go each step, so two men closing you down
 		// don't double the odds.
-		const settling = o.team === 0 && frame - (o.gotAt || 0) < 22;
+		const settling = steered(o) && frame - (o.gotAt || 0) < 22;
 		for (const q of players) {
 			if (q.team === o.team || q.kickCd > 0 || q.role === "gk" && rel(q.team, q.x) > 160 * GH) { continue; }
-			const isHuman = q.team === 0 && players.indexOf(q) === ctrl;
+			const isHuman = steered(q);
 			const sliding = (isHuman && q.lunge > 0) || q.slideAI > 0;
 			// Measure to the ball as well as the carrier: separation keeps bodies 30
 			// apart, so a carrier standing still could otherwise never be tackled.
@@ -489,23 +489,23 @@
 			if (near > (sliding ? 28 : 23)) { continue; }
 			// Staying tight to the carrier wins the ball back over time; a slide wins it fast.
 			const yours = isHuman && handsOff < HANDS_OFF;   // left alone, he tackles as the computer would
-			let chance = (q.team === 1 ? diff.tackle : yours ? (pressOn() ? 0.045 : 0.035) : 0.022) * mood(q.team, 0.4) * defMul(q) * (yours ? 1 : TACKLE_FX[tackling[q.team]].win) * (0.8 + 0.2 * staOf(q)) * (wobble(q.team) ? 0.82 : 1);
+			let chance = (yours ? (pressOn() ? 0.045 : 0.035) : 0.024 * shieldMul(o)) * mood(q.team, 0.4) * defMul(q) * (yours ? 1 : TACKLE_FX[tackling[q.team]].win) * (0.8 + 0.2 * staOf(q)) * (wobble(q.team) ? 0.82 : 1);
 			if (tr(q, "winner")) { chance *= 1.4; }
 			if (tr(o, "target") && !sliding) { chance *= 0.7; }
 			if (dist(o, ball) > 27) { chance *= 1.5; }   // a heavy touch: the ball is a step from his feet
 			if (sliding) { chance = 0.3 * defMul(q) * (tr(q, "winner") ? 1.2 : 1); }
-			if (settling && q.team === 1) { chance *= sliding ? 0.5 : 0.15; }
+			if (settling) { chance *= sliding ? 0.5 : 0.15; }
 			const won = Math.random() < chance;
 			// A slide that arrives and misses the ball takes the man instead, from behind most of all.
 			if (!won && sliding && !q.slideHit) {
 				q.slideHit = true;
 				const moving = Math.hypot(o.vx, o.vy) > 0.5;
 				const behind = moving && Math.cos(Math.atan2(o.y - q.y, o.x - q.x) - Math.atan2(o.vy, o.vx)) > 0.55;
-				if (Math.random() < Math.min(0.9, (behind ? 0.6 : q.team === 1 ? 0.22 : 0.14) * (1 + 0.5 * edge(1 - q.team)) * (isHuman ? 1 : Math.sqrt(TACKLE_FX[tackling[q.team]].foul)))) { commitFoul(q, o, behind); return; }
+				if (Math.random() < Math.min(0.9, (behind ? 0.6 : isHuman ? 0.14 : 0.18) * (1 + 0.5 * edge(1 - q.team)) * (isHuman ? 1 : Math.sqrt(TACKLE_FX[tackling[q.team]].foul)))) { commitFoul(q, o, behind); return; }
 			}
 			// A tense defender stands in and sometimes clatters the man instead.
 			if (!won && !sliding && !isHuman && Math.random() < (0.0025 * edge(1 - q.team) + (tackling[q.team] === "hard" ? 0.0009 : 0)) * TACKLE_FX[tackling[q.team]].foul) { commitFoul(q, o, false); return; }
-			if (!won) { if (q.team === 1) { break; } continue; }
+			if (!won) { break; }   // one challenger a step, whoever has it
 			{
 				o.kickCd = 40;
 				gainBall(q);
@@ -701,12 +701,13 @@
 	function recvKind (c, rnd = Math.random) {
 		if (c.z >= 26) { return "chest"; }
 		if (c.z >= 11) { return "thigh"; }
-		const heavy = clamp((64 - c.pas) / 110, 0, 0.16) + (c.spd > 9 ? 0.04 : 0) + (c.wet ? 0.03 : 0) - (c.play ? 0.05 : 0);
+		const heavy = clamp((74 - c.pas) / 90, 0, 0.18) + (c.spd > 9 ? 0.04 : 0) + (c.wet ? 0.03 : 0) - (c.play ? 0.05 : 0);
 		if (rnd() < heavy) { return "heavy"; }
 		if (c.back && c.space && !c.human) { return "turn"; }
 		return c.spd < 7 && (c.seed < 0.4 || c.play) ? "sole" : "inside";
 	}
 	function gainBall (p) {
+		ball.intended = null;
 		const lostBy = p.team !== possTeam ? possTeam : -1;
 		// First touch by a teammate who was offside when the ball was played (or a tight one either way).
 		if (offside.team === p.team && offside.margin && offside.margin.has(p) && !bulkSim && !shoot && !tut && state === "play" && (offside.set.has(p) || p.team === 0 || p.role === "fwd") && Math.random() < 0.5) {

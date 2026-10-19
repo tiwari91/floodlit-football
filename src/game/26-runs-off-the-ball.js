@@ -215,9 +215,9 @@
 		const m = outfield(p.team).filter(q => dist(q, p) > 90 && !(offsideOn() && isOffside(q, offsideLine(p.team)))).sort((a, b) => openness(b) - openness(a))[0];
 		return m && openness(m) > 45 ? "keeper-short" : "keeper-long";
 	};
-	function aiHandOff (p, m, t) { if (p.team === 0 && m && m !== p) { handOff(m, t); } }
+	function aiHandOff (p, m, t) { if (m && m !== p) { ball.intended = m; } if (p.team === 0 && m && m !== p) { handOff(m, t); } }
 	function aiOwnerAct (p) {
-		const cfg = p.team === 1 ? diff : DIFF.normal;
+		const cfg = DIFF.normal;   // (how sharp each man is comes from his ratings now, for either side)
 		if (setPiece && (setPiece.kind === "free" || setPiece.kind === "pen") && setPiece.taker === p) {
 			// The computer's free kick: a moment over the ball, then a shot if it's close, else find a man.
 			const H = setPiece.kind === "pen" ? 60 : 40;
@@ -274,7 +274,7 @@
 			return [ goal.x, FH / 2 + (p.y - FH / 2) * 0.7 ];
 		}
 		if (--p.think <= 0) {
-			p.think = Math.max(2, cfg.think + (p.team === 1 ? lv.think : 0) + Math.round(6 * edge(1 - p.team) - 2 * edge(p.team)));   // rattled players dither; confident ones play quicker
+			p.think = Math.max(2, thinkOf(p) + (p.team === 1 ? lv.think : 0) + Math.round(6 * edge(1 - p.team) - 2 * edge(p.team)));   // rattled players dither; confident ones play quicker
 			// Wide in the final third: cross it into the box.
 			if (rel(p.team, p.x) > FW * 0.72 && isWide(p.y) && Math.random() < 0.45) {
 				const goalX = attackX(p.team);
@@ -293,11 +293,13 @@
 			// One on one with the keeper off his line: sometimes dink it over him.
 			const keeper = players.find(q => q.team !== p.team && q.role === "gk");
 			if (keeper && dg < 330 * range && dg > 110 * range && rel(keeper.team, keeper.x) > 55 * GH && dist(keeper, p) < dg * 0.75 && Math.random() < 0.3) { chipShot(p); return null; }
-			if (dg < 170 * range || (dg < 270 * range && Math.random() < 0.35) || longShot) {
+			if (dg < 170 * range || (dg < 270 * range && Math.random() < 0.2) || longShot) {
 				// Better finishers are more accurate and hit it harder.
-				const fin = (clamp(1.3 - (A(p, "sho") - 50) / 100, 0.6, 1.4) + Math.max(0, 0.75 - staOf(p)) * 0.8) * (tr(p, "poacher") && inAttackBox(p) ? 0.7 : 1);
-				const aim = FH / 2 + ((Math.random() * 2 - 1) * 42 + (Math.random() * 2 - 1) * (cfg.spread + 45 * edge(1 - p.team)) * fin * (p.team === 1 ? lv.shot : 1)) * GH;
-				shootAt(p, clamp(0.55 + Math.random() * 0.45 + (A(p, "sho") - 65) * 0.004, 0.4, 1), aim);
+				const fin = (clamp(1.1 - (A(p, "sho") - 66) * 0.07, 0.4, 2) + Math.max(0, 0.75 - staOf(p)) * 0.8) * (tr(p, "poacher") && inAttackBox(p) ? 0.7 : 1);
+				// He picks the corner away from the keeper; how close he gets to it is his finishing.
+				const gkO = team(1 - p.team).find(q => q.role === "gk"), side = gkO && Math.abs(gkO.y - FH / 2) > 6 ? (gkO.y < FH / 2 ? 1 : -1) : (Math.random() < 0.5 ? 1 : -1);
+				const aim = FH / 2 + side * FMT.goal * 0.32 + (Math.random() * 2 - 1) * (14 + (60 + 45 * edge(1 - p.team)) * fin * (p.team === 1 ? lv.shot : 1)) * GH;
+				shootAt(p, clamp(0.55 + Math.random() * 0.45 + (A(p, "sho") - 66) * 0.008, 0.4, 1), aim);
 				return null;
 			}
 			// A forward timing a run on the offside line: slide a through ball into the space behind.
