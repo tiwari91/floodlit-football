@@ -294,8 +294,8 @@
 			const keeper = players.find(q => q.team !== p.team && q.role === "gk");
 			if (keeper && dg < 330 * range && dg > 110 * range && rel(keeper.team, keeper.x) > 55 * GH && dist(keeper, p) < dg * 0.75 && Math.random() < 0.3) { chipShot(p); return null; }
 			if (dg < 170 * range || (dg < 270 * range && Math.random() < 0.2) || longShot) {
-				// Better finishers are more accurate and hit it harder.
-				const fin = (clamp(1.1 - (A(p, "sho") - 66) * 0.07, 0.4, 2) + Math.max(0, 0.75 - staOf(p)) * 0.8) * (tr(p, "poacher") && inAttackBox(p) ? 0.7 : 1);
+				// Better finishers (against the keeper in front of them) are more accurate and hit it harder.
+				const fin = (finQ(p) + Math.max(0, 0.75 - staOf(p)) * 0.8) * (tr(p, "poacher") && inAttackBox(p) ? 0.7 : 1);
 				// He picks the corner away from the keeper; how close he gets to it is his finishing.
 				const gkO = team(1 - p.team).find(q => q.role === "gk"), side = gkO && Math.abs(gkO.y - FH / 2) > 6 ? (gkO.y < FH / 2 ? 1 : -1) : (Math.random() < 0.5 ? 1 : -1);
 				const aim = FH / 2 + side * FMT.goal * 0.32 + (Math.random() * 2 - 1) * (14 + (60 + 45 * edge(1 - p.team)) * fin * (p.team === 1 ? lv.shot : 1)) * GH;

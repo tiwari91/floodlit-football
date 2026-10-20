@@ -237,7 +237,7 @@
 	}
 
 	// Aiming: while you charge a shot at goal, up and down move a crosshair along the
-	// goal mouth. Harder shots stray further from it; poor finishers stray more.
+	// goal mouth. Harder shots stray further from it; poor finishers (against the keeper they face) stray more.
 	let aimY = null;
 	function shotInRange (p) {
 		const toGoal = Math.atan2(FH / 2 - ball.y, FW + 20 - ball.x);
@@ -245,7 +245,7 @@
 		return ball.x > FW - 650 * Math.sqrt(S) && Math.abs(off) < 1.0;
 	}
 	function shotSpread (p, power) {
-		return (6 + power * 18 + 22 * edge(1) + Math.max(0, 65 - A(p, "sho")) * 0.4 + 30 * Math.max(0, 0.75 - staOf(p))) * GH * (tr(p, "poacher") && inAttackBox(p) ? 0.75 : 1);
+		return (6 + power * 18 + 22 * edge(1) + clamp(finQ(p) - 0.5, 0, 1.5) * 18 + 30 * Math.max(0, 0.75 - staOf(p))) * GH * (tr(p, "poacher") && inAttackBox(p) ? 0.75 : 1);
 	}
 
 	function humanShootPress () {

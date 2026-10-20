@@ -9,7 +9,7 @@
 			v: 1, key: liveKey(), score, timeLeft, momentum, possFrames, stats, ostats: oppStats, best: bestStreak, ment: mentality[0], lastConceded, half: halfDone, at: Date.now(),
 			off: dismissed, cards: matchCards, hurt: matchInjuries, hurtInfo: matchInjInfo, subs: subLog, log: matchLog, goals: matchGoals,
 			marks: players.filter(p => p.yellow || p.injured).map(p => [ p.team, p.idx, p.yellow || 0, p.injured ? 1 : 0 ]),
-			sta: players.map(p => [ p.team, p.idx, Math.round(staOf(p) * 100) ]), cpuWin: cpuSubWin
+			sta: players.map(p => [ p.team, p.idx, Math.round(staOf(p) * 100) ]), cpuWin: subWin[1], youWin: subWin[0]
 		}));
 	}
 	const clearLive = () => store.del("ff-live");
@@ -31,7 +31,7 @@
 		if (Array.isArray(v.marks)) { for (const [ t, i, y, h ] of v.marks) { const p = find(t, i); if (p) { p.yellow = Number(y) || 0; p.injured = !!h; } } }
 		if (Array.isArray(v.off)) { for (const [ t, i ] of v.off) { const p = find(t, i); if (p) { sendOff(p); } } }
 		if (Array.isArray(v.sta)) { for (const [ t, i, s ] of v.sta) { const p = find(t, i); if (p && Number.isFinite(s)) { p.sta = clamp(s / 100, 0.25, 1); } } }
-		cpuSubWin = clamp(Number(v.cpuWin) || 0, 0, 3);
+		subWin = [ clamp(Number(v.youWin) || 0, 0, 3), clamp(Number(v.cpuWin) || 0, 0, 3) ];
 		if (Array.isArray(v.cards)) { matchCards = v.cards.filter(c => c && typeof c.name === "string"); }
 		if (Array.isArray(v.hurt)) { matchInjuries = v.hurt.filter(n => typeof n === "string"); }
 		if (v.hurtInfo && typeof v.hurtInfo === "object") { for (const [ n, i ] of Object.entries(v.hurtInfo)) { if (i && typeof i.type === "string" && Number.isFinite(i.games)) { matchInjInfo[n] = { type: i.type, games: clamp(i.games, 1, 12), serious: !!i.serious }; } } }

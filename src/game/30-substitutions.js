@@ -9,7 +9,7 @@
 			const start = new Set(slotsFor(fmtKey));
 			pool = [ ...c.squad.filter((pl, i) => !start.has(i)), ...c.bench ];
 		} else {
-			genericBench = genericBench || BENCH_POS.map(pos => genPlayer(pos, 64));
+			genericBench = genericBench || BENCH_POS.map(pos => genPlayer(pos, youSquad ? cpuOvr(friendlyYouStr()) - 2 : 64));   // a friendly bench as good as theirs
 			pool = genericBench;
 		}
 		return pool.filter(pl => !onNow.has(pl.name) && !wentOff.includes(pl.name) && !(pl.inj > 0) && !(pl.ban > 0));
@@ -38,18 +38,28 @@
 		saveLive();
 	}
 
-	// The computer's bench: three windows in the second half. Tired or limping men come off; a side
-	// chasing the game sends on a forward for a tired defender or midfielder.
+	// The computer's bench: three windows in the second half. Tired or limping men make way for a
+	// fresh man in the same position. Your side gets the same
+	// bench calls while the computer plays it for you (autopilot), so neither side has fresher legs.
 	function cpuSubCheck () {
-		if (tut || shoot || mode === "tutorial" || cpuSubs <= 0 || state !== "play") { return; }
-		const f = 1 - timeLeft / Math.max(1, matchLen), wins = [ 0.58, 0.7, 0.8 ];
-		if (cpuSubWin >= wins.length || f < wins[cpuSubWin]) { return; }
-		const lim = [ 0.74, 0.68, 0.64 ][cpuSubWin];
-		cpuSubWin++;
-		const chasing = score[1] < score[0] && f > 0.65;
-		const cands = outfield(1).filter(p => ball.owner !== p && !(setPiece && setPiece.taker === p) && (p.injured || staOf(p) < lim)).sort((a, b) => (b.injured ? 1 : 0) - (a.injured ? 1 : 0) || staOf(a) - staOf(b));
-		if (chasing && !cands.length) { const m = outfield(1).filter(p => p.role !== "fwd" && ball.owner !== p).sort((a, b) => staOf(a) - staOf(b))[0]; if (m) { cands.push(m); } }
-		for (const p of cands.slice(0, Math.min(cpuSubs, cpuSubWin === 3 ? 1 : 2))) { cpuSub(p, chasing && p.role !== "fwd" ? "fwd" : p.role, p.injured ? "injured" : chasing && p.role !== "fwd" ? "chasing the game" : "tired"); }
+		if (tut || shoot || mode === "tutorial" || state !== "play") { return; }
+		benchCall(1);
+		if (autoPilot) { benchCall(0); }
+	}
+	function benchCall (t) {
+		const left = t === 1 ? cpuSubs : subsLeft;
+		if (left <= 0) { return; }
+		const f = 1 - timeLeft / Math.max(1, matchLen), wins = [ 0.58, 0.7, 0.8 ], w = subWin[t];
+		if (w >= wins.length || f < wins[w]) { return; }
+		const lim = [ 0.74, 0.68, 0.64 ][w];
+		subWin[t] = w + 1;
+		const cands = outfield(t).filter(p => ball.owner !== p && !(setPiece && setPiece.taker === p) && (p.injured || staOf(p) < lim)).sort((a, b) => (b.injured ? 1 : 0) - (a.injured ? 1 : 0) || staOf(a) - staOf(b));
+		// Like for like: a tired defender makes way for a defender (an extra forward for a side behind only propped up the weaker side).
+		for (const p of cands.slice(0, Math.min(left, w + 1 === 3 ? 1 : 2))) {
+			if (t === 1) { cpuSub(p, p.role, p.injured ? "injured" : "tired"); continue; }
+			const pool = subPool(), pl = pool.filter(q => q.pos === p.role)[0] || pool.filter(q => q.pos !== "gk")[0];
+			if (pl) { makeSub(p, pl); }
+		}
 	}
 	function cpuSub (p, kind, why) {
 		const was = p.name, np = genPlayer(kind, cpuOvr(clamp(Math.round(oppStrength), 1, 5)) - 2);
@@ -438,7 +448,7 @@
 				const aimed = receiver || ball.intended, isReceiver = p === aimed;
 				// Cutting out a pass takes a defender really in the lane.
 				const cutIn = aimed && p.team !== aimed.team && speed > 3.5 ? -3 : 0;
-				const reach = isGk ? (shotAt(p) ? 36 : 27) * Math.min(1.03, 1 + (A(p, "def") - 79) * 0.012) * (p.team === 1 ? lv.gk : 1) : isReceiver ? 26 : 19 + cutIn + clamp((A(p, "def") - 68) * 0.4, -6, 8);   // a diving keeper stretches (a good one only so far: past that the ball would jump to his gloves)
+				const reach = isGk ? (shotAt(p) ? 36 : 27) * clamp(1 + (A(p, "def") - 79) * GK_K, 0.97, 1.03) * (p.team === 1 ? lv.gk : 1) : isReceiver ? 26 : 19 + cutIn + clamp((A(p, "def") - 68) * 0.4, -6, 8);   // a diving keeper stretches (a good one only so far: past that the ball would jump to his gloves)
 				if (d > reach || d >= td) { continue; }
 				// A ball just struck is past the man closing the kicker down before he can react:
 				// pressing you forces a pass, it doesn't win it off your boot.
@@ -524,7 +534,7 @@
 		const gx = attackX(p.team) + (p.team === 0 ? 20 : -20), sho = A(p, "sho"), z0 = Math.max(6, ball.z);
 		// Headers are softer than shots and less accurate: aimed for the side the keeper isn't on,
 		// down towards the line, and a poor header of the ball sends it wide or over.
-		const gk = team(1 - p.team).find(q => q.role === "gk"), err = clamp(1.45 - sho / 100, 0.5, 1.1);
+		const gk = team(1 - p.team).find(q => q.role === "gk"), err = clamp(0.72 - finGap(p) * HEAD_K, 0.45, 1.6);
 		const side = gk ? (gk.y < FH / 2 ? 1 : -1) * (Math.random() < 0.8 ? 1 : -1) : (Math.random() < 0.5 ? 1 : -1);
 		const aimY = FH / 2 + side * FMT.goal * 0.3 + gauss() * FMT.goal * 0.26 * err;
 		const sp = 8.4 + sho * 0.035 + Math.random() * 1.5;

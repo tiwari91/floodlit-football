@@ -342,6 +342,8 @@
 			}
 		}
 
+		// Under autopilot your man nearest the ball chases it as their chaser does, at the same pace.
+		const autoChaser = p => autoPilot && players.indexOf(p) === ctrl && !(ball.owner && ball.owner.team === 0);
 		for (const p of players) {
 			if (p.kickCd > 0) { p.kickCd--; }
 			if (p.jump > 0) { p.jump--; }
@@ -493,7 +495,7 @@
 				target = cornerTarget(p); setRole = true;
 			} else if (airMen.has(p)) {
 				target = airMen.get(p); setRole = true;
-			} else if (p === chaser1 || (autoPilot && players.indexOf(p) === ctrl && !(ball.owner && ball.owner.team === 0))) {
+			} else if (p === chaser1 || autoChaser(p)) {
 				// Read a ball in the air: run to where it will come down (his own side's pass: perhaps to meet it at chest height).
 				target = ball.z > 0 ? (lastTouch === p.team ? meetPoint() : [ ball.landX, ball.landY ]) : [ ball.x + ball.vx * 6, ball.y + ball.vy * 6 ];
 			} else if (p === cover1) {
@@ -528,7 +530,7 @@
 			// A keeper facing a shot moves at full stretch; how quickly depends on his handling.
 			const diving = p.role === "gk" && shotAt(p) ? 1.3 * (0.85 + 0.15 * defMul(p)) : 0;
 			// Real pace: a chaser at full tilt tops out near 10 m/s, and a man with the ball is a touch slower.
-			let sprint = diving || (p === chaser1 || p === cover0 || (p === cover1 && press[1] === "high") || ((p === second1 || p === second0) && dist(p, { x: target[0], y: target[1] }) > 60) ? 1.05 : ball.owner === p ? 0.96 : 1);
+			let sprint = diving || (p === chaser1 || autoChaser(p) || p === cover0 || (p === cover1 && press[1] === "high") || ((p === second1 || p === second0) && dist(p, { x: target[0], y: target[1] }) > 60) ? 1.05 : ball.owner === p ? 0.96 : 1);
 			if (!diving && p.team === 1 && sprint > 1 && lv !== LEVELS.normal) { sprint *= lv.chase; }   // difficulty: how hard they press
 			// Off the ball, nobody runs flat out all game: they jog back into shape, stride out
 			// when they're well out of position or near the ball, and markers match their runner.

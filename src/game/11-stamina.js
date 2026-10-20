@@ -6,7 +6,7 @@
 	const STA_K = 1.35, TIRED_STA = 0.55;
 	const staOf = p => (p && Number.isFinite(p.sta) ? p.sta : 1);
 	const tiredness = p => 1 - staOf(p);
-	let cpuSubWin = 0, matchSta = {};
+	let subWin = [ 0, 0 ], matchSta = {};
 	function drainStamina () {
 		if (tut || shoot) { return; }
 		const mf = 1 / Math.max(60, matchLen * 60);

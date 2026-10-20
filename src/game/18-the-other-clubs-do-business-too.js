@@ -126,8 +126,12 @@
 	// Ratings at work, the same for both sides (a normal club's keeper is about 79, its outfielders about 71 at passing, 66 at shooting):
 	// a keeper's handling from his rating,
 	// a duel: his handling against the shooter's finishing (a normal club's keeper is about 4 up on its forwards),
-	const KEEP_SAVE = 0.84;
+	const KEEP_SAVE = 0.84, FIN_K = 0.06, HEAD_K = 0.03, GK_K = 0.006, FIN_0 = 0.6, FIN_MIN = 0.35, FIN_KLO = 0.09;
 	const keeperSave = (p, by) => clamp(KEEP_SAVE + (A(p, "def") - (by ? A(by, "sho") : 75) - 4) * 0.02, 0.3, 0.88);
+	// a finisher against the keeper he faces: how far his shots and headers stray grows as his finishing falls
+	// below the keeper's handling (a normal club's forwards are level with its keeper; ten up or down is a mismatch),
+	const finGap = p => A(p, "sho") - A(team(1 - p.team).find(q => q.role === "gk"), "def");
+	const finQ = p => { const g = finGap(p); return clamp(FIN_0 - g * (g < 0 ? FIN_KLO : FIN_K), FIN_MIN, 3); };   // (outclassed finishers fall away faster)
 	// a carrier's close control (passing and pace) against a challenge,
 	const shieldMul = o => clamp(1 - ((A(o, "pas") + A(o, "pac")) / 2 - 71) * 0.04, 0.5, 1.6);
 	// how far a computer-run pass strays (everyone takes the same beat to make up his mind: a quicker one for good passers only rushed them).
