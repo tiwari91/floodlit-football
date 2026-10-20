@@ -9,11 +9,13 @@
 	let frameDt = 16.7;
 	const IDLE_STATES = new Set([ "paused", "intro", "half", "full" ]), IDLE_FRAME = 100, IDLE_AFTER = 2500;
 	let lastDrawAt = 0, idleState = "", idleSince = 0;
-	// 30 a second where nothing needs 60: paused, the menus and the cards, between plays (the kick-off and
-	// restart waits, a goal being celebrated) and, on Light graphics, in play too. A replay and slow motion
-	// keep every frame. (The simulation steps at 60 whatever the drawing does.)
+	// 30 a second where nothing needs 60: paused, the menus and the cards and, on Light graphics, in play too.
+	// Between plays (the kick-off sweep and restart walks, a goal being celebrated) the camera is moving, so
+	// High and Medium keep 60 there; Low and Light take 30. A replay and slow motion keep every frame.
+	// (The simulation steps at 60 whatever the drawing does.)
 	const CAP_FRAME = 1000 / 30 - 2.5;
-	const capped = () => !odr && !replayOn() && !(slowMo > 0) && (IDLE_STATES.has(state) || state === "goal" || (state === "play" && freeze > 0) || (gfx3().fps || 60) <= 30);
+	const smoothMoves = () => gfxLevel === "high" || gfxLevel === "medium";
+	const capped = () => !odr && !replayOn() && !(slowMo > 0) && (IDLE_STATES.has(state) || (!smoothMoves() && (state === "goal" || (state === "play" && freeze > 0))) || (gfx3().fps || 60) <= 30);
 	let wasCapped = false, parked = false;
 	// A hidden tab draws nothing at all: the loop parks and starts again when the tab is shown.
 	document.addEventListener("visibilitychange", () => {
@@ -27,6 +29,7 @@
 		frameDt = clamp(now - last, 1, 100);
 		// Graphics Auto judges only uncapped frames (a capped one is long on purpose).
 		if (!cap && !wasCapped) { gfxAutoTick(now - last, now); }
+		dynTick3D(now - last, now, cap || wasCapped);
 		wasCapped = cap;
 		pollPad();
 		acc = Math.min(acc + (now - last) * (slowMo > 0 && !odr ? SLOW_RATE : 1), 250);

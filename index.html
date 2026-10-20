@@ -1187,6 +1187,7 @@
 .coachmark[hidden], .pitchwrap:has(.overlay:not([hidden])) .coachmark { display: none; }
 .coachmark kbd { display: inline-block; min-width: 20px; padding: 1px 6px; margin: 0 2px; border-radius: 3px; background: #f4f6f2; color: #10161c; font: 700 13px Barlow, Arial, sans-serif; text-align: center; }
 .coachmark button { pointer-events: auto; padding: 5px 12px; font-size: 13px; }
+.coachmark.lightask { bottom: auto; top: 64px; gap: 10px; white-space: normal; max-width: calc(100% - 32px); }
 </style>
 
 <main class="wrap">
@@ -1219,6 +1220,7 @@
 		<canvas id="pitch3d" hidden aria-hidden="true"></canvas>
 		<canvas id="pitch" aria-label="Football pitch"></canvas>
 		<div class="coachmark" id="coachMark" role="note" hidden><span>Hold <kbd>D</kbd> to shoot, <kbd>S</kbd> to pass, <kbd>E</kbd> to sprint</span><button id="coachClose" type="button" aria-label="Dismiss tip" title="Got it">Got it</button></div>
+		<div class="coachmark lightask" id="lightAsk" role="dialog" aria-label="Graphics suggestion" hidden><span>Switch to Light graphics to keep things cooler?</span><button id="lightAskYes" type="button" class="primary">Switch</button><button id="lightAskNo" type="button">Not now</button></div>
 		<button class="menutoggle" id="menuToggle" type="button" aria-pressed="true" title="Show or hide the page menu and settings (F)">Show menu</button>
 		<div class="scorebug" id="scoreBug" aria-hidden="true"><span id="bugHome">You</span><b id="bugScore">0 – 0</b><span id="bugAway">CPU</span><span class="t" id="bugClock">03:00</span><span class="bugbar"><span class="mfill" id="bugFill"></span></span><span class="bugmood" id="bugMood" hidden></span></div>
 		<div class="lower" id="lowerThird" aria-hidden="true" hidden><span class="lt-tag" id="ltTag">Goal</span><span class="lt-main"><b id="ltName"></b><small id="ltSub"></small></span></div>
@@ -11459,12 +11461,12 @@
 	// pitch (four lamps mirrored, not eight), half the rain and a softer HUD canvas.
 	// fps: the cap in play. budget/minRatio: the 3D pixel budget and how far under 1 it may go.
 	// hud: the 2D canvas's pixel ratio cap. glare: the lamp halo's size. wetLamps: lamps the wet pitch
-	// mirrors. rain: share of the rain streaks. benches: seats as a bench along the row.
+	// mirrors. rain: share of the rain streaks. benches: seats as a bench along the row. dyn: dynamic resolution.
 	const GFX3 = {
 		light: { seat: 18, fill: 0.5, hiRows: 0, nearHiRows: 0, liteRow: 1, lattice: false, shadows: 1, ratio: 1, aa: false, fps: 30, budget: 1.3e6, minRatio: 0.75, hud: 1.25, glare: 0.6, wetLamps: 4, rain: 0.45, benches: true },
 		low: { seat: 15, fill: 0.62, hiRows: 0, nearHiRows: 2, liteRow: 3, lattice: false, shadows: 1, ratio: 1, aa: false, benches: true },
-		medium: { seat: 12, fill: 0.82, hiRows: 0, nearHiRows: 4, liteRow: 6, lattice: true, shadows: 3, ratio: 1.5, aa: !coarse },
-		high: { seat: 10, fill: 1, hiRows: 2, nearHiRows: 5, liteRow: 8, lattice: true, shadows: 5, ratio: 2, aa: true }
+		medium: { seat: 12, fill: 0.82, hiRows: 0, nearHiRows: 4, liteRow: 6, lattice: true, shadows: 3, ratio: 1.5, aa: !coarse, dyn: true },
+		high: { seat: 10, fill: 1, hiRows: 2, nearHiRows: 5, liteRow: 8, lattice: true, shadows: 5, ratio: 2, aa: true, dyn: true }
 	};
 	const GFX_NAME = { light: "Light", low: "Low", medium: "Medium", high: "High" };
 	const PIX_BUDGET3 = 3.2e6;
@@ -11503,9 +11505,55 @@
 		// A pixel budget as well as the level's ratio: a retina laptop at 2x was drawing over five million
 		// pixels sixty times a second, which is what made it run hot; about three million looks the same.
 		const Q = gfx3(), budget = Math.sqrt((Q.budget || PIX_BUDGET3) / Math.max(1, rect.width * rect.height));
-		G3.renderer.setPixelRatio(Math.max(Q.minRatio || 1, Math.min(window.devicePixelRatio || 1, Q.ratio, budget)));
+		if (DYN3.lvl !== gfxLevel) { DYN3.lvl = gfxLevel; DYN3.s = 1; DYN3.over = DYN3.under = 0; }
+		G3.renderer.setPixelRatio(Math.max(Q.minRatio || 1, Math.min(window.devicePixelRatio || 1, Q.ratio, budget)) * (Q.dyn ? DYN3.s : 1));
 		G3.renderer.setSize(Math.max(1, Math.round(rect.width)), Math.max(1, Math.round(rect.height)), false);
 	}
+	// Dynamic resolution (High and Medium): when the GPU's time for a frame stays over budget the 3D picture
+	// is drawn with fewer pixels, a tenth at a time down to 0.6 of the level's own scale, and it climbs back
+	// once there is room for the next step. Over budget for 2 s to step down, room for 5 s to step up, and
+	// a few seconds between steps, so it never flickers (each step also resizes the drawing buffer). The GPU's
+	// time comes from a timer query where the browser has one; elsewhere the frame time stands in for it.
+	// Light and Low keep their fixed scale. The 2D HUD is untouched.
+	const DYN3 = { s: 1, min: 0.6, step: 0.1, lvl: "", ms: 0, has: false, over: 0, under: 0, at: -1e9, ext: undefined, q: null, gl: null, budget: 7, room: 5 };
+	function gpuBegin3D () {
+		if (!gfx3().dyn || window.__ffNoGpuTimer || DYN3.q) { return null; }
+		const gl = G3.renderer.getContext();
+		if (DYN3.gl !== gl) { DYN3.gl = gl; DYN3.ext = gl.getExtension("EXT_disjoint_timer_query_webgl2") || null; }
+		if (!DYN3.ext) { return null; }
+		const q = gl.createQuery(); gl.beginQuery(DYN3.ext.TIME_ELAPSED_EXT, q);
+		return q;
+	}
+	function gpuEnd3D (q) {
+		const gl = DYN3.gl;
+		if (q) { gl.endQuery(DYN3.ext.TIME_ELAPSED_EXT); DYN3.q = q; return; }
+		if (!DYN3.q || gl !== G3.renderer.getContext()) { if (DYN3.q && gl !== G3.renderer.getContext()) { DYN3.q = null; } return; }
+		if (!gl.getQueryParameter(DYN3.q, gl.QUERY_RESULT_AVAILABLE)) { return; }   // never wait for it
+		if (!gl.getParameter(DYN3.ext.GPU_DISJOINT_EXT)) { const ms = gl.getQueryParameter(DYN3.q, gl.QUERY_RESULT) / 1e6; DYN3.ms = DYN3.has ? DYN3.ms + (ms - DYN3.ms) * 0.08 : ms; DYN3.has = true; }
+		gl.deleteQuery(DYN3.q); DYN3.q = null;
+	}
+	// Once a drawn frame in play: judge the GPU time (or, without a timer, the frame time) and step the scale.
+	function dynTick3D (dt, now, cap) {
+		if (!gfx3().dyn || !G3.renderer || state !== "play" || camMode !== "3d") { return; }
+		const sec = Math.min(dt, 100) / 1000;
+		let over, room;
+		if (DYN3.has) {
+			over = DYN3.ms > DYN3.budget;
+			const up = Math.min(1, DYN3.s + DYN3.step) / DYN3.s;
+			room = DYN3.ms * up * up < DYN3.room;   // the next step up would still fit
+		} else {
+			if (dt > 80 || cap) { return; }   // a capped frame is long on purpose
+			DYN3.ms += (dt - DYN3.ms) * 0.05;
+			over = DYN3.ms > 20; room = DYN3.ms < 17.6;
+		}
+		DYN3.over = over ? DYN3.over + sec : Math.max(0, DYN3.over - sec * 2);
+		DYN3.under = room && !over ? DYN3.under + sec : 0;
+		let to = DYN3.s;
+		if (DYN3.over > 2 && now - DYN3.at > 2500 && DYN3.s > DYN3.min + 1e-3) { to = Math.max(DYN3.min, DYN3.s - DYN3.step); }
+		else if (DYN3.under > 5 && now - DYN3.at > 5000 && DYN3.s < 1) { to = Math.min(1, DYN3.s + DYN3.step); }
+		if (to !== DYN3.s) { DYN3.s = +to.toFixed(2); DYN3.at = now; DYN3.over = DYN3.under = 0; if (!DYN3.has) { DYN3.ms = 16.7; } resize3D(); }
+	}
+	const dynFloored3D = () => !gfx3().dyn || DYN3.s <= DYN3.min + 1e-3;
 	// One material per colour, shared by every mesh that wears it.
 	function mat3D (hex, lit = true) {
 		const key = (lit ? "L" : "B") + hex;
@@ -12284,7 +12332,7 @@
 		const net = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.42 }));
 		net.userData.ownGeo = true; net.userData.ownMat = true;
 		st.add(net);
-		G3.nets = { net, rest: Float32Array.from(rest), nrm: Float32Array.from(nrm), wgt: Float32Array.from(wgt), goalOf, amp: [ 0, 0 ], ph: [ 0, 0 ], hit: [ null, null ], inside: [ false, false ], moving: false };
+		G3.nets = { net, rest: Float32Array.from(rest), nrm: Float32Array.from(nrm), wgt: Float32Array.from(wgt), goalOf, amp: [ 0, 0 ], ph: [ 0, 0 ], hit: [ null, null ], inside: [ false, false ], moving: false, rip: [ 0, 0 ], rt: [ 0, 0 ], rAt: [ null, null ] };
 	}
 	// The ball off the woodwork: the frame shudders and the net swings from the post or the bar.
 	function shakeGoal3D (left, y, z) {
@@ -12292,21 +12340,31 @@
 		if (!NT || bulkSim) { return; }
 		const wx = (endsSwapped() ? !left : left) ? 0 : FW, g = wx < FW / 2 ? 0 : 1;
 		NT.amp[g] = Math.max(NT.amp[g], 4.5); NT.ph[g] = 0; NT.hit[g] = [ wx, Math.max(0, z) * Z3, y ]; NT.moving = true;
+		if (gfxLevel !== "light") { NT.rip[g] = Math.max(NT.rip[g], 1.6); NT.rt[g] = 0; NT.rAt[g] = NT.hit[g]; }
 	}
-	// Every frame: is the ball in a net? Push it back where the ball is and let it swing.
+	// Every frame: is the ball in a net? It bulges where the ball is (a pocket that holds while the ball sits
+	// in it) and swings, and from where it struck a ring of ripple runs out across the mesh and dies away.
+	// All of it moves the net's own knots, no extra draw call. Light has the bulge and swing, not the ripple.
+	const NET_RIP_W = 15, NET_RIP_V = 3.4, NET_RIP_L = 9;   // the ripple's width, its speed out (a frame), its wavelength
 	function animateNets3D (bx, by, bh, dt) {
 		const NT = G3.nets;
 		if (!NT) { return; }
-		const cb = 55 * Z3;
+		const cb = 55 * Z3, rippled = gfxLevel !== "light";
 		let any = false;
 		for (let g = 0; g < 2; g++) {
 			const inside = (g === 0 ? bx < -1 : bx > FW + 1) && by > GOAL_T - 2 && by < GOAL_B + 2 && bh < cb + 4;
-			if (inside && !NT.inside[g]) { NT.amp[g] = Math.min(9, 3 + Math.hypot(ball.vx || 0, ball.vy || 0) * 0.9); NT.ph[g] = 0; NT.hit[g] = [ bx, bh, by ]; }
+			if (inside && !NT.inside[g]) {
+				const pace = Math.hypot(ball.vx || 0, ball.vy || 0);
+				NT.amp[g] = Math.min(9, 3 + pace * 0.9); NT.ph[g] = 0; NT.hit[g] = [ bx, bh, by ];
+				NT.rip[g] = rippled ? Math.min(4.5, 1.2 + pace * 0.3) : 0; NT.rt[g] = 0; NT.rAt[g] = [ bx, bh, by ];
+			}
 			NT.inside[g] = inside;
 			if (inside) { NT.hit[g] = [ bx, bh, by ]; }
 			NT.ph[g] += dt * 0.32;
 			NT.amp[g] *= Math.pow(0.955, dt);
-			if (NT.amp[g] > 0.05 || inside) { any = true; }
+			NT.rt[g] += dt; NT.rip[g] *= Math.pow(0.95, dt);
+			if (NT.rip[g] < 0.05) { NT.rip[g] = 0; }
+			if (NT.amp[g] > 0.05 || inside || NT.rip[g] > 0) { any = true; }
 		}
 		if (!any && !NT.moving) { return; }
 		NT.moving = any;
@@ -12318,6 +12376,11 @@
 				const dx = R[k] - h[0], dy = R[k + 1] - h[1], dz = R[k + 2] - h[2], dd = dx * dx + dy * dy + dz * dz;
 				const fall = Math.exp(-dd / (2 * 34 * 34));
 				d = w[v] * fall * (NT.amp[g] * Math.sin(NT.ph[g]) + (NT.inside[g] ? 3.5 : 0));
+				const ra = NT.rAt[g];
+				if (NT.rip[g] > 0 && ra) {   // the ring running out from where it struck
+					const r = Math.hypot(R[k] - ra[0], R[k + 1] - ra[1], R[k + 2] - ra[2]) - NT.rt[g] * NET_RIP_V;
+					if (r > -3 * NET_RIP_W && r < 3 * NET_RIP_W) { d += Math.sqrt(w[v]) * NT.rip[g] * Math.exp(-r * r / (2 * NET_RIP_W * NET_RIP_W)) * Math.cos(r / NET_RIP_L * Math.PI); }
+				}
 			}
 			arr[k] = R[k] + n[k] * d; arr[k + 1] = R[k + 1] + n[k + 1] * d; arr[k + 2] = R[k + 2] + n[k + 2] * d;
 		}
@@ -14702,6 +14765,7 @@
 		const [ sux, suz ] = sunDir3D(); G3.ballShadow.position.set(bx + sux * (2.4 * bk + h * 0.07), 0.3, bz + suz * (2.4 * bk + h * 0.07));
 		G3.ballShadow.scale.set((4.5 * sh + 2) * bk, 1, (4.5 * sh + 2) * bk);
 		G3.ballShadow.material.opacity = 0.3 * sh + 0.08;
+		ballContact3D(bx, bz, h * Z3, br, spd, held);
 		if (G3.shot.startsWith("replay")) { for (const m of Object.values(G3.marks)) { m.visible = false; } return; }   // a clean picture for the replay
 		// The markers on the grass.
 		const mk = G3.marks, me = human(), playing = state === "play" && freeze <= 0;
@@ -14753,6 +14817,70 @@
 			mk.tut.position.set(WX(tut.marker.x), 0.5, tut.marker.y); mk.tut.scale.set(r, 1, r);
 			mk.tutFill.position.set(WX(tut.marker.x), 0.45, tut.marker.y); mk.tutFill.scale.set(r, 1, r);
 		}
+	}
+	// Where the ball meets the grass: a soft dark patch right under it (the floodlight shadow above falls off
+	// to one side), small and dark as it comes down to the ground, gone by the time it is a few feet up. On a
+	// wet pitch a bounce or a hard strike off the grass throws up a little spray (fewer drops on Light).
+	const SPRAY_N3 = 40;
+	function ballContact3D (bx, bz, hw, br, spd, held) {
+		if (G3.contact && G3.contact.scene !== G3.scene) { G3.contact = null; }
+		let C = G3.contact;
+		if (!C) {
+			const c = document.createElement("canvas"); c.width = c.height = 32;
+			const g = c.getContext && c.getContext("2d");
+			if (g) { const gr = g.createRadialGradient(16, 16, 0, 16, 16, 16); gr.addColorStop(0, "rgba(0, 0, 0, 1)"); gr.addColorStop(0.45, "rgba(0, 0, 0, 0.6)"); gr.addColorStop(1, "rgba(0, 0, 0, 0)"); g.fillStyle = gr; g.fillRect(0, 0, 32, 32); }
+			const blob = new THREE.Mesh(new THREE.PlaneGeometry(2, 2).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffffff, map: g ? new THREE.CanvasTexture(c) : null, transparent: true, opacity: 0, depthWrite: false }));
+			const pg = new THREE.BufferGeometry(), pa = new Float32Array(SPRAY_N3 * 3).fill(-1e4);
+			pg.setAttribute("position", new THREE.BufferAttribute(pa, 3).setUsage(THREE.DynamicDrawUsage));
+			const dc = document.createElement("canvas"); dc.width = dc.height = 16;
+			const dg = dc.getContext && dc.getContext("2d");
+			if (dg) { const gr = dg.createRadialGradient(8, 8, 0, 8, 8, 8); gr.addColorStop(0, "rgba(255, 255, 255, 1)"); gr.addColorStop(0.5, "rgba(255, 255, 255, 0.55)"); gr.addColorStop(1, "rgba(255, 255, 255, 0)"); dg.fillStyle = gr; dg.fillRect(0, 0, 16, 16); }
+			const drops = new THREE.Points(pg, new THREE.PointsMaterial({ color: 0xdfe9f2, map: dg ? new THREE.CanvasTexture(dc) : null, size: 1.3, sizeAttenuation: true, transparent: true, opacity: 0.8, depthWrite: false }));
+			drops.visible = false; drops.frustumCulled = false;
+			G3.scene.add(blob, drops);
+			C = G3.contact = { scene: G3.scene, blob, drops, v: new Float32Array(SPRAY_N3 * 3), life: new Float32Array(SPRAY_N3), next: 0, ph: 0, ps: 0, live: 0 };
+		}
+		// The contact patch: tight and dark on the grass, wider and fainter as the ball rises, gone by about 40 up.
+		const near = held && held.w > 0.5 ? 0 : 1 - Math.min(1, hw / 40);
+		C.blob.visible = near > 0.01;
+		if (C.blob.visible) {
+			const r = br * (0.75 + 0.9 * (1 - near));
+			C.blob.position.set(bx, 0.35, bz); C.blob.scale.set(r, 1, r);
+			C.blob.material.opacity = 0.5 * near * near;
+		}
+		// The spray: on a bounce (it was coming down and now it is on the grass) or a hard strike off the grass.
+		const k = Math.min(3, frameDt / 16.7), wetNow = cond.wet > 0 && !cond.snow;
+		const dropping = C.ph - hw, bounce = C.pd > 0.6 && C.ph < 30 && (hw <= 1 || hw > C.ph), strike = hw < 8 && spd > 9 && spd - C.ps > 5 && !ball.owner;
+		if (wetNow && !held && !reduceMotion && (bounce || strike)) {
+			const n = Math.round((gfxLevel === "light" ? 8 : 22) * Math.min(1.4, cond.wet)), up = bounce ? Math.min(3.2, 1 + C.pd * 0.35) : 2.2;
+			const dx = ball.vx || 0, dz = ball.vy || 0, sp = Math.hypot(dx, dz) || 1, sw = endsSwapped() ? -1 : 1;
+			for (let i = 0; i < n; i++) {
+				const j = C.next, a = Math.random() * Math.PI * 2, out = 0.25 + Math.random() * 0.7;
+				C.next = (C.next + 1) % SPRAY_N3;
+				const P = C.drops.geometry.attributes.position.array;
+				P[j * 3] = bx + Math.cos(a) * br * 0.6; P[j * 3 + 1] = 0.6; P[j * 3 + 2] = bz + Math.sin(a) * br * 0.6;
+				C.v[j * 3] = Math.cos(a) * out + sw * dx / sp * 0.5; C.v[j * 3 + 1] = up * (0.5 + Math.random() * 0.7); C.v[j * 3 + 2] = Math.sin(a) * out + dz / sp * 0.5;
+				C.life[j] = 1;
+			}
+			C.live = 1;
+		}
+		C.pd = dropping > 0 ? dropping / Math.max(0.5, k) : 0; C.ph = hw; C.ps = spd;
+		if (C.live) {
+			const P = C.drops.geometry.attributes.position.array;
+			let alive = 0, top = 0;
+			for (let j = 0; j < SPRAY_N3; j++) {
+				if (C.life[j] <= 0) { continue; }
+				C.life[j] -= 0.045 * k;
+				C.v[j * 3 + 1] -= 0.22 * k;
+				P[j * 3] += C.v[j * 3] * k; P[j * 3 + 1] += C.v[j * 3 + 1] * k; P[j * 3 + 2] += C.v[j * 3 + 2] * k;
+				if (C.life[j] <= 0 || P[j * 3 + 1] < 0) { C.life[j] = 0; P[j * 3 + 1] = -1e4; continue; }
+				alive++; top = Math.max(top, C.life[j]);
+			}
+			C.drops.geometry.attributes.position.needsUpdate = true;
+			C.drops.material.opacity = 0.8 * Math.min(1, top * 1.6);
+			C.live = alive > 0 ? 1 : 0;
+		}
+		C.drops.visible = !!C.live;
 	}
 	// A point on the pitch (x, y, height) to the screen, in the HUD's units; null when it is behind the camera.
 	function proj3D (x, y, z) {
@@ -14934,7 +15062,7 @@
 		let restore = null;
 		try {
 			if (replayOn()) { restore = applyReplay(); }
-			try { sync3D(); if (window.__ffCam3D) { window.__ffCam3D(G3, THREE); } G3.renderer.render(G3.scene, G3.cam); } finally { if (restore) { restore(); } }
+			try { sync3D(); if (window.__ffCam3D) { window.__ffCam3D(G3, THREE); } const q = gpuBegin3D(); G3.renderer.render(G3.scene, G3.cam); gpuEnd3D(q); } finally { if (restore) { restore(); } }
 			hud3D();
 			if (threeToldLoading) { threeToldLoading = false; fx = fx.filter(f => !(f.toast && f.label === "Loading 3D view")); }
 		} catch (e) {
@@ -15483,11 +15611,13 @@
 	let frameDt = 16.7;
 	const IDLE_STATES = new Set([ "paused", "intro", "half", "full" ]), IDLE_FRAME = 100, IDLE_AFTER = 2500;
 	let lastDrawAt = 0, idleState = "", idleSince = 0;
-	// 30 a second where nothing needs 60: paused, the menus and the cards, between plays (the kick-off and
-	// restart waits, a goal being celebrated) and, on Light graphics, in play too. A replay and slow motion
-	// keep every frame. (The simulation steps at 60 whatever the drawing does.)
+	// 30 a second where nothing needs 60: paused, the menus and the cards and, on Light graphics, in play too.
+	// Between plays (the kick-off sweep and restart walks, a goal being celebrated) the camera is moving, so
+	// High and Medium keep 60 there; Low and Light take 30. A replay and slow motion keep every frame.
+	// (The simulation steps at 60 whatever the drawing does.)
 	const CAP_FRAME = 1000 / 30 - 2.5;
-	const capped = () => !odr && !replayOn() && !(slowMo > 0) && (IDLE_STATES.has(state) || state === "goal" || (state === "play" && freeze > 0) || (gfx3().fps || 60) <= 30);
+	const smoothMoves = () => gfxLevel === "high" || gfxLevel === "medium";
+	const capped = () => !odr && !replayOn() && !(slowMo > 0) && (IDLE_STATES.has(state) || (!smoothMoves() && (state === "goal" || (state === "play" && freeze > 0))) || (gfx3().fps || 60) <= 30);
 	let wasCapped = false, parked = false;
 	// A hidden tab draws nothing at all: the loop parks and starts again when the tab is shown.
 	document.addEventListener("visibilitychange", () => {
@@ -15501,6 +15631,7 @@
 		frameDt = clamp(now - last, 1, 100);
 		// Graphics Auto judges only uncapped frames (a capped one is long on purpose).
 		if (!cap && !wasCapped) { gfxAutoTick(now - last, now); }
+		dynTick3D(now - last, now, cap || wasCapped);
 		wasCapped = cap;
 		pollPad();
 		acc = Math.min(acc + (now - last) * (slowMo > 0 && !odr ? SLOW_RATE : 1), 250);
@@ -15871,12 +16002,32 @@
 		if (i < 0) { return; }   // Light is only ever chosen, never stepped into
 		if (gfxAuto.ms > 22) { gfxAuto.slow += dt / 1000; gfxAuto.good = 0; } else { gfxAuto.slow = 0; }
 		if (gfxAuto.ms < 18) { gfxAuto.good += dt / 1000; }
-		if (gfxAuto.slow > 3 && i > floor) {
+		lightAskTick(gfxAuto.ms > 22 || (DYN3.has && DYN3.ms > DYN3.budget && dynFloored3D()), dt);
+		// Dynamic resolution goes first: a level is dropped only once it is down to its floor, and raised only
+		// once it is back at full scale (each level change rebuilds the ground).
+		if (gfxAuto.slow > 3 && i > floor && dynFloored3D()) {
 			if (now - gfxAuto.lastUp < 15000) { gfxAuto.wait = Math.min(600, gfxAuto.wait * 2); }   // that step up was too much
 			setGfx(order[i - 1]); gfxAuto.slow = 0; gfxAuto.good = 0; gfxAuto.ms = 16.7;
-		} else if (gfxAuto.good > gfxAuto.wait && order.indexOf(gfxAuto.top) > i) {
+		} else if (gfxAuto.good > gfxAuto.wait && order.indexOf(gfxAuto.top) > i && DYN3.s >= 1) {
 			setGfx(order[i + 1]); gfxAuto.good = 0; gfxAuto.lastUp = now; gfxAuto.ms = 16.7;
 		}
+	}
+	// Auto never steps into Light, but after a long slow stretch (about 90 s of slow frames in play, still slow
+	// at its lowest step) it offers it, once a session; two "Not now"s and it never asks again.
+	const lightAsk = { el: $("lightAsk"), t: 0, asked: false, no: Number(store.get("ff-light-no") || 0) };
+	const LIGHT_ASK_AFTER = 90;
+	function lightAskTick (slow, dt) {
+		if (lightAsk.asked || lightAsk.no >= 2 || !lightAsk.el || gfxLevel === "light") { return; }
+		lightAsk.t = Math.max(0, lightAsk.t + (slow ? dt : -dt * 0.5) / 1000);
+		if (lightAsk.t >= LIGHT_ASK_AFTER) { showLightAsk(); }
+	}
+	function showLightAsk () {
+		if (!lightAsk.el) { return; }
+		lightAsk.asked = true; lightAsk.el.hidden = false;
+	}
+	if (lightAsk.el) {
+		$("lightAskYes").addEventListener("click", e => { e.currentTarget.blur(); lightAsk.el.hidden = true; setGfx("light", true); toast("Graphics: Light", "#f2b52e"); });
+		$("lightAskNo").addEventListener("click", e => { e.currentTarget.blur(); lightAsk.el.hidden = true; lightAsk.no++; store.set("ff-light-no", String(lightAsk.no)); });
 	}
 	function setGfx (level, chosen = false) {
 		if (level === "auto") {
@@ -16238,7 +16389,7 @@
 				passTo(c, f);
 				return f;
 			},
-			get restartWalk () { return restartWalk; }, get review () { return review; }, get cpuSubs () { return cpuSubs; }, get surge () { return surge; }, get pressI () { return press; }, formBonus, get lastRatings () { return lastRatings; }, get stretcher () { return stretcher; }, injureTest (t, serious) { const v = outfield(t).find(p => !p.injured); const o = outfield(1 - t)[0]; if (v && o) { tackling[1 - t] = "hard"; const r = Math.random; Math.random = () => 0.01; try { commitFoul(o, v, true); } finally { Math.random = r; } } return v; }, staOf, get offside () { return offside; }, get deadBall () { return deadBall; }, get tally () { return tally; }, get freezeKind () { return freezeKind; }, fkDist () { return fkDist(); }, simExtra () { return { tally, poss: possFrames.slice() }; }, get setPieceKind () { return setPiece ? setPiece.kind : null; }, get gfxLevel () { return gfxLevel; }, get gfxAuto () { return gfxAuto; }, gfxAutoTick, setGfx, get musicBar () { return music ? music.bar : -1; }, get audioState () { return audio ? audio.state : "none"; }, get replayOn () { return replayOn(); }, get replay () { return replay; }, get recFrames () { return rec.n; }, REPLAY_AT, REPLAY_FR, GOAL_CELEB, get lastCaption () { return lastCaption; }, get lastCommentary () { return lastCommentary; }, moment, commReset () { commAt = -1e9; commRecent = []; },
+			get restartWalk () { return restartWalk; }, get review () { return review; }, get cpuSubs () { return cpuSubs; }, get surge () { return surge; }, get pressI () { return press; }, formBonus, get lastRatings () { return lastRatings; }, get stretcher () { return stretcher; }, injureTest (t, serious) { const v = outfield(t).find(p => !p.injured); const o = outfield(1 - t)[0]; if (v && o) { tackling[1 - t] = "hard"; const r = Math.random; Math.random = () => 0.01; try { commitFoul(o, v, true); } finally { Math.random = r; } } return v; }, staOf, get offside () { return offside; }, get deadBall () { return deadBall; }, get tally () { return tally; }, get freezeKind () { return freezeKind; }, fkDist () { return fkDist(); }, simExtra () { return { tally, poss: possFrames.slice() }; }, get setPieceKind () { return setPiece ? setPiece.kind : null; }, get gfxLevel () { return gfxLevel; }, get gfxAuto () { return gfxAuto; }, gfxAutoTick, setGfx, get dynScale () { return DYN3.s; }, get dyn () { return DYN3; }, dynSet (v) { DYN3.s = v; DYN3.at = performance.now(); resize3D(); }, dynTick3D, get lightAsk () { return lightAsk; }, lightAskTest () { showLightAsk(); }, lightAskTick, get musicBar () { return music ? music.bar : -1; }, get audioState () { return audio ? audio.state : "none"; }, get replayOn () { return replayOn(); }, get replay () { return replay; }, get recFrames () { return rec.n; }, REPLAY_AT, REPLAY_FR, GOAL_CELEB, get lastCaption () { return lastCaption; }, get lastCommentary () { return lastCommentary; }, moment, commReset () { commAt = -1e9; commRecent = []; },
 			// Pose one player on a spare figure, n frames in a row, right now (no simulation step in between).
 			staffProbe (kind, o = {}) { const F3 = G3.fig; if (!F3) { return null; } const r = F3.rigs[F3.rigs.length - 1], m = { x: FW / 2, y: FH + 13, vx: 0, vy: 0, dir: 0, stride: 0, runAmt: o.run || 0, idlePh: o.ph || 0, role: "staff", team: 0, celebA: o.celebA || 0, kneel: o.kneel || 0 }; r.mir = 1; resetRig3D(r); pose3D(r, m, m.x, m.y, 0, 0, 0); if (kind === "bench") { benchPose3D(r, o.st || 0, o.ph || 0, 0, 0); } else { staffGesture3D(r, kind === "sprint" ? "" : kind, o.ph || 0, kind === "sprint", o.kneel || 0); } r.root.updateMatrixWorld(true); return r; },
 			poseProbe (p, n = 30, ballNear = 0) { const F3 = G3.fig; if (!F3) { return null; } const r = F3.rigs[F3.rigs.length - 1]; r.mir = 1; animLag = 0; for (let k = 0; k < n; k++) { resetRig3D(r); pose3D(r, p, p.x, p.y, p.dir, 0, ballNear, 0, 0); } r.root.updateMatrixWorld(true); return r; }, caption, get camMode () { return camMode; }, get crowdMood () { return crowdMood; }, get frameDt () { return frameDt; }, get crowdBed () { return crowd; }, get soundOn () { return soundOn; },

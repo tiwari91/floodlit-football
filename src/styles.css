@@ -1166,3 +1166,4 @@
 .coachmark[hidden], .pitchwrap:has(.overlay:not([hidden])) .coachmark { display: none; }
 .coachmark kbd { display: inline-block; min-width: 20px; padding: 1px 6px; margin: 0 2px; border-radius: 3px; background: #f4f6f2; color: #10161c; font: 700 13px Barlow, Arial, sans-serif; text-align: center; }
 .coachmark button { pointer-events: auto; padding: 5px 12px; font-size: 13px; }
+.coachmark.lightask { bottom: auto; top: 64px; gap: 10px; white-space: normal; max-width: calc(100% - 32px); }

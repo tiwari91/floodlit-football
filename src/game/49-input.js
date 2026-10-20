@@ -295,12 +295,32 @@
 		if (i < 0) { return; }   // Light is only ever chosen, never stepped into
 		if (gfxAuto.ms > 22) { gfxAuto.slow += dt / 1000; gfxAuto.good = 0; } else { gfxAuto.slow = 0; }
 		if (gfxAuto.ms < 18) { gfxAuto.good += dt / 1000; }
-		if (gfxAuto.slow > 3 && i > floor) {
+		lightAskTick(gfxAuto.ms > 22 || (DYN3.has && DYN3.ms > DYN3.budget && dynFloored3D()), dt);
+		// Dynamic resolution goes first: a level is dropped only once it is down to its floor, and raised only
+		// once it is back at full scale (each level change rebuilds the ground).
+		if (gfxAuto.slow > 3 && i > floor && dynFloored3D()) {
 			if (now - gfxAuto.lastUp < 15000) { gfxAuto.wait = Math.min(600, gfxAuto.wait * 2); }   // that step up was too much
 			setGfx(order[i - 1]); gfxAuto.slow = 0; gfxAuto.good = 0; gfxAuto.ms = 16.7;
-		} else if (gfxAuto.good > gfxAuto.wait && order.indexOf(gfxAuto.top) > i) {
+		} else if (gfxAuto.good > gfxAuto.wait && order.indexOf(gfxAuto.top) > i && DYN3.s >= 1) {
 			setGfx(order[i + 1]); gfxAuto.good = 0; gfxAuto.lastUp = now; gfxAuto.ms = 16.7;
 		}
+	}
+	// Auto never steps into Light, but after a long slow stretch (about 90 s of slow frames in play, still slow
+	// at its lowest step) it offers it, once a session; two "Not now"s and it never asks again.
+	const lightAsk = { el: $("lightAsk"), t: 0, asked: false, no: Number(store.get("ff-light-no") || 0) };
+	const LIGHT_ASK_AFTER = 90;
+	function lightAskTick (slow, dt) {
+		if (lightAsk.asked || lightAsk.no >= 2 || !lightAsk.el || gfxLevel === "light") { return; }
+		lightAsk.t = Math.max(0, lightAsk.t + (slow ? dt : -dt * 0.5) / 1000);
+		if (lightAsk.t >= LIGHT_ASK_AFTER) { showLightAsk(); }
+	}
+	function showLightAsk () {
+		if (!lightAsk.el) { return; }
+		lightAsk.asked = true; lightAsk.el.hidden = false;
+	}
+	if (lightAsk.el) {
+		$("lightAskYes").addEventListener("click", e => { e.currentTarget.blur(); lightAsk.el.hidden = true; setGfx("light", true); toast("Graphics: Light", "#f2b52e"); });
+		$("lightAskNo").addEventListener("click", e => { e.currentTarget.blur(); lightAsk.el.hidden = true; lightAsk.no++; store.set("ff-light-no", String(lightAsk.no)); });
 	}
 	function setGfx (level, chosen = false) {
 		if (level === "auto") {

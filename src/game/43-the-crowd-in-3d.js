@@ -590,6 +590,7 @@
 		const [ sux, suz ] = sunDir3D(); G3.ballShadow.position.set(bx + sux * (2.4 * bk + h * 0.07), 0.3, bz + suz * (2.4 * bk + h * 0.07));
 		G3.ballShadow.scale.set((4.5 * sh + 2) * bk, 1, (4.5 * sh + 2) * bk);
 		G3.ballShadow.material.opacity = 0.3 * sh + 0.08;
+		ballContact3D(bx, bz, h * Z3, br, spd, held);
 		if (G3.shot.startsWith("replay")) { for (const m of Object.values(G3.marks)) { m.visible = false; } return; }   // a clean picture for the replay
 		// The markers on the grass.
 		const mk = G3.marks, me = human(), playing = state === "play" && freeze <= 0;
@@ -641,6 +642,70 @@
 			mk.tut.position.set(WX(tut.marker.x), 0.5, tut.marker.y); mk.tut.scale.set(r, 1, r);
 			mk.tutFill.position.set(WX(tut.marker.x), 0.45, tut.marker.y); mk.tutFill.scale.set(r, 1, r);
 		}
+	}
+	// Where the ball meets the grass: a soft dark patch right under it (the floodlight shadow above falls off
+	// to one side), small and dark as it comes down to the ground, gone by the time it is a few feet up. On a
+	// wet pitch a bounce or a hard strike off the grass throws up a little spray (fewer drops on Light).
+	const SPRAY_N3 = 40;
+	function ballContact3D (bx, bz, hw, br, spd, held) {
+		if (G3.contact && G3.contact.scene !== G3.scene) { G3.contact = null; }
+		let C = G3.contact;
+		if (!C) {
+			const c = document.createElement("canvas"); c.width = c.height = 32;
+			const g = c.getContext && c.getContext("2d");
+			if (g) { const gr = g.createRadialGradient(16, 16, 0, 16, 16, 16); gr.addColorStop(0, "rgba(0, 0, 0, 1)"); gr.addColorStop(0.45, "rgba(0, 0, 0, 0.6)"); gr.addColorStop(1, "rgba(0, 0, 0, 0)"); g.fillStyle = gr; g.fillRect(0, 0, 32, 32); }
+			const blob = new THREE.Mesh(new THREE.PlaneGeometry(2, 2).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffffff, map: g ? new THREE.CanvasTexture(c) : null, transparent: true, opacity: 0, depthWrite: false }));
+			const pg = new THREE.BufferGeometry(), pa = new Float32Array(SPRAY_N3 * 3).fill(-1e4);
+			pg.setAttribute("position", new THREE.BufferAttribute(pa, 3).setUsage(THREE.DynamicDrawUsage));
+			const dc = document.createElement("canvas"); dc.width = dc.height = 16;
+			const dg = dc.getContext && dc.getContext("2d");
+			if (dg) { const gr = dg.createRadialGradient(8, 8, 0, 8, 8, 8); gr.addColorStop(0, "rgba(255, 255, 255, 1)"); gr.addColorStop(0.5, "rgba(255, 255, 255, 0.55)"); gr.addColorStop(1, "rgba(255, 255, 255, 0)"); dg.fillStyle = gr; dg.fillRect(0, 0, 16, 16); }
+			const drops = new THREE.Points(pg, new THREE.PointsMaterial({ color: 0xdfe9f2, map: dg ? new THREE.CanvasTexture(dc) : null, size: 1.3, sizeAttenuation: true, transparent: true, opacity: 0.8, depthWrite: false }));
+			drops.visible = false; drops.frustumCulled = false;
+			G3.scene.add(blob, drops);
+			C = G3.contact = { scene: G3.scene, blob, drops, v: new Float32Array(SPRAY_N3 * 3), life: new Float32Array(SPRAY_N3), next: 0, ph: 0, ps: 0, live: 0 };
+		}
+		// The contact patch: tight and dark on the grass, wider and fainter as the ball rises, gone by about 40 up.
+		const near = held && held.w > 0.5 ? 0 : 1 - Math.min(1, hw / 40);
+		C.blob.visible = near > 0.01;
+		if (C.blob.visible) {
+			const r = br * (0.75 + 0.9 * (1 - near));
+			C.blob.position.set(bx, 0.35, bz); C.blob.scale.set(r, 1, r);
+			C.blob.material.opacity = 0.5 * near * near;
+		}
+		// The spray: on a bounce (it was coming down and now it is on the grass) or a hard strike off the grass.
+		const k = Math.min(3, frameDt / 16.7), wetNow = cond.wet > 0 && !cond.snow;
+		const dropping = C.ph - hw, bounce = C.pd > 0.6 && C.ph < 30 && (hw <= 1 || hw > C.ph), strike = hw < 8 && spd > 9 && spd - C.ps > 5 && !ball.owner;
+		if (wetNow && !held && !reduceMotion && (bounce || strike)) {
+			const n = Math.round((gfxLevel === "light" ? 8 : 22) * Math.min(1.4, cond.wet)), up = bounce ? Math.min(3.2, 1 + C.pd * 0.35) : 2.2;
+			const dx = ball.vx || 0, dz = ball.vy || 0, sp = Math.hypot(dx, dz) || 1, sw = endsSwapped() ? -1 : 1;
+			for (let i = 0; i < n; i++) {
+				const j = C.next, a = Math.random() * Math.PI * 2, out = 0.25 + Math.random() * 0.7;
+				C.next = (C.next + 1) % SPRAY_N3;
+				const P = C.drops.geometry.attributes.position.array;
+				P[j * 3] = bx + Math.cos(a) * br * 0.6; P[j * 3 + 1] = 0.6; P[j * 3 + 2] = bz + Math.sin(a) * br * 0.6;
+				C.v[j * 3] = Math.cos(a) * out + sw * dx / sp * 0.5; C.v[j * 3 + 1] = up * (0.5 + Math.random() * 0.7); C.v[j * 3 + 2] = Math.sin(a) * out + dz / sp * 0.5;
+				C.life[j] = 1;
+			}
+			C.live = 1;
+		}
+		C.pd = dropping > 0 ? dropping / Math.max(0.5, k) : 0; C.ph = hw; C.ps = spd;
+		if (C.live) {
+			const P = C.drops.geometry.attributes.position.array;
+			let alive = 0, top = 0;
+			for (let j = 0; j < SPRAY_N3; j++) {
+				if (C.life[j] <= 0) { continue; }
+				C.life[j] -= 0.045 * k;
+				C.v[j * 3 + 1] -= 0.22 * k;
+				P[j * 3] += C.v[j * 3] * k; P[j * 3 + 1] += C.v[j * 3 + 1] * k; P[j * 3 + 2] += C.v[j * 3 + 2] * k;
+				if (C.life[j] <= 0 || P[j * 3 + 1] < 0) { C.life[j] = 0; P[j * 3 + 1] = -1e4; continue; }
+				alive++; top = Math.max(top, C.life[j]);
+			}
+			C.drops.geometry.attributes.position.needsUpdate = true;
+			C.drops.material.opacity = 0.8 * Math.min(1, top * 1.6);
+			C.live = alive > 0 ? 1 : 0;
+		}
+		C.drops.visible = !!C.live;
 	}
 	// A point on the pitch (x, y, height) to the screen, in the HUD's units; null when it is behind the camera.
 	function proj3D (x, y, z) {
@@ -822,7 +887,7 @@
 		let restore = null;
 		try {
 			if (replayOn()) { restore = applyReplay(); }
-			try { sync3D(); if (window.__ffCam3D) { window.__ffCam3D(G3, THREE); } G3.renderer.render(G3.scene, G3.cam); } finally { if (restore) { restore(); } }
+			try { sync3D(); if (window.__ffCam3D) { window.__ffCam3D(G3, THREE); } const q = gpuBegin3D(); G3.renderer.render(G3.scene, G3.cam); gpuEnd3D(q); } finally { if (restore) { restore(); } }
 			hud3D();
 			if (threeToldLoading) { threeToldLoading = false; fx = fx.filter(f => !(f.toast && f.label === "Loading 3D view")); }
 		} catch (e) {

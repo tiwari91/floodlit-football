@@ -31,12 +31,12 @@
 	// pitch (four lamps mirrored, not eight), half the rain and a softer HUD canvas.
 	// fps: the cap in play. budget/minRatio: the 3D pixel budget and how far under 1 it may go.
 	// hud: the 2D canvas's pixel ratio cap. glare: the lamp halo's size. wetLamps: lamps the wet pitch
-	// mirrors. rain: share of the rain streaks. benches: seats as a bench along the row.
+	// mirrors. rain: share of the rain streaks. benches: seats as a bench along the row. dyn: dynamic resolution.
 	const GFX3 = {
 		light: { seat: 18, fill: 0.5, hiRows: 0, nearHiRows: 0, liteRow: 1, lattice: false, shadows: 1, ratio: 1, aa: false, fps: 30, budget: 1.3e6, minRatio: 0.75, hud: 1.25, glare: 0.6, wetLamps: 4, rain: 0.45, benches: true },
 		low: { seat: 15, fill: 0.62, hiRows: 0, nearHiRows: 2, liteRow: 3, lattice: false, shadows: 1, ratio: 1, aa: false, benches: true },
-		medium: { seat: 12, fill: 0.82, hiRows: 0, nearHiRows: 4, liteRow: 6, lattice: true, shadows: 3, ratio: 1.5, aa: !coarse },
-		high: { seat: 10, fill: 1, hiRows: 2, nearHiRows: 5, liteRow: 8, lattice: true, shadows: 5, ratio: 2, aa: true }
+		medium: { seat: 12, fill: 0.82, hiRows: 0, nearHiRows: 4, liteRow: 6, lattice: true, shadows: 3, ratio: 1.5, aa: !coarse, dyn: true },
+		high: { seat: 10, fill: 1, hiRows: 2, nearHiRows: 5, liteRow: 8, lattice: true, shadows: 5, ratio: 2, aa: true, dyn: true }
 	};
 	const GFX_NAME = { light: "Light", low: "Low", medium: "Medium", high: "High" };
 	const PIX_BUDGET3 = 3.2e6;
@@ -75,9 +75,55 @@
 		// A pixel budget as well as the level's ratio: a retina laptop at 2x was drawing over five million
 		// pixels sixty times a second, which is what made it run hot; about three million looks the same.
 		const Q = gfx3(), budget = Math.sqrt((Q.budget || PIX_BUDGET3) / Math.max(1, rect.width * rect.height));
-		G3.renderer.setPixelRatio(Math.max(Q.minRatio || 1, Math.min(window.devicePixelRatio || 1, Q.ratio, budget)));
+		if (DYN3.lvl !== gfxLevel) { DYN3.lvl = gfxLevel; DYN3.s = 1; DYN3.over = DYN3.under = 0; }
+		G3.renderer.setPixelRatio(Math.max(Q.minRatio || 1, Math.min(window.devicePixelRatio || 1, Q.ratio, budget)) * (Q.dyn ? DYN3.s : 1));
 		G3.renderer.setSize(Math.max(1, Math.round(rect.width)), Math.max(1, Math.round(rect.height)), false);
 	}
+	// Dynamic resolution (High and Medium): when the GPU's time for a frame stays over budget the 3D picture
+	// is drawn with fewer pixels, a tenth at a time down to 0.6 of the level's own scale, and it climbs back
+	// once there is room for the next step. Over budget for 2 s to step down, room for 5 s to step up, and
+	// a few seconds between steps, so it never flickers (each step also resizes the drawing buffer). The GPU's
+	// time comes from a timer query where the browser has one; elsewhere the frame time stands in for it.
+	// Light and Low keep their fixed scale. The 2D HUD is untouched.
+	const DYN3 = { s: 1, min: 0.6, step: 0.1, lvl: "", ms: 0, has: false, over: 0, under: 0, at: -1e9, ext: undefined, q: null, gl: null, budget: 7, room: 5 };
+	function gpuBegin3D () {
+		if (!gfx3().dyn || window.__ffNoGpuTimer || DYN3.q) { return null; }
+		const gl = G3.renderer.getContext();
+		if (DYN3.gl !== gl) { DYN3.gl = gl; DYN3.ext = gl.getExtension("EXT_disjoint_timer_query_webgl2") || null; }
+		if (!DYN3.ext) { return null; }
+		const q = gl.createQuery(); gl.beginQuery(DYN3.ext.TIME_ELAPSED_EXT, q);
+		return q;
+	}
+	function gpuEnd3D (q) {
+		const gl = DYN3.gl;
+		if (q) { gl.endQuery(DYN3.ext.TIME_ELAPSED_EXT); DYN3.q = q; return; }
+		if (!DYN3.q || gl !== G3.renderer.getContext()) { if (DYN3.q && gl !== G3.renderer.getContext()) { DYN3.q = null; } return; }
+		if (!gl.getQueryParameter(DYN3.q, gl.QUERY_RESULT_AVAILABLE)) { return; }   // never wait for it
+		if (!gl.getParameter(DYN3.ext.GPU_DISJOINT_EXT)) { const ms = gl.getQueryParameter(DYN3.q, gl.QUERY_RESULT) / 1e6; DYN3.ms = DYN3.has ? DYN3.ms + (ms - DYN3.ms) * 0.08 : ms; DYN3.has = true; }
+		gl.deleteQuery(DYN3.q); DYN3.q = null;
+	}
+	// Once a drawn frame in play: judge the GPU time (or, without a timer, the frame time) and step the scale.
+	function dynTick3D (dt, now, cap) {
+		if (!gfx3().dyn || !G3.renderer || state !== "play" || camMode !== "3d") { return; }
+		const sec = Math.min(dt, 100) / 1000;
+		let over, room;
+		if (DYN3.has) {
+			over = DYN3.ms > DYN3.budget;
+			const up = Math.min(1, DYN3.s + DYN3.step) / DYN3.s;
+			room = DYN3.ms * up * up < DYN3.room;   // the next step up would still fit
+		} else {
+			if (dt > 80 || cap) { return; }   // a capped frame is long on purpose
+			DYN3.ms += (dt - DYN3.ms) * 0.05;
+			over = DYN3.ms > 20; room = DYN3.ms < 17.6;
+		}
+		DYN3.over = over ? DYN3.over + sec : Math.max(0, DYN3.over - sec * 2);
+		DYN3.under = room && !over ? DYN3.under + sec : 0;
+		let to = DYN3.s;
+		if (DYN3.over > 2 && now - DYN3.at > 2500 && DYN3.s > DYN3.min + 1e-3) { to = Math.max(DYN3.min, DYN3.s - DYN3.step); }
+		else if (DYN3.under > 5 && now - DYN3.at > 5000 && DYN3.s < 1) { to = Math.min(1, DYN3.s + DYN3.step); }
+		if (to !== DYN3.s) { DYN3.s = +to.toFixed(2); DYN3.at = now; DYN3.over = DYN3.under = 0; if (!DYN3.has) { DYN3.ms = 16.7; } resize3D(); }
+	}
+	const dynFloored3D = () => !gfx3().dyn || DYN3.s <= DYN3.min + 1e-3;
 	// One material per colour, shared by every mesh that wears it.
 	function mat3D (hex, lit = true) {
 		const key = (lit ? "L" : "B") + hex;
@@ -856,7 +902,7 @@
 		const net = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.42 }));
 		net.userData.ownGeo = true; net.userData.ownMat = true;
 		st.add(net);
-		G3.nets = { net, rest: Float32Array.from(rest), nrm: Float32Array.from(nrm), wgt: Float32Array.from(wgt), goalOf, amp: [ 0, 0 ], ph: [ 0, 0 ], hit: [ null, null ], inside: [ false, false ], moving: false };
+		G3.nets = { net, rest: Float32Array.from(rest), nrm: Float32Array.from(nrm), wgt: Float32Array.from(wgt), goalOf, amp: [ 0, 0 ], ph: [ 0, 0 ], hit: [ null, null ], inside: [ false, false ], moving: false, rip: [ 0, 0 ], rt: [ 0, 0 ], rAt: [ null, null ] };
 	}
 	// The ball off the woodwork: the frame shudders and the net swings from the post or the bar.
 	function shakeGoal3D (left, y, z) {
@@ -864,21 +910,31 @@
 		if (!NT || bulkSim) { return; }
 		const wx = (endsSwapped() ? !left : left) ? 0 : FW, g = wx < FW / 2 ? 0 : 1;
 		NT.amp[g] = Math.max(NT.amp[g], 4.5); NT.ph[g] = 0; NT.hit[g] = [ wx, Math.max(0, z) * Z3, y ]; NT.moving = true;
+		if (gfxLevel !== "light") { NT.rip[g] = Math.max(NT.rip[g], 1.6); NT.rt[g] = 0; NT.rAt[g] = NT.hit[g]; }
 	}
-	// Every frame: is the ball in a net? Push it back where the ball is and let it swing.
+	// Every frame: is the ball in a net? It bulges where the ball is (a pocket that holds while the ball sits
+	// in it) and swings, and from where it struck a ring of ripple runs out across the mesh and dies away.
+	// All of it moves the net's own knots, no extra draw call. Light has the bulge and swing, not the ripple.
+	const NET_RIP_W = 15, NET_RIP_V = 3.4, NET_RIP_L = 9;   // the ripple's width, its speed out (a frame), its wavelength
 	function animateNets3D (bx, by, bh, dt) {
 		const NT = G3.nets;
 		if (!NT) { return; }
-		const cb = 55 * Z3;
+		const cb = 55 * Z3, rippled = gfxLevel !== "light";
 		let any = false;
 		for (let g = 0; g < 2; g++) {
 			const inside = (g === 0 ? bx < -1 : bx > FW + 1) && by > GOAL_T - 2 && by < GOAL_B + 2 && bh < cb + 4;
-			if (inside && !NT.inside[g]) { NT.amp[g] = Math.min(9, 3 + Math.hypot(ball.vx || 0, ball.vy || 0) * 0.9); NT.ph[g] = 0; NT.hit[g] = [ bx, bh, by ]; }
+			if (inside && !NT.inside[g]) {
+				const pace = Math.hypot(ball.vx || 0, ball.vy || 0);
+				NT.amp[g] = Math.min(9, 3 + pace * 0.9); NT.ph[g] = 0; NT.hit[g] = [ bx, bh, by ];
+				NT.rip[g] = rippled ? Math.min(4.5, 1.2 + pace * 0.3) : 0; NT.rt[g] = 0; NT.rAt[g] = [ bx, bh, by ];
+			}
 			NT.inside[g] = inside;
 			if (inside) { NT.hit[g] = [ bx, bh, by ]; }
 			NT.ph[g] += dt * 0.32;
 			NT.amp[g] *= Math.pow(0.955, dt);
-			if (NT.amp[g] > 0.05 || inside) { any = true; }
+			NT.rt[g] += dt; NT.rip[g] *= Math.pow(0.95, dt);
+			if (NT.rip[g] < 0.05) { NT.rip[g] = 0; }
+			if (NT.amp[g] > 0.05 || inside || NT.rip[g] > 0) { any = true; }
 		}
 		if (!any && !NT.moving) { return; }
 		NT.moving = any;
@@ -890,6 +946,11 @@
 				const dx = R[k] - h[0], dy = R[k + 1] - h[1], dz = R[k + 2] - h[2], dd = dx * dx + dy * dy + dz * dz;
 				const fall = Math.exp(-dd / (2 * 34 * 34));
 				d = w[v] * fall * (NT.amp[g] * Math.sin(NT.ph[g]) + (NT.inside[g] ? 3.5 : 0));
+				const ra = NT.rAt[g];
+				if (NT.rip[g] > 0 && ra) {   // the ring running out from where it struck
+					const r = Math.hypot(R[k] - ra[0], R[k + 1] - ra[1], R[k + 2] - ra[2]) - NT.rt[g] * NET_RIP_V;
+					if (r > -3 * NET_RIP_W && r < 3 * NET_RIP_W) { d += Math.sqrt(w[v]) * NT.rip[g] * Math.exp(-r * r / (2 * NET_RIP_W * NET_RIP_W)) * Math.cos(r / NET_RIP_L * Math.PI); }
+				}
 			}
 			arr[k] = R[k] + n[k] * d; arr[k + 1] = R[k + 1] + n[k + 1] * d; arr[k + 2] = R[k + 2] + n[k + 2] * d;
 		}
