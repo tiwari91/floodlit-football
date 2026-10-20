@@ -5,7 +5,7 @@
 	let SW = 0, SH = 0, rotTop = false;
 	function resize () {
 		const rect = canvas.getBoundingClientRect();
-		const dpr = Math.min(window.devicePixelRatio || 1, 2);
+		const dpr = Math.min(window.devicePixelRatio || 1, gfx3().hud || 2);   // Light draws the HUD and 2D cameras softer
 		canvas.width = Math.round(rect.width * dpr);
 		canvas.height = Math.round(rect.height * dpr);
 		fitView();
@@ -763,7 +763,7 @@
 	function switchRingTight (m) {
 		let dn = 1e9;
 		for (const q of players) { if (q !== m) { dn = Math.min(dn, Math.hypot(q.x - m.x, q.y - m.y)); } }
-		const t = clamp((34 - dn) / 20, 0, 1);
+		const t = clamp((42 - dn) / 18, 0, 1);   // fully drawn in once a man is within about 24 (shoulder to shoulder)
 		m.ringT = m.ringT === undefined ? t : m.ringT + (t - m.ringT) * 0.15;
 		return m.ringT;
 	}
@@ -1159,7 +1159,7 @@
 				const lean = (0.1 + 0.3 * clamp(cond.wind.s / 40, 0, 1)) * (Math.cos(cond.wind.a) * (endsSwapped() ? -1 : 1) < 0 ? -1 : 1);
 				const dt = clamp(frameDt / 16.7, 0.25, 3);
 				RAIN_LAYERS.forEach((L, li) => {
-					const list = drops[li] || (drops[li] = []), want = Math.round(L.n * cond.wet * (SW * SH) / (1072 * 648));
+					const list = drops[li] || (drops[li] = []), want = Math.round(L.n * cond.wet * (gfx3().rain || 1) * (SW * SH) / (1072 * 648));
 					while (list.length < want) { list.push({ x: rainRnd() * (SW + 80) - 40, y: rainRnd() * SH, l: L.len[0] + rainRnd() * (L.len[1] - L.len[0]), v: L.v[0] + rainRnd() * (L.v[1] - L.v[0]) }); }
 					list.length = Math.min(list.length, want);
 					ctx.lineWidth = L.w; ctx.lineCap = "round";

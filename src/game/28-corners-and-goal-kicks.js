@@ -55,6 +55,7 @@
 		banner.textContent = text;
 		banner.className = "banner call " + (forTeam === 0 ? "home" : "away");
 		banner.hidden = false;
+		hideLineups();   // the call goes where the line-ups card sits; it would hide behind it
 		setTimeout(() => { if (banner.textContent === text) { banner.hidden = true; } }, 1000);
 		$("announce").textContent = `${text} to ${forTeam === 0 ? "you" : opp.name}.`;
 	}

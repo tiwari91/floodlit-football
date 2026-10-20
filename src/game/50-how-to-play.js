@@ -45,7 +45,7 @@
 			sec("Any time", [
 				row(K.tactic, "Tactic", `${howScheme === "keys" ? "1 Defensive, 2 Balanced, 3 Attacking, 4 All-out attack (T cycles)" : "Cycle Defensive, Balanced, Attacking, All-out attack"}. The tag at the top left of the pitch shows the current one.`),
 				row(K.pause, "Pause", "The clock stops. The pause card has the camera, sound and switching settings, your line and tackling instructions, substitutions, and Simulate the rest."),
-				row(K.cam, "Camera", "Overhead, TV or 3D. The one you pick is remembered. Graphics (Low, Medium, High) under the pitch or on the pause card sets how much the 3D view draws. After a goal in 3D there is a replay; any key or tap skips it."),
+				row(K.cam, "Camera", "Overhead, TV or 3D. The one you pick is remembered. Graphics (Light, Low, Medium, High) under the pitch or on the pause card sets how much the 3D view draws; Light draws 30 frames a second and less detail, for a laptop that runs warm. After a goal in 3D there is a replay; any key or tap skips it."),
 				row(howScheme === "touch" ? "Replay" : howScheme === "pad" ? "Back / Share" : "R", "Replay", "The last six seconds again, a little slower, with the clock stopped. Any key or tap ends it. Goals, parries and clearances off the line also go into slow motion for a moment."),
 				row(K.big, "Big pitch", "The ground fills the screen with a small score bug; Show menu brings the page back."),
 				row(K.help, "How to play", "This screen.")

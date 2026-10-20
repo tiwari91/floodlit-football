@@ -25,15 +25,34 @@
 	// shape, the floodlight towers' lattice, the players' floodlight shadows, the pixel ratio and
 	// antialiasing. Phones start on Low (Medium on a big tablet), computers on High (Medium on a
 	// four-core machine); the choice is remembered.
+	// Light is for a laptop that runs warm: half the frames (30 a second, which the fixed-step simulation
+	// does not notice), about a third of High's pixels (and below one a CSS pixel on a big screen), no
+	// antialiasing, a thinner crowd on benches, no floodlight shadows, smaller lamp glare, a cheaper wet
+	// pitch (four lamps mirrored, not eight), half the rain and a softer HUD canvas.
+	// fps: the cap in play. budget/minRatio: the 3D pixel budget and how far under 1 it may go.
+	// hud: the 2D canvas's pixel ratio cap. glare: the lamp halo's size. wetLamps: lamps the wet pitch
+	// mirrors. rain: share of the rain streaks. benches: seats as a bench along the row.
 	const GFX3 = {
-		low: { seat: 15, fill: 0.62, hiRows: 0, nearHiRows: 2, liteRow: 3, lattice: false, shadows: 1, ratio: 1, aa: false },
+		light: { seat: 18, fill: 0.5, hiRows: 0, nearHiRows: 0, liteRow: 1, lattice: false, shadows: 1, ratio: 1, aa: false, fps: 30, budget: 1.3e6, minRatio: 0.75, hud: 1.25, glare: 0.6, wetLamps: 4, rain: 0.45, benches: true },
+		low: { seat: 15, fill: 0.62, hiRows: 0, nearHiRows: 2, liteRow: 3, lattice: false, shadows: 1, ratio: 1, aa: false, benches: true },
 		medium: { seat: 12, fill: 0.82, hiRows: 0, nearHiRows: 4, liteRow: 6, lattice: true, shadows: 3, ratio: 1.5, aa: !coarse },
 		high: { seat: 10, fill: 1, hiRows: 2, nearHiRows: 5, liteRow: 8, lattice: true, shadows: 5, ratio: 2, aa: true }
 	};
-	const GFX_NAME = { low: "Low", medium: "Medium", high: "High" };
+	const GFX_NAME = { light: "Light", low: "Low", medium: "Medium", high: "High" };
 	const PIX_BUDGET3 = 3.2e6;
+	// A software renderer (no real GPU) or a two-core machine starts on Light.
+	const weakGPU = (() => {
+		try {
+			const c = document.createElement("canvas"), gl = c.getContext("webgl2") || c.getContext("webgl");
+			if (!gl) { return false; }
+			const ext = gl.getExtension("WEBGL_debug_renderer_info"), name = String(gl.getParameter(ext ? ext.UNMASKED_RENDERER_WEBGL : gl.RENDERER) || "");
+			const lose = gl.getExtension("WEBGL_lose_context"); if (lose) { lose.loseContext(); }
+			return /swiftshader|llvmpipe|software|basic render/i.test(name);
+		} catch (e) { return false; }
+	})();
 	const defaultGfx = () => {
 		const cores = navigator.hardwareConcurrency || 4;
+		if (weakGPU || cores <= 2) { return "light"; }
 		if (coarse) { let big = false; try { big = Math.min(screen.width, screen.height) >= 700; } catch (e) { /* none */ } return big && cores >= 6 ? "medium" : "low"; }
 		return cores <= 4 ? "medium" : "high";
 	};
@@ -55,8 +74,8 @@
 		const rect = canvas3d.getBoundingClientRect();
 		// A pixel budget as well as the level's ratio: a retina laptop at 2x was drawing over five million
 		// pixels sixty times a second, which is what made it run hot; about three million looks the same.
-		const budget = Math.sqrt(PIX_BUDGET3 / Math.max(1, rect.width * rect.height));
-		G3.renderer.setPixelRatio(Math.max(1, Math.min(window.devicePixelRatio || 1, gfx3().ratio, budget)));
+		const Q = gfx3(), budget = Math.sqrt((Q.budget || PIX_BUDGET3) / Math.max(1, rect.width * rect.height));
+		G3.renderer.setPixelRatio(Math.max(Q.minRatio || 1, Math.min(window.devicePixelRatio || 1, Q.ratio, budget)));
 		G3.renderer.setSize(Math.max(1, Math.round(rect.width)), Math.max(1, Math.round(rect.height)), false);
 	}
 	// One material per colour, shared by every mesh that wears it.
@@ -245,7 +264,7 @@
 	let WET_LAMPS3 = null;   // made once three.js is here
 	const wetLampCol3 = [ 1, 0.94, 0.82 ];   // the colour the wet grass mirrors: the ground's lamps
 	const wetLamps3 = () => WET_LAMPS3 || (WET_LAMPS3 = Array.from({ length: 8 }, () => new THREE.Vector3(0, -1e4, 0)));
-	function wetGround3D (mat) {
+	function wetGround3D (mat, nLamps = 8) {
 		mat.onBeforeCompile = sh => {
 			sh.uniforms.ffLamps = { value: wetLamps3() }; sh.uniforms.ffWet = { value: Math.min(1.5, cond.wet) }; sh.uniforms.ffLampCol = { value: wetLampCol3 };
 			sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nvarying vec3 vWp;").replace("#include <begin_vertex>", "#include <begin_vertex>\nvWp = (modelMatrix * vec4(transformed, 1.0)).xyz;");
@@ -267,12 +286,12 @@
 						float fres = 0.04 + 0.96 * pow(1.0 - max(dot(n, V), 0.0), 5.0);
 						float shin = mix(60.0, 500.0, pud), norm = (shin + 8.0) / 25.0;
 						float sp = 0.0;
-						for (int i = 0; i < 8; i++) { vec3 L = normalize(ffLamps[i] - vWp); sp += pow(max(dot(n, normalize(L + V)), 0.0), shin); }
+						for (int i = 0; i < 8; i += ${8 / nLamps}) { vec3 L = normalize(ffLamps[i] - vWp); sp += ${8 / nLamps}.0 * pow(max(dot(n, normalize(L + V)), 0.0), shin); }
 						float blade = 0.55 + 0.45 * ffNz(q / 1.7);   // the blades break up the mirror, softly
 						diffuseColor.rgb = diffuseColor.rgb * (1.0 - 0.1 * pud * ffWet) + ffLampCol * 0.35 * (1.0 - exp(-sp * norm * fres * blade * ffWet * 0.08));   // soft roll-off, never a white patch
 					}`);
 		};
-		mat.customProgramCacheKey = () => "ff-wet";
+		mat.customProgramCacheKey = () => "ff-wet" + nLamps;
 	}
 	// An afternoon in the sun: the stands' shadow on the grass, painted into the pitch picture once (no cost
 	// per frame). The sun comes over the near stand (as the players' shadows say); the sunlit part of the pitch
@@ -327,7 +346,7 @@
 			standShadow(pg, gs);
 			const tex = canvasTex3D(pc);
 			const mat = new THREE.MeshBasicMaterial({ map: tex });
-			if (cond.wet > 0) { wetGround3D(mat); }
+			if (cond.wet > 0) { wetGround3D(mat, Q.wetLamps || 8); }
 			const ground = own(new THREE.Mesh(new THREE.PlaneGeometry(WW, WH), mat), true);
 			ground.rotation.x = -Math.PI / 2;
 			ground.position.set(WW / 2 - MX, 0, WH / 2 - MY);
@@ -376,7 +395,7 @@
 		const lastRow = P.rows[P.rows.length - 1];
 		// Seats: one by one (a pan and a back, in the ground's colours) where the Graphics level allows, built
 		// with the crowd so that every empty place has a seat and none sits inside a fan; none on a terrace.
-		const seatsMode = gs.seats || "club", seatEach = !!stands && gfxLevel !== "low" && seatsMode !== "terrace";
+		const seatsMode = gs.seats || "club", seatEach = !!stands && !Q.benches && seatsMode !== "terrace";
 		for (let j = 0; j < N; j++) {
 			const T = isNear(j) ? near : main, TL = isNear(j) ? nearLamp : lamp, ai = aislesOf(j);
 			// The front wall, with a painted band in the club's colour.
@@ -460,6 +479,12 @@
 				{
 					const L = segLen(j, rIn), nr = Math.max(2, Math.round(L / 9)), seam = roofC.map(v => Math.min(1, v * 1.25 + 0.17)), steel = [ 0.26, 0.27, 0.3 ];
 					for (let k = 0; k <= nr; k++) { const u = k / nr; accBeam3(T, at(j, rIn, u, hIn + 0.5), at(j, rOut, u, hOut + 0.5), 0.45, seam); }
+					// Seen from outside, the top: a translucent rooflight band (pale by day, lit from below at night),
+					// purlins across the ribs and a capping strip along the front edge, so it reads as built, not a slab.
+					const fH = f => hIn + (hOut - hIn) * f, fD = f => rIn + (rOut - rIn) * f;
+					if (!cond.snow) { strip(T, j, fD(0.4), fH(0.4) + 0.35, fD(0.56), fH(0.56) + 0.35, cond.ko === "day" ? [ 0.46, 0.5, 0.54 ] : [ 0.42, 0.37, 0.27 ]); }
+					for (const f of [ 0.22, 0.4, 0.56, 0.78 ]) { accBeam3(T, at(j, fD(f), 0, fH(f) + 0.7), at(j, fD(f), 1, fH(f) + 0.7), 0.7, roofC.map(v => v * 0.6)); }
+					accBeam3(T, at(j, rIn + 0.6, 0, hIn + 0.8), at(j, rIn + 0.6, 1, hIn + 0.8), 1.4, [ 0.5, 0.52, 0.55 ]);   // the front capping
 					accBeam3(T, at(j, rOut + 1, 0, hOut - 0.5), at(j, rOut + 1, 1, hOut - 0.5), 2.2, [ 0.2, 0.21, 0.23 ]);   // the gutter
 					accBeam3(T, at(j, rOut + 0.3, 0, hOut - 3), at(j, rOut + 0.3, 1, hOut - 3), 1.2, [ 0.32, 0.33, 0.36 ]);   // the fascia under it
 					if (Q.lattice) {
@@ -683,7 +708,7 @@
 			if (!pts.length || !G3.glowTex) { return; }
 			const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
 			const haze = cond.fog ? 1.9 : cond.wet || cond.snow ? 1.45 : 1;   // the wet air (or the snow) catches the light: a wider halo
-			const p = own(new THREE.Points(g, new THREE.PointsMaterial({ map: G3.glowTex, color: new THREE.Color(...wetLampCol3), size: (roofLights ? 110 : 260) * haze, sizeAttenuation: true, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.75, fog: false })), true);
+			const p = own(new THREE.Points(g, new THREE.PointsMaterial({ map: G3.glowTex, color: new THREE.Color(...wetLampCol3), size: (roofLights ? 110 : 260) * haze * (Q.glare || 1), sizeAttenuation: true, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.75, fog: false })), true);
 			st.add(p); if (isNearSide) { G3.nearRoof.push(p); }
 		};
 		glowPts(glow, false); glowPts(nearGlow, true);

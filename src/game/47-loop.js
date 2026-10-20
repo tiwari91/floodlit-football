@@ -9,10 +9,25 @@
 	let frameDt = 16.7;
 	const IDLE_STATES = new Set([ "paused", "intro", "half", "full" ]), IDLE_FRAME = 100, IDLE_AFTER = 2500;
 	let lastDrawAt = 0, idleState = "", idleSince = 0;
+	// 30 a second where nothing needs 60: paused, the menus and the cards, between plays (the kick-off and
+	// restart waits, a goal being celebrated) and, on Light graphics, in play too. A replay and slow motion
+	// keep every frame. (The simulation steps at 60 whatever the drawing does.)
+	const CAP_FRAME = 1000 / 30 - 2.5;
+	const capped = () => !odr && !replayOn() && !(slowMo > 0) && (IDLE_STATES.has(state) || state === "goal" || (state === "play" && freeze > 0) || (gfx3().fps || 60) <= 30);
+	let wasCapped = false, parked = false;
+	// A hidden tab draws nothing at all: the loop parks and starts again when the tab is shown.
+	document.addEventListener("visibilitychange", () => {
+		if (!document.hidden && parked) { parked = false; last = performance.now(); acc = 0; requestAnimationFrame(loop); }
+	});
 	function loop (now) {
+		if (document.hidden) { parked = true; return; }
 		if (!frameDue(now, last)) { requestAnimationFrame(loop); return; }
+		const cap = capped();
+		if (cap && now - last < CAP_FRAME) { requestAnimationFrame(loop); return; }
 		frameDt = clamp(now - last, 1, 100);
-		if (!(IDLE_STATES.has(state) && now - idleSince > IDLE_AFTER)) { gfxAutoTick(now - last, now); }
+		// Graphics Auto judges only uncapped frames (a capped one is long on purpose).
+		if (!cap && !wasCapped) { gfxAutoTick(now - last, now); }
+		wasCapped = cap;
 		pollPad();
 		acc = Math.min(acc + (now - last) * (slowMo > 0 && !odr ? SLOW_RATE : 1), 250);
 		last = now;

@@ -292,6 +292,7 @@
 		if (!gfxAuto.on || state !== "play" || camMode !== "3d" || document.hidden || dt > 80) { return; }
 		gfxAuto.ms += (dt - gfxAuto.ms) * 0.05;
 		const order = [ "low", "medium", "high" ], i = order.indexOf(gfxLevel), floor = coarse ? 0 : 1;
+		if (i < 0) { return; }   // Light is only ever chosen, never stepped into
 		if (gfxAuto.ms > 22) { gfxAuto.slow += dt / 1000; gfxAuto.good = 0; } else { gfxAuto.slow = 0; }
 		if (gfxAuto.ms < 18) { gfxAuto.good += dt / 1000; }
 		if (gfxAuto.slow > 3 && i > floor) {
@@ -315,6 +316,7 @@
 		gfxLevel = level;
 		if (gfxSel) { gfxSel.value = gfxAuto.on ? "auto" : level; }
 		if (chosen) { store.set("ff-gfx", level); }
+		if (GFX3[was] && (GFX3[was].hud || 2) !== (gfx3().hud || 2) && canvas) { resize(); }   // the HUD canvas's sharpness follows the level (Light draws it softer)
 		if (level === was || !G3.renderer) { return; }
 		if (G3.aa !== gfx3().aa && canvas3d) {
 			try { G3.renderer.dispose(); if (G3.renderer.forceContextLoss) { G3.renderer.forceContextLoss(); } } catch (e) { /* gone already */ }
