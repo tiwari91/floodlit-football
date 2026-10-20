@@ -534,7 +534,7 @@
 		const gx = attackX(p.team) + (p.team === 0 ? 20 : -20), sho = A(p, "sho"), z0 = Math.max(6, ball.z);
 		// Headers are softer than shots and less accurate: aimed for the side the keeper isn't on,
 		// down towards the line, and a poor header of the ball sends it wide or over.
-		const gk = team(1 - p.team).find(q => q.role === "gk"), err = clamp(0.72 - finGap(p) * HEAD_K, 0.45, 1.6);
+		const gk = team(1 - p.team).find(q => q.role === "gk"), g = finGap(p), err = clamp(0.72 - g * (g < 0 ? 0.05 : HEAD_K), 0.45, 1.6);
 		const side = gk ? (gk.y < FH / 2 ? 1 : -1) * (Math.random() < 0.8 ? 1 : -1) : (Math.random() < 0.5 ? 1 : -1);
 		const aimY = FH / 2 + side * FMT.goal * 0.3 + gauss() * FMT.goal * 0.26 * err;
 		const sp = 8.4 + sho * 0.035 + Math.random() * 1.5;

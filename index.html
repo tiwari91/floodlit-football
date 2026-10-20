@@ -4032,8 +4032,8 @@
 	// Ratings at work, the same for both sides (a normal club's keeper is about 79, its outfielders about 71 at passing, 66 at shooting):
 	// a keeper's handling from his rating,
 	// a duel: his handling against the shooter's finishing (a normal club's keeper is about 4 up on its forwards),
-	const KEEP_SAVE = 0.84, FIN_K = 0.06, HEAD_K = 0.03, GK_K = 0.006, FIN_0 = 0.6, FIN_MIN = 0.35, FIN_KLO = 0.09;
-	const keeperSave = (p, by) => clamp(KEEP_SAVE + (A(p, "def") - (by ? A(by, "sho") : 75) - 4) * 0.02, 0.3, 0.88);
+	const KEEP_SAVE = 0.84, FIN_K = 0.06, HEAD_K = 0.03, GK_K = 0.006, FIN_0 = 0.6, FIN_MIN = 0.35, FIN_KLO = 0.11;
+	const keeperSave = (p, by) => clamp(KEEP_SAVE + (A(p, "def") - (by ? A(by, "sho") : 75) - 4) * 0.02, 0.55, 0.88);
 	// a finisher against the keeper he faces: how far his shots and headers stray grows as his finishing falls
 	// below the keeper's handling (a normal club's forwards are level with its keeper; ten up or down is a mismatch),
 	const finGap = p => A(p, "sho") - A(team(1 - p.team).find(q => q.role === "gk"), "def");
@@ -4820,7 +4820,9 @@
 	function cpuShapeKey () {
 		const table = CPU_SHAPES[fmtKey];
 		let key = press[1] === "high" && style[1] !== "possession" ? table.press : table[style[1]];
-		if (key === teamShape[0]) {
+		// A friendly opponent plays the shape its style calls for, even if that is yours: dodging it used to
+		// hand it the attacking 4-3-3 against your default 4-4-2. A league club still never mirrors you.
+		if (key === teamShape[0] && leagueMatch) {
 			// Don't mirror you: take the nearest alternative.
 			const others = Object.keys(SHAPES[fmtKey]).filter(k => k !== teamShape[0]);
 			key = others.includes(table.balanced) && table.balanced !== teamShape[0] ? table.balanced : others[0];
@@ -7759,7 +7761,7 @@
 		const gx = attackX(p.team) + (p.team === 0 ? 20 : -20), sho = A(p, "sho"), z0 = Math.max(6, ball.z);
 		// Headers are softer than shots and less accurate: aimed for the side the keeper isn't on,
 		// down towards the line, and a poor header of the ball sends it wide or over.
-		const gk = team(1 - p.team).find(q => q.role === "gk"), err = clamp(0.72 - finGap(p) * HEAD_K, 0.45, 1.6);
+		const gk = team(1 - p.team).find(q => q.role === "gk"), g = finGap(p), err = clamp(0.72 - g * (g < 0 ? 0.05 : HEAD_K), 0.45, 1.6);
 		const side = gk ? (gk.y < FH / 2 ? 1 : -1) * (Math.random() < 0.8 ? 1 : -1) : (Math.random() < 0.5 ? 1 : -1);
 		const aimY = FH / 2 + side * FMT.goal * 0.3 + gauss() * FMT.goal * 0.26 * err;
 		const sp = 8.4 + sho * 0.035 + Math.random() * 1.5;
@@ -8059,11 +8061,15 @@
 				style[1] = alts[leagueMatch.opp % alts.length];
 			}
 		} else {
-			// Any style and any press, as a league club may play, but never both the same as yours.
+			// Half the time a friendly opponent lines up as you do; otherwise any style and any press, as a
+			// league club may play, but never both the same as yours. (Always dodging you gave it a set-up
+			// that beat your default about 55-45 between equal sides.)
 			const ss = Object.keys(STYLES), ps = Object.keys(PRESSES);
-			style[1] = ss[Math.floor(Math.random() * ss.length)];
-			press[1] = ps[Math.floor(Math.random() * ps.length)];
-			if (style[1] === style[0] && press[1] === press[0]) { const alts = ss.filter(k => k !== style[0]); style[1] = alts[Math.floor(Math.random() * alts.length)]; }
+			if (Math.random() < 0.5) { style[1] = style[0]; press[1] = press[0]; } else {
+				style[1] = ss[Math.floor(Math.random() * ss.length)];
+				press[1] = ps[Math.floor(Math.random() * ps.length)];
+				if (style[1] === style[0] && press[1] === press[0]) { const alts = ss.filter(k => k !== style[0]); style[1] = alts[Math.floor(Math.random() * alts.length)]; }
+			}
 		}
 		// The computer's line follows its press, and each club has its own way of tackling.
 		line[1] = press[1] === "high" ? "high" : press[1] === "low" ? "deep" : "normal";

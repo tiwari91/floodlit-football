@@ -44,11 +44,15 @@
 				style[1] = alts[leagueMatch.opp % alts.length];
 			}
 		} else {
-			// Any style and any press, as a league club may play, but never both the same as yours.
+			// Half the time a friendly opponent lines up as you do; otherwise any style and any press, as a
+			// league club may play, but never both the same as yours. (Always dodging you gave it a set-up
+			// that beat your default about 55-45 between equal sides.)
 			const ss = Object.keys(STYLES), ps = Object.keys(PRESSES);
-			style[1] = ss[Math.floor(Math.random() * ss.length)];
-			press[1] = ps[Math.floor(Math.random() * ps.length)];
-			if (style[1] === style[0] && press[1] === press[0]) { const alts = ss.filter(k => k !== style[0]); style[1] = alts[Math.floor(Math.random() * alts.length)]; }
+			if (Math.random() < 0.5) { style[1] = style[0]; press[1] = press[0]; } else {
+				style[1] = ss[Math.floor(Math.random() * ss.length)];
+				press[1] = ps[Math.floor(Math.random() * ps.length)];
+				if (style[1] === style[0] && press[1] === press[0]) { const alts = ss.filter(k => k !== style[0]); style[1] = alts[Math.floor(Math.random() * alts.length)]; }
+			}
 		}
 		// The computer's line follows its press, and each club has its own way of tackling.
 		line[1] = press[1] === "high" ? "high" : press[1] === "low" ? "deep" : "normal";

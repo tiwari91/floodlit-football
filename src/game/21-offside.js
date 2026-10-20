@@ -88,7 +88,9 @@
 	function cpuShapeKey () {
 		const table = CPU_SHAPES[fmtKey];
 		let key = press[1] === "high" && style[1] !== "possession" ? table.press : table[style[1]];
-		if (key === teamShape[0]) {
+		// A friendly opponent plays the shape its style calls for, even if that is yours: dodging it used to
+		// hand it the attacking 4-3-3 against your default 4-4-2. A league club still never mirrors you.
+		if (key === teamShape[0] && leagueMatch) {
 			// Don't mirror you: take the nearest alternative.
 			const others = Object.keys(SHAPES[fmtKey]).filter(k => k !== teamShape[0]);
 			key = others.includes(table.balanced) && table.balanced !== teamShape[0] ? table.balanced : others[0];
