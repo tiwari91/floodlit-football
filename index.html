@@ -11505,13 +11505,14 @@
 	// fps: the cap in play. budget/minRatio: the 3D pixel budget and how far under 1 it may go.
 	// hud: the 2D canvas's pixel ratio cap. glare: the lamp halo's size. wetLamps: lamps the wet pitch
 	// mirrors. rain: share of the rain streaks. benches: seats as a bench along the row. dyn: dynamic resolution.
+	// fill over 1: a fuller house than the ground's own (its empty seats taken).
 	// feet: a soft contact shadow under each boot (Medium and High). grass: the fine blade grain close up.
 	// bloom: the broad halo round the floodlights at night, and the boards' light on the grass.
 	const GFX3 = {
 		light: { seat: 18, fill: 0.5, hiRows: 0, nearHiRows: 0, liteRow: 1, lattice: false, shadows: 1, ratio: 1, aa: false, fps: 30, budget: 1.3e6, minRatio: 0.75, hud: 1.25, glare: 0.6, wetLamps: 4, rain: 0.45, benches: true },
 		low: { seat: 15, fill: 0.62, hiRows: 0, nearHiRows: 2, liteRow: 3, lattice: false, shadows: 1, ratio: 1, aa: false, benches: true },
-		medium: { seat: 12, fill: 0.82, hiRows: 0, nearHiRows: 4, liteRow: 6, lattice: true, shadows: 3, ratio: 1.5, aa: !coarse, dyn: true, feet: true, grass: true, bloom: true },
-		high: { seat: 10, fill: 1, hiRows: 2, nearHiRows: 5, liteRow: 8, lattice: true, shadows: 5, ratio: 2, aa: true, dyn: true, feet: true, grass: true, bloom: true }
+		medium: { seat: 12, fill: 0.9, hiRows: 0, nearHiRows: 4, liteRow: 6, lattice: true, shadows: 3, ratio: 1.5, aa: !coarse, dyn: true, feet: true, grass: true, bloom: true },
+		high: { seat: 10, fill: 1.15, hiRows: 2, nearHiRows: 5, liteRow: 8, lattice: true, shadows: 5, ratio: 2, aa: true, dyn: true, feet: true, grass: true, bloom: true }
 	};
 	const GFX_NAME = { light: "Light", low: "Low", medium: "Medium", high: "High" };
 	// The sponsors on the boards: invented names, none of them a real brand.
@@ -12451,6 +12452,8 @@
 		const key1 = new THREE.DirectionalLight(0xfff1d6, (dayLit ? 0.9 : 0.75) * LI); key1.position.set(-FW * 0.2, FH * 1.6, FH * 1.6); key1.target.position.set(FW / 2, 0, FH / 2);
 		const key2 = new THREE.DirectionalLight(0xfff1d6, 0.45 * LI); key2.position.set(FW * 1.2, FH * 1.6, -FH * 0.5); key2.target.position.set(FW / 2, 0, FH / 2);
 		st.add(key1, key1.target, key2, key2.target);
+		// At night the lamps on the far side catch the players' edges, as they do on television: a cool back light.
+		if (!dayLit) { const rim = new THREE.DirectionalLight(0xdce6ff, 0.42 * LI); rim.position.set(FW * 0.5, FH * 1.1, -FH * 1.6); rim.target.position.set(FW / 2, 0, FH / 2); st.add(rim, rim.target); }
 		// A little haze with distance, so the far stand and roof sit back behind the pitch: thicker in the
 		// heat, in rain (wet air, lit by the floodlights at night) and in snow. (There is no fog weather:
 		// fog thickest of all, closing in over the pitch itself.) At night the air is a lit blue-grey, never black,
