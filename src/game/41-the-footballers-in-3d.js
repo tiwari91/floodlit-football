@@ -206,11 +206,11 @@
 		g.lineWidth = 3; g.strokeStyle = ink; g.stroke();
 		g.fillStyle = kit.outfield; g.font = "900 32px 'Big Shoulders Display', 'Arial Narrow', Arial, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle";
 		g.fillText(name.charAt(0).toUpperCase(), cx, cy + 1);
-		// the maker's mark: an invented one (a small diamond with a bar through it), nobody's real logo
+		// the maker's mark: an invented one (a small hexagon round a dot), nobody's real logo
 		const mx = w * 0.31;
-		g.strokeStyle = ink; g.fillStyle = ink; g.lineWidth = 4; g.lineJoin = "miter";
-		g.beginPath(); g.moveTo(mx, cy - 13); g.lineTo(mx + 11, cy); g.lineTo(mx, cy + 13); g.lineTo(mx - 11, cy); g.closePath(); g.stroke();
-		g.fillRect(mx - 15, cy - 2, 30, 4);
+		g.strokeStyle = ink; g.fillStyle = ink; g.lineWidth = 4; g.lineJoin = "round";
+		g.beginPath(); for (let i = 0; i < 6; i++) { const a = Math.PI / 6 + i * Math.PI / 3; if (i) { g.lineTo(mx + 12 * Math.cos(a), cy + 12 * Math.sin(a)); } else { g.moveTo(mx + 12 * Math.cos(a), cy + 12 * Math.sin(a)); } } g.closePath(); g.stroke();
+		g.beginPath(); g.arc(mx, cy, 3.5, 0, Math.PI * 2); g.fill();
 		// the sponsor across the chest
 		g.fillStyle = ink; g.font = "900 62px 'Barlow', 'Helvetica Neue', Arial, sans-serif"; g.textBaseline = "middle";
 		g.fillText(SPONSORS3[h % SPONSORS3.length], w / 2, y0 + 98, w * 0.94);
@@ -620,22 +620,20 @@
 	// quick blend over a few frames while the running cycle passes untouched. The legs and hips are left on
 	// the pose (they put the boots on the grass), and actions (a kick, a header, a dive) stay sharp.
 	// st: the player's own drawn state (kept across frames); free: take the pose as it is and remember it.
+	function blendJoint3 (o, a, k, lim, free) {
+		const e = o.rotation;
+		let x = e.x, y = e.y, z = e.z;
+		if (!free) { x = clamp(x, a[k] - lim, a[k] + lim); y = clamp(y, a[k + 1] - lim, a[k + 1] + lim); z = clamp(z, a[k + 2] - lim, a[k + 2] + lim); e.set(x, y, z); }
+		a[k] = x; a[k + 1] = y; a[k + 2] = z;
+		return k + 3;
+	}
 	function blendUpper3D (r, st, free) {
 		let a = st.blend;
 		if (!a) { a = st.blend = new Float32Array(30); free = true; }
 		const lim = 18 * Math.min(frameDt, 50) / 1000;
-		let k = 0;
-		const one = o => {
-			const e = o.rotation;
-			for (let c = 0; c < 3; c++) {
-				const key = c === 0 ? "x" : c === 1 ? "y" : "z";
-				let v = e[key];
-				if (!free) { const d = v - a[k]; if (d > lim) { v = a[k] + lim; } else if (d < -lim) { v = a[k] - lim; } e[key] = v; }
-				a[k++] = v;
-			}
-		};
-		one(r.spine); one(r.chest); one(r.neck); one(r.head);
-		for (let i = 0; i < 2; i++) { one(r.sh[i]); one(r.el[i]); one(r.ha[i]); }
+		let k = blendJoint3(r.spine, a, 0, lim, free);
+		k = blendJoint3(r.chest, a, k, lim, free); k = blendJoint3(r.neck, a, k, lim, free); k = blendJoint3(r.head, a, k, lim, free);
+		for (let i = 0; i < 2; i++) { k = blendJoint3(r.sh[i], a, k, lim, free); k = blendJoint3(r.el[i], a, k, lim, free); k = blendJoint3(r.ha[i], a, k, lim, free); }
 	}
 	// Which way shadows fall on the grass: away from the main key light (high over the near stand,
 	// toward the far side of the pitch), as a unit (x, z).
@@ -1071,22 +1069,31 @@
 		const h = build(p).seed;
 		return cond.snow ? true : cond.heat ? false : cond.wet >= 1 ? h < 0.8 : cond.ko !== "day" ? h < 0.3 : false;
 	}
-	// A colour a shade darker or lighter (cached: the kits are read every frame).
-	const SHADE3 = new Map();
-	const shade3 = (hex, t) => { const k = `${hex}|${t}`; let v = SHADE3.get(k); if (!v) { v = mixHex3(hex, t < 0 ? "#000000" : "#ffffff", Math.abs(t)); SHADE3.set(k, v); } return v; };
 	// Keepers' gloves: bright, as modern gloves are, and never the shirt's colour.
 	const GLOVES3 = [ "#d6ff3a", "#ff7a1a", "#f4f4f4", "#2ad0ff", "#ff3d7f" ];
 	const gloves3 = (shirt, team) => { for (let i = 0; i < GLOVES3.length; i++) { const g = GLOVES3[(i + (team > 0 ? 2 : 0)) % GLOVES3.length]; if (deltaE(g, shirt) > 30) { return g; } } return "#f4f4f4"; };
 	// The outline round the back number: the kit's trim if it stands apart from the shirt and the ink, else a darker shirt.
-	const numOut3 = (shirt, second, ink) => (second && deltaE(second, shirt) > 18 && deltaE(second, ink) > 18 ? second : shade3(shirt, lum(shirt) > 0.55 ? -0.3 : -0.45));
+	const numOut3 = (shirt, second, ink) => (second && deltaE(second, shirt) > 18 && deltaE(second, ink) > 18 ? second : mixHex3(shirt, "#000000", lum(shirt) > 0.55 ? 0.3 : 0.45));
+	// The colours worked out from a club's kit (the number's outline, the keeper's shorts, panels, ink and
+	// gloves), once per kit rather than every frame: kept against the kit and redone only when it changes.
+	const KITC3 = new WeakMap();
+	function kitCols3 (kit, team) {
+		let c = KITC3.get(kit);
+		if (!c || c.o !== kit.outfield || c.s !== kit.second || c.i !== kit.ink || c.g !== kit.gk) {
+			const g = kit.gk, light = lum(g) > 0.5;
+			c = { o: kit.outfield, s: kit.second, i: kit.ink, g, numOut: numOut3(kit.outfield, kit.second, kit.ink || "#ffffff"), gkShorts: mixHex3(g, "#000000", 0.42), gkInk: light ? "#0e1a24" : "#f4f4f4", gkSecond: mixHex3(g, light ? "#000000" : "#ffffff", light ? 0.22 : 0.18), gkGloves: gloves3(g, team) };
+			KITC3.set(kit, c);
+		}
+		return c;
+	}
 	function kit3D (p) {
-		const kit = KITS[p.team] || KITS[0], gk = p.role === "gk";
+		const kit = KITS[p.team] || KITS[0], gk = p.role === "gk", kc = kitCols3(kit, p.team);
 		// The keeper in his own kit: shirt, shorts a shade darker, socks to match the shirt, side panels and yoke.
-		const shirt = gk ? kit.gk : kit.outfield, shorts = gk ? shade3(kit.gk, -0.42) : kit.second || "#1f2a36";
-		const ink = gk ? (lum(shirt) > 0.5 ? "#0e1a24" : "#f4f4f4") : kit.ink || "#ffffff", second = gk ? shade3(kit.gk, lum(kit.gk) > 0.5 ? -0.22 : 0.18) : kit.second || shirt;
+		const shirt = gk ? kit.gk : kit.outfield, shorts = gk ? kc.gkShorts : kit.second || "#1f2a36";
+		const ink = gk ? kc.gkInk : kit.ink || "#ffffff", second = gk ? kc.gkSecond : kit.second || shirt;
 		return {
-			shirt, shorts, socks: gk ? shirt : shirt, second, pattern: gk ? PATTERN3.keeper : PATTERN3[kit.pattern] || 0, numOut: gk ? second : numOut3(shirt, kit.second, ink),
-			ink, gloves: gk ? gloves3(shirt, p.team) : null, sleeves: gk || longSleeves3D(p),
+			shirt, shorts, socks: shirt, second, pattern: gk ? PATTERN3.keeper : PATTERN3[kit.pattern] || 0, numOut: gk ? second : kc.numOut,
+			ink, gloves: gk ? kc.gkGloves : null, sleeves: gk || longSleeves3D(p),
 			captain: !!(G3.fig && G3.fig.capt && G3.fig.capt[p.team] === p),
 			boots: BOOTS3[(p.num || 0) % BOOTS3.length], ring: shirt, team: p.team, gk, name: p.name || ""
 		};
