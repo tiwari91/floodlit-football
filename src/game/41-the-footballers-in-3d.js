@@ -17,7 +17,7 @@
 		[ "boot", "an", 0 ], [ "boot", "an", 1 ], [ "sole", "an", 0 ], [ "sole", "an", 1 ]
 	];
 	const PER_FIG3 = PART_PLAN3.reduce((m, [ n ]) => { m[n] = (m[n] || 0) + 1; return m; }, {});
-	const PATTERN3 = { plain: 0, stripes: 1, hoops: 2, halves: 3, sash: 4 };
+	const PATTERN3 = { plain: 0, stripes: 1, hoops: 2, halves: 3, sash: 4, keeper: 5 };
 	const HAIR_SCALE3 = { short: [ 1, 1, 1 ], crop: [ 1.02, 1.06, 1.02 ], curly: [ 1.14, 1.2, 1.14 ], afro: [ 1.3, 1.3, 1.3 ], long: [ 1.06, 1.12, 1.06 ], tied: [ 1.02, 1.04, 1.02 ], buzz: [ 0.98, 0.96, 0.98 ], shaved: null };
 	// Long hair falls down the back of the head; tied hair is a bun at the crown. One unit sphere, placed per style.
 	const TAIL3 = { long: [ -1.55, 1.45, 0, 0.8, 1.75, 1.6 ], tied: [ -1.95, 3.55, 0, 0.88, 0.85, 0.88 ] };
@@ -335,8 +335,10 @@
 			// A ribbed collar round the base of the neck, in the trim colour.
 			collar: () => loft3D([ [ 9.2, 1.95, 1.62, 1.72 ], [ 9.55, 2.0, 1.66, 1.76 ], [ 10.05, 1.7, 1.48, 1.56 ], [ 10.25, 1.5, 1.3, 1.38 ] ], 12, 2.2),
 			// The shorts: a waistband and seat on the hips, and a leg for each thigh (shortLeg) so they move with the stride.
-			shorts: () => loft3D([ [ 1.6, 3.05, 2.02, 2.05 ], [ 1.75, 3.12, 2.08, 2.1 ], [ 0.6, 3.5, 2.15, 2.32 ], [ -0.9, 3.8, 2.18, 2.4 ], [ -1.9, 3.5, 2.0, 2.1 ], [ -2.3, 2.6, 1.6, 1.6 ] ], 12, 2.4),
-			shortLeg: () => loft3D([ [ 0.9, 1.8, 1.9, 2.05 ], [ -0.6, 2.02, 2.12, 2.16 ], [ -2.5, 2.0, 2.2, 2.08, 0.1 ], [ -2.75, 2.06, 2.26, 2.12, 0.12 ], [ -2.95, 2.04, 2.22, 2.1, 0.12 ], [ -3.0, 1.62, 1.7, 1.6, 0.12 ] ], 12, 2.2),   // shorts to mid-thigh, over the fuller quads
+			// The seat ends at the top of the thighs and closes up into the crotch, so the legs carry the shorts
+			// below it (no box hanging between the legs); the hips are as wide as the legs' outsides, so no step.
+			shorts: () => loft3D([ [ 1.6, 3.05, 2.02, 2.05 ], [ 1.75, 3.12, 2.08, 2.1 ], [ 0.6, 3.62, 2.15, 2.3 ], [ -0.5, 4.05, 2.16, 2.36 ], [ -1.25, 3.7, 2.02, 2.2 ], [ -1.75, 2.5, 1.55, 1.7 ], [ -2.0, 0.9, 0.8, 0.9 ] ], 14, 2.5),
+			shortLeg: () => loft3D([ [ 1.1, 1.6, 1.8, 1.95 ], [ 0.2, 1.95, 2.05, 2.15 ], [ -0.9, 2.08, 2.16, 2.2 ], [ -2.5, 2.04, 2.22, 2.1, 0.1 ], [ -2.75, 2.1, 2.28, 2.14, 0.12 ], [ -2.95, 2.07, 2.24, 2.12, 0.12 ], [ -3.0, 1.62, 1.7, 1.6, 0.12 ] ], 14, 2.2),   // shorts to mid-thigh, over the fuller quads, a hem at the bottom
 			neck: () => loft3D([ [ -0.6, 1.6, 1.38, 1.5 ], [ 0.4, 1.42, 1.24, 1.3, -0.05 ], [ 1.4, 1.3, 1.16, 1.18, 0.05 ], [ 2.3, 1.18, 1.1, 1.1, 0.1 ], [ 2.5, 0.7, 0.7, 0.7, 0.1 ] ], 10, 2),   // a footballer's neck, not a stalk
 			head: () => sculpt3D(new T.SphereGeometry(1, 48, 36)),
 		ear: () => { const g = new T.SphereGeometry(0.58, 10, 8); g.scale(0.5, 1.0, 0.32); g.rotateZ(0.18); return g; },
@@ -348,8 +350,10 @@
 			// The captain's armband on the left upper arm, just below the sleeve.
 			armband: () => loft3D([ [ -2.75, 1.12, 1.16, 1.14 ], [ -2.8, 1.17, 1.21, 1.19 ], [ -3.65, 1.12, 1.16, 1.12 ], [ -3.7, 1.06, 1.1, 1.06 ] ], 12, 2.0),
 			cuff: () => loft3D([ [ -2.05, 1.23, 1.21, 1.21 ], [ -2.4, 1.23, 1.21, 1.21 ], [ -2.45, 0.92, 0.92, 0.92 ] ], 10, 2.0),
-			upperArm: () => loft3D([ [ 0.25, 0.7, 0.7, 0.7 ], [ -0.1, 1.02, 1.0, 1.0 ], [ -1.6, 1.0, 1.1, 0.98 ], [ -3.1, 0.9, 1.06, 0.92 ], [ -4.7, 0.78, 0.8, 0.8 ], [ -5.6, 0.72, 0.72, 0.76 ], [ -6.0, 0.4, 0.4, 0.45 ] ], 9, 2.0),
-			foreArm: () => loft3D([ [ 0.4, 0.55, 0.55, 0.6 ], [ 0, 0.84, 0.82, 0.88 ], [ -1.1, 0.96, 0.92, 0.98 ], [ -2.6, 0.8, 0.76, 0.78 ], [ -4.2, 0.6, 0.5, 0.52 ], [ -4.9, 0.54, 0.46, 0.46 ], [ -5.2, 0.32, 0.3, 0.3 ] ], 9, 2.0),   // muscle below the elbow, a slimmer wrist; a little shorter
+			// An athlete's arm: the biceps and triceps fuller, rounded into the elbow, which is capped (the forearm's
+			// top is a dome round the joint), so a bent arm never shows a gap or a crease at the elbow.
+			upperArm: () => loft3D([ [ 0.25, 0.72, 0.72, 0.72 ], [ -0.1, 1.08, 1.06, 1.06 ], [ -1.6, 1.08, 1.2, 1.08 ], [ -3.1, 0.98, 1.16, 1.02 ], [ -4.7, 0.82, 0.84, 0.86 ], [ -5.6, 0.76, 0.76, 0.8 ], [ -6.05, 0.62, 0.62, 0.66 ], [ -6.3, 0.3, 0.3, 0.34 ] ], 12, 2.0),
+			foreArm: () => loft3D([ [ 0.95, 0.28, 0.28, 0.3 ], [ 0.75, 0.64, 0.64, 0.7 ], [ 0.4, 0.8, 0.8, 0.86 ], [ 0, 0.9, 0.86, 0.92 ], [ -1.1, 1.0, 0.96, 1.02 ], [ -2.6, 0.84, 0.8, 0.82 ], [ -4.2, 0.62, 0.52, 0.54 ], [ -4.9, 0.55, 0.47, 0.47 ], [ -5.2, 0.32, 0.3, 0.3 ] ], 12, 2.0),   // muscle below the elbow, a slimmer wrist
 			// A flat hand with the fingers together and a thumb in front.
 			// A relaxed hand, half closed: the palm with a wrist and knuckles, four fingers curled forward in
 			// two bends (shorter at the little finger), and a thumb along the side of the index finger.
@@ -408,8 +412,10 @@
 					if (vPat > 0.5 && vPat < 1.5) { km = step(0.0, sin(atan(vKp.z, vKp.x) * 5.0)); }
 					else if (vPat > 1.5 && vPat < 2.5) { km = step(0.0, sin(vKp.y * 1.7)); }
 					else if (vPat > 2.5 && vPat < 3.5) { km = step(0.0, vKp.z); }
-					else if (vPat > 3.5) { km = 1.0 - step(1.5, abs(vKp.y - 4.7 + vKp.z * 0.95)); }
+					else if (vPat > 3.5 && vPat < 4.5) { km = 1.0 - step(1.5, abs(vKp.y - 4.7 + vKp.z * 0.95)); }
+					else if (vPat > 4.5) { km = max(smoothstep(2.6, 2.8, abs(vKp.z)) * step(vKp.y, 8.3), smoothstep(8.3, 8.5, vKp.y)); }   // the keeper's shirt: side panels and a shoulder yoke
 					diffuseColor.rgb = mix(diffuseColor.rgb, vCol2, km);
+					diffuseColor.rgb *= 1.0 + 0.04 * sin(vKp.y * 2.3 + sin(vKp.z * 1.7) * 1.3) * sin(vKp.z * 1.15 + vKp.y * 0.45);   // the cloth's creases, faint
 					diffuseColor.rgb *= 0.8 + 0.2 * smoothstep(-0.6, 6.8, vKp.y);   // cloth in shade toward the hem, under the chest`);
 			sh.fragmentShader = skinLight3D(sh.fragmentShader, BODY_LIGHT3);
 		};
@@ -496,18 +502,25 @@
 			G3.scene.add(m);
 		}
 		// Numbers on the backs: one atlas of 0-99, a plane per figure picking its cell.
-		const ac = document.createElement("canvas"); ac.width = ac.height = 640;
+		const ac = document.createElement("canvas"); ac.width = ac.height = 1024;
 		const ag = ac.getContext && ac.getContext("2d");
 		if (ag) {
-			ag.textAlign = "center"; ag.textBaseline = "middle"; ag.font = "700 46px 'Barlow', 'Helvetica Neue', Arial, sans-serif";
-			ag.lineWidth = 5; ag.strokeStyle = "rgba(0, 0, 0, 0.45)"; ag.fillStyle = "#ffffff";
-			for (let n = 0; n < 100; n++) { const x = (n % 10) * 64 + 32, y = Math.floor(n / 10) * 64 + 35; ag.strokeText(String(n), x, y); ag.fillText(String(n), x, y); }
+			// A broadcast shirt number: tall, condensed figures in the ink colour with an outline in the kit's
+			// trim. The outline is painted red-free (green) and the figure white, so one atlas serves every kit:
+			// the shader picks the ink for the figure and the instance's outline colour for the rest.
+			ag.textAlign = "center"; ag.textBaseline = "middle"; ag.font = "700 84px 'Big Shoulders Display', 'Arial Narrow', Arial, sans-serif"; ag.lineJoin = "round";
+			ag.lineWidth = 6; ag.strokeStyle = "#00ff00"; ag.fillStyle = "#ffffff";
+			for (let n = 0; n < 100; n++) { const x = (n % 10) * 102.4 + 51.2, y = Math.floor(n / 10) * 102.4 + 55; ag.strokeText(String(n), x, y, 92); ag.fillText(String(n), x, y, 92); }
 		}
 		const numMat = new T.MeshLambertMaterial({ color: 0xffffff, map: tex3D(ac), alphaTest: 0.35, polygonOffset: true, polygonOffsetFactor: -2 });
 		numMat.onBeforeCompile = sh => {
 			sh.vertexShader = sh.vertexShader
-				.replace("#include <common>", "#include <common>\nattribute float aCell;")
-				.replace("#include <uv_vertex>", "#include <uv_vertex>\nvMapUv = (uv + vec2(mod(aCell, 10.0), 9.0 - floor(aCell / 10.0))) / 10.0;");
+				.replace("#include <common>", "#include <common>\nattribute float aCell; attribute vec3 aOut; varying vec3 vOut;")
+				.replace("#include <uv_vertex>", "#include <uv_vertex>\nvMapUv = (uv + vec2(mod(aCell, 10.0), 9.0 - floor(aCell / 10.0))) / 10.0; vOut = aOut;");
+			sh.fragmentShader = sh.fragmentShader
+				.replace("#include <common>", "#include <common>\nvarying vec3 vOut;")
+				.replace("#include <map_fragment>", "vec4 ffNt = texture2D(map, vMapUv); diffuseColor.a *= ffNt.a;")
+				.replace("#include <color_fragment>", "#include <color_fragment>\ndiffuseColor.rgb = mix(vOut, diffuseColor.rgb, smoothstep(0.3, 0.7, ffNt.r));");
 		};
 		numMat.customProgramCacheKey = () => "ff-num";
 		// curved onto the back of the shirt, just proud of it
@@ -515,6 +528,7 @@
 		for (let i = 0; i < NP.count; i++) { NP.setX(i, -backDepth3D(NP.getY(i), NP.getZ(i)) - 0.06); }
 		ng.computeVertexNormals();
 		ng.setAttribute("aCell", new T.InstancedBufferAttribute(new Float32Array(MAXF3), 1).setUsage(T.DynamicDrawUsage));
+		ng.setAttribute("aOut", new T.InstancedBufferAttribute(new Float32Array(MAXF3 * 3), 3).setUsage(T.DynamicDrawUsage));
 		const nums = new T.InstancedMesh(ng, numMat, MAXF3);
 		nums.instanceMatrix.setUsage(T.DynamicDrawUsage); nums.setColorAt(0, white); nums.frustumCulled = false; nums.count = 0;
 		G3.scene.add(nums);
@@ -1034,12 +1048,22 @@
 		const h = build(p).seed;
 		return cond.snow ? true : cond.heat ? false : cond.wet >= 1 ? h < 0.8 : cond.ko !== "day" ? h < 0.3 : false;
 	}
+	// A colour a shade darker or lighter (cached: the kits are read every frame).
+	const SHADE3 = new Map();
+	const shade3 = (hex, t) => { const k = `${hex}|${t}`; let v = SHADE3.get(k); if (!v) { v = mixHex3(hex, t < 0 ? "#000000" : "#ffffff", Math.abs(t)); SHADE3.set(k, v); } return v; };
+	// Keepers' gloves: bright, as modern gloves are, and never the shirt's colour.
+	const GLOVES3 = [ "#d6ff3a", "#ff7a1a", "#f4f4f4", "#2ad0ff", "#ff3d7f" ];
+	const gloves3 = (shirt, team) => { for (let i = 0; i < GLOVES3.length; i++) { const g = GLOVES3[(i + (team > 0 ? 2 : 0)) % GLOVES3.length]; if (deltaE(g, shirt) > 30) { return g; } } return "#f4f4f4"; };
+	// The outline round the back number: the kit's trim if it stands apart from the shirt and the ink, else a darker shirt.
+	const numOut3 = (shirt, second, ink) => (second && deltaE(second, shirt) > 18 && deltaE(second, ink) > 18 ? second : shade3(shirt, lum(shirt) > 0.55 ? -0.3 : -0.45));
 	function kit3D (p) {
 		const kit = KITS[p.team] || KITS[0], gk = p.role === "gk";
-		const shirt = gk ? kit.gk : kit.outfield, shorts = gk ? "#1f2a36" : kit.second || "#1f2a36";
+		// The keeper in his own kit: shirt, shorts a shade darker, socks to match the shirt, side panels and yoke.
+		const shirt = gk ? kit.gk : kit.outfield, shorts = gk ? shade3(kit.gk, -0.42) : kit.second || "#1f2a36";
+		const ink = gk ? (lum(shirt) > 0.5 ? "#0e1a24" : "#f4f4f4") : kit.ink || "#ffffff", second = gk ? shade3(kit.gk, lum(kit.gk) > 0.5 ? -0.22 : 0.18) : kit.second || shirt;
 		return {
-			shirt, shorts, socks: gk ? "#1f2a36" : shirt, second: kit.second || shirt, pattern: gk ? 0 : PATTERN3[kit.pattern] || 0,
-			ink: gk ? "#0e1a24" : kit.ink || "#ffffff", gloves: gk ? (lum(shirt) > 0.5 ? "#15181a" : "#f2f2f2") : null, sleeves: gk || longSleeves3D(p),
+			shirt, shorts, socks: gk ? shirt : shirt, second, pattern: gk ? PATTERN3.keeper : PATTERN3[kit.pattern] || 0, numOut: gk ? second : numOut3(shirt, kit.second, ink),
+			ink, gloves: gk ? gloves3(shirt, p.team) : null, sleeves: gk || longSleeves3D(p),
 			captain: !!(G3.fig && G3.fig.capt && G3.fig.capt[p.team] === p),
 			boots: BOOTS3[(p.num || 0) % BOOTS3.length], ring: shirt, team: p.team, gk, name: p.name || ""
 		};
@@ -1059,6 +1083,9 @@
 		if (!lk.shape) { const h = hashStr(`${lk.skin}|${lk.hair}|${lk.style}|${lk.face}|${lk.name || ""}`), u = k => ((h >>> (k * 6)) % 41) / 40; lk.shape = [ 0.95 + 0.09 * u(0), 0.97 + 0.06 * u(1), 0.95 + 0.08 * u(2), 0.9 + 0.17 * u(3) ]; const h2 = hashStr(`${h}nose`), v = k => ((h2 >>> (k * 6)) % 41) / 40; lk.shape.push(-0.03 + 0.08 * v(0), 0.86 + 0.32 * v(1), 0.93 + 0.16 * v(2), 0.84 + 0.4 * v(3)); }   // and his hairline (higher or lower), his nose (how far it stands out, how long, how broad)
 		const HS = HM3[2].makeTranslation(HEAD_C3[0], HEAD_C3[1], 0).multiply(HM3[0].makeScale(lk.shape[0], lk.shape[1], lk.shape[2])).multiply(HM3[1].makeTranslation(-HEAD_C3[0], -HEAD_C3[1], 0));
 		const hairStyle = rig.shirtHead ? "afro" : HAIR_STYLES3[lk.style] ? lk.style : "short";
+		// His own shade of skin within his tone (a little warmer or cooler, lighter or darker), fixed by his look.
+		if (!lk.skin3) { const h = hashStr(`${lk.skin}|${lk.face}|${lk.hair}|${lk.name || ""}skin`), u = k => ((h >>> (k * 7)) % 101) / 100 - 0.5; lk.skin3 = "#" + new THREE.Color(lk.skin).offsetHSL(u(0) * 0.03, u(1) * 0.12, u(2) * 0.07).getHexString(); }
+		const skin = lk.skin3;
 		for (const [ name, joint, side ] of PART_PLAN3) {
 			const mesh = F.parts[name], node = side === undefined ? rig[joint] : rig[joint][side];
 			let mtx = node.matrixWorld;
@@ -1082,11 +1109,11 @@
 			if (k >= mesh.instanceMatrix.count) { F.cnt[name]--; continue; }   // never past the buffer
 			mesh.setMatrixAt(k, mtx);
 			if (name === "armband") { mesh.setColorAt(k, C.set(deltaE(kit.shirt, "#f4f1e6") < 25 ? "#1d2330" : "#f4f1e6")); continue; }   // white, or dark on a white shirt
-			const sh = rig.shirtHead && (name === "torso" || name === "collar") ? lk.skin : rig.shirtHead && (name === "head" || name === "hair" || name === "ear") ? kit.shirt : null;   // shirt over his head: bare chest, the shirt bunched round his head
+			const sh = rig.shirtHead && (name === "torso" || name === "collar") ? skin : rig.shirtHead && (name === "head" || name === "hair" || name === "ear") ? kit.shirt : null;   // shirt over his head: bare chest, the shirt bunched round his head
 			const c = sh ? sh : name === "torso" || name === "sleeve" || ((name === "upperArm" || name === "foreArm") && kit.sleeves) ? kit.shirt
 				: name === "collar" || name === "cuff" || name === "band" ? trim3D(kit) : name === "sole" ? (lum(kit.boots) > 0.5 ? "#26292c" : "#e4e6e8")
 				: name === "shorts" || name === "shortLeg" ? kit.shorts : name === "shin" ? kit.socks : name === "boot" ? kit.boots
-				: name === "hair" || name === "tail" ? lk.hair : name === "hand" && kit.gloves ? kit.gloves : lk.skin;
+				: name === "hair" || name === "tail" ? lk.hair : name === "hand" && kit.gloves ? kit.gloves : skin;
 			mesh.setColorAt(k, C.set(c));
 			if (name === "torso") {
 				const g = mesh.geometry, pat = g.attributes.aPat, c2 = g.attributes.aCol2;
@@ -1130,6 +1157,7 @@
 			F.nums.setMatrixAt(n, rig.spine.matrixWorld);
 			F.nums.setColorAt(n, C.set(kit.ink));
 			F.nums.geometry.attributes.aCell.setX(n, clamp(Math.round(num), 0, 99));
+			C.set(kit.numOut || kit.shirt); F.nums.geometry.attributes.aOut.setXYZ(n, C.r, C.g, C.b);
 			if (F.names && kit.name && F.names.count < 32) {
 				// The surname in the number's colour, in this figure's own cell (repainted only when it changes).
 				const k = F.names.count++, label = `${kit.name.replace(/^.*?\.\s*/, "").toUpperCase()}|${kit.ink}`;
