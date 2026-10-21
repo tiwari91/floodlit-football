@@ -222,6 +222,27 @@
 				wear(MX + gd * 0.5, MY + FH / 2, gd * 0.9, FMT.goal * 0.45, worn);
 				wear(MX + FW - gd * 0.5, MY + FH / 2, gd * 0.9, FMT.goal * 0.45, worn);
 				wear(MX + FW / 2, MY + FH / 2, FMT.circle * 0.8, FMT.circle * 0.55, worn * 0.6);
+				// Scuffs, close up: a patchy bare strip in front of each goal where the keeper paces, and the goal
+				// line and six-yard line half rubbed out by boots (grass-coloured dabs over the paint). Seeded
+				// from the pitch, so the same every time it is painted.
+				let h = 9301 + Math.round(FW);
+				const rr = () => (h = (h * 48271) % 2147483647) / 2147483647;
+				const k = cond.surfaceKey === "turf" ? 0.3 : cond.surfaceKey === "mud" ? 1.4 : 1, gcol = cond.surfaceKey === "turf" ? "35, 120, 70" : "31, 100, 58";
+				for (const left of [ true, false ]) {
+					const gx = left ? MX : MX + FW, dir = left ? 1 : -1;
+					for (let i = 0; i < 34; i++) {
+						const x = gx + dir * (3 + rr() * gd * 0.6), y = MY + FH / 2 + (rr() - 0.5) * FMT.goal * 1.15, rad = 5 + rr() * 15;
+						const g = ctx.createRadialGradient(x, y, 0, x, y, rad), a = (0.08 + rr() * 0.16) * k;
+						g.addColorStop(0, `rgba(118, 100, 62, ${a})`); g.addColorStop(1, "rgba(118, 100, 62, 0)");
+						ctx.fillStyle = g; ctx.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+					}
+					for (const [ lx, half ] of [ [ gx, FMT.goal * 0.75 ], [ gx + dir * gd, ghw ] ]) {
+						for (let i = 0; i < 26; i++) {
+							const y = MY + FH / 2 + (rr() - 0.5) * half * 2, l = 2 + rr() * 7;
+							ctx.fillStyle = `rgba(${gcol}, ${(0.18 + rr() * 0.3) * Math.min(1, k)})`; ctx.fillRect(lx - 2.2, y, 4.4, l);
+						}
+					}
+				}
 			}
 		} else {
 			// Futsal-style D areas: quarter circles round each post, joined by a line.

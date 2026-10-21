@@ -32,13 +32,18 @@
 	// fps: the cap in play. budget/minRatio: the 3D pixel budget and how far under 1 it may go.
 	// hud: the 2D canvas's pixel ratio cap. glare: the lamp halo's size. wetLamps: lamps the wet pitch
 	// mirrors. rain: share of the rain streaks. benches: seats as a bench along the row. dyn: dynamic resolution.
+	// feet: a soft contact shadow under each boot (Medium and High). grass: the fine blade grain close up.
+	// bloom: the broad halo round the floodlights at night, and the boards' light on the grass.
 	const GFX3 = {
 		light: { seat: 18, fill: 0.5, hiRows: 0, nearHiRows: 0, liteRow: 1, lattice: false, shadows: 1, ratio: 1, aa: false, fps: 30, budget: 1.3e6, minRatio: 0.75, hud: 1.25, glare: 0.6, wetLamps: 4, rain: 0.45, benches: true },
 		low: { seat: 15, fill: 0.62, hiRows: 0, nearHiRows: 2, liteRow: 3, lattice: false, shadows: 1, ratio: 1, aa: false, benches: true },
-		medium: { seat: 12, fill: 0.82, hiRows: 0, nearHiRows: 4, liteRow: 6, lattice: true, shadows: 3, ratio: 1.5, aa: !coarse, dyn: true },
-		high: { seat: 10, fill: 1, hiRows: 2, nearHiRows: 5, liteRow: 8, lattice: true, shadows: 5, ratio: 2, aa: true, dyn: true }
+		medium: { seat: 12, fill: 0.82, hiRows: 0, nearHiRows: 4, liteRow: 6, lattice: true, shadows: 3, ratio: 1.5, aa: !coarse, dyn: true, feet: true, grass: true, bloom: true },
+		high: { seat: 10, fill: 1, hiRows: 2, nearHiRows: 5, liteRow: 8, lattice: true, shadows: 5, ratio: 2, aa: true, dyn: true, feet: true, grass: true, bloom: true }
 	};
 	const GFX_NAME = { light: "Light", low: "Low", medium: "Medium", high: "High" };
+	// The sponsors on the boards: invented names, none of them a real brand.
+	const BOARD_ADS3 = [ "Norvexa", "Kestralux", "Brixolt Energy", "Zephanio", "Talventa", "Gruvexis" ];
+	const mixHex3 = (a, b, t) => { const A = new THREE.Color(a), B = new THREE.Color(b); return "#" + A.lerp(B, t).getHexString(); };
 	const PIX_BUDGET3 = 3.2e6;
 	// A software renderer (no real GPU) or a two-core machine starts on Light.
 	const weakGPU = (() => {
@@ -142,6 +147,9 @@
 			const renderer = new THREE.WebGLRenderer({ canvas: canvas3d, antialias: gfx3().aa, powerPreference: "high-performance", alpha: false });
 			G3.aa = gfx3().aa;
 			renderer.setClearColor(0x070c12, 1);
+			// A broadcast picture: a neutral tone curve (it leaves the club colours and the grass alone and only
+			// rolls off the highlights, the lit shirts and the floodlights) a touch over exposed.
+			if (THREE.NeutralToneMapping !== undefined) { renderer.toneMapping = THREE.NeutralToneMapping; renderer.toneMappingExposure = 1.08; }
 			G3.renderer = renderer;
 			G3.scene = new THREE.Scene();
 			G3.cam = new THREE.PerspectiveCamera(36, 16 / 9, 8, 30000);
@@ -167,7 +175,18 @@
 				ballMat = new THREE.MeshLambertMaterial({ map: bt });
 			}
 			G3.ball = new THREE.Mesh(g.ball, ballMat);
-			G3.ballShadow = flat3D(g.shadow, 0x000000, 0.4);
+			// A soft shadow: dark in the middle and fading out to nothing, never a disc with an edge. Shared
+			// by the ball's shadow and the shadows under the players (and their feet).
+			const sc = document.createElement("canvas"); sc.width = sc.height = 64;
+			const sg = sc.getContext && sc.getContext("2d");
+			if (sg) {
+				const im = sg.createImageData(64, 64);
+				for (let y = 0; y < 64; y++) { for (let x = 0; x < 64; x++) { const r2 = ((x - 31.5) ** 2 + (y - 31.5) ** 2) / (31.5 * 31.5), o = (y * 64 + x) * 4; im.data[o] = im.data[o + 1] = im.data[o + 2] = 255; im.data[o + 3] = r2 >= 1 ? 0 : Math.round(255 * Math.exp(-2.6 * r2) * (1 - r2 * r2)); } }
+				sg.putImageData(im, 0, 0);
+				G3.softTex = new THREE.CanvasTexture(sc);
+			}
+			G3.ballShadow = flat3D(g.shadow, 0x000000, G3.softTex ? 0.62 : 0.4);
+			if (G3.softTex) { G3.ballShadow.material.map = G3.softTex; }
 			G3.scene.add(G3.ball, G3.ballShadow);
 			// The markers painted on the grass: pass ring, your ring and arrow, the offside line, the
 			// referee's spray and the wall, the keeper's ring, the tutorial's ring.
@@ -190,6 +209,23 @@
 				grad.addColorStop(0, "rgba(255, 255, 255, 0.9)"); grad.addColorStop(0.35, "rgba(255, 255, 255, 0.3)"); grad.addColorStop(1, "rgba(255, 255, 255, 0)");   // white: each ground tints it to its lamps
 				gg.fillStyle = grad; gg.fillRect(0, 0, 64, 64);
 				G3.glowTex = tex3D(gc);
+			}
+			// The bloom round a floodlight at night: a wide, faint halo with a soft horizontal streak, as a
+			// broadcast lens shows it. Drawn on billboards (Medium and High), not points, so it can be big.
+			const hc = document.createElement("canvas"); hc.width = hc.height = 128;
+			const hg = hc.getContext && hc.getContext("2d");
+			if (hg) {
+				const im = hg.createImageData(128, 128);
+				for (let y = 0; y < 128; y++) {
+					for (let x = 0; x < 128; x++) {
+						const dx = (x - 63.5) / 63.5, dy = (y - 63.5) / 63.5, r = Math.hypot(dx, dy), o = (y * 128 + x) * 4;
+						const halo = Math.exp(-r * r * 9) * 0.85 + Math.exp(-r * r * 2.2) * 0.22, streak = Math.exp(-dy * dy * 900) * Math.max(0, 1 - Math.abs(dx)) ** 2 * 0.45;
+						const a = Math.min(1, (halo + streak) * Math.max(0, 1 - r * r * r));
+						im.data[o] = im.data[o + 1] = im.data[o + 2] = 255; im.data[o + 3] = Math.round(255 * a);
+					}
+				}
+				hg.putImageData(im, 0, 0);
+				G3.haloTex = new THREE.CanvasTexture(hc);
 			}
 			G3.shot = "";
 			return true;
@@ -339,6 +375,40 @@
 		};
 		mat.customProgramCacheKey = () => "ff-wet" + nLamps;
 	}
+	// The grass up close, on top of the painted pitch (and the wet sheen, if any): the mowing stripes catch
+	// the light by the way the blades lie, so a band is light seen one way and dark seen the other, as on a
+	// broadcast (all levels: a few instructions); and, Medium and High, a fine blade grain that fades out by
+	// distance, so the camera at pitch level sees grass, not a blurred picture of it.
+	function grassShader3D (mat, gs, detail) {
+		const mow = gs && cond.surfaceKey !== "turf" ? gs.mow : "stripes";
+		const kind = mow === "checks" ? 2 : mow === "diag" ? 3 : mow === "rings" ? 0 : 1;
+		const bands = Math.round(FW / (mow === "wide" ? 200 : 100)), prev = mat.onBeforeCompile, prevKey = prev ? mat.customProgramCacheKey() : "";
+		mat.onBeforeCompile = (sh, r) => {
+			if (prev) { prev(sh, r); }
+			sh.uniforms.ffPitch = { value: new THREE.Vector4(FW, FH, FW / bands, FW / 14) };
+			sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nvarying vec3 vGp;").replace("#include <begin_vertex>", "#include <begin_vertex>\nvGp = (modelMatrix * vec4(transformed, 1.0)).xyz;");
+			sh.fragmentShader = sh.fragmentShader
+				.replace("#include <common>", `#include <common>
+					varying vec3 vGp; uniform vec4 ffPitch;
+					float ffGh (vec2 p) { return fract(sin(dot(p, vec2(41.3, 289.1))) * 15731.743); }
+					float ffGn (vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(ffGh(i), ffGh(i + vec2(1.0, 0.0)), f.x), mix(ffGh(i + vec2(0.0, 1.0)), ffGh(i + vec2(1.0, 1.0)), f.x), f.y); }`)
+				.replace("#include <map_fragment>", `#include <map_fragment>
+					{
+						vec2 q = vGp.xz; vec3 V = cameraPosition - vGp; float dist = length(V); vec2 v2 = normalize(V.xz + vec2(1e-4));
+						float inP = step(0.0, q.x) * step(q.x, ffPitch.x) * step(0.0, q.y) * step(q.y, ffPitch.y), sheen = 0.0;
+						${kind === 1 ? "sheen = (mod(floor(q.x / ffPitch.z), 2.0) * 2.0 - 1.0) * v2.y;" : ""}
+						${kind === 2 ? "float cp = mod(floor(q.x / (ffPitch.x / 12.0)) + floor(q.y / (ffPitch.y / 8.0)), 2.0); sheen = cp > 0.5 ? v2.y : v2.x;" : ""}
+						${kind === 3 ? "vec2 dq = q - ffPitch.xy * 0.5; float u = (dq.x + dq.y) * 0.7071; sheen = (1.0 - 2.0 * mod(floor(u / ffPitch.w), 2.0)) * dot(v2, vec2(-0.7071, 0.7071));" : ""}
+						diffuseColor.rgb *= 1.0 + 0.075 * sheen * inP;
+						${detail ? `float near = 1.0 - smoothstep(120.0, 620.0, dist);
+						if (near > 0.0) {
+							float g1 = ffGn(q * vec2(1.9, 0.55)), g2 = ffGn(q * vec2(0.6, 2.3) + 13.0), g3 = ffGn(q * 0.11);
+							diffuseColor.rgb *= 1.0 + near * (0.16 * (g1 * g2 - 0.28) + 0.06 * (g3 - 0.5));
+						}` : ""}
+					}`);
+		};
+		mat.customProgramCacheKey = () => `${prevKey}|ff-grass${kind}${detail ? "d" : ""}`;
+	}
 	// An afternoon in the sun: the stands' shadow on the grass, painted into the pitch picture once (no cost
 	// per frame). The sun comes over the near stand (as the players' shadows say); the sunlit part of the pitch
 	// is the opening of the bowl (the roof's front edge, or the top of an open stand) carried down along the
@@ -393,6 +463,7 @@
 			const tex = canvasTex3D(pc);
 			const mat = new THREE.MeshBasicMaterial({ map: tex });
 			if (cond.wet > 0) { wetGround3D(mat, Q.wetLamps || 8); }
+			grassShader3D(mat, gs, !!Q.grass);
 			const ground = own(new THREE.Mesh(new THREE.PlaneGeometry(WW, WH), mat), true);
 			ground.rotation.x = -Math.PI / 2;
 			ground.position.set(WW / 2 - MX, 0, WH / 2 - MY);
@@ -758,6 +829,26 @@
 			st.add(p); if (isNearSide) { G3.nearRoof.push(p); }
 		};
 		glowPts(glow, false); glowPts(nearGlow, true);
+		// At night, Medium and High: a broad bloom round the lamps, every few lamps along a roof (one draw call a side).
+		const bloom = (pts, isNearSide) => {
+			if (!pts.length || !G3.haloTex || !Q.bloom || cond.ko === "day") { return; }
+			const n = pts.length / 3, step = Math.max(1, Math.round(n / 40)), cs = [];
+			for (let i = 0; i < n; i += step) { cs.push(pts[i * 3], pts[i * 3 + 1], pts[i * 3 + 2]); }
+			const base = new THREE.PlaneGeometry(1, 1), g = new THREE.InstancedBufferGeometry();
+			g.index = base.index; g.setAttribute("position", base.attributes.position); g.setAttribute("uv", base.attributes.uv);
+			g.setAttribute("aC", new THREE.InstancedBufferAttribute(new Float32Array(cs), 3)); g.instanceCount = cs.length / 3;
+			const haze = cond.fog ? 1.6 : cond.wet || cond.snow ? 1.3 : 1;
+			const mat = new THREE.ShaderMaterial({
+				uniforms: { map: { value: G3.haloTex }, uSize: { value: (roofLights ? 330 : 820) * haze * (step > 1 ? 1.15 : 1) }, uCol: { value: new THREE.Color(...wetLampCol3).multiplyScalar(roofLights ? 0.3 : 0.42) } },
+				vertexShader: "attribute vec3 aC; uniform float uSize; varying vec2 vUv; void main () { vUv = uv; vec4 mv = viewMatrix * vec4(aC, 1.0); mv.xy += position.xy * uSize; gl_Position = projectionMatrix * mv; }",
+				fragmentShader: "uniform sampler2D map; uniform vec3 uCol; varying vec2 vUv; void main () { float a = texture2D(map, vUv).a; gl_FragColor = vec4(uCol * a, 1.0); }",
+				blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, toneMapped: false
+			});
+			const m = own(new THREE.Mesh(g, mat), true); m.frustumCulled = false; m.renderOrder = 2;
+			base.dispose = () => {};
+			st.add(m); if (isNearSide) { G3.nearRoof.push(m); }
+		};
+		bloom(glow, false); bloom(nearGlow, true);
 		// The wet pitch reflects these lamps: up to eight, spread along the lists.
 		const lampsAll = [ ...glow, ...nearGlow ], nL = lampsAll.length / 3;
 		wetLamps3().forEach((v, i) => { if (nL) { const k = Math.floor((i + 0.5) * nL / 8) * 3; v.set(lampsAll[k], lampsAll[k + 1], lampsAll[k + 2]); } else { v.set(0, -1e4, 0); } });
@@ -789,22 +880,37 @@
 			seat.scale.set(dw - 6, 1.6, 6); seat.position.set(cx, 7, FH + F_SIDE3 + 5); st.add(seat);
 			G3.nearRoof.push(dug, roof, seat); dug.userData.dugout = cx;
 		}
-		// 4b. Advertising boards all round the pitch, lit like LED hoardings, with gaps for the dugouts.
-		const ac = document.createElement("canvas"); ac.width = 1024; ac.height = 48;
+		// 4b. LED advertising boards all round the pitch, with gaps for the dugouts: invented sponsors (no real
+		// brand) on dark panels, lit from behind (not tone mapped, so they glow), a fine grid of LEDs over
+		// them, and every few seconds the panels roll on to the next sponsor (a texture offset, nothing
+		// allocated). Medium and High at night: their light spills on to the grass in front of them.
+		const ac = document.createElement("canvas"); ac.width = 2048; ac.height = 96;
 		const ag = ac.getContext && ac.getContext("2d");
 		if (ag) {
-			// The words in the country's language; one panel in each four in the club's colour, one in the flag's.
+			// The ground's own words (in the country's language) are kept for two panels in eight.
 			const words = gs.words || [ "FLOODLIT", "MATCHDAY", "LIGA", "KICK OFF", "PREMIER", "NIGHT GAME", "90 MINUTOS", "GOL" ];
 			const nc = (gs.natCols || [ "#c8102e" ]).find(c => lum(c) < 0.75 && lum(c) > 0.04) || "#c8102e";
-			const cols = [ [ "#102a4a", "#ffffff" ], [ "#ffffff", "#0d1b2a" ], [ KITS[homeSide].outfield, lum(KITS[homeSide].outfield) < 0.3 ? "#ffffff" : "#0b0f12" ], [ "#1d1d1d", "#f2b52e" ], [ "#ffffff", "#0d1b2a" ], [ nc, lum(nc) < 0.45 ? "#ffffff" : "#0b0f12" ], [ KITS[homeSide].outfield, lum(KITS[homeSide].outfield) < 0.3 ? "#ffffff" : "#0b0f12" ], [ "#102a4a", "#f2b52e" ] ];
-			for (let i = 0; i < 8; i++) {
-				const [ bgc, fg ] = cols[i % cols.length];
-				ag.fillStyle = bgc; ag.fillRect(i * 128, 0, 128, 48);
-				ag.fillStyle = fg; ag.font = "800 22px 'Big Shoulders Display', 'Arial Narrow', Arial, sans-serif"; ag.textAlign = "center"; ag.textBaseline = "middle";
-				ag.fillText(words[i], i * 128 + 64, 25, 114);   // squeezed to fit its panel, never run over the edge
-			}
+			const home = KITS[homeSide].outfield, homeInk = lum(home) < 0.3 ? "#ffffff" : "#0b0f12";
+			const panels = [
+				[ BOARD_ADS3[0], "#0a1a33", "#5fd0ff" ], [ BOARD_ADS3[1], "#f4f6f8", "#101820" ], [ words[0], home, homeInk ], [ BOARD_ADS3[2], "#111111", "#f2b52e" ],
+				[ BOARD_ADS3[3], "#0d3b2a", "#d8ff6a" ], [ BOARD_ADS3[4], nc, lum(nc) < 0.45 ? "#ffffff" : "#0b0f12" ], [ words[3], home, homeInk ], [ BOARD_ADS3[5], "#2a0a3a", "#ff7ad9" ]
+			];
+			panels.forEach(([ txt, bgc, fg ], i) => {
+				const x0 = i * 256, gr = ag.createLinearGradient(0, 0, 0, 96);
+				gr.addColorStop(0, bgc); gr.addColorStop(1, mixHex3(bgc, "#000000", 0.35));
+				ag.fillStyle = gr; ag.fillRect(x0, 0, 256, 96);
+				ag.fillStyle = fg; ag.fillRect(x0 + 10, 12, 6, 72);   // a sponsor's bar
+				ag.font = "800 46px 'Big Shoulders Display', 'Arial Narrow', Arial, sans-serif"; ag.textAlign = "center"; ag.textBaseline = "middle";
+				ag.fillText(String(txt).toUpperCase(), x0 + 134, 50, 220);
+			});
+			// The LEDs: a dark grid every few pixels, fine enough to read as a screen close up and vanish by distance.
+			ag.fillStyle = "rgba(0, 0, 0, 0.28)";
+			for (let x = 0; x < 2048; x += 4) { ag.fillRect(x, 0, 1, 96); }
+			for (let y = 0; y < 96; y += 4) { ag.fillRect(0, y, 2048, 1); }
 			const tex = canvasTex3D(ac); tex.wrapS = THREE.RepeatWrapping;
-			const boardMat = new THREE.MeshBasicMaterial({ map: tex });
+			G3.boardTex = tex;
+			const boardMat = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false, color: new THREE.Color(cond.ko === "day" ? 0.92 : 1.12, cond.ko === "day" ? 0.92 : 1.12, cond.ko === "day" ? 0.92 : 1.12) });
+			const spill = Q.bloom && cond.ko !== "day" ? acc3() : null;
 			let first = true;
 			const board = (a0, a1, fixed, ry, alongX) => {
 				const w = a1 - a0;
@@ -818,11 +924,30 @@
 				m.rotation.y = ry;
 				m.userData.ownGeo = true; m.userData.ownMat = first; first = false;
 				st.add(m);
+				if (spill) {
+					// a strip of light on the grass, from the foot of the board out toward the pitch
+					const d = 22, inX = alongX ? 0 : (fixed < 0 ? 1 : -1), inZ = alongX ? (fixed < 0 ? 1 : -1) : 0;
+					const p = (a, o) => (alongX ? [ a, 0.3, fixed + inZ * o ] : [ fixed + inX * o, 0.3, a ]);
+					accQuad3(spill, p(a0, 0.5), p(a1, 0.5), p(a1, d), p(a0, d), [ 0, 0, 0 ]);
+				}
 			};
 			board(-F_END3 + 16, FW + F_END3 - 16, -12, 0, true);
 			const gaps = [ FW / 2 - dw * 0.62 - 20, FW / 2 + dw * 0.62 + 20 ].map(cx => [ cx - dw / 2 - 6, cx + dw / 2 + 6 ]);
 			board(-F_END3 + 16, gaps[0][0], FH + 12, Math.PI, true); board(gaps[0][1], FW / 2 - 20, FH + 12, Math.PI, true); board(FW / 2 + 20, gaps[1][0], FH + 12, Math.PI, true); board(gaps[1][1], FW + F_END3 - 16, FH + 12, Math.PI, true);   // a gap for the tunnel
 			board(-6, FH + 6, -NET - 12, Math.PI / 2, false); board(-6, FH + 6, FW + NET + 12, -Math.PI / 2, false);
+			if (spill && spill.pos.length) {
+				// Brightest at the board, fading out over the grass: the fade is the strip's own depth (uv.y).
+				const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(spill.pos, 3));
+				const fade = new Float32Array(spill.pos.length / 3);
+				for (let i = 0; i < fade.length; i++) { fade[i] = [ 1, 1, 0, 1, 0, 0 ][i % 6]; }   // each quad (a, b, c, a, c, d): a and b at the board, c and d out on the grass
+				g.setAttribute("aF", new THREE.BufferAttribute(fade, 1));
+				const sm = new THREE.ShaderMaterial({
+					vertexShader: "attribute float aF; varying float vF; void main () { vF = aF; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
+					fragmentShader: "varying float vF; void main () { gl_FragColor = vec4(vec3(0.75, 0.82, 0.95) * 0.11 * vF * vF, 1.0); }",
+					blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, toneMapped: false, side: THREE.DoubleSide
+				});
+				st.add(own(new THREE.Mesh(g, sm), true));
+			}
 		}
 		// 5. The night: a sky that darkens overhead, a few stars, and the floodlights lighting the players.
 		const sc = document.createElement("canvas"); sc.width = 2; sc.height = 128;

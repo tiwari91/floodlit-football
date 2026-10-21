@@ -359,6 +359,8 @@
 		CROWD_U.uOla.value = reduceMotion ? 0 : m.ola;
 		animateEnds3D(k);
 		CROWD_U.uOlaA.value = m.olaA || 0;
+		// The LED boards roll on to the next sponsor every seven seconds, in a quick slide (held still with reduced motion).
+		if (G3.boardTex && !reduceMotion) { const t = now / 1000, f = t % 7, e = clamp((f - 6.4) / 0.6, 0, 1); G3.boardTex.offset.x = ((Math.floor(t / 7) + e * e * (3 - 2 * e)) % 8) / 8; }
 		const mid = CROWD_U.uMid.value; mid[0] = FW / 2; mid[1] = FH / 2; mid[2] = FW / 2 + 160; mid[3] = FH / 2 + 160;
 	}
 	// The stands' jolts fade: a cheer in a couple of seconds, a gasp quicker.

@@ -194,7 +194,7 @@
 	}
 	// The front of the shirt: the club's crest on the left breast, a kit maker's mark on the right and a
 	// shirt sponsor across the chest, all invented. One atlas row per side, repainted when the kits change.
-	const SPONSORS3 = [ "NORTHLINE", "KESTREL AIR", "VOLTA", "BRIGHTWATER", "ORBITEL", "HALCYON", "TERRAFOLD", "MERIDIAN", "AXIOM BANK", "SUNVALE", "CORAL TELECOM", "FENWAY TYRES" ];
+	const SPONSORS3 = [ "NORVELLO", "KESTRAVIK", "ZOLTARA", "BRIXWELL", "ORVANTIQ", "HALVORA", "TERRAQUIN", "MERIVEX", "AXELMORA", "SUNDRAVI", "CORVALIS", "FENTRAX" ];   // invented, none a real company
 	function paintChest3D (g, row, kit, club) {
 		const y0 = row * 128, ink = kit.ink || "#ffffff", w = 512;
 		g.clearRect(0, y0, w, 128);
@@ -206,9 +206,11 @@
 		g.lineWidth = 3; g.strokeStyle = ink; g.stroke();
 		g.fillStyle = kit.outfield; g.font = "900 32px 'Big Shoulders Display', 'Arial Narrow', Arial, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle";
 		g.fillText(name.charAt(0).toUpperCase(), cx, cy + 1);
-		// the maker's mark: a small swoosh-like chevron (no real brand)
-		g.strokeStyle = ink; g.lineWidth = 6; g.lineCap = "round";
-		g.beginPath(); g.moveTo(w * 0.25, cy - 2); g.lineTo(w * 0.29, cy + 9); g.lineTo(w * 0.37, cy - 11); g.stroke();
+		// the maker's mark: an invented one (a small diamond with a bar through it), nobody's real logo
+		const mx = w * 0.31;
+		g.strokeStyle = ink; g.fillStyle = ink; g.lineWidth = 4; g.lineJoin = "miter";
+		g.beginPath(); g.moveTo(mx, cy - 13); g.lineTo(mx + 11, cy); g.lineTo(mx, cy + 13); g.lineTo(mx - 11, cy); g.closePath(); g.stroke();
+		g.fillRect(mx - 15, cy - 2, 30, 4);
 		// the sponsor across the chest
 		g.fillStyle = ink; g.font = "900 62px 'Barlow', 'Helvetica Neue', Arial, sans-serif"; g.textBaseline = "middle";
 		g.fillText(SPONSORS3[h % SPONSORS3.length], w / 2, y0 + 98, w * 0.94);
@@ -552,7 +554,8 @@
 		G3.scene.add(chest);
 		// A kit-coloured ring at each player's feet (it keeps the sides readable from the gantry) and a soft shadow.
 		const rings = new T.InstancedMesh(G3.geo.ring, new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.36, depthWrite: false }), MAXF3);   // the side's ring under each man: a hint, not a halo
-		const blobs = new T.InstancedMesh(G3.geo.shadow, new T.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.32, depthWrite: false }), MAXF3);
+		// The soft shadow under him, and (Medium and High) a smaller one under each boot that fades as the foot lifts.
+		const blobs = new T.InstancedMesh(G3.geo.shadow, new T.MeshBasicMaterial({ color: 0x000000, map: G3.softTex || null, transparent: true, opacity: G3.softTex ? 0.5 : 0.32, depthWrite: false }), MAXF3 * 3);
 		// Under four floodlights a player throws four faint shadows, one away from each (as many as the Graphics setting draws).
 		// The floodlight shadows: darkest at his feet and fading out toward the tip with soft sides, as a
 		// shadow from a lamp a long way off does; an even grey ellipse read as four dark legs round each man.
@@ -1094,6 +1097,15 @@
 		const V = F.V.setFromMatrixPosition(rig.root.matrixWorld), x = V.x, z = V.z, air = Math.max(0, V.y);
 		const [ sux, suz ] = sunDir3D();
 		F.blobs.setMatrixAt(F.blobs.count++, M.compose(V.set(x + sux * 2.4, 0.2, z + suz * 2.4), F.Q.identity(), F.S.set(11 + air * 0.15, 1, 7 + air * 0.1)));
+		if (gfx3().feet && air < 6) {
+			for (let i = 0; i < 2; i++) {
+				const e = rig.an[i].matrixWorld.elements, sx = Math.hypot(e[0], e[2]) || 1, fx = e[0] / sx, fz = e[2] / sx;   // the boot's heading on the grass
+				const lift = clamp(1 - (e[13] - ANK3) / 4.5, 0, 1);
+				if (lift < 0.08 || F.blobs.count >= F.blobs.instanceMatrix.count) { continue; }
+				F.blobs.setMatrixAt(F.blobs.count++, M.compose(V.set(e[12] + fx * 1.1, 0.24, e[14] + fz * 1.1), F.Q.setFromAxisAngle(F.Y || (F.Y = new THREE.Vector3(0, 1, 0)), Math.atan2(-fz, fx)), F.S.set(3.6 * lift, 1, 2.1 * lift)));
+			}
+			V.setFromMatrixPosition(rig.root.matrixWorld);
+		}
 		const ns = gfx3().shadows - 1;
 		if (ns > 0 && air < 20 && cond && cond.ko === "day") {
 			// An afternoon game: one sun shadow, the same way for everyone, longer than his blob.
