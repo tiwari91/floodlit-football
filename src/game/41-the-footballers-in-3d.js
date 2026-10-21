@@ -614,6 +614,29 @@
 		for (let i = 0; i < 2; i++) { r.sh[i].rotation.set(0, 0, 0); r.el[i].rotation.set(0, 0, 0); r.ha[i].rotation.set(0, 0, 0); r.hip[i].rotation.set(0, 0, 0); r.kn[i].rotation.set(0, 0, 0); r.an[i].rotation.set(0, 0, 0); }
 		r.root.rotation.set(0, 0, 0); r.root.position.set(0, 0, 0); r.root.scale.setScalar(1);
 	}
+	// Blending, on the drawn figure only: a change of pose (a reaction, a receive, a celebration, the end of a
+	// slide or a dive) can swing his arms and body round in one frame. Outside an action, each upper-body
+	// joint may turn at most about 18 rad/s, which the run's own swing never reaches, so a pop becomes a
+	// quick blend over a few frames while the running cycle passes untouched. The legs and hips are left on
+	// the pose (they put the boots on the grass), and actions (a kick, a header, a dive) stay sharp.
+	// st: the player's own drawn state (kept across frames); free: take the pose as it is and remember it.
+	function blendUpper3D (r, st, free) {
+		let a = st.blend;
+		if (!a) { a = st.blend = new Float32Array(30); free = true; }
+		const lim = 18 * Math.min(frameDt, 50) / 1000;
+		let k = 0;
+		const one = o => {
+			const e = o.rotation;
+			for (let c = 0; c < 3; c++) {
+				const key = c === 0 ? "x" : c === 1 ? "y" : "z";
+				let v = e[key];
+				if (!free) { const d = v - a[k]; if (d > lim) { v = a[k] + lim; } else if (d < -lim) { v = a[k] - lim; } e[key] = v; }
+				a[k++] = v;
+			}
+		};
+		one(r.spine); one(r.chest); one(r.neck); one(r.head);
+		for (let i = 0; i < 2; i++) { one(r.sh[i]); one(r.el[i]); one(r.ha[i]); }
+	}
 	// Which way shadows fall on the grass: away from the main key light (high over the near stand,
 	// toward the far side of the pitch), as a unit (x, z).
 	const sunDir3D = () => { const dx = FW * 0.7, dz = -FH * 1.1, l = Math.hypot(dx, dz) || 1; return [ dx / l, dz / l ]; };
