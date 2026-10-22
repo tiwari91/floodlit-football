@@ -871,6 +871,19 @@
 	.assist-ask { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
 	.assist-ask span { flex: 1 1 100%; }
 	.assist-ask button { padding: 3px 10px; font-size: 12px; }
+	.assist-list { margin: 4px 0 2px; padding-left: 18px; }
+	.assist-list li { margin: 2px 0; }
+	.assist-list li.warn b { color: #f2b52e; }
+	.assist-list li.next { opacity: 0.85; }
+	.lg-extras h4 { margin: 12px 0 4px; }
+	.lg-extras .detail { margin: 0 0 4px; font-size: 13px; }
+	.lg-extras ul { list-style: none; margin: 4px 0; padding: 0; font-size: 13px; }
+	.lg-extras li { padding: 3px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+	.lg-extras li.mine { font-weight: 600; }
+	.lg-extras .academy li { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+	.lg-extras .academy .who { flex: 1 1 auto; }
+	.lg-extras .academy button { padding: 2px 8px; font-size: 12px; }
+	.lg-extras .awards b { color: #f2b52e; font-weight: 600; }
 	.market .bids { grid-row: span 3; display: grid; gap: 4px; justify-items: stretch; }
 	.market .bids button { grid-row: auto; padding: 3px 8px; font-size: 12px; }
 	.market .swap { grid-column: 2 / 3; }
@@ -1538,10 +1551,10 @@
 		<p class="fine"><b>Goals.</b> The scorer wheels away to the corner, slides on his knees in front of the fans and is mobbed by his teammates while the other side trudges back and their keeper fetches the ball out of the net, which bulges and swings where the ball hit it. A caption names the scorer and the minute, and the score bug flashes. In the 3D view the celebration then gives way to an instant replay of the build-up in slow motion, from high behind the goal or low beside it, before the camera goes back to the scorer and cuts wide for the restart. The match clock is stopped throughout. Any key, button or tap skips the celebration and the replay. Cards and substitutions get captions too.</p>
 		<p class="fine"><b>Weather and grounds.</b> Every club has a home ground: grass, muddy or artificial turf. Mud slows the ball and the players and kills the bounce. Turf is quick and true. Rain holds the ball up (heavy rain and mud most of all), costs players grip on the turn, sends passes a little astray and makes shots harder for keepers to hold, so they spill more. Wind pushes the ball while it is in the air: long balls, crosses, corners and lofted shots carry with it and hang against it; the arrow and speed at the top left of the pitch show which way it blows. League fixtures kick off in the afternoon or at night under the floodlights, with the stands dark around a lit pitch. In the league, matchdays 10 to 26 are the rainy season, windier and mostly at night, and the forecast is shown in advance (☾ night, ☀ afternoon, ≈ windy); the kick-off card gives the time, the rain and which way the wind blows for you. In a friendly, pick the weather (including Windy, and Fog, which only thickens the air: the far side fades but the ball plays as on a dry night) and ground yourself.</p>
 		<p class="fine"><b>Your season, backed up.</b> Your league saves in this browser. Export league saves it to a file; Import league loads a file back (press twice to confirm, since it replaces the season you have). Use it to keep a backup or carry your season to another browser or device.</p>
-		<p class="fine"><b>Assistant.</b> Under Your team, the Assistant setting hands the club's paperwork to your assistant manager. Contracts: between matches he offers a new deal to every player in the last year of his contract, the most valuable first, as far as the money allows above the £0.4m wage reserve; only a player too unhappy to talk is left, and the notes say who. When the money runs short he puts it to you under the setting: renew anyway and spend the £0.4m wage reserve, or leave them for now, and he asks again when the money changes. Transfers: when a window is open he answers bids (cashing in only well over a player's value, or on anyone past 31 at a fair price, never the only keeper), and signs at most two players a window where a known quantity, scouted or from home, is a clear step up on your weakest starter in that position. Everything he does appears in the notes on the League panel. Off by default.</p>
+		<p class="fine"><b>Assistant.</b> Under Your team, the Assistant setting hands the club's paperwork to your assistant manager. Contracts: between matches he goes through everyone in the last year of his deal, the most important first (rating, age, how much he plays and who else can play there). Young key men get three more seasons, men past 31 and the fringe one, older squad men take a pay cut, and a squad man of 33 or more, or one the squad doesn't need, is let go on a free. He keeps £0.4m back for wages. When the money runs short, a key man who would otherwise walk signs with no signing-on fee and a bigger rise instead; with Transfers on too and a window open he sells a squad player to pay for the rest, otherwise he suggests one. His report says who renewed, for how long and at what wage, who hasn't signed yet, when their deals end and why, and what you can do: spend the wage money, sell, or offer the deal yourself from the squad list. Transfers: when a window is open he answers bids (cashing in only well over a player's value, or on anyone past 31 at a fair price, never the only keeper), and signs at most two players a window where a known quantity, scouted or from home, is a clear step up on your weakest starter in that position. Everything he does appears in the notes on the League panel. Off by default.</p>
 		<p class="fine"><b>The transfer window.</b> The market opens on the For you tab: a shortlist of the players who would improve your eleven, each with the gain over the starter he would replace (an estimate until he is scouted). "Sign the best for me" lets the assistant buy up to two known step-ups at the asking price, keeping money for wages; "Scout the shortlist" spends the window's reports on it, best first. The line above the tabs says where the eleven is thinnest. The other tabs show every market as before.</p>
 		<p class="fine"><b>Offers for you, and your agent.</b> You are the manager, not the club. When a season ends, clubs who liked your work come calling in the League panel: finish in the top four and the big clubs in the division want you, finish mid-table and a club at your level does, finish low and only the division below will, and a good season draws a club abroad. Take a job and you inherit that club's squad, ground and colours with a budget to match its size; your old club carries on under its own name. Move abroad and you start afresh in a new country: a new squad of mostly local players, and a new league of that country's clubs under its own name (La Liga-style Primera División in Spain, Ligue 1 in France, the J1 League in Japan and so on), your career intact. Your agent also sounds clubs out at the January window: agree to an approach and you join when the season ends. Decline, or start the next season, and the offers lapse. With several offers on the table your agent marks the <b>best move</b> and says why: the strongest squad, the most to spend, a new country on your record. Your coaching staff, training plan and facilities come with you to any new club, and a bigger club's facilities are already built to its standing. The career line under them keeps your record.</p>
-		<p class="fine"><b>Contracts ending.</b> At the January window, and with two games to go, you get a heads-up naming the starters in the last year of their deals. Renew them under Your team, or leave it: in the summer the club keeps its last-year starters on anyway, most valuable first, as far as the money allows (£0.4m is always kept for wages), and the League notes say who could not be kept. Squad men are left to run down unless the Assistant is on.</p>
+		<p class="fine"><b>Contracts ending.</b> At the January window, with ten games to go and with two, you get a heads-up naming the starters in the last year of their deals, how many games are left and, with the Assistant on, any he couldn't sign yet. Renew them under Your team, or leave it: in the summer the club keeps its last-year starters on anyway, most valuable first, as far as the money allows (£0.4m is always kept for wages), and the League notes say who could not be kept. A happy player under 34 otherwise takes the club's standard two-year deal in the summer; anyone else leaves on a free.</p>
 		<p class="fine"><b>Touchline cam.</b> On a foul, a card, a near miss or a big save, the director cuts to the touchline for a couple of seconds in the bottom-right corner while play carries on: the manager in his technical area lets the referee have it, or holds his head, with the bench and a coach behind him and a caption of what he is shouting. Not shown on phones, in simulated matches or in the tutorial.</p>
 		<p class="fine"><b>Careers end.</b> Players may retire each summer from 34 and all have by 38; keepers last two years longer. From 33 (keepers 35) a new contract is for one more season at a time, and a player in his final season gets none. The League notes list who retired, and academy players fill the gaps.</p>
 		<p class="fine"><b>On a phone.</b> Held upright, the overhead camera turns the pitch on its side so its whole width fits: you attack down the screen in the first half and up it in the second, and the joystick follows the picture. The settings, league table and help sit behind More under the pads.</p>
@@ -2547,12 +2560,14 @@
 			if (typeof assistRun === "function") { assistRun("summer"); }   // new deals before contracts run out
 			if (typeof keyContracts === "function") { keyContracts(club); }   // the starters, even with the assistant off
 			gone = rolloverClub(club);
+			league.assistReport = null;   // the deals are settled now; the assistant's note says how
 			if (league.assistShort) {   // the unpaid deals are settled by the summer: kept on standard terms, or gone
 				const names = league.assistShort.names, kept = names.filter(n => (club.resigned || []).includes(n)), lost = names.filter(n => gone.includes(n));
 				league.assistShort = null;
 				league.assistNote = `${league.assistNote || "Assistant (summer):"}${kept.length ? ` The club kept ${kept.join(", ")} on standard terms anyway.` : ""}${lost.length ? ` Out of contract and gone: ${lost.join(", ")}.` : ""}`;
 			}
 			if (typeof seasonCoaching === "function") { seasonCoaching(club); }
+			if (typeof youthIntake === "function") { youthIntake(club); }   // the academy's new intake, and the others grow
 			if (club.retired && club.retired.length) { league.news = `${league.news} Retired: ${club.retired.join(", ")}.`.trim(); }
 			if (gone.length) { league.news = `${league.news} Out of contract and gone: ${gone.join(", ")}. Academy players fill the gaps.`.trim(); }
 			if (club.resigned && club.resigned.length) { league.news = `${league.news} Signed new deals: ${club.resigned.join(", ")}.`.trim(); }
@@ -2641,7 +2656,8 @@
 		if (!windowOpen()) { league.bidsIn = []; }
 		if (league.round === JANUARY) { league.club.market = genMarket(); league.club.scoutLeft = 2 + staffLvl(league.club, "scout"); if (typeof windowEvents === "function") { windowEvents("January"); } if (typeof agentApproaches === "function") { agentApproaches("January"); } }
 		if (typeof assistRun === "function") { assistRun(league.round === JANUARY ? "January window" : "this week"); }
-		if (typeof contractAlerts === "function" && (league.round === JANUARY || league.round === league.fixtures.length - 2)) { contractAlerts(); }
+		if (typeof cupNight === "function") { cupNight(); }   // a cup night between matchdays
+		if (typeof contractAlerts === "function" && (league.round === JANUARY || league.round === league.fixtures.length - 10 || league.round === league.fixtures.length - 2)) { contractAlerts(); }
 		// Knocks from this match: out for one to three games, and off the team sheet.
 		const byName = n => [ ...league.club.squad, ...league.club.bench ].find(pl => pl.name === n);
 		for (const n of matchGoals) { const pl = byName(n); if (pl) { pl.goals = (pl.goals || 0) + 1; } }
@@ -2676,6 +2692,7 @@
 			league.club.market = genMarket();
 			league.club.scoutLeft = 2 + staffLvl(league.club, "scout");
 			league.paid = true;
+			if (typeof seasonAwards === "function") { seasonAwards(); }
 			if (typeof offerJobs === "function") { offerJobs(pos); }
 		}
 		saveLeague();
@@ -2809,6 +2826,7 @@
 		renderClub();
 		renderClubs();
 		renderShapes();
+		if (typeof renderExtras === "function") { renderExtras(); }
 	}
 
 	let clubsView = "div", openClub = null;
@@ -3152,7 +3170,8 @@
 			pl.contract--;
 			if (pl.contract > 0) { continue; }
 			// Out of contract: a happy player under 34 signs on for two more at a little more money; the rest go.
-			if (pl.morale >= 50 && pl.age < 34) { pl.contract = oneYearOnly(pl) ? 1 : 2; pl.wage = Math.round(wageOf(pl) * 1.1 * 1000) / 1000; kept.push(pl.name); } else { gone.push(pl.name); }
+			// The assistant may have decided to let him go on a free (pl.letGo).
+			if (pl.morale >= 50 && pl.age < 34 && !(pl.letGo && typeof assistDoes === "function" && assistMode !== "off" && assistDoes("contracts"))) { pl.contract = oneYearOnly(pl) ? 1 : 2; pl.wage = Math.round(wageOf(pl) * 1.1 * 1000) / 1000; kept.push(pl.name); } else { gone.push(pl.name); }
 		}
 		if (gone.length) { c.squad = c.squad.filter(p => !gone.includes(p.name)); c.bench = c.bench.filter(p => !gone.includes(p.name)); }
 		if (gone.length || c.bench.length < 5) { refillSquad(c); }
@@ -3161,14 +3180,16 @@
 	}
 	// The deal itself: a signing-on fee, a rise, two more seasons (five at most). Shared by the Renew
 	// button and the assistant; says why when he won't or the club can't.
-	function renewDeal (pl, c) {
-		const fee = round1(valueOf(pl) * 0.15);
+	// terms (from the assistant): { years, rise, fee } in place of the standard offer.
+	function renewDeal (pl, c, terms = null) {
+		const fee = terms ? terms.fee : round1(valueOf(pl) * 0.15);
 		if (lastSeason(pl)) { return { ok: false, why: `${pl.name} (${pl.age}) is retiring at the end of the season; there's no new deal to offer.` }; }
 		if (pl.morale < 40) { return { ok: false, why: `${pl.name} won't talk about a new contract while he's unhappy (morale ${pl.morale}).` }; }
 		if (c.budget + 1e-9 < fee) { return { ok: false, why: `A new deal for ${pl.name} needs a ${money(fee)} signing-on fee.` }; }
 		c.budget = round1(c.budget - fee);
-		pl.wage = Math.round(wageOf(pl) * (roleOf(pl, c) === "key" ? 1.2 : 1.1) * 1000) / 1000;
-		pl.contract = oneYearOnly(pl) ? Math.min(2, pl.contract + 1) : Math.min(5, pl.contract + 2);   // veterans: one more season at a time
+		pl.wage = Math.round(wageOf(pl) * (terms ? terms.rise : roleOf(pl, c) === "key" ? 1.2 : 1.1) * 1000) / 1000;
+		pl.contract = terms ? Math.min(5, pl.contract + (oneYearOnly(pl) ? 1 : terms.years)) : oneYearOnly(pl) ? Math.min(2, pl.contract + 1) : Math.min(5, pl.contract + 2);   // veterans: one more season at a time
+		pl.letGo = false;
 		pl.morale = clamp(pl.morale + 8, 0, 100);
 		return { ok: true, fee, why: `${pl.name} signs a new contract to ${pl.contract} seasons (${money(fee)} signing-on, ${wageWeek(pl.wage)}).` };
 	}
@@ -4127,28 +4148,131 @@
 		if (pl.morale < 40 || pl.age >= (starter ? 36 : 33)) { return false; }
 		return starter || ovrNow(pl) >= squadMedian(c) || (role === "prospect" && (pl.pot || 0) >= ovrNow(pl) + 6);
 	}
-	// Why a last-year player is left to run down: only because he won't talk.
-	const assistWhyNot = pl => (lastSeason(pl) ? `${pl.age}, retiring` : pl.morale < 40 ? `unhappy, morale ${pl.morale}` : "");
-	// Every player in his last year gets a new deal, the most valuable first so the money goes on the
-	// stars before the squad men, as far as the budget allows above the reserve. Only a player who
-	// won't talk (unhappy) is left to run down; the note says so.
-	function assistContracts (c, reserve = ASSIST_RESERVE) {
-		const done = [], skint = [], left = [];
-		let need = 0;
-		const lastYear = [ ...c.squad, ...c.bench ].filter(pl => { ensurePlayer(pl); return pl.contract <= 1; });
-		const due = lastYear.filter(pl => pl.morale >= 40 && !lastSeason(pl)).sort((a, b) => valueOf(b) - valueOf(a));
-		for (const pl of due) {
-			const fee = round1(valueOf(pl) * 0.15);
-			if (c.budget - fee < reserve) { skint.push(pl.name); need = round1(need + fee); continue; }
-			const deal = renewDeal(pl, c);
-			if (deal.ok) { done.push(`${pl.name} signed on to ${pl.contract} seasons`); }
+	// How much a player in his last year matters to the side, for the order of renewals: his rating
+	// against the middle of the squad, his place in the side, his age (young men with room to grow
+	// count for more, men past 31 for less), whether anyone else can do his job and how much he plays.
+	function renewWorth (pl, c) {
+		ensurePlayer(pl);
+		const o = ovrNow(pl), role = roleOf(pl, c), all = [ ...c.squad, ...c.bench ];
+		const cover = all.filter(q => q !== pl && q.pos === pl.pos && ovrNow(q) >= o - 2).length;
+		const need = pl.pos === "gk" ? (cover ? 0 : 10) : cover === 0 ? 8 : cover === 1 ? 4 : cover === 2 ? 1 : 0;
+		const age = pl.age <= 23 ? 3 + Math.max(0, (pl.pot || o) - o) * 0.3 : pl.age <= 29 ? 2 : pl.age <= 31 ? 0 : -(pl.age - 31) * 2.5;
+		const played = league && league.round > 0 ? Math.min(1, (pl.apps || 0) / league.round) * 5 : 0;
+		return Math.round((o - squadMedian(c)) + ({ key: 10, first: 6, prospect: 2 }[role] || 0) + age + need + played);
+	}
+	// What to offer him, or why not: a longer deal for the young and the important, one season for
+	// men past 31 and the fringe, a pay cut for an older squad man, and a free transfer for those not
+	// worth keeping (a squad man of 33 or more, or one well short of the squad with others covering).
+	function renewPlan (pl, c) {
+		const role = roleOf(pl, c), starter = role === "key" || role === "first", worth = renewWorth(pl, c), o = ovrNow(pl);
+		const prospect = role === "prospect" && (pl.pot || 0) >= o + 6;
+		if (lastSeason(pl)) { return { keep: false, worth, why: `${pl.age}, retiring at the end of the season` }; }
+		if (pl.morale < 40) { return { keep: false, worth, sulk: true, why: `unhappy (morale ${pl.morale}), so he won't talk about a new deal yet` }; }
+		if (!starter && !prospect && pl.age >= 33) { return { keep: false, worth, free: true, why: `${pl.age} and not in the side` }; }
+		if (!starter && !prospect && worth < -4) { return { keep: false, worth, free: true, why: "not needed, others cover his position" }; }
+		const years = oneYearOnly(pl) || pl.age >= 31 || (!starter && !prospect && (worth < 2 || pl.age > 24)) ? 1 : pl.age <= 25 && (starter || prospect) ? 3 : 2;
+		const rise = role === "key" ? 1.2 : starter ? 1.1 : pl.age >= 31 ? 0.9 : 1;
+		const fee = round1(valueOf(pl) * 0.15 * (years === 1 ? 0.5 : years === 3 ? 1.2 : 1));
+		return { keep: true, key: role === "key" || worth >= 12, years, rise, fee, worth };
+	}
+	// He walks in the summer unless something is done: the club's standard summer deal only goes to
+	// happy players under 34, a year older by then (see rolloverClub).
+	const atRisk = pl => pl.morale < 50 || pl.age >= 33;
+	const gamesLeft = () => (league ? Math.max(0, league.fixtures.length - league.round) : 0);
+	const endsWhen = (summer = false) => { const n = gamesLeft(); return n > 0 && !summer ? `deal ends this summer, ${n} game${n === 1 ? "" : "s"} left` : "deal ends now"; };
+	const who = pl => `${pl.name} (${POS_LABEL[pl.pos]} ${ovrNow(pl)}, ${pl.age})`;
+	const seasons = n => `${n} more season${n === 1 ? "" : "s"}`;
+	const listNames = (a, n = 4) => `${a.slice(0, n).join(", ")}${a.length > n ? ` and ${a.length - n} more` : ""}`;
+	// Squad men who could be sold to pay for the deals: off the bench, not a starter or a prospect,
+	// never the last keeper and never worth more than the men being kept; cheapest to lose first,
+	// only as many as the shortfall needs.
+	function sellToFund (c, need, keep) {
+		const all = [ ...c.squad, ...c.bench ], top = Math.max(0, ...keep.map(valueOf)), lg = league, others = lg.members.filter(id => id !== 0), out = [];
+		const pool = c.bench.filter(pl => {
+			const r = roleOf(pl, c);
+			if (keep.includes(pl) || r === "key" || r === "first" || (r === "prospect" && (pl.pot || 0) >= ovrNow(pl) + 6)) { return false; }
+			if (pl.pos === "gk" && all.filter(q => q.pos === "gk").length < 2) { return false; }
+			return pl.contract > 1 && valueOf(pl) <= top;
+		}).sort((a, b) => ovrNow(a) - ovrNow(b) || valueOf(b) - valueOf(a));
+		let got = 0;
+		for (const pl of pool) {
+			if (got >= need - 1e-9) { break; }
+			const fee = round1(Math.max(0.1, valueOf(pl) * 0.85));
+			out.push({ pl, name: pl.name, fee, club: others[hashStr(pl.name + lg.round + lg.season) % others.length] });
+			got = round1(got + fee);
 		}
-		for (const pl of lastYear) { if (!due.includes(pl)) { left.push(`${pl.name} (${assistWhyNot(pl)})`); } }
-		if (skint.length) { done.push(`no money yet for new deals for ${skint.slice(0, 4).join(", ")}${skint.length > 4 ? ` and ${skint.length - 4} more` : ""} (${money(reserve)} is kept for wages)`); }
-		// Short of money: put the call to the manager rather than just reporting it (see renderAssistNote).
-		if (league) { league.assistShort = skint.length && reserve > 0 ? { names: skint, need, have: round1(Math.max(0, c.budget)), reserve } : null; }
-		if (left.length) { done.push(`left to run down: ${left.slice(0, 5).join(", ")}${left.length > 5 ? ` and ${left.length - 5} more` : ""}`); }
+		return out;
+	}
+	// Every player in his last year, the most important first: a new deal on sensible terms while the
+	// money lasts above the wage reserve, a free transfer for those not worth keeping. Short of money,
+	// a key man who would otherwise walk signs with no signing-on fee and a bigger rise instead, and
+	// squad men are sold to pay for the rest (with transfers on too and a window open) or suggested.
+	// Writes the plain-words report the League panel shows (league.assistReport); returns what it did.
+	function assistContracts (c, reserve = ASSIST_RESERVE, when = "") {
+		const rep = { when, renewed: [], unsigned: [], leaving: [], sold: [], next: [], sell: [] }, done = [];
+		const lastYear = [ ...c.squad, ...c.bench ].filter(pl => { ensurePlayer(pl); return pl.contract <= 1; });
+		const plans = new Map(lastYear.map(pl => [ pl, renewPlan(pl, c) ]));
+		const order = lastYear.slice().sort((a, b) => plans.get(b).worth - plans.get(a).worth);
+		const sign = (pl, pn, terms) => {
+			const deal = renewDeal(pl, c, terms);
+			if (!deal.ok) { return false; }
+			rep.renewed.push(`${who(pl)}: ${seasons(terms.years)} at ${wageWeek(pl.wage)}${terms.fee ? `, ${money(terms.fee)} to sign` : ", no signing-on fee and a bigger rise instead"}`);
+			done.push(`renewed ${pl.name} for ${seasons(terms.years)}`);
+			return true;
+		};
+		let short = [];
+		for (const pl of order) {
+			const pn = plans.get(pl);
+			pl.letGo = !pn.keep && !!pn.free;
+			if (!pn.keep) { continue; }
+			if (c.budget - pn.fee >= reserve - 1e-9) { sign(pl, pn, pn); continue; }
+			if (pn.key && atRisk(pl) && c.budget >= 0) { sign(pl, pn, { ...pn, fee: 0, rise: pn.rise + 0.25 }); continue; }
+			short.push(pl);
+		}
+		// Raise the money by selling a squad man or two, when the assistant may and a window is open.
+		if (short.length) {
+			const need = round1(short.reduce((t, pl) => t + plans.get(pl).fee, 0) - Math.max(0, c.budget - reserve));
+			const sales = windowOpen() && c.budget >= 0 ? sellToFund(c, need, lastYear) : [];
+			if (sales.length && assistDoes("transfers")) {
+				for (const s of sales) { sellPlayer(s.name, s.fee, s.club); rep.sold.push(`${s.name} to ${TEAMS[s.club].name} for ${money(s.fee)}`); done.push(`funded: sold ${s.name}`); }
+				short = short.filter(pl => { const pn = plans.get(pl); return !(c.budget - pn.fee >= reserve - 1e-9 && sign(pl, pn, pn)); });
+			} else if (sales.length) { rep.sell = sales.map(s => ({ name: s.name, fee: s.fee, club: s.club })); }
+		}
+		const spare = round1(Math.max(0, c.budget - reserve));
+		for (const pl of short) {
+			const pn = plans.get(pl);
+			const fate = atRisk(pl) ? "He leaves on a free in the summer unless you act." : "If he stays happy he signs the club's standard two-year deal in the summer anyway.";
+			rep.unsigned.push({ name: pl.name, key: pn.key && atRisk(pl), text: `${who(pl)}: ${endsWhen(when === "summer")}. A new deal needs ${money(pn.fee)} to sign and ${spare > 0 ? `only ${money(spare)} is free` : "there's no money free"}. ${fate}` });
+		}
+		for (const pl of order) {
+			const pn = plans.get(pl);
+			if (pn.keep) { continue; }
+			if (pn.sulk) { rep.unsigned.push({ name: pl.name, key: roleOf(pl, c) === "key" || roleOf(pl, c) === "first", text: `${who(pl)}: ${endsWhen(when === "summer")}. He's ${pn.why}. Play him more to win him round, or he leaves on a free.` }); }
+			else { rep.leaving.push(`${who(pl)}: ${pn.why}, so he leaves on a free in the summer`); }
+		}
+		rep.unsigned.sort((a, b) => b.key - a.key);
+		if (short.length) {
+			const need = round1(short.reduce((t, pl) => t + plans.get(pl).fee, 0));
+			if (rep.sell.length) { rep.next.push(`Sell ${rep.sell.map(s => `${s.name} (${money(s.fee)})`).join(" and ")} to pay for the new deals.`); }
+			else if (!windowOpen()) { rep.next.push(`Sell a squad player when the window opens ${league.round < JANUARY ? "in January" : "at the end of the season"} to pay for the new deals.`); }
+			if (reserve > 0 && c.budget > 0.05) { rep.next.push(`Spend the ${money(Math.min(c.budget, reserve))} kept back for wages on them.`); }
+			rep.next.push("Or offer the deals yourself from the squad list.");
+			if (league) { league.assistShort = reserve > 0 ? { names: short.map(pl => pl.name), need, have: round1(Math.max(0, c.budget)), reserve } : null; }
+		} else if (league) { league.assistShort = null; }
+		if (rep.unsigned.some(u => !short.some(pl => pl.name === u.name))) { rep.next.push("Unhappy players come round with games and good results; a word in the squad list (his role) helps."); }
+		if (league) { league.assistReport = rep.renewed.length || rep.unsigned.length || rep.leaving.length || rep.sold.length ? rep : null; }
+		for (const u of rep.unsigned) { done.push(`not renewed: ${u.name}`); }
+		for (const l of rep.leaving) { done.push(`leaving: ${l.split(" (")[0]}`); }
 		return done;
+	}
+	// The report as one line of text, for the club log and the transfer notes.
+	function reportText (rep) {
+		const parts = [];
+		if (rep.renewed.length) { parts.push(`renewed ${rep.renewed.map(r => r.replace(/ \([^)]*\)/, "").replace(/, (£[\d.]+[mk] to sign|no signing-on fee and a bigger rise instead)$/, "")).join("; ")}`); }
+		if (rep.sold.length) { parts.push(`sold ${rep.sold.join(", ")} to pay for them`); }
+		if (rep.unsigned.length) { parts.push(`not signed yet: ${listNames(rep.unsigned.map(u => u.name))} (${endsWhen(rep.when === "summer")})`); }
+		if (rep.leaving.length) { parts.push(`leaving on a free: ${listNames(rep.leaving.map(l => l.split(" (")[0]))}`); }
+		return parts.map(t => t[0].toUpperCase() + t.slice(1)).join(". ");
 	}
 	// Your important players: starters (key or first-team) in the last year of their deal.
 	function keyPlayers (c) {
@@ -4159,14 +4283,14 @@
 	function keyContracts (c) {
 		if (assistMode !== "off" && assistDoes("contracts")) { return []; }   // the assistant has already been through them
 		const done = [], skint = [];
-		for (const pl of keyPlayers(c).filter(pl => assistKeeps(pl, c)).sort((a, b) => valueOf(b) - valueOf(a))) {
+		for (const pl of keyPlayers(c).filter(pl => assistKeeps(pl, c)).sort((a, b) => renewWorth(b, c) - renewWorth(a, c))) {
 			if (c.budget - round1(valueOf(pl) * 0.15) < ASSIST_RESERVE) { skint.push(pl.name); continue; }
 			const deal = renewDeal(pl, c);
 			if (deal.ok) { done.push(`${pl.name} to ${pl.contract} seasons`); }
 		}
 		const note = [];
 		if (done.length) { note.push(`kept on before their deals ran out: ${done.join(", ")}`); }
-		if (skint.length) { note.push(`no money to keep ${skint.join(", ")} (${money(ASSIST_RESERVE)} is kept for wages)`); }
+		if (skint.length) { note.push(`no money to keep ${listNames(skint)} on new terms, so ${skint.length === 1 ? "he stays on the club's standard deal if he's happy, or leaves" : "they stay on the club's standard deal if they're happy, or leave"} on a free`); }
 		if (note.length) {
 			lastDeal = `Contracts (summer): ${note.join("; ")}.`;
 			c.log = [ ...(c.log || []), lastDeal ].slice(-10);
@@ -4175,16 +4299,18 @@
 		}
 		return done;
 	}
-	// A heads-up at the January window and with two games to go: which important players are in
-	// their last year, and what will happen about it.
+	// A heads-up at the January window, with ten games to go and with two: which important players
+	// are in their last year, when, and what will happen about it.
 	function contractAlerts () {
 		const c = league && league.club;
 		if (!c) { return []; }
 		const due = keyPlayers(c);
 		if (!due.length) { return []; }
-		const names = due.map(pl => `${pl.name} (${ovrNow(pl)})`);
-		const plan = assistMode !== "off" && assistDoes("contracts") ? "the assistant will sort their deals" : "renew in Your team, or they are kept on in the summer as far as the money allows";
-		lastDeal = `Contracts ending for ${names.slice(0, 4).join(", ")}${due.length > 4 ? ` and ${due.length - 4} more` : ""}: ${plan}.`;
+		const names = due.map(pl => `${pl.name} (${ovrNow(pl)})`), rep = league.assistReport, stuck = rep ? rep.unsigned.filter(u => due.some(pl => pl.name === u.name)).map(u => u.name) : [];
+		const plan = assistMode !== "off" && assistDoes("contracts")
+			? stuck.length ? `the assistant can't sign ${listNames(stuck)} yet, see Your team` : "the assistant is sorting their deals"
+			: "offer new deals from the squad list, or the club tries to keep them on in the summer if the money is there";
+		lastDeal = `Contracts ending in ${gamesLeft()} games for ${listNames(names)}: ${plan}.`;
 		c.log = [ ...(c.log || []), lastDeal ].slice(-10);
 		league.news = `${league.news || ""} ${lastDeal}`.trim();
 		toast(`Contracts ending: ${due.length} key player${due.length === 1 ? "" : "s"}, see League notes`, "#f2b52e");
@@ -4288,22 +4414,38 @@
 		}
 		return why.join("; ");
 	}
+	// Open a player's contract row in the squad list and bring it into view.
+	function showContract (name) {
+		openPl = name || null;
+		renderClub();
+		const row = $("sqBody") && $("sqBody").querySelector("tr.detail");
+		if (row && row.scrollIntoView) { row.scrollIntoView({ block: "center", behavior: "smooth" }); }
+	}
 	function renderAssistNote () {
 		const p = $("assistNote");
 		if (!p) { return; }
 		if (assistMode === "off") { p.textContent = "Off: you renew contracts, answer bids and sign players yourself. Starters in their last year are still kept on in the summer if the money is there."; return; }
-		const c = league && league.club;
-		p.textContent = c ? (league.assistNote || `Assistant: nothing to do right now (${assistIdleWhy(c)}). It looks again after every match and when a window opens.`) : "";
-		const sh = c && league.assistShort;
-		if (!sh || !sh.names.length) { return; }
-		// The manager's call: spend the wage reserve on the deals the money reaches, or leave them for now.
-		const canDo = sh.have > 0.05 ? `Spending the reserve covers about ${Math.min(sh.names.length, Math.max(0, Math.floor(sh.have / Math.max(0.05, sh.need / sh.names.length))))} of the ${sh.names.length}.` : "There is nothing to spend.";
+		const c = league && league.club, rep = c && assistDoes("contracts") ? league.assistReport : null;
+		if (!rep) { p.textContent = c ? (league.assistNote || `Assistant: nothing to do right now (${assistIdleWhy(c)}). It looks again after every match and when a window opens.`) : ""; return; }
+		// The contracts report as a short list: who signed, who hasn't and why, who is leaving, what next.
+		p.replaceChildren(el("b", "", `Contracts${rep.when ? `, ${rep.when}` : ""}`));
+		const ul = el("ul", "assist-list");
+		const sec = (title, items, cls = "") => { for (const t of items) { const li = el("li", cls); li.append(el("b", "", `${title} `), document.createTextNode(t)); ul.append(li); } };
+		sec("Renewed:", rep.renewed);
+		sec("Sold to pay for them:", rep.sold);
+		for (const u of rep.unsigned) { const li = el("li", u.key ? "warn" : ""); li.append(el("b", "", u.key ? "Key man not signed:" : "Not signed yet:"), document.createTextNode(` ${u.text}`)); ul.append(li); }
+		sec("Leaving:", rep.leaving);
+		sec("Next:", rep.next, "next");
+		p.append(ul);
+		if ((league.assistDeals || []).length) { p.append(el("span", "", `Transfers: ${league.assistDeals.join("; ")}.`)); }
 		const ask = el("div", "assist-ask");
-		ask.append(el("span", "", `${sh.names.length} new deal${sh.names.length === 1 ? "" : "s"} need${sh.names.length === 1 ? "s" : ""} ${money(sh.need)}; ${money(sh.have)} in the bank, ${money(sh.reserve)} of it the wage reserve. ${canDo} Your call:`));
-		const yes = el("button", "", "Renew anyway, spend the reserve"); yes.type = "button"; yes.disabled = sh.have <= 0.05; yes.addEventListener("click", () => assistRenewAnyway());
-		const no = el("button", "", "Leave them for now"); no.type = "button"; no.addEventListener("click", () => { league.assistShort = null; league.assistNote = `${league.assistNote || "Assistant:"} You chose to leave the unsigned deals for now; the assistant will ask again when the money changes.`; saveLeague(); renderAssistNote(); });
-		ask.append(yes, no);
-		p.append(ask);
+		const btn = (text, fn, off = false) => { const b = el("button", "", text); b.type = "button"; b.disabled = off; b.addEventListener("click", fn); ask.append(b); return b; };
+		const sh = league.assistShort;
+		if (sh && sh.names.length && sh.have > 0.05) { btn(`Spend the wage money (${money(Math.min(sh.have, sh.reserve))})`, () => assistRenewAnyway()); }
+		for (const s of rep.sell || []) { btn(`Sell ${s.name} (${money(s.fee)})`, () => { sellPlayer(s.name, s.fee, s.club); assistRun("after the sale", true); }, !windowOpen()); }
+		if (rep.unsigned.length) { btn("Show in the squad list", () => showContract(rep.unsigned[0].name)); }
+		if (sh && sh.names.length) { btn("Leave them for now", () => { league.assistShort = null; rep.next = [ "You chose to leave the unsigned deals for now. The assistant asks again when the money changes." ]; saveLeague(); renderAssistNote(); }); }
+		if (ask.childElementCount) { p.append(ask); }
 	}
 	// The manager said yes: the same renewals with no reserve, as far as the money goes.
 	function assistRenewAnyway () {
@@ -4311,31 +4453,41 @@
 		if (!c) { return []; }
 		assistBatch = true;
 		let done = [];
-		try { done = assistContracts(c, 0); } finally { assistBatch = false; }
+		try { done = assistContracts(c, 0, "using the wage money"); } finally { assistBatch = false; }
 		league.assistShort = null;
-		league.assistNote = `Assistant (your call, reserve spent): ${done.length ? done.join("; ") : "nothing more could be signed"}.`;
+		const rep = league.assistReport;
+		league.assistNote = rep ? `Assistant (using the wage money): ${reportText(rep)}.` : "Assistant: nothing more could be signed.";
 		lastDeal = league.assistNote;
 		c.log = [ ...(c.log || []), lastDeal ].slice(-10);
-		toast(`Renewed ${done.filter(d => / signed on to /.test(d)).length} on your say-so`, "#f2b52e");
+		const n = done.filter(d => /^renewed /.test(d)).length;
+		toast(n ? `Renewed ${n} with the wage money` : "Nothing more could be signed", "#f2b52e");
 		afterClubChange();
 		renderAssistNote();
 		return done;
 	}
 	// Runs after a league week and when a window opens; also the moment the setting is switched on.
-	function assistRun (when) {
+	// The note is logged when something was done or the list of unsigned men changes, not every week.
+	function assistRun (when, force = false) {
 		if (!league || !league.club || assistMode === "off") { return []; }
 		const c = league.club, done = [];
+		let rep = null;
 		assistBatch = true;
 		try {
-			if (assistDoes("contracts")) { done.push(...assistContracts(c)); }
+			if (assistDoes("contracts")) { done.push(...assistContracts(c, ASSIST_RESERVE, when)); rep = league.assistReport; } else { league.assistReport = null; }
 			if (assistDoes("transfers")) { done.push(...assistTransfers(c)); }
 		} finally { assistBatch = false; }
-		league.assistNote = done.length ? `Assistant (${when}): ${done.join("; ")}.` : null;
-		if (done.length) {
+		const deals = done.filter(d => !/^(renewed|not renewed|leaving|funded)/.test(d));
+		league.assistDeals = deals;
+		const text = [ rep ? reportText(rep) : "", deals.join("; ") ].filter(Boolean).join(". ");
+		league.assistNote = text ? `Assistant (${when}): ${text}.` : null;
+		const acted = done.some(d => /^(renewed|funded|sold|signed|turned down)/.test(d));
+		const sig = rep ? rep.unsigned.map(u => u.name).join(",") + "|" + rep.leaving.length : "";
+		if (league.assistNote && (acted || force || sig !== league.assistSig)) {
 			lastDeal = league.assistNote;
 			c.log = [ ...(c.log || []), lastDeal ].slice(-10);
 			afterClubChange();
 		}
+		league.assistSig = sig;
 		renderAssistNote();
 		return done;
 	}
@@ -4348,8 +4500,8 @@
 	if (assistSel) {
 		assistSel.addEventListener("change", () => {
 			setAssist(assistSel.value, false);
-			const done = assistRun("now");
-			const acted = done.filter(d => !/^(no money yet|left to run down)/.test(d)).length;
+			const done = assistRun("now", true);
+			const acted = done.filter(d => !/^(not renewed|leaving)/.test(d)).length;
 			toast(assistMode === "off" ? ASSIST.off : acted ? `Assistant: ${acted} done, see League notes` : done.length ? "Assistant: nothing it can do yet, see League notes" : "Assistant: nothing to do right now", "#f2b52e");
 			renderAssistNote();
 			assistSel.blur();
@@ -4644,6 +4796,222 @@
 		if (Array.isArray(lg.fixtures)) { forecastLeague(lg, lg.round || 0); }   // its weather from the next matchday
 		lg.news = `${lg.news || ""} Your league is now the ${FOREIGN[nat][0]} in ${NATIONS[nat] ? NATIONS[nat][0] : nat}.`.trim();
 		return true;
+	}
+	/* ---------- the cup, the season's awards and the academy ----------
+	   The cup: a knockout among the twenty clubs of the division, drawn at random each round, its ties
+	   played on cup nights between league matchdays. Level after ninety minutes it goes to extra time,
+	   then penalties, five each and sudden death. The final is the last cup night. Your ties are played
+	   out from the two sides' strength, like the other games of a matchday.
+	   The awards: at the end of the season, your club's player of the season, top scorer and young
+	   player, and the division's manager of the season.
+	   The academy: each summer two or three youngsters come through, with room to grow. Promote one to
+	   the bench or let him go; the rest grow a little each season until you decide. */
+	const CUP_NIGHTS = [ 5, 11, 19, 27, 34 ];   // played after these league matchdays
+	const CUP_ROUNDS = [ "First round", "Round of 16", "Quarter-finals", "Semi-finals", "Final" ];
+	const CUP_PRIZE = { win: 0.1, final: 0.5, winner: 1 };
+	const cupName = () => "League Cup";
+	function newCup (lg) {
+		return { v: 1, season: lg.season, alive: lg.members.slice(), rounds: [], out: null, winner: null, skip: 0 };
+	}
+	// An old save, or one from before the cup: a cup for this season if its first night is still to
+	// come, otherwise none until next season.
+	function ensureCup (lg) {
+		if (!lg || !Array.isArray(lg.members)) { return null; }
+		const c = lg.cup;
+		const ok = c && c.v === 1 && c.season === lg.season && Array.isArray(c.alive) && Array.isArray(c.rounds);
+		if (!ok) { lg.cup = lg.round <= CUP_NIGHTS[0] ? newCup(lg) : { v: 1, season: lg.season, alive: [], rounds: [], out: null, winner: null, none: true }; }
+		return lg.cup;
+	}
+	// Penalties: five each, then sudden death; the better side scores a touch more often.
+	function cupPens (sh, sa, rnd = Math.random) {
+		const p = s => clamp(0.74 + 0.02 * s, 0.6, 0.9);
+		let h = 0, a = 0;
+		for (let k = 0; k < 5; k++) {
+			if (rnd() < p(sh - sa)) { h++; }
+			if (h > a + (5 - k)) { break; }
+			if (rnd() < p(sa - sh)) { a++; }
+			if (a > h + (4 - k) || h > a + (4 - k)) { break; }
+		}
+		for (let k = 0; h === a && k < 30; k++) { const x = rnd() < p(sh - sa), y = rnd() < p(sa - sh); h += x; a += y; }
+		if (h === a) { h++; }
+		return [ h, a ];
+	}
+	// One tie: ninety minutes, then thirty more, then penalties.
+	function cupTie (h, a, rnd = Math.random) {
+		const [ , , hg, ag ] = simMatch(h, a);
+		const t = { h, a, hg, ag, et: false, pens: null };
+		if (hg === ag) {
+			t.et = true;
+			const d = getStr(h) - getStr(a);
+			t.hg += poisson(clamp(0.38 + 0.08 * d, 0.1, 0.8)); t.ag += poisson(clamp(0.32 - 0.08 * d, 0.1, 0.8));
+			if (t.hg === t.ag) { t.pens = cupPens(getStr(h), getStr(a), rnd); }
+		}
+		t.win = t.pens ? (t.pens[0] > t.pens[1] ? h : a) : t.hg > t.ag ? h : a;
+		return t;
+	}
+	const tieLine = t => `${TEAMS[t.h].name} ${t.hg}–${t.ag} ${TEAMS[t.a].name}${t.pens ? ` (after extra time, ${t.pens[0]}–${t.pens[1]} on penalties)` : t.et ? " (after extra time)" : ""}`;
+	const youInTie = t => t.h === 0 || t.a === 0;
+	// The draw for a round: the first round thins twenty to sixteen; after that everyone left plays.
+	function cupDraw (alive, k) {
+		const pool = shuffle(alive.slice()), playing = k === 0 ? pool.slice(0, Math.max(0, (pool.length - 16) * 2)) : pool, ties = [];
+		for (let i = 0; i + 1 < playing.length; i += 2) { ties.push([ playing[i], playing[i + 1] ]); }
+		return { ties, byes: pool.filter(id => !playing.includes(id)) };
+	}
+	// A cup night: called after every league matchday; plays a round when one is due.
+	function cupNight () {
+		const lg = league, cup = ensureCup(lg);
+		if (!cup || cup.none || cup.winner !== null) { return null; }
+		const k = CUP_NIGHTS.indexOf(lg.round);
+		if (k < 0 || k < cup.skip || cup.rounds.some(r => r.k === k)) { return null; }
+		const { ties, byes } = cupDraw(cup.alive, k);
+		const played = ties.map(([ h, a ]) => cupTie(h, a));
+		cup.alive = [ ...byes, ...played.map(t => t.win) ];
+		cup.rounds.push({ k, name: CUP_ROUNDS[k], ties: played, byes });
+		const mine = played.find(youInTie);
+		let note = "";
+		if (mine) {
+			const won = mine.win === 0, opp = mine.h === 0 ? mine.a : mine.h;
+			const prize = won ? (k === CUP_ROUNDS.length - 1 ? CUP_PRIZE.winner : CUP_PRIZE.win) : k === CUP_ROUNDS.length - 1 ? CUP_PRIZE.final : 0;
+			if (prize) { lg.club.budget = round1(lg.club.budget + prize); }
+			if (!won) { cup.out = { k, by: opp }; }
+			note = `${cupName()}, ${CUP_ROUNDS[k].toLowerCase()}: ${tieLine(mine)}. ${won ? (k === CUP_ROUNDS.length - 1 ? "You've won the cup!" : "You're through.") : k === CUP_ROUNDS.length - 1 ? "Beaten in the final." : "You're out."}${prize ? ` ${money(prize)} in prize money.` : ""}`;
+			toast(won ? `Cup: through to the next round` : `Cup: knocked out by ${TEAMS[opp].name}`, won ? "#7fd49b" : "#de4f5a");
+		} else if (byes.includes(0)) { note = `${cupName()}: a bye in the ${CUP_ROUNDS[k].toLowerCase()}.`; }
+		if (k === CUP_ROUNDS.length - 1) { cup.winner = cup.alive[0]; if (!mine) { note = `${cupName()} final: ${tieLine(played[0])}.`; } }
+		if (note) { lg.news = `${lg.news || ""} ${note}`.trim(); lastDeal = note; }
+		return played;
+	}
+	// Your next cup night, for the panel.
+	function cupNext () {
+		const lg = league, cup = ensureCup(lg);
+		if (!cup || cup.none) { return "No cup this season: it starts again next season."; }
+		if (cup.winner !== null) { return cup.winner === 0 ? "You won the cup!" : `${TEAMS[cup.winner].name} won the cup${cup.out ? `; you went out in the ${CUP_ROUNDS[cup.out.k].toLowerCase()}` : ""}.`; }
+		if (cup.out) { return `Out in the ${CUP_ROUNDS[cup.out.k].toLowerCase()}, beaten by ${TEAMS[cup.out.by].name}.`; }
+		const k = CUP_NIGHTS.findIndex((r, i) => i >= cup.skip && !cup.rounds.some(x => x.k === i));
+		return k < 0 ? "" : `Next: the ${CUP_ROUNDS[k].toLowerCase()}, drawn after matchday ${CUP_NIGHTS[k]}.`;
+	}
+
+	/* The awards. */
+	const seasonAvgOf = pl => (pl.rn > 0 ? pl.rsum / pl.rn : null);
+	function seasonAwards () {
+		const lg = league, c = lg.club, all = [ ...c.squad, ...c.bench ], minApps = Math.max(3, Math.round(lg.round * 0.3));
+		const rated = all.filter(pl => (pl.apps || 0) >= minApps && seasonAvgOf(pl) !== null).sort((a, b) => seasonAvgOf(b) - seasonAvgOf(a));
+		const scorers = all.filter(pl => (pl.goals || 0) > 0).sort((a, b) => b.goals - a.goals || (b.apps || 0) - (a.apps || 0));
+		const young = rated.filter(pl => pl.age <= 21);
+		const rows = standings(), pos = rows.findIndex(r => r.id === 0) + 1;
+		// Manager of the season: the one whose side finished furthest above its standing at the start.
+		const byStr = lg.members.slice().sort((a, b) => getStr(b) - getStr(a)), over = rows.map((r, i) => ({ id: r.id, gain: byStr.indexOf(r.id) - i, i })).sort((a, b) => b.gain - a.gain || a.i - b.i);
+		const mgr = rows[0].id === 0 || (over[0].id === 0) ? 0 : over[0].gain >= 3 ? over[0].id : rows[0].id;
+		const line = (pl, what) => (pl ? { name: pl.name, pos: POS_LABEL[pl.pos], what } : null);
+		lg.awards = {
+			season: lg.season,
+			player: line(rated[0], rated[0] ? `average rating ${seasonAvgOf(rated[0]).toFixed(2)} in ${rated[0].apps} games` : ""),
+			scorer: line(scorers[0], scorers[0] ? `${scorers[0].goals} goal${scorers[0].goals === 1 ? "" : "s"}` : ""),
+			young: line(young[0], young[0] ? `${young[0].age}, average rating ${seasonAvgOf(young[0]).toFixed(2)}` : ""),
+			manager: { id: mgr, name: mgr === 0 ? "You" : `${TEAMS[mgr].name}'s manager`, what: mgr === rows[0].id ? `champions with ${rows[0].pts} points` : `${ordinal(rows.findIndex(r => r.id === mgr) + 1)}, well above where they were expected to finish` },
+			finish: pos,
+			cup: lg.cup && lg.cup.winner !== null && lg.cup.winner !== undefined ? lg.cup.winner : null
+		};
+		const a = lg.awards, bits = [ a.player && `player of the season ${a.player.name}`, a.scorer && `top scorer ${a.scorer.name} (${a.scorer.what})`, a.young && `young player ${a.young.name}`, `manager of the season: ${a.manager.name}` ].filter(Boolean);
+		lg.news = `${lg.news || ""} Season awards: ${bits.join(", ")}.`.trim();
+		return a;
+	}
+
+	/* The academy. */
+	function academyProspect () {
+		const pos = [ "gk", "def", "def", "mid", "mid", "fwd" ][Math.floor(Math.random() * 6)];
+		const coach = typeof staffLvl === "function" && league ? staffLvl(league.club, "youth") || 0 : 0;
+		const pl = genPlayer(pos, 46 + Math.floor(Math.random() * 10));
+		pl.age = 16 + Math.floor(Math.random() * 2); pl.pot = Math.min(92, 64 + Math.floor(Math.random() * 20) + coach * 2); pl.contract = 3; pl.role = "prospect";
+		pl.nat = natsOf("home")[Math.floor(Math.random() * Math.min(4, natsOf("home").length))];
+		pl.morale = 75;
+		return ensurePlayer(pl);
+	}
+	const ACADEMY_MAX = 6;
+	function ensureAcademy (c) {
+		if (!Array.isArray(c.academy)) { c.academy = []; }
+		c.academy = c.academy.filter(pl => pl && typeof pl === "object" && pl.name).map(ensurePlayer).slice(0, ACADEMY_MAX);
+		return c.academy;
+	}
+	// Each summer: the youngsters already there grow toward their potential, two or three new ones come
+	// through, and anyone past 19 still in the academy moves on.
+	function youthIntake (c) {
+		const acad = ensureAcademy(c), left = [];
+		for (const pl of acad) {
+			pl.age++;
+			const g = Math.max(0, Math.round(((pl.pot || 60) - ovrOf(pl)) * (0.18 + Math.random() * 0.12)));
+			for (const k of [ "pac", "sho", "pas", "def" ]) { pl[k] = clamp(pl[k] + g + Math.floor(Math.random() * 2), 1, 99); }
+		}
+		c.academy = acad.filter(pl => { if (pl.age > 19) { left.push(pl.name); return false; } return true; });
+		const n = 2 + (Math.random() < 0.4 ? 1 : 0), fresh = [];
+		for (let k = 0; k < n && c.academy.length < ACADEMY_MAX; k++) { const pl = academyProspect(); c.academy.push(pl); fresh.push(`${pl.name} (${POS_LABEL[pl.pos]}, ${pl.age})`); }
+		if (league) { league.news = `${league.news || ""}${fresh.length ? ` Through from the academy: ${fresh.join(", ")}.` : ""}${left.length ? ` Left the academy: ${left.join(", ")}.` : ""}`.trim(); }
+		return fresh;
+	}
+	function promoteYouth (name) {
+		const c = league.club, acad = ensureAcademy(c), i = acad.findIndex(pl => pl.name === name);
+		if (i < 0) { return false; }
+		if (c.bench.length >= BENCH) { lastDeal = `The bench is full: release or sell someone before you promote ${name}.`; afterClubChange(); return false; }
+		const [ pl ] = acad.splice(i, 1);
+		c.bench.push(pl);
+		lastDeal = `${pl.name} promoted from the academy to the first-team squad.`;
+		c.log = [ ...(c.log || []), lastDeal ].slice(-10);
+		afterClubChange();
+		return true;
+	}
+	function releaseYouth (name) {
+		const c = league.club, acad = ensureAcademy(c), i = acad.findIndex(pl => pl.name === name);
+		if (i < 0) { return false; }
+		acad.splice(i, 1);
+		lastDeal = `${name} released from the academy.`;
+		afterClubChange();
+		return true;
+	}
+
+	/* The panel: a card for the cup, the awards when the season is over, and the academy. */
+	function renderExtras () {
+		const side = document.querySelector("#league .lg-side");
+		if (!side || !league) { return; }
+		let box = $("lgExtras");
+		if (!box) { box = el("div", "lg-extras"); box.id = "lgExtras"; side.append(box); }
+		box.replaceChildren();
+		const cup = ensureCup(league);
+		const cupBox = el("div", "lg-cup");
+		cupBox.append(el("h4", "", cupName()), el("p", "detail", cupNext()));
+		const last = cup && cup.rounds[cup.rounds.length - 1];
+		if (last) {
+			const ul = el("ul", "cup-ties");
+			const ties = last.ties.slice().sort((a, b) => youInTie(b) - youInTie(a));
+			for (const t of ties) { ul.append(el("li", youInTie(t) ? "mine" : "", tieLine(t))); }
+			cupBox.append(el("span", "eyebrow", last.name), ul);
+		}
+		box.append(cupBox);
+		const aw = league.awards;
+		if (aw && aw.season === league.season) {
+			const a = el("div", "lg-awards");
+			a.append(el("h4", "", `Season ${aw.season} awards`));
+			const ul = el("ul", "awards");
+			const row = (title, x) => { if (!x) { return; } const li = el("li"); li.append(el("b", "", title), el("span", "", ` ${x.name}${x.pos ? ` (${x.pos})` : ""}, ${x.what}`)); ul.append(li); };
+			row("Player of the season", aw.player); row("Top scorer", aw.scorer); row("Young player", aw.young); row("Manager of the season", aw.manager);
+			if (aw.cup !== null && aw.cup !== undefined) { const li = el("li"); li.append(el("b", "", "Cup winners"), el("span", "", ` ${aw.cup === 0 ? "You" : TEAMS[aw.cup].name}`)); ul.append(li); }
+			a.append(ul);
+			box.append(a);
+		}
+		const acad = ensureAcademy(league.club);
+		const ac = el("div", "lg-academy");
+		ac.append(el("h4", "", "Academy"));
+		if (!acad.length) { ac.append(el("p", "detail", "No youngsters in the academy right now. New ones come through every summer.")); }
+		const ul = el("ul", "academy");
+		for (const pl of acad) {
+			const li = el("li");
+			li.append(el("span", "pos", POS_LABEL[pl.pos]), el("span", "who", `${pl.name}, ${pl.age} · OVR ${ovrOf(pl)} · potential ${Math.round(pl.pot)}`));
+			const pr = el("button", "", "Promote"); pr.type = "button"; pr.disabled = league.club.bench.length >= BENCH; pr.title = pr.disabled ? "The bench is full" : "Move him to the first-team bench"; pr.addEventListener("click", () => promoteYouth(pl.name));
+			const rl = el("button", "", "Release"); rl.type = "button"; rl.addEventListener("click", () => releaseYouth(pl.name));
+			li.append(pr, rl);
+			ul.append(li);
+		}
+		ac.append(ul);
+		box.append(ac);
 	}
 	/* ---------- audio ----------
 	   Everything is synthesised in WebAudio: the ball off a boot, the referee's whistle, and a
@@ -10213,6 +10581,18 @@
 		clapAlong(t0 + 8 * E, 24, 2 * E);
 		setTimeout(() => { try { bus.disconnect(); dl.disconnect(); fb.disconnect(); } catch (e) { /* already gone */ } }, (len + 6) * 1000);
 	}
+	// A gasp: the whole ground drawing breath at once, at the woodwork or a big save. Loudest from the
+	// end whose side had the shot; the other end lets out a lower sigh of relief.
+	let gaspAt = -1e9;
+	function gasp (t) {
+		if (!soundOn || !audio || bulkSim || frame - gaspAt < 90) { return; }
+		gaspAt = frame;
+		const at = audio.currentTime + 0.01, home = t === homeSide, pan = home ? -0.2 : 0.5;
+		noiseBurst("white", at, 0.55, home ? 0.09 : 0.05, "bandpass", 900, 2600, 0.8, pan);
+		voices(at + 0.05, 4, 280, 360, 0.45, home ? 0.013 : 0.008, 1200, pan);
+		noiseBurst("brown", at + 0.45, 1.2, home ? 0.04 : 0.06, "lowpass", 600, 260, 0.7, home ? 0.4 : -0.2);
+	}
+
 	function clapAlong (t, n, every) { for (let k = 0; k < n; k++) { noiseBurst("white", t + k * every, 0.08, 0.04, "bandpass", 1900, 1700, 0.9, -0.3); } }
 	// An away goal: only the away corner, a cheer and a burst of clapping from over in their end.
 	function awayCornerCheer () {
@@ -10278,6 +10658,7 @@
 	// The crowd bed: a rumble, the wash of voices and the air above them, each breathing a little,
 	// all of it swelling with the heat of the match.
 	function updateCrowd () {
+		if (typeof commTick === "function") { commTick(); }
 		if (!audio) { return; }
 		const live = soundOn && (state === "play" || state === "goal" || state === "half");
 		if (!crowd && live) {
@@ -10291,11 +10672,17 @@
 		if (!crowd) { return; }
 		const t = audio.currentTime, heat = live ? Math.max(crowdHeat, isDerby() ? 0.35 : 0) : 0;
 		const breathe = 1 + 0.12 * Math.sin(t * 0.63) + 0.08 * Math.sin(t * 1.71 + 1);
+		// An attack building toward the box: the home end rises in pitch and volume as its side carries the
+		// ball in; when the visitors do, the noise drops to a low, anxious rumble. Eased, so it swells.
+		const own = ball && ball.owner && state === "play" ? ball.owner.team : -1, deep = own >= 0 ? clamp((rel(own, ball.x) - FW * 0.6) / (FW * 0.3), 0, 1) : 0;
+		const antTarget = own === homeSide ? deep : own >= 0 ? -0.6 * deep : 0;
+		crowd.ant = (crowd.ant || 0) + (antTarget - (crowd.ant || 0)) * 0.04;
+		const up = Math.max(0, crowd.ant), worry = Math.max(0, -crowd.ant);
 		const quiet = (state === "half" ? 0.5 : 1) * (isDerby() ? 1.35 : 1) * (crowdHush > 0 ? 0.35 : 1);   // a derby is the loudest night of the season
-		crowd.rumble.g.gain.setTargetAtTime(live ? (0.045 + 0.08 * heat) * breathe * quiet : 0, t, 0.4);
-		crowd.vox.g.gain.setTargetAtTime(live ? (0.022 + 0.085 * heat) * breathe * quiet : 0, t, 0.35);
-		crowd.air.g.gain.setTargetAtTime(live ? (0.004 + 0.01 * heat) * quiet : 0, t, 0.5);
-		crowd.vox.f.frequency.setTargetAtTime(620 + 650 * heat - 180 * crowdTense + 70 * Math.sin(t * 0.9), t, 0.4);
+		crowd.rumble.g.gain.setTargetAtTime(live ? (0.045 + 0.08 * heat + 0.03 * worry) * breathe * quiet : 0, t, 0.4);
+		crowd.vox.g.gain.setTargetAtTime(live ? (0.022 + 0.085 * heat + 0.03 * up) * (1 - 0.3 * worry) * breathe * quiet : 0, t, 0.35);
+		crowd.air.g.gain.setTargetAtTime(live ? (0.004 + 0.01 * heat + 0.006 * up) * quiet : 0, t, 0.5);
+		crowd.vox.f.frequency.setTargetAtTime(620 + 650 * heat + 260 * up - 180 * crowdTense - 120 * worry + 70 * Math.sin(t * 0.9), t, 0.4);
 		if (crowd.pan) { crowd.pan.pan.setTargetAtTime(0.22 * Math.sin(t * 0.21), t, 0.5); }
 		if (live && state === "play" && freeze <= 0 && crowdHush <= 0 && t > crowd.nextChant) {
 			// The home end sings, louder when the home side is on top; the away corner answers when theirs is.
@@ -10730,14 +11117,23 @@
 		lateWin: [ "Late, late drama! That could be the winner from {n}!", "{n} at the death! Surely that's the winner", "Late, late drama! {n} has broken their hearts" ],
 		lateEq: [ "Late, late drama! {n} levels it!", "{n} pulls them level at the death!", "Never say never! {n} with the late equaliser" ],
 		hattrick: [ "A hat-trick for {n}! He'll want the match ball", "That's three for {n}! What a performance" ],
-		rocket: [ "{n} lets fly from distance!", "Have a go! {n} tries his luck from range", "{n} unleashes one from way out" ]
+		rocket: [ "{n} lets fly from distance!", "Have a go! {n} tries his luck from range", "{n} unleashes one from way out" ],
+		equaliser: [ "And they're level! {n} with the equaliser", "{n} brings them back into it, all square", "Game on! {n} levels it", "That's the equaliser, and {n} has done it" ],
+		ahead: [ "{n} puts them in front!", "The lead, and it's {n} who takes it", "{n} breaks the deadlock at last", "Now they're ahead, through {n}" ],
+		comeback: [ "What a comeback! {n} completes the turnaround", "From two down to this! {n} has done it", "They were dead and buried, and {n} has brought them back" ],
+		own: [ "Oh no, {n} turns it into his own net", "An own goal! {n} won't want to see that again", "Disaster for {n}, into his own net" ],
+		red: [ "{n} is off! Straight red, and no complaints", "Red card! {n} has let his side down there", "Off he goes, {n} sent off" ],
+		red2: [ "Second yellow for {n}, and he's off", "{n} walks: a second booking, and a red", "That's two yellows, so {n} has to go" ]
 	};
-	let commAt = -1e9, commRecent = [], commTimer = 0, lastCommentary = null;
+	let commAt = -1e9, commRecent = [], commTimer = 0, lastCommentary = null, commKindAt = {};
 	const shortName = p => (p && (p.name || `No. ${p.num}`)) || "";
 	function commentary (kind, vars, t, priority = false) {
 		if (bulkSim || mode === "tutorial" || shoot || replayOn() || (state !== "play" && state !== "goal")) { return false; }
 		const pool = COMM[kind], el = $("commLine"), lt = $("lowerThird"), now = performance.now();
 		if (!pool || !el || (now - commAt < 6500 && !priority) || (lt && !lt.hidden)) { return false; }   // one at a time; captions come first
+		if (commAt === -1e9) { commKindAt = {}; }   // a fresh match (or the test hook's reset)
+		if (!priority && now - (commKindAt[kind] || -1e9) < 25000) { return false; }   // the same sort of line at most every 25 seconds
+		commKindAt[kind] = now;
 		const fresh = pool.filter(s => !commRecent.includes(s)), line = fresh[Math.floor(Math.random() * fresh.length)] || pool[0];
 		commRecent = [ line, ...commRecent ].slice(0, 6);
 		const text = line.replace(/\{(\w)\}/g, (_, k) => vars[k] || "");
@@ -10755,9 +11151,44 @@
 		const said = commentary(kind === "woodwork" && o.bar ? "bar" : kind, { n: shortName(p), k: shortName(o.keeper) }, p.team, !!o.priority);
 		// The player's own reaction, played out by the 3D figure (and decayed in the player tick).
 		if (kind === "near" || kind === "over" || kind === "woodwork") { p.headHands = 90; }
+		if (kind === "woodwork" || kind === "save") { gasp(kind === "save" && o.shooter ? o.shooter.team : p.team); }
 		if (kind === "save" && o.shooter === p) { p.headHands = 70; }
 		if (kind === "tackle") { p.fistPump = 50; crowdMood.excite = Math.min(1, crowdMood.excite + 0.2); if (p.team === homeSide) { crowdMood.home = Math.max(crowdMood.home, 0.6); } }
 		return said;
+	}
+
+	// The match log as the commentator follows it: a goal that levels it, puts a side in front late on
+	// or finishes a comeback from two down, an own goal and a sending-off each get a line once the
+	// caption has gone. The late winner and equaliser and the hat-trick are called by the celebration.
+	let commSeen = 0, commWait = null;
+	function goalCall (log, i) {
+		const e = log[i], g = [ 0, 0 ];
+		let worst = 0;
+		for (let k = 0; k < i; k++) { if (log[k].kind === "goal") { g[log[k].team]++; worst = Math.min(worst, g[e.team] - g[1 - e.team]); } }
+		const before = g[e.team] - g[1 - e.team], after = before + 1;
+		const own = / \(own goal\)$/.test(e.text), name = e.text.replace(/ \((header|own goal)\)$/, "");
+		const goals = log.slice(0, i + 1).filter(x => x.kind === "goal" && x.team === e.team && x.text.replace(/ \(header\)$/, "") === name).length;
+		if (own) { return { kind: "own", name }; }
+		if (e.min >= 80 && (before === 0 || before === -1)) { return null; }   // the celebration has it
+		if (goals === 3) { return null; }
+		if (worst <= -2 && after >= 0) { return { kind: "comeback", name }; }
+		if (before === -1) { return { kind: "equaliser", name }; }
+		if (before === 0 && e.min >= 60) { return { kind: "ahead", name }; }
+		return null;
+	}
+	function commTick () {
+		const log = typeof matchLog !== "undefined" && Array.isArray(matchLog) ? matchLog : null;
+		if (!log) { return; }
+		if (log.length < commSeen) { commSeen = 0; commWait = null; }   // a new match
+		for (; commSeen < log.length; commSeen++) {
+			const e = log[commSeen];
+			if (e.kind === "goal") { const g = goalCall(log, commSeen); if (g) { commWait = { kind: g.kind, n: g.name, team: e.kind === "goal" && g.kind === "own" ? 1 - e.team : e.team, until: performance.now() + 14000 }; } }
+			else if (e.kind === "red") { commWait = { kind: /second yellow/.test(e.text) ? "red2" : "red", n: e.text.replace(/ \(.*\)$/, ""), team: e.team, until: performance.now() + 12000 }; }
+		}
+		if (commWait) {
+			if (performance.now() > commWait.until) { commWait = null; return; }
+			if (commentary(commWait.kind, { n: commWait.n }, commWait.team, true)) { commWait = null; }
+		}
 	}
 	/* ---------- camera ---------- */
 	let camX = 0, camY = 0;
@@ -16660,6 +17091,9 @@
 			}
 		};
 	}
+
+	// More test hooks, kept apart from the big list above.
+	if (window.__ff) { Object.assign(window.__ff, { renewWorth, renewPlan, assistContracts, reportText, rolloverClub, showContract, goalCall, COMM, cupNight, cupTie, cupPens, ensureCup, seasonAwards, youthIntake, promoteYouth, releaseYouth, renderExtras, CUP_NIGHTS }); }
 
 	const hot = window.claude && window.claude.hot;
 	if (hot && typeof hot.snapshot === "function") {

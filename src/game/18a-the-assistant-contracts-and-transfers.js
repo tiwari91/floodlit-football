@@ -17,28 +17,131 @@
 		if (pl.morale < 40 || pl.age >= (starter ? 36 : 33)) { return false; }
 		return starter || ovrNow(pl) >= squadMedian(c) || (role === "prospect" && (pl.pot || 0) >= ovrNow(pl) + 6);
 	}
-	// Why a last-year player is left to run down: only because he won't talk.
-	const assistWhyNot = pl => (lastSeason(pl) ? `${pl.age}, retiring` : pl.morale < 40 ? `unhappy, morale ${pl.morale}` : "");
-	// Every player in his last year gets a new deal, the most valuable first so the money goes on the
-	// stars before the squad men, as far as the budget allows above the reserve. Only a player who
-	// won't talk (unhappy) is left to run down; the note says so.
-	function assistContracts (c, reserve = ASSIST_RESERVE) {
-		const done = [], skint = [], left = [];
-		let need = 0;
-		const lastYear = [ ...c.squad, ...c.bench ].filter(pl => { ensurePlayer(pl); return pl.contract <= 1; });
-		const due = lastYear.filter(pl => pl.morale >= 40 && !lastSeason(pl)).sort((a, b) => valueOf(b) - valueOf(a));
-		for (const pl of due) {
-			const fee = round1(valueOf(pl) * 0.15);
-			if (c.budget - fee < reserve) { skint.push(pl.name); need = round1(need + fee); continue; }
-			const deal = renewDeal(pl, c);
-			if (deal.ok) { done.push(`${pl.name} signed on to ${pl.contract} seasons`); }
+	// How much a player in his last year matters to the side, for the order of renewals: his rating
+	// against the middle of the squad, his place in the side, his age (young men with room to grow
+	// count for more, men past 31 for less), whether anyone else can do his job and how much he plays.
+	function renewWorth (pl, c) {
+		ensurePlayer(pl);
+		const o = ovrNow(pl), role = roleOf(pl, c), all = [ ...c.squad, ...c.bench ];
+		const cover = all.filter(q => q !== pl && q.pos === pl.pos && ovrNow(q) >= o - 2).length;
+		const need = pl.pos === "gk" ? (cover ? 0 : 10) : cover === 0 ? 8 : cover === 1 ? 4 : cover === 2 ? 1 : 0;
+		const age = pl.age <= 23 ? 3 + Math.max(0, (pl.pot || o) - o) * 0.3 : pl.age <= 29 ? 2 : pl.age <= 31 ? 0 : -(pl.age - 31) * 2.5;
+		const played = league && league.round > 0 ? Math.min(1, (pl.apps || 0) / league.round) * 5 : 0;
+		return Math.round((o - squadMedian(c)) + ({ key: 10, first: 6, prospect: 2 }[role] || 0) + age + need + played);
+	}
+	// What to offer him, or why not: a longer deal for the young and the important, one season for
+	// men past 31 and the fringe, a pay cut for an older squad man, and a free transfer for those not
+	// worth keeping (a squad man of 33 or more, or one well short of the squad with others covering).
+	function renewPlan (pl, c) {
+		const role = roleOf(pl, c), starter = role === "key" || role === "first", worth = renewWorth(pl, c), o = ovrNow(pl);
+		const prospect = role === "prospect" && (pl.pot || 0) >= o + 6;
+		if (lastSeason(pl)) { return { keep: false, worth, why: `${pl.age}, retiring at the end of the season` }; }
+		if (pl.morale < 40) { return { keep: false, worth, sulk: true, why: `unhappy (morale ${pl.morale}), so he won't talk about a new deal yet` }; }
+		if (!starter && !prospect && pl.age >= 33) { return { keep: false, worth, free: true, why: `${pl.age} and not in the side` }; }
+		if (!starter && !prospect && worth < -4) { return { keep: false, worth, free: true, why: "not needed, others cover his position" }; }
+		const years = oneYearOnly(pl) || pl.age >= 31 || (!starter && !prospect && (worth < 2 || pl.age > 24)) ? 1 : pl.age <= 25 && (starter || prospect) ? 3 : 2;
+		const rise = role === "key" ? 1.2 : starter ? 1.1 : pl.age >= 31 ? 0.9 : 1;
+		const fee = round1(valueOf(pl) * 0.15 * (years === 1 ? 0.5 : years === 3 ? 1.2 : 1));
+		return { keep: true, key: role === "key" || worth >= 12, years, rise, fee, worth };
+	}
+	// He walks in the summer unless something is done: the club's standard summer deal only goes to
+	// happy players under 34, a year older by then (see rolloverClub).
+	const atRisk = pl => pl.morale < 50 || pl.age >= 33;
+	const gamesLeft = () => (league ? Math.max(0, league.fixtures.length - league.round) : 0);
+	const endsWhen = (summer = false) => { const n = gamesLeft(); return n > 0 && !summer ? `deal ends this summer, ${n} game${n === 1 ? "" : "s"} left` : "deal ends now"; };
+	const who = pl => `${pl.name} (${POS_LABEL[pl.pos]} ${ovrNow(pl)}, ${pl.age})`;
+	const seasons = n => `${n} more season${n === 1 ? "" : "s"}`;
+	const listNames = (a, n = 4) => `${a.slice(0, n).join(", ")}${a.length > n ? ` and ${a.length - n} more` : ""}`;
+	// Squad men who could be sold to pay for the deals: off the bench, not a starter or a prospect,
+	// never the last keeper and never worth more than the men being kept; cheapest to lose first,
+	// only as many as the shortfall needs.
+	function sellToFund (c, need, keep) {
+		const all = [ ...c.squad, ...c.bench ], top = Math.max(0, ...keep.map(valueOf)), lg = league, others = lg.members.filter(id => id !== 0), out = [];
+		const pool = c.bench.filter(pl => {
+			const r = roleOf(pl, c);
+			if (keep.includes(pl) || r === "key" || r === "first" || (r === "prospect" && (pl.pot || 0) >= ovrNow(pl) + 6)) { return false; }
+			if (pl.pos === "gk" && all.filter(q => q.pos === "gk").length < 2) { return false; }
+			return pl.contract > 1 && valueOf(pl) <= top;
+		}).sort((a, b) => ovrNow(a) - ovrNow(b) || valueOf(b) - valueOf(a));
+		let got = 0;
+		for (const pl of pool) {
+			if (got >= need - 1e-9) { break; }
+			const fee = round1(Math.max(0.1, valueOf(pl) * 0.85));
+			out.push({ pl, name: pl.name, fee, club: others[hashStr(pl.name + lg.round + lg.season) % others.length] });
+			got = round1(got + fee);
 		}
-		for (const pl of lastYear) { if (!due.includes(pl)) { left.push(`${pl.name} (${assistWhyNot(pl)})`); } }
-		if (skint.length) { done.push(`no money yet for new deals for ${skint.slice(0, 4).join(", ")}${skint.length > 4 ? ` and ${skint.length - 4} more` : ""} (${money(reserve)} is kept for wages)`); }
-		// Short of money: put the call to the manager rather than just reporting it (see renderAssistNote).
-		if (league) { league.assistShort = skint.length && reserve > 0 ? { names: skint, need, have: round1(Math.max(0, c.budget)), reserve } : null; }
-		if (left.length) { done.push(`left to run down: ${left.slice(0, 5).join(", ")}${left.length > 5 ? ` and ${left.length - 5} more` : ""}`); }
+		return out;
+	}
+	// Every player in his last year, the most important first: a new deal on sensible terms while the
+	// money lasts above the wage reserve, a free transfer for those not worth keeping. Short of money,
+	// a key man who would otherwise walk signs with no signing-on fee and a bigger rise instead, and
+	// squad men are sold to pay for the rest (with transfers on too and a window open) or suggested.
+	// Writes the plain-words report the League panel shows (league.assistReport); returns what it did.
+	function assistContracts (c, reserve = ASSIST_RESERVE, when = "") {
+		const rep = { when, renewed: [], unsigned: [], leaving: [], sold: [], next: [], sell: [] }, done = [];
+		const lastYear = [ ...c.squad, ...c.bench ].filter(pl => { ensurePlayer(pl); return pl.contract <= 1; });
+		const plans = new Map(lastYear.map(pl => [ pl, renewPlan(pl, c) ]));
+		const order = lastYear.slice().sort((a, b) => plans.get(b).worth - plans.get(a).worth);
+		const sign = (pl, pn, terms) => {
+			const deal = renewDeal(pl, c, terms);
+			if (!deal.ok) { return false; }
+			rep.renewed.push(`${who(pl)}: ${seasons(terms.years)} at ${wageWeek(pl.wage)}${terms.fee ? `, ${money(terms.fee)} to sign` : ", no signing-on fee and a bigger rise instead"}`);
+			done.push(`renewed ${pl.name} for ${seasons(terms.years)}`);
+			return true;
+		};
+		let short = [];
+		for (const pl of order) {
+			const pn = plans.get(pl);
+			pl.letGo = !pn.keep && !!pn.free;
+			if (!pn.keep) { continue; }
+			if (c.budget - pn.fee >= reserve - 1e-9) { sign(pl, pn, pn); continue; }
+			if (pn.key && atRisk(pl) && c.budget >= 0) { sign(pl, pn, { ...pn, fee: 0, rise: pn.rise + 0.25 }); continue; }
+			short.push(pl);
+		}
+		// Raise the money by selling a squad man or two, when the assistant may and a window is open.
+		if (short.length) {
+			const need = round1(short.reduce((t, pl) => t + plans.get(pl).fee, 0) - Math.max(0, c.budget - reserve));
+			const sales = windowOpen() && c.budget >= 0 ? sellToFund(c, need, lastYear) : [];
+			if (sales.length && assistDoes("transfers")) {
+				for (const s of sales) { sellPlayer(s.name, s.fee, s.club); rep.sold.push(`${s.name} to ${TEAMS[s.club].name} for ${money(s.fee)}`); done.push(`funded: sold ${s.name}`); }
+				short = short.filter(pl => { const pn = plans.get(pl); return !(c.budget - pn.fee >= reserve - 1e-9 && sign(pl, pn, pn)); });
+			} else if (sales.length) { rep.sell = sales.map(s => ({ name: s.name, fee: s.fee, club: s.club })); }
+		}
+		const spare = round1(Math.max(0, c.budget - reserve));
+		for (const pl of short) {
+			const pn = plans.get(pl);
+			const fate = atRisk(pl) ? "He leaves on a free in the summer unless you act." : "If he stays happy he signs the club's standard two-year deal in the summer anyway.";
+			rep.unsigned.push({ name: pl.name, key: pn.key && atRisk(pl), text: `${who(pl)}: ${endsWhen(when === "summer")}. A new deal needs ${money(pn.fee)} to sign and ${spare > 0 ? `only ${money(spare)} is free` : "there's no money free"}. ${fate}` });
+		}
+		for (const pl of order) {
+			const pn = plans.get(pl);
+			if (pn.keep) { continue; }
+			if (pn.sulk) { rep.unsigned.push({ name: pl.name, key: roleOf(pl, c) === "key" || roleOf(pl, c) === "first", text: `${who(pl)}: ${endsWhen(when === "summer")}. He's ${pn.why}. Play him more to win him round, or he leaves on a free.` }); }
+			else { rep.leaving.push(`${who(pl)}: ${pn.why}, so he leaves on a free in the summer`); }
+		}
+		rep.unsigned.sort((a, b) => b.key - a.key);
+		if (short.length) {
+			const need = round1(short.reduce((t, pl) => t + plans.get(pl).fee, 0));
+			if (rep.sell.length) { rep.next.push(`Sell ${rep.sell.map(s => `${s.name} (${money(s.fee)})`).join(" and ")} to pay for the new deals.`); }
+			else if (!windowOpen()) { rep.next.push(`Sell a squad player when the window opens ${league.round < JANUARY ? "in January" : "at the end of the season"} to pay for the new deals.`); }
+			if (reserve > 0 && c.budget > 0.05) { rep.next.push(`Spend the ${money(Math.min(c.budget, reserve))} kept back for wages on them.`); }
+			rep.next.push("Or offer the deals yourself from the squad list.");
+			if (league) { league.assistShort = reserve > 0 ? { names: short.map(pl => pl.name), need, have: round1(Math.max(0, c.budget)), reserve } : null; }
+		} else if (league) { league.assistShort = null; }
+		if (rep.unsigned.some(u => !short.some(pl => pl.name === u.name))) { rep.next.push("Unhappy players come round with games and good results; a word in the squad list (his role) helps."); }
+		if (league) { league.assistReport = rep.renewed.length || rep.unsigned.length || rep.leaving.length || rep.sold.length ? rep : null; }
+		for (const u of rep.unsigned) { done.push(`not renewed: ${u.name}`); }
+		for (const l of rep.leaving) { done.push(`leaving: ${l.split(" (")[0]}`); }
 		return done;
+	}
+	// The report as one line of text, for the club log and the transfer notes.
+	function reportText (rep) {
+		const parts = [];
+		if (rep.renewed.length) { parts.push(`renewed ${rep.renewed.map(r => r.replace(/ \([^)]*\)/, "").replace(/, (£[\d.]+[mk] to sign|no signing-on fee and a bigger rise instead)$/, "")).join("; ")}`); }
+		if (rep.sold.length) { parts.push(`sold ${rep.sold.join(", ")} to pay for them`); }
+		if (rep.unsigned.length) { parts.push(`not signed yet: ${listNames(rep.unsigned.map(u => u.name))} (${endsWhen(rep.when === "summer")})`); }
+		if (rep.leaving.length) { parts.push(`leaving on a free: ${listNames(rep.leaving.map(l => l.split(" (")[0]))}`); }
+		return parts.map(t => t[0].toUpperCase() + t.slice(1)).join(". ");
 	}
 	// Your important players: starters (key or first-team) in the last year of their deal.
 	function keyPlayers (c) {
@@ -49,14 +152,14 @@
 	function keyContracts (c) {
 		if (assistMode !== "off" && assistDoes("contracts")) { return []; }   // the assistant has already been through them
 		const done = [], skint = [];
-		for (const pl of keyPlayers(c).filter(pl => assistKeeps(pl, c)).sort((a, b) => valueOf(b) - valueOf(a))) {
+		for (const pl of keyPlayers(c).filter(pl => assistKeeps(pl, c)).sort((a, b) => renewWorth(b, c) - renewWorth(a, c))) {
 			if (c.budget - round1(valueOf(pl) * 0.15) < ASSIST_RESERVE) { skint.push(pl.name); continue; }
 			const deal = renewDeal(pl, c);
 			if (deal.ok) { done.push(`${pl.name} to ${pl.contract} seasons`); }
 		}
 		const note = [];
 		if (done.length) { note.push(`kept on before their deals ran out: ${done.join(", ")}`); }
-		if (skint.length) { note.push(`no money to keep ${skint.join(", ")} (${money(ASSIST_RESERVE)} is kept for wages)`); }
+		if (skint.length) { note.push(`no money to keep ${listNames(skint)} on new terms, so ${skint.length === 1 ? "he stays on the club's standard deal if he's happy, or leaves" : "they stay on the club's standard deal if they're happy, or leave"} on a free`); }
 		if (note.length) {
 			lastDeal = `Contracts (summer): ${note.join("; ")}.`;
 			c.log = [ ...(c.log || []), lastDeal ].slice(-10);
@@ -65,16 +168,18 @@
 		}
 		return done;
 	}
-	// A heads-up at the January window and with two games to go: which important players are in
-	// their last year, and what will happen about it.
+	// A heads-up at the January window, with ten games to go and with two: which important players
+	// are in their last year, when, and what will happen about it.
 	function contractAlerts () {
 		const c = league && league.club;
 		if (!c) { return []; }
 		const due = keyPlayers(c);
 		if (!due.length) { return []; }
-		const names = due.map(pl => `${pl.name} (${ovrNow(pl)})`);
-		const plan = assistMode !== "off" && assistDoes("contracts") ? "the assistant will sort their deals" : "renew in Your team, or they are kept on in the summer as far as the money allows";
-		lastDeal = `Contracts ending for ${names.slice(0, 4).join(", ")}${due.length > 4 ? ` and ${due.length - 4} more` : ""}: ${plan}.`;
+		const names = due.map(pl => `${pl.name} (${ovrNow(pl)})`), rep = league.assistReport, stuck = rep ? rep.unsigned.filter(u => due.some(pl => pl.name === u.name)).map(u => u.name) : [];
+		const plan = assistMode !== "off" && assistDoes("contracts")
+			? stuck.length ? `the assistant can't sign ${listNames(stuck)} yet, see Your team` : "the assistant is sorting their deals"
+			: "offer new deals from the squad list, or the club tries to keep them on in the summer if the money is there";
+		lastDeal = `Contracts ending in ${gamesLeft()} games for ${listNames(names)}: ${plan}.`;
 		c.log = [ ...(c.log || []), lastDeal ].slice(-10);
 		league.news = `${league.news || ""} ${lastDeal}`.trim();
 		toast(`Contracts ending: ${due.length} key player${due.length === 1 ? "" : "s"}, see League notes`, "#f2b52e");
@@ -178,22 +283,38 @@
 		}
 		return why.join("; ");
 	}
+	// Open a player's contract row in the squad list and bring it into view.
+	function showContract (name) {
+		openPl = name || null;
+		renderClub();
+		const row = $("sqBody") && $("sqBody").querySelector("tr.detail");
+		if (row && row.scrollIntoView) { row.scrollIntoView({ block: "center", behavior: "smooth" }); }
+	}
 	function renderAssistNote () {
 		const p = $("assistNote");
 		if (!p) { return; }
 		if (assistMode === "off") { p.textContent = "Off: you renew contracts, answer bids and sign players yourself. Starters in their last year are still kept on in the summer if the money is there."; return; }
-		const c = league && league.club;
-		p.textContent = c ? (league.assistNote || `Assistant: nothing to do right now (${assistIdleWhy(c)}). It looks again after every match and when a window opens.`) : "";
-		const sh = c && league.assistShort;
-		if (!sh || !sh.names.length) { return; }
-		// The manager's call: spend the wage reserve on the deals the money reaches, or leave them for now.
-		const canDo = sh.have > 0.05 ? `Spending the reserve covers about ${Math.min(sh.names.length, Math.max(0, Math.floor(sh.have / Math.max(0.05, sh.need / sh.names.length))))} of the ${sh.names.length}.` : "There is nothing to spend.";
+		const c = league && league.club, rep = c && assistDoes("contracts") ? league.assistReport : null;
+		if (!rep) { p.textContent = c ? (league.assistNote || `Assistant: nothing to do right now (${assistIdleWhy(c)}). It looks again after every match and when a window opens.`) : ""; return; }
+		// The contracts report as a short list: who signed, who hasn't and why, who is leaving, what next.
+		p.replaceChildren(el("b", "", `Contracts${rep.when ? `, ${rep.when}` : ""}`));
+		const ul = el("ul", "assist-list");
+		const sec = (title, items, cls = "") => { for (const t of items) { const li = el("li", cls); li.append(el("b", "", `${title} `), document.createTextNode(t)); ul.append(li); } };
+		sec("Renewed:", rep.renewed);
+		sec("Sold to pay for them:", rep.sold);
+		for (const u of rep.unsigned) { const li = el("li", u.key ? "warn" : ""); li.append(el("b", "", u.key ? "Key man not signed:" : "Not signed yet:"), document.createTextNode(` ${u.text}`)); ul.append(li); }
+		sec("Leaving:", rep.leaving);
+		sec("Next:", rep.next, "next");
+		p.append(ul);
+		if ((league.assistDeals || []).length) { p.append(el("span", "", `Transfers: ${league.assistDeals.join("; ")}.`)); }
 		const ask = el("div", "assist-ask");
-		ask.append(el("span", "", `${sh.names.length} new deal${sh.names.length === 1 ? "" : "s"} need${sh.names.length === 1 ? "s" : ""} ${money(sh.need)}; ${money(sh.have)} in the bank, ${money(sh.reserve)} of it the wage reserve. ${canDo} Your call:`));
-		const yes = el("button", "", "Renew anyway, spend the reserve"); yes.type = "button"; yes.disabled = sh.have <= 0.05; yes.addEventListener("click", () => assistRenewAnyway());
-		const no = el("button", "", "Leave them for now"); no.type = "button"; no.addEventListener("click", () => { league.assistShort = null; league.assistNote = `${league.assistNote || "Assistant:"} You chose to leave the unsigned deals for now; the assistant will ask again when the money changes.`; saveLeague(); renderAssistNote(); });
-		ask.append(yes, no);
-		p.append(ask);
+		const btn = (text, fn, off = false) => { const b = el("button", "", text); b.type = "button"; b.disabled = off; b.addEventListener("click", fn); ask.append(b); return b; };
+		const sh = league.assistShort;
+		if (sh && sh.names.length && sh.have > 0.05) { btn(`Spend the wage money (${money(Math.min(sh.have, sh.reserve))})`, () => assistRenewAnyway()); }
+		for (const s of rep.sell || []) { btn(`Sell ${s.name} (${money(s.fee)})`, () => { sellPlayer(s.name, s.fee, s.club); assistRun("after the sale", true); }, !windowOpen()); }
+		if (rep.unsigned.length) { btn("Show in the squad list", () => showContract(rep.unsigned[0].name)); }
+		if (sh && sh.names.length) { btn("Leave them for now", () => { league.assistShort = null; rep.next = [ "You chose to leave the unsigned deals for now. The assistant asks again when the money changes." ]; saveLeague(); renderAssistNote(); }); }
+		if (ask.childElementCount) { p.append(ask); }
 	}
 	// The manager said yes: the same renewals with no reserve, as far as the money goes.
 	function assistRenewAnyway () {
@@ -201,31 +322,41 @@
 		if (!c) { return []; }
 		assistBatch = true;
 		let done = [];
-		try { done = assistContracts(c, 0); } finally { assistBatch = false; }
+		try { done = assistContracts(c, 0, "using the wage money"); } finally { assistBatch = false; }
 		league.assistShort = null;
-		league.assistNote = `Assistant (your call, reserve spent): ${done.length ? done.join("; ") : "nothing more could be signed"}.`;
+		const rep = league.assistReport;
+		league.assistNote = rep ? `Assistant (using the wage money): ${reportText(rep)}.` : "Assistant: nothing more could be signed.";
 		lastDeal = league.assistNote;
 		c.log = [ ...(c.log || []), lastDeal ].slice(-10);
-		toast(`Renewed ${done.filter(d => / signed on to /.test(d)).length} on your say-so`, "#f2b52e");
+		const n = done.filter(d => /^renewed /.test(d)).length;
+		toast(n ? `Renewed ${n} with the wage money` : "Nothing more could be signed", "#f2b52e");
 		afterClubChange();
 		renderAssistNote();
 		return done;
 	}
 	// Runs after a league week and when a window opens; also the moment the setting is switched on.
-	function assistRun (when) {
+	// The note is logged when something was done or the list of unsigned men changes, not every week.
+	function assistRun (when, force = false) {
 		if (!league || !league.club || assistMode === "off") { return []; }
 		const c = league.club, done = [];
+		let rep = null;
 		assistBatch = true;
 		try {
-			if (assistDoes("contracts")) { done.push(...assistContracts(c)); }
+			if (assistDoes("contracts")) { done.push(...assistContracts(c, ASSIST_RESERVE, when)); rep = league.assistReport; } else { league.assistReport = null; }
 			if (assistDoes("transfers")) { done.push(...assistTransfers(c)); }
 		} finally { assistBatch = false; }
-		league.assistNote = done.length ? `Assistant (${when}): ${done.join("; ")}.` : null;
-		if (done.length) {
+		const deals = done.filter(d => !/^(renewed|not renewed|leaving|funded)/.test(d));
+		league.assistDeals = deals;
+		const text = [ rep ? reportText(rep) : "", deals.join("; ") ].filter(Boolean).join(". ");
+		league.assistNote = text ? `Assistant (${when}): ${text}.` : null;
+		const acted = done.some(d => /^(renewed|funded|sold|signed|turned down)/.test(d));
+		const sig = rep ? rep.unsigned.map(u => u.name).join(",") + "|" + rep.leaving.length : "";
+		if (league.assistNote && (acted || force || sig !== league.assistSig)) {
 			lastDeal = league.assistNote;
 			c.log = [ ...(c.log || []), lastDeal ].slice(-10);
 			afterClubChange();
 		}
+		league.assistSig = sig;
 		renderAssistNote();
 		return done;
 	}
@@ -238,8 +369,8 @@
 	if (assistSel) {
 		assistSel.addEventListener("change", () => {
 			setAssist(assistSel.value, false);
-			const done = assistRun("now");
-			const acted = done.filter(d => !/^(no money yet|left to run down)/.test(d)).length;
+			const done = assistRun("now", true);
+			const acted = done.filter(d => !/^(not renewed|leaving)/.test(d)).length;
 			toast(assistMode === "off" ? ASSIST.off : acted ? `Assistant: ${acted} done, see League notes` : done.length ? "Assistant: nothing it can do yet, see League notes" : "Assistant: nothing to do right now", "#f2b52e");
 			renderAssistNote();
 			assistSel.blur();

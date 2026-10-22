@@ -117,6 +117,9 @@
 		};
 	}
 
+	// More test hooks, kept apart from the big list above.
+	if (window.__ff) { Object.assign(window.__ff, { renewWorth, renewPlan, assistContracts, reportText, rolloverClub, showContract, goalCall, COMM, cupNight, cupTie, cupPens, ensureCup, seasonAwards, youthIntake, promoteYouth, releaseYouth, renderExtras, CUP_NIGHTS }); }
+
 	const hot = window.claude && window.claude.hot;
 	if (hot && typeof hot.snapshot === "function") {
 		hot.snapshot(() => (state === "play" || state === "paused" || state === "goal"

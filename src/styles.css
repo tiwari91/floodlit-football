@@ -850,6 +850,19 @@
 	.assist-ask { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
 	.assist-ask span { flex: 1 1 100%; }
 	.assist-ask button { padding: 3px 10px; font-size: 12px; }
+	.assist-list { margin: 4px 0 2px; padding-left: 18px; }
+	.assist-list li { margin: 2px 0; }
+	.assist-list li.warn b { color: #f2b52e; }
+	.assist-list li.next { opacity: 0.85; }
+	.lg-extras h4 { margin: 12px 0 4px; }
+	.lg-extras .detail { margin: 0 0 4px; font-size: 13px; }
+	.lg-extras ul { list-style: none; margin: 4px 0; padding: 0; font-size: 13px; }
+	.lg-extras li { padding: 3px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+	.lg-extras li.mine { font-weight: 600; }
+	.lg-extras .academy li { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+	.lg-extras .academy .who { flex: 1 1 auto; }
+	.lg-extras .academy button { padding: 2px 8px; font-size: 12px; }
+	.lg-extras .awards b { color: #f2b52e; font-weight: 600; }
 	.market .bids { grid-row: span 3; display: grid; gap: 4px; justify-items: stretch; }
 	.market .bids button { grid-row: auto; padding: 3px 8px; font-size: 12px; }
 	.market .swap { grid-column: 2 / 3; }

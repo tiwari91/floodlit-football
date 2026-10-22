@@ -81,12 +81,14 @@
 			if (typeof assistRun === "function") { assistRun("summer"); }   // new deals before contracts run out
 			if (typeof keyContracts === "function") { keyContracts(club); }   // the starters, even with the assistant off
 			gone = rolloverClub(club);
+			league.assistReport = null;   // the deals are settled now; the assistant's note says how
 			if (league.assistShort) {   // the unpaid deals are settled by the summer: kept on standard terms, or gone
 				const names = league.assistShort.names, kept = names.filter(n => (club.resigned || []).includes(n)), lost = names.filter(n => gone.includes(n));
 				league.assistShort = null;
 				league.assistNote = `${league.assistNote || "Assistant (summer):"}${kept.length ? ` The club kept ${kept.join(", ")} on standard terms anyway.` : ""}${lost.length ? ` Out of contract and gone: ${lost.join(", ")}.` : ""}`;
 			}
 			if (typeof seasonCoaching === "function") { seasonCoaching(club); }
+			if (typeof youthIntake === "function") { youthIntake(club); }   // the academy's new intake, and the others grow
 			if (club.retired && club.retired.length) { league.news = `${league.news} Retired: ${club.retired.join(", ")}.`.trim(); }
 			if (gone.length) { league.news = `${league.news} Out of contract and gone: ${gone.join(", ")}. Academy players fill the gaps.`.trim(); }
 			if (club.resigned && club.resigned.length) { league.news = `${league.news} Signed new deals: ${club.resigned.join(", ")}.`.trim(); }
@@ -175,7 +177,8 @@
 		if (!windowOpen()) { league.bidsIn = []; }
 		if (league.round === JANUARY) { league.club.market = genMarket(); league.club.scoutLeft = 2 + staffLvl(league.club, "scout"); if (typeof windowEvents === "function") { windowEvents("January"); } if (typeof agentApproaches === "function") { agentApproaches("January"); } }
 		if (typeof assistRun === "function") { assistRun(league.round === JANUARY ? "January window" : "this week"); }
-		if (typeof contractAlerts === "function" && (league.round === JANUARY || league.round === league.fixtures.length - 2)) { contractAlerts(); }
+		if (typeof cupNight === "function") { cupNight(); }   // a cup night between matchdays
+		if (typeof contractAlerts === "function" && (league.round === JANUARY || league.round === league.fixtures.length - 10 || league.round === league.fixtures.length - 2)) { contractAlerts(); }
 		// Knocks from this match: out for one to three games, and off the team sheet.
 		const byName = n => [ ...league.club.squad, ...league.club.bench ].find(pl => pl.name === n);
 		for (const n of matchGoals) { const pl = byName(n); if (pl) { pl.goals = (pl.goals || 0) + 1; } }
@@ -210,6 +213,7 @@
 			league.club.market = genMarket();
 			league.club.scoutLeft = 2 + staffLvl(league.club, "scout");
 			league.paid = true;
+			if (typeof seasonAwards === "function") { seasonAwards(); }
 			if (typeof offerJobs === "function") { offerJobs(pos); }
 		}
 		saveLeague();

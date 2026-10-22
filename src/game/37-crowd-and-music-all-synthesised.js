@@ -222,6 +222,18 @@
 		clapAlong(t0 + 8 * E, 24, 2 * E);
 		setTimeout(() => { try { bus.disconnect(); dl.disconnect(); fb.disconnect(); } catch (e) { /* already gone */ } }, (len + 6) * 1000);
 	}
+	// A gasp: the whole ground drawing breath at once, at the woodwork or a big save. Loudest from the
+	// end whose side had the shot; the other end lets out a lower sigh of relief.
+	let gaspAt = -1e9;
+	function gasp (t) {
+		if (!soundOn || !audio || bulkSim || frame - gaspAt < 90) { return; }
+		gaspAt = frame;
+		const at = audio.currentTime + 0.01, home = t === homeSide, pan = home ? -0.2 : 0.5;
+		noiseBurst("white", at, 0.55, home ? 0.09 : 0.05, "bandpass", 900, 2600, 0.8, pan);
+		voices(at + 0.05, 4, 280, 360, 0.45, home ? 0.013 : 0.008, 1200, pan);
+		noiseBurst("brown", at + 0.45, 1.2, home ? 0.04 : 0.06, "lowpass", 600, 260, 0.7, home ? 0.4 : -0.2);
+	}
+
 	function clapAlong (t, n, every) { for (let k = 0; k < n; k++) { noiseBurst("white", t + k * every, 0.08, 0.04, "bandpass", 1900, 1700, 0.9, -0.3); } }
 	// An away goal: only the away corner, a cheer and a burst of clapping from over in their end.
 	function awayCornerCheer () {
@@ -287,6 +299,7 @@
 	// The crowd bed: a rumble, the wash of voices and the air above them, each breathing a little,
 	// all of it swelling with the heat of the match.
 	function updateCrowd () {
+		if (typeof commTick === "function") { commTick(); }
 		if (!audio) { return; }
 		const live = soundOn && (state === "play" || state === "goal" || state === "half");
 		if (!crowd && live) {
@@ -300,11 +313,17 @@
 		if (!crowd) { return; }
 		const t = audio.currentTime, heat = live ? Math.max(crowdHeat, isDerby() ? 0.35 : 0) : 0;
 		const breathe = 1 + 0.12 * Math.sin(t * 0.63) + 0.08 * Math.sin(t * 1.71 + 1);
+		// An attack building toward the box: the home end rises in pitch and volume as its side carries the
+		// ball in; when the visitors do, the noise drops to a low, anxious rumble. Eased, so it swells.
+		const own = ball && ball.owner && state === "play" ? ball.owner.team : -1, deep = own >= 0 ? clamp((rel(own, ball.x) - FW * 0.6) / (FW * 0.3), 0, 1) : 0;
+		const antTarget = own === homeSide ? deep : own >= 0 ? -0.6 * deep : 0;
+		crowd.ant = (crowd.ant || 0) + (antTarget - (crowd.ant || 0)) * 0.04;
+		const up = Math.max(0, crowd.ant), worry = Math.max(0, -crowd.ant);
 		const quiet = (state === "half" ? 0.5 : 1) * (isDerby() ? 1.35 : 1) * (crowdHush > 0 ? 0.35 : 1);   // a derby is the loudest night of the season
-		crowd.rumble.g.gain.setTargetAtTime(live ? (0.045 + 0.08 * heat) * breathe * quiet : 0, t, 0.4);
-		crowd.vox.g.gain.setTargetAtTime(live ? (0.022 + 0.085 * heat) * breathe * quiet : 0, t, 0.35);
-		crowd.air.g.gain.setTargetAtTime(live ? (0.004 + 0.01 * heat) * quiet : 0, t, 0.5);
-		crowd.vox.f.frequency.setTargetAtTime(620 + 650 * heat - 180 * crowdTense + 70 * Math.sin(t * 0.9), t, 0.4);
+		crowd.rumble.g.gain.setTargetAtTime(live ? (0.045 + 0.08 * heat + 0.03 * worry) * breathe * quiet : 0, t, 0.4);
+		crowd.vox.g.gain.setTargetAtTime(live ? (0.022 + 0.085 * heat + 0.03 * up) * (1 - 0.3 * worry) * breathe * quiet : 0, t, 0.35);
+		crowd.air.g.gain.setTargetAtTime(live ? (0.004 + 0.01 * heat + 0.006 * up) * quiet : 0, t, 0.5);
+		crowd.vox.f.frequency.setTargetAtTime(620 + 650 * heat + 260 * up - 180 * crowdTense - 120 * worry + 70 * Math.sin(t * 0.9), t, 0.4);
 		if (crowd.pan) { crowd.pan.pan.setTargetAtTime(0.22 * Math.sin(t * 0.21), t, 0.5); }
 		if (live && state === "play" && freeze <= 0 && crowdHush <= 0 && t > crowd.nextChant) {
 			// The home end sings, louder when the home side is on top; the away corner answers when theirs is.

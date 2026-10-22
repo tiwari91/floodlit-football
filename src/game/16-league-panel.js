@@ -79,6 +79,7 @@
 		renderClub();
 		renderClubs();
 		renderShapes();
+		if (typeof renderExtras === "function") { renderExtras(); }
 	}
 
 	let clubsView = "div", openClub = null;
@@ -422,7 +423,8 @@
 			pl.contract--;
 			if (pl.contract > 0) { continue; }
 			// Out of contract: a happy player under 34 signs on for two more at a little more money; the rest go.
-			if (pl.morale >= 50 && pl.age < 34) { pl.contract = oneYearOnly(pl) ? 1 : 2; pl.wage = Math.round(wageOf(pl) * 1.1 * 1000) / 1000; kept.push(pl.name); } else { gone.push(pl.name); }
+			// The assistant may have decided to let him go on a free (pl.letGo).
+			if (pl.morale >= 50 && pl.age < 34 && !(pl.letGo && typeof assistDoes === "function" && assistMode !== "off" && assistDoes("contracts"))) { pl.contract = oneYearOnly(pl) ? 1 : 2; pl.wage = Math.round(wageOf(pl) * 1.1 * 1000) / 1000; kept.push(pl.name); } else { gone.push(pl.name); }
 		}
 		if (gone.length) { c.squad = c.squad.filter(p => !gone.includes(p.name)); c.bench = c.bench.filter(p => !gone.includes(p.name)); }
 		if (gone.length || c.bench.length < 5) { refillSquad(c); }
@@ -431,14 +433,16 @@
 	}
 	// The deal itself: a signing-on fee, a rise, two more seasons (five at most). Shared by the Renew
 	// button and the assistant; says why when he won't or the club can't.
-	function renewDeal (pl, c) {
-		const fee = round1(valueOf(pl) * 0.15);
+	// terms (from the assistant): { years, rise, fee } in place of the standard offer.
+	function renewDeal (pl, c, terms = null) {
+		const fee = terms ? terms.fee : round1(valueOf(pl) * 0.15);
 		if (lastSeason(pl)) { return { ok: false, why: `${pl.name} (${pl.age}) is retiring at the end of the season; there's no new deal to offer.` }; }
 		if (pl.morale < 40) { return { ok: false, why: `${pl.name} won't talk about a new contract while he's unhappy (morale ${pl.morale}).` }; }
 		if (c.budget + 1e-9 < fee) { return { ok: false, why: `A new deal for ${pl.name} needs a ${money(fee)} signing-on fee.` }; }
 		c.budget = round1(c.budget - fee);
-		pl.wage = Math.round(wageOf(pl) * (roleOf(pl, c) === "key" ? 1.2 : 1.1) * 1000) / 1000;
-		pl.contract = oneYearOnly(pl) ? Math.min(2, pl.contract + 1) : Math.min(5, pl.contract + 2);   // veterans: one more season at a time
+		pl.wage = Math.round(wageOf(pl) * (terms ? terms.rise : roleOf(pl, c) === "key" ? 1.2 : 1.1) * 1000) / 1000;
+		pl.contract = terms ? Math.min(5, pl.contract + (oneYearOnly(pl) ? 1 : terms.years)) : oneYearOnly(pl) ? Math.min(2, pl.contract + 1) : Math.min(5, pl.contract + 2);   // veterans: one more season at a time
+		pl.letGo = false;
 		pl.morale = clamp(pl.morale + 8, 0, 100);
 		return { ok: true, fee, why: `${pl.name} signs a new contract to ${pl.contract} seasons (${money(fee)} signing-on, ${wageWeek(pl.wage)}).` };
 	}

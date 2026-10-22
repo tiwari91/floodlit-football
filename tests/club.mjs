@@ -69,11 +69,11 @@ const priority = await page.evaluate(() => {
 	const star = c.squad[9], squadMan = c.squad[1];
 	star.contract = 1; star.morale = 80; star.age = 23; star.pac = star.sho = star.pas = star.def = 90; star.role = "key";
 	squadMan.contract = 1; squadMan.morale = 80; squadMan.age = 29; squadMan.pac = squadMan.sho = squadMan.pas = squadMan.def = 80; squadMan.role = "first";   // a real fee, not pocket change
-	c.budget = Math.round(F.valueOf(star) * 0.15 * 10) / 10 + 0.5;   // one deal plus the reserve
+	c.budget = F.renewPlan(star, c).fee + 0.5;   // one deal plus the reserve
 	const done = F.assistRun("test");
 	return { done, star: star.contract, squadMan: squadMan.contract, note: F.lastDeal };
 });
-check("contracts: the most valuable player is signed first and the shortfall is reported", priority.star === 3 && priority.squadMan === 1 && /no money yet/.test(priority.note), JSON.stringify(priority));
+check("contracts: the most valuable player is signed first and the shortfall is reported", priority.star === 4 && priority.squadMan === 1 && /Not signed yet: /.test(priority.note), JSON.stringify(priority));
 const leftOut = await page.evaluate(() => {
 	const F = window.__ff, c = F.league.club;
 	for (const pl of [ ...c.squad, ...c.bench ]) { pl.contract = 3; }
@@ -82,10 +82,121 @@ const leftOut = await page.evaluate(() => {
 	old.contract = 1; old.morale = 80; old.age = 34; old.pac = old.sho = old.pas = old.def = 70; old.role = "";
 	sulk.contract = 1; sulk.morale = 25; sulk.age = 27;
 	c.budget = 9;
-	const done = F.assistRun("test");
-	return { done, dud: dud.contract, old: old.contract, sulk: sulk.contract, names: [ dud.name, old.name, sulk.name ] };
+	const done = F.assistRun("test"), rep = F.league.assistReport;
+	return { done, dud: dud.contract, old: old.contract, sulk: sulk.contract, letGo: [ dud.letGo, old.letGo, !!sulk.letGo ], leaving: rep.leaving, unsigned: rep.unsigned.map(u => u.text), names: [ dud.name, old.name, sulk.name ] };
 });
-check("contracts: every last-year player who will talk is renewed (a 34-year-old for one more season), squad men included; only the unhappy one is left and the note says so", leftOut.dud === 3 && leftOut.old === 2 && leftOut.sulk === 1 && leftOut.done.some(d => /left to run down/.test(d) && d.includes(leftOut.names[2]) && /unhappy/.test(d) && !d.includes(leftOut.names[0])), JSON.stringify(leftOut));
+check("contracts: a 40-rated squad man and a 34-year-old reserve are let go on a free, the unhappy one is listed as not signed and why", leftOut.dud === 1 && leftOut.old === 1 && leftOut.sulk === 1 && leftOut.letGo.join() === "true,true,false" && leftOut.leaving.some(l => l.startsWith(leftOut.names[0]) && /leaves on a free/.test(l)) && leftOut.leaving.some(l => l.startsWith(leftOut.names[1]) && /34 and not in the side/.test(l)) && leftOut.unsigned.some(u => u.startsWith(leftOut.names[2]) && /unhappy/.test(u) && /deal ends this summer/.test(u)), JSON.stringify(leftOut));
+
+// Renewals in order of value to the side, on terms that fit the man.
+const prio = await page.evaluate(() => {
+	const F = window.__ff, c = F.league.club, all = [ ...c.squad, ...c.bench ];
+	F.setAssist("contracts");
+	all.forEach(x => { x.contract = 3; x.morale = 70; x.age = 26; x.role = ""; x.pac = x.sho = x.pas = x.def = 65; x.pot = 65; });
+	const set = (pl, o, age, role) => { pl.pac = pl.sho = pl.pas = pl.def = o; pl.age = age; pl.contract = 1; pl.role = role; pl.pot = o; };
+	const young = c.squad[9], vet = c.squad[7], fringe = c.bench[2], old = c.bench[3];
+	set(young, 80, 23, "key"); set(vet, 76, 31, "first"); set(fringe, 66, 27, "rotation"); set(old, 70, 33, "rotation");
+	const w = [ young, vet, fringe, old ].map(p => F.renewWorth(p, c)), pl = [ young, vet, fringe, old ].map(p => F.renewPlan(p, c));
+	return { w, pl: pl.map(p => ({ keep: p.keep, years: p.years, rise: p.rise, fee: p.fee, free: !!p.free })) };
+});
+check("renewal order: the young key man, then the 31-year-old starter, then the squad men", prio.w[0] > prio.w[1] && prio.w[1] > prio.w[2] && prio.w[1] > prio.w[3], JSON.stringify(prio.w));
+check("terms: three seasons for the young key man, one for the 31-year-old, one cheaper season for the fringe man, a free for the 33-year-old reserve", prio.pl[0].years === 3 && prio.pl[0].rise === 1.2 && prio.pl[1].years === 1 && prio.pl[2].keep && prio.pl[2].years === 1 && prio.pl[2].rise <= 1 && !prio.pl[3].keep && prio.pl[3].free, JSON.stringify(prio.pl));
+// The report in plain words: who renewed for how long and at what wage, who hasn't, when, why, and what next.
+const report = await page.evaluate(() => {
+	const F = window.__ff, lg = F.league, c = lg.club, all = [ ...c.squad, ...c.bench ];
+	lg.round = 24; lg.bidsIn = [];
+	all.forEach(x => { x.contract = 3; x.morale = 70; x.age = 26; x.role = ""; });
+	const set = (pl, o, age, role) => { pl.pac = pl.sho = pl.pas = pl.def = o; pl.age = age; pl.contract = 1; pl.role = role; pl.pot = o; };
+	set(c.squad[9], 82, 24, "key"); set(c.squad[5], 78, 27, "key"); set(c.squad[3], 74, 30, "first"); set(c.squad[7], 72, 33, "first"); set(c.bench[1], 64, 34, "rotation");
+	c.budget = 1.2;
+	F.setAssist("contracts"); F.assistRun("this week"); F.renderLeagueTest();
+	const rep = lg.assistReport, p = document.getElementById("assistNote");
+	return { rep, text: p.innerText, buttons: [ ...p.querySelectorAll("button") ].map(b => b.textContent), first: rep.renewed[0] || "", star: c.squad[9].name, note: lg.assistNote };
+});
+check("the report names who renewed, for how long and at what wage, the most important first", report.rep.renewed.length >= 1 && report.first.startsWith(report.star) && report.rep.renewed.every(r => /: \d more seasons? at £[\d.]+k\/wk/.test(r)), JSON.stringify(report.rep.renewed));
+check("unsigned men are listed with when their deal ends and why, and what to do next", report.rep.unsigned.length >= 1 && report.rep.unsigned.every(u => /deal ends this summer, 14 games left/.test(u.text) && /needs £[\d.]+m to sign|unhappy/.test(u.text)) && report.rep.next.length >= 1 && report.buttons.some(b => /Show in the squad list/.test(b)), JSON.stringify({ u: report.rep.unsigned, next: report.rep.next, b: report.buttons }));
+check("no jargon and no £0.0m in the note", !/your call|reserve spent|£0\.0m|kept for wages\)/.test(report.text + report.note), report.text);
+// A man the assistant lets go leaves in the summer even though he'd take the standard deal.
+const letGo = await page.evaluate(() => {
+	const F = window.__ff, c = F.league.club;
+	F.setAssist("contracts");
+	const pl = c.bench[4]; pl.contract = 1; pl.morale = 80; pl.age = 30; pl.letGo = true;
+	const keep = c.bench[3]; keep.contract = 1; keep.morale = 80; keep.age = 30; keep.letGo = false;
+	const gone = F.rolloverClub(c);
+	return { gone, name: pl.name, kept: keep.name };
+});
+check("a player the assistant let go leaves on a free at the rollover; a happy one without the flag stays", letGo.gone.includes(letGo.name) && !letGo.gone.includes(letGo.kept), JSON.stringify(letGo));
+// Short of money with transfers on and a window open: a squad man is sold to pay for the deals; never the only keeper.
+const fund = await page.evaluate(() => {
+	const F = window.__ff, lg = F.league, c = lg.club, all = () => [ ...c.squad, ...c.bench ];
+	lg.round = 0; lg.bidsIn = []; c.market = [];
+	all().forEach(x => { x.contract = 3; x.morale = 70; x.age = 26; x.role = ""; x.pac = x.sho = x.pas = x.def = 66; x.pot = 66; });
+	const star = c.squad[9]; star.pac = star.sho = star.pas = star.def = 84; star.contract = 1; star.age = 25; star.role = "first";
+	const spare = c.bench.find(x => x.pos !== "gk"); spare.pac = spare.sho = spare.pas = spare.def = 70; spare.contract = 3;
+	const fee = F.renewPlan(star, c).fee; c.budget = 0.45;
+	F.setAssist("both"); const done = F.assistRun("window");
+	const gks = all().filter(x => x.pos === "gk").length;
+	return { done, fee, starContract: star.contract, sold: lg.assistReport && lg.assistReport.sold, gks, budget: c.budget };
+});
+check("short of money in a window, with transfers on, a squad man is sold and the key deal is done", fund.starContract >= 3 && fund.sold.length >= 1 && fund.gks >= 1 && fund.budget >= 0, JSON.stringify(fund));
+
+// The commentator calls the goals that change a game: the equaliser, a lead taken late, a comeback from
+// two down, an own goal; leaves the late drama and the hat-trick to the celebration; red cards have lines.
+const calls = await page.evaluate(() => {
+	const F = window.__ff, g = (team, min, text) => ({ team, min, kind: "goal", text });
+	const call = (log) => { const c = F.goalCall(log, log.length - 1); return c ? `${c.kind}:${c.name}` : null; };
+	return {
+		eq: call([ g(1, 10, "A. Rook"), g(0, 30, "B. Hale") ]),
+		ahead: call([ g(0, 65, "B. Hale") ]),
+		early: call([ g(0, 12, "B. Hale") ]),
+		comeback: call([ g(1, 10, "A"), g(1, 20, "A"), g(0, 50, "C. Dunn"), g(0, 60, "C. Dunn (header)") ]),
+		own: call([ g(0, 33, "D. Moss (own goal)") ]),
+		late: call([ g(1, 10, "A"), g(0, 85, "E. Ward") ]),
+		pools: [ "equaliser", "ahead", "comeback", "own", "red", "red2" ].map(k => (F.COMM[k] || []).length)
+	};
+});
+check("the big goals get their own call; late drama is left to the celebration", calls.eq === "equaliser:B. Hale" && calls.ahead === "ahead:B. Hale" && calls.early === null && calls.comeback === "comeback:C. Dunn" && calls.own === "own:D. Moss" && calls.late === null && calls.pools.every(n => n >= 3), JSON.stringify(calls));
+
+// The cup: twenty clubs down to one over five cup nights, level ties settled by extra time and penalties.
+const cup = await page.evaluate(() => {
+	const F = window.__ff, lg = F.league;
+	lg.cup = null; lg.round = 0;
+	const c = F.ensureCup(lg), start = c.alive.length, sizes = [];
+	for (const r of F.CUP_NIGHTS) { lg.round = r; F.cupNight(); sizes.push(lg.cup.alive.length); }
+	const ties = lg.cup.rounds.flatMap(x => x.ties), level = ties.filter(t => t.et);
+	let pens = 0, pensOk = true;
+	for (let i = 0; i < 300; i++) { const p = F.cupPens(3, 3); pens++; if (p[0] === p[1]) { pensOk = false; } }
+	F.renderExtras();
+	const box = document.getElementById("lgExtras");
+	return { start, sizes, winner: lg.cup.winner, rounds: lg.cup.rounds.map(x => [ x.name, x.ties.length ]), level: level.length, settled: ties.every(t => t.win === t.h || t.win === t.a) && level.every(t => t.hg !== t.ag || (t.pens && t.pens[0] !== t.pens[1])), pensOk, card: box ? box.innerText : "" };
+});
+check("the cup: 20 clubs, a first round to 16, then 8, 4, 2 and a winner", cup.start === 20 && cup.sizes.join() === "16,8,4,2,1" && cup.winner !== null && cup.rounds.map(r => r[1]).join() === "4,8,4,2,1", JSON.stringify(cup));
+check("level ties go to extra time and then penalties, which always find a winner", cup.settled && cup.pensOk, JSON.stringify({ level: cup.level }));
+check("the League panel shows the cup", /League Cup/.test(cup.card) && /Final|won the cup|Out in the/.test(cup.card), cup.card.slice(0, 200));
+// Awards at the end of the season, and the academy's intake, promotion and release.
+const extras = await page.evaluate(() => {
+	const F = window.__ff, lg = F.league, c = lg.club, all = [ ...c.squad, ...c.bench ];
+	lg.round = lg.fixtures.length;
+	all.forEach((pl, i) => { pl.apps = 20; pl.rn = 20; pl.rsum = 20 * (6.5 + i * 0.01); pl.goals = 0; });
+	c.squad[9].goals = 14; c.squad[2].rsum = 20 * 8.1; c.bench[0].age = 19; c.bench[0].rsum = 20 * 7.4;
+	const aw = F.seasonAwards();
+	c.academy = undefined;
+	const fresh = F.youthIntake(c);
+	const n = c.academy.length, kid = c.academy[0];
+	while (c.bench.length > 6) { c.bench.pop(); }
+	const promoted = F.promoteYouth(kid.name), onBench = c.bench.some(p => p.name === kid.name);
+	const other = c.academy[0], released = F.releaseYouth(other.name);
+	F.renderExtras();
+	return { aw, fresh, n, kid: { age: kid.age, pot: kid.pot, role: kid.role }, promoted, onBench, released, left: c.academy.length, star: c.squad[2].name, scorer: c.squad[9].name, young: c.bench.find(p => p.age === 19) && c.bench.find(p => p.age === 19).name, card: document.getElementById("lgExtras").innerText };
+});
+check("season awards: player of the season, top scorer, young player and manager", extras.aw.player.name === extras.star && extras.aw.scorer.name === extras.scorer && /14 goals/.test(extras.aw.scorer.what) && extras.aw.young && extras.aw.manager && /Season \d+ awards/.test(extras.card), JSON.stringify(extras.aw));
+check("the academy: two or three prospects each summer with room to grow, promoted to the bench or released", extras.n >= 2 && extras.n <= 3 && extras.kid.age <= 17 && extras.kid.pot >= 64 && extras.promoted && extras.onBench && extras.released && extras.left === extras.n - 2 && /Academy/.test(extras.card), JSON.stringify(extras));
+// An old save with no cup, awards or academy loads cleanly mid-season.
+const oldSave = await (async () => {
+	await page.evaluate(() => { const raw = JSON.parse(localStorage.getItem("ff-league")); delete raw.cup; delete raw.awards; delete raw.club.academy; raw.round = 15; raw.results = raw.results.slice(0, 15); localStorage.setItem("ff-league", JSON.stringify(raw)); });
+	await page.reload(); await page.waitForFunction(() => window.__ff && window.__ff.league && window.__ff.league.club, null, { timeout: 60000 });
+	return page.evaluate(() => { const F = window.__ff; F.renderLeagueTest(); return { cup: F.league.cup && (F.league.cup.none ? "none" : "cup"), card: (document.getElementById("lgExtras") || {}).innerText || "" }; });
+})();
+check("an old save mid-season loads with no cup this season and an empty academy, no errors", oldSave.cup === "none" && /starts again next season/.test(oldSave.card) && /Academy/.test(oldSave.card), JSON.stringify(oldSave));
 
 // Offers for the manager: a title-winner hears from the big clubs, a bottom finisher only from below.
 const offers = await page.evaluate(() => {
@@ -199,7 +310,7 @@ const keys = await page.evaluate(() => {
 	const skint = F.keyContracts(c);
 	return { role: F.roleOf(star, c), alerted, news, kept, after, skint, skintNote: F.lastDeal };
 });
-check("the January alert names the important players in their last year", keys.alerted.length >= 1 && /Contracts ending for/.test(keys.news), JSON.stringify(keys));
+check("the January alert names the important players in their last year", keys.alerted.length >= 1 && /Contracts ending in \d+ games for/.test(keys.news), JSON.stringify(keys));
 check("with the assistant off, a key starter is still kept on in the summer when the money is there", keys.kept.length >= 1 && keys.after.contract >= 2 && keys.after.budget < 5 && /kept on before their deals ran out/.test(keys.after.note), JSON.stringify(keys));
 // The assistant always says something under its control: what it did, or why there was nothing to do.
 const note = await page.evaluate(() => {
@@ -215,7 +326,7 @@ const note = await page.evaluate(() => {
 });
 check("with the assistant off the note says what you handle yourself", /^Off: you renew contracts/.test(note.off), note.off);
 check("with nothing to do the note says so and why", note.done.length === 0 && /nothing to do right now \(nobody is in the last year of his deal; no bids in; the window is closed/.test(note.idle), note.idle);
-check("after it acts the note reports what it did", note.did.length >= 1 && /^Assistant \(test\): .* signed on to/.test(note.active), note.active);
+check("after it acts the note reports what it did", note.did.length >= 1 && /Renewed: .* more seasons? at £[\d.]+k\/wk/.test(note.active), note.active);
 // Short of money, the assistant asks the manager: renew anyway (spend the reserve) or leave them.
 const ask = await page.evaluate(async () => {
 	const F = window.__ff, lg = F.league, c = lg.club, p = document.getElementById("assistNote");
@@ -226,11 +337,11 @@ const ask = await page.evaluate(async () => {
 	c.budget = Math.round((fees[0] + 0.3) * 10) / 10;   // one deal clears the reserve, the next two do not
 	const done = F.assistRun("test"); F.renderLeagueTest();
 	const short = lg.assistShort, btns = [ ...p.querySelectorAll("button") ].map(b => [ b.textContent, b.disabled ]);
-	const yes = p.querySelector("button"); yes.click(); await new Promise(r => setTimeout(r, 300));
-	return { done, short, btns, after: { contracts: three.map(x => x.contract), budget: c.budget, note: lg.assistNote, cleared: !lg.assistShort, btnsLeft: p.querySelectorAll("button").length } };
+	const yes = [ ...p.querySelectorAll("button") ].find(b => /Spend the wage money/.test(b.textContent)); if (yes) { yes.click(); } await new Promise(r => setTimeout(r, 300));
+	return { done, short, btns, after: { contracts: three.map(x => x.contract), budget: c.budget, note: lg.assistNote, cleared: !lg.assistShort, btnsLeft: [ ...p.querySelectorAll("button") ].map(b => b.textContent) } };
 });
-check("short of money, the note asks the manager with the sums and two choices", ask.short && ask.short.names.length >= 1 && ask.btns.length === 2 && /Renew anyway/.test(ask.btns[0][0]) && /Leave them/.test(ask.btns[1][0]), JSON.stringify({ short: ask.short, btns: ask.btns }));
-check("Renew anyway spends the reserve on the deals it reaches and clears the question", ask.after.contracts.filter(x => x >= 3).length > ask.done.filter(d => / signed on to /.test(d)).length && ask.after.budget >= 0 && /your call, reserve spent/.test(ask.after.note) && ask.after.cleared && ask.after.btnsLeft === 0, JSON.stringify(ask.after));
+check("short of money, the note asks the manager with the sums and two choices", ask.short && ask.short.names.length >= 1 && /Spend the wage money \(£0\.[1-4]m\)/.test(ask.btns[0][0]) && ask.btns.some(b => /Show in the squad list/.test(b[0])) && /Leave them/.test(ask.btns[ask.btns.length - 1][0]), JSON.stringify({ short: ask.short, btns: ask.btns }));
+check("Renew anyway spends the reserve on the deals it reaches and clears the question", ask.after.contracts.filter(x => x >= 2).length > ask.done.filter(d => /^renewed /.test(d)).length && ask.after.budget >= 0 && /^Assistant \(using the wage money\): Renewed /.test(ask.after.note) && !/£0\.0m|your call|reserve spent/.test(ask.after.note) && ask.after.cleared && !ask.after.btnsLeft.some(b => /Spend the wage money|Leave them/.test(b)), JSON.stringify(ask.after));
 // A question left unanswered at season's end is settled by the summer, not left hanging.
 const summer = await page.evaluate(() => {
 	const F = window.__ff, lg = F.league, c = lg.club;
