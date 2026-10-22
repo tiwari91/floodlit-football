@@ -36,7 +36,7 @@
 	// feet: a soft contact shadow under each boot (Medium and High). grass: the fine blade grain close up.
 	// bloom: the broad halo round the floodlights at night, and the boards' light on the grass.
 	const GFX3 = {
-		light: { seat: 18, fill: 0.5, hiRows: 0, nearHiRows: 0, liteRow: 1, lattice: false, shadows: 1, ratio: 1, aa: false, fps: 30, budget: 1.3e6, minRatio: 0.75, hud: 1.25, glare: 0.6, wetLamps: 4, rain: 0.45, benches: true },
+		light: { seat: 18, fill: 0.5, hiRows: 0, nearHiRows: 0, liteRow: 1, lattice: false, shadows: 1, ratio: 1, aa: false, fps: 30, budget: 1.3e6, minRatio: 0.75, dyn: true, hud: 1.25, glare: 0.6, wetLamps: 4, rain: 0.45, benches: true },
 		low: { seat: 15, fill: 0.62, hiRows: 0, nearHiRows: 2, liteRow: 3, lattice: false, shadows: 1, ratio: 1, aa: false, benches: true },
 		medium: { seat: 12, fill: 0.9, hiRows: 0, nearHiRows: 4, liteRow: 6, lattice: true, shadows: 3, ratio: 1.5, aa: !coarse, dyn: true, feet: true, grass: true, bloom: true },
 		high: { seat: 10, fill: 1.15, hiRows: 2, nearHiRows: 5, liteRow: 8, lattice: true, shadows: 5, ratio: 2, aa: true, dyn: true, feet: true, grass: true, bloom: true }
@@ -90,7 +90,7 @@
 	// once there is room for the next step. Over budget for 2 s to step down, room for 5 s to step up, and
 	// a few seconds between steps, so it never flickers (each step also resizes the drawing buffer). The GPU's
 	// time comes from a timer query where the browser has one; elsewhere the frame time stands in for it.
-	// Light and Low keep their fixed scale. The 2D HUD is untouched.
+	// Light steps down the same way (so a wider TV shot drops detail, never to the 2D view); Low keeps its fixed scale. The 2D HUD is untouched.
 	const DYN3 = { s: 1, min: 0.6, step: 0.1, lvl: "", ms: 0, has: false, over: 0, under: 0, at: -1e9, ext: undefined, q: null, gl: null, budget: 7, room: 5 };
 	function gpuBegin3D () {
 		if (!gfx3().dyn || window.__ffNoGpuTimer || DYN3.q) { return null; }
@@ -110,7 +110,7 @@
 	}
 	// Once a drawn frame in play: judge the GPU time (or, without a timer, the frame time) and step the scale.
 	function dynTick3D (dt, now, cap) {
-		if (!gfx3().dyn || !G3.renderer || state !== "play" || camMode !== "3d") { return; }
+		if (!gfx3().dyn || !G3.renderer || state !== "play" || !view3D()) { return; }
 		const sec = Math.min(dt, 100) / 1000;
 		let over, room;
 		if (DYN3.has) {

@@ -289,7 +289,7 @@
 	const gfxAuto = { on: false, top: "high", ms: 16.7, slow: 0, good: 0, wait: 30, lastUp: -1e9 };
 	const gfxLabel = () => (gfxAuto.on ? `Auto (${GFX_NAME[gfxLevel]})` : GFX_NAME[gfxLevel]);
 	function gfxAutoTick (dt, now) {
-		if (!gfxAuto.on || state !== "play" || camMode !== "3d" || document.hidden || dt > 80) { return; }
+		if (!gfxAuto.on || state !== "play" || !view3D() || document.hidden || dt > 80) { return; }
 		gfxAuto.ms += (dt - gfxAuto.ms) * 0.05;
 		const order = [ "low", "medium", "high" ], i = order.indexOf(gfxLevel), floor = coarse ? 0 : 1;
 		if (i < 0) { return; }   // Light is only ever chosen, never stepped into
@@ -344,7 +344,7 @@
 			canvas3d.replaceWith(fresh); canvas3d = fresh; watchCanvas3D(fresh);
 			G3.renderer = null; G3.scene = null; G3.stadium = null; G3.stadiumKey = ""; G3.mats.clear(); G3.fig = null; G3.crowd = null; G3.nets = null; G3.w = 0; G3.shot = ""; G3.lost = false;
 			crowdMat3 = null;
-			show3D(camMode === "3d");
+			show3D(view3D());
 		} else {
 			resize3D();
 		}

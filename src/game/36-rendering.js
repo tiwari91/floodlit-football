@@ -1158,7 +1158,7 @@
 	// Where a spot on the grass is on the screen (and how many screen units a unit there spans), for the
 	// camera in use; null for the overhead camera (rain there falls straight at you: no splashes).
 	function rainGround (x, y) {
-		if (camMode === "3d" && G3.cam) { return proj3D(x, y, 0); }
+		if (view3D() && G3.cam) { return proj3D(x, y, 0); }
 		if (camMode === "tv" && TV.camX != null) { const q = tvProj(x, y, 0); if (q && endsSwapped()) { q.x = VW - q.x; } return q; }
 		return null;
 	}

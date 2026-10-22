@@ -386,7 +386,7 @@
 	}
 	// How far a spot on the pitch is from the 3D camera (sounds fade with it); 0 when not in 3D.
 	function listenerDist3D (x, y) {
-		if (camMode !== "3d" || !G3.cam) { return 0; }
+		if (!view3D() || !G3.cam) { return 0; }
 		const sw = endsSwapped(), p = G3.cam.position;
 		return Math.hypot((sw ? FW - x : x) - p.x, y - p.z, p.y);
 	}
@@ -453,6 +453,7 @@
 			return out;
 		}
 		const fx0 = o ? o.x : ball.x, fy0 = o ? o.y : ball.y, vx = o ? o.vx : ball.vx, vy = o ? o.vy : ball.vy;
+		if (camMode === "tv") { return tvShot3D(out, fx0 + vx * 14, fy0 + vy * 14, WX); }
 		let tx = fx0 + vx * 14;
 		const ty = clamp(fy0 + vy * 14, FH * 0.22, FH * 0.78);
 		// The near touchline is closest to the lens, so the view is narrowest there. Clamp the camera
@@ -467,6 +468,36 @@
 		out.look.set(WX(tx), 0, ty);
 		return out;
 	}
+	// The TV camera: high in the main stand on the halfway side with a longer lens, like the broadcast
+	// ("tele") view. It shows about the width of the action (two fifths of the pitch on a wide screen,
+	// a little less on a portrait phone, where it climbs higher and pulls back so the pitch still fills
+	// the picture). It glides along the touchline, never faster than about two thirds of the pitch a
+	// second, and barely tilts: the depth it looks at follows the ball across the pitch only a quarter
+	// of the way, slowly, which is what keeps it from making anyone queasy.
+	const TVC = { x: 0, z: 0, at: -1e9 };
+	function tvShot3D (out, bx, by, WX) {
+		const asp = G3.cam.aspect, tall = asp < 1;
+		const fov = tall ? 46 : asp < 1.5 ? 36 : 30, tanX = Math.tan(fov * Math.PI / 360) * asp;
+		// Wider than 16:9 (a phone on its side) the picture is shallower: a touch more pitch across and a
+		// lower angle, so both touchlines still fit.
+		const k = Math.sqrt(Math.max(1, asp / 1.78)), cover = FW * (tall ? 0.13 : 0.36 * k), elev = tall ? 42 * Math.PI / 180 : Math.asin(Math.sin(28 * Math.PI / 180) / k);
+		const dist = cover / tanX, eyeH = dist * Math.sin(elev), back = dist * Math.cos(elev);
+		const half = cover, halfNear = Math.hypot(eyeH, back - FH / 2) * tanX;
+		const wantX = half * 2 >= FW ? FW / 2 : clamp(bx, Math.min(FW / 2, halfNear - MX * 0.55), Math.max(FW / 2, FW - halfNear + MX * 0.55));
+		const wantZ = FH * (tall ? 0.5 : 0.66) + (clamp(by, 0, FH) - FH / 2) * (tall ? 0.6 : 0.25);   // on a wide screen centred a little toward the near side, so both touchlines are in
+		const now = performance.now();
+		if (G3.shot !== "tv" || now - TVC.at > 1000 || reduceMotion) { TVC.x = wantX; TVC.z = wantZ; }   // a cut into the shot
+		else {
+			const dt = Math.min(frameDt, 50), ex = 1 - Math.exp(-dt / 420), ez = 1 - Math.exp(-dt / 1100), cap = FW * 0.65 * dt / 1000;
+			TVC.x += clamp((wantX - TVC.x) * ex, -cap, cap);
+			TVC.z += (wantZ - TVC.z) * ez;
+		}
+		TVC.at = now;
+		out.kind = "tv"; out.fov = fov;
+		out.eye.set(WX(TVC.x), eyeH, TVC.z + back);
+		out.look.set(WX(TVC.x), 0, TVC.z);
+		return out;
+	}
 	const shotWant = { kind: "", eye: null, look: null };
 	function camera3D () {
 		if (!shotWant.eye) { shotWant.eye = new THREE.Vector3(); shotWant.look = new THREE.Vector3(); }
@@ -476,7 +507,8 @@
 		G3.cam.fov = shotWant.fov || (shotWant.kind === "follow" ? FOLLOW_FOV : 36);
 		G3.cam.updateProjectionMatrix();
 		// A new shot is a cut; within a shot the camera glides, eased by elapsed time.
-		if (shotWant.kind !== G3.shot) { G3.shot = shotWant.kind; G3.eye.copy(shotWant.eye); G3.look.copy(shotWant.look); }
+		// The TV shot does its own gliding (along the line, and slower in depth), so it is taken as it is.
+		if (shotWant.kind !== G3.shot || shotWant.kind === "tv") { G3.shot = shotWant.kind; G3.eye.copy(shotWant.eye); G3.look.copy(shotWant.look); }
 		else {
 			const ease = reduceMotion ? 1 : 1 - Math.exp(-frameDt / 240);
 			G3.eye.lerp(shotWant.eye, ease); G3.look.lerp(shotWant.look, ease);
@@ -871,8 +903,9 @@
 	function drawScene3D () {
 		const st = threeState();
 		if (st === "failed") {
-			setCam(wideScreen ? "tv" : "top");
-			toast("3D view unavailable here (three.js did not load): showing the " + (wideScreen ? "TV" : "overhead") + " camera", "#eef6ea");
+			// The 3D close camera falls back to TV; TV itself (and the saved choice) stays, drawn in 2D from now on.
+			setCam(camMode === "3d" ? (wideScreen ? "tv" : "top") : camMode);
+			toast("3D view unavailable here (three.js did not load): showing the " + (camMode === "top" ? "overhead" : "painted TV") + " camera", "#eef6ea");
 			return false;
 		}
 		if (st === "loading") {

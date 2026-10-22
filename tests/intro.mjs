@@ -120,7 +120,7 @@ const run = await page.evaluate(async () => {
 	const F = window.__ff, wait = ms => new Promise(r => setTimeout(r, ms));
 	if (F.state !== "play") { document.getElementById("ovButton").click(); await wait(300); }
 	for (let i = 0; i < 4000 && F.state !== "play"; i++) { F.step(1); }
-	if (F.camMode !== undefined && F.camMode !== "3d") { return { skip: F.camMode }; }
+	if (!F.view3D) { return { skip: F.camMode }; }
 	F.freeze = 0; F.forceGoal(0);
 	for (let i = 0; i < 80 && F.state !== "goal"; i++) { F.step(1); }
 	const m = F.staff3[0].mgr, x0 = m.x;

@@ -10254,7 +10254,7 @@
 	// Where a spot on the grass is on the screen (and how many screen units a unit there spans), for the
 	// camera in use; null for the overhead camera (rain there falls straight at you: no splashes).
 	function rainGround (x, y) {
-		if (camMode === "3d" && G3.cam) { return proj3D(x, y, 0); }
+		if (view3D() && G3.cam) { return proj3D(x, y, 0); }
 		if (camMode === "tv" && TV.camX != null) { const q = tvProj(x, y, 0); if (q && endsSwapped()) { q.x = VW - q.x; } return q; }
 		return null;
 	}
@@ -11251,9 +11251,9 @@
 	const replayTagEl = $("replayTag");
 	function drawScene () {
 		// The REPLAY tag over the picture while one runs (and no GOAL banner over the replay).
-		const rp = (camMode === "3d" && replayOn()) || !!odr;
+		const rp = (view3D() && replayOn()) || !!odr;
 		if (replayTagEl && replayTagEl.hidden === rp) { replayTagEl.hidden = !rp; if (rp) { banner.hidden = true; } }
-		if (camMode === "3d" && drawScene3D()) { return; }   // while three.js loads, the TV camera stands in
+		if (view3D() && drawScene3D()) { return; }   // while three.js loads, the painted TV camera stands in
 		if ((camMode === "tv" || camMode === "3d") && !benchCam()) { drawSceneTV(); return; }
 		drawSceneTop();
 	}
@@ -11320,8 +11320,10 @@
 	// The pitch (with everything painted on it: shadows, rings, lines) is drawn flat into an
 	// offscreen picture, then laid down in perspective one strip at a time; players, the ball,
 	// the goals and the far stand stand up on top of it.
-	// The 3D camera by default on a laptop or desktop with WebGL (TV without it); on a phone the
-	// players would be tiny, so overhead.
+	// That painted picture is now only the stand-in: with WebGL the TV camera is drawn in 3D (three.js),
+	// from a raised broadcast position on the halfway side, and this painted version is used while
+	// three.js loads or where it cannot run.
+	// The TV camera by default on a wide screen; on a portrait phone the players would be tiny, so overhead.
 	const wideScreen = (() => { try { return window.matchMedia("(min-width: 700px)").matches; } catch (e) { return false; } })();
 	const webglOK = (() => {
 		try { const c = document.createElement("canvas"); return !!(window.WebGLRenderingContext && (c.getContext("webgl2") || c.getContext("webgl"))); } catch (e) { return false; }
@@ -11331,7 +11333,10 @@
 	// Older builds saved under "ff-cam" with a 2D default; that value is ignored (except an explicit
 	// 3D) so it cannot hide the 3D view from someone who never chose a camera at all.
 	const CAM_KEY = "ff-cam2";
-	const defaultCam = () => (wideScreen && !coarse && webglOK ? "3d" : wideScreen ? "tv" : "top");
+	const defaultCam = () => (wideScreen ? "tv" : "top");
+	// Whether the picture is the three.js one: the 3D camera, or the TV camera where WebGL and three.js work.
+	// (threeFailed is set further down, before anything draws.)
+	const view3D = () => (camMode === "3d" || camMode === "tv") && webglOK && !threeFailed;
 	let camMode = (() => {
 		const s = store.get(CAM_KEY) || (store.get("ff-cam") === "3d" ? "3d" : null);
 		return s === "tv" || s === "top" || s === "3d" ? s : defaultCam();
@@ -11899,8 +11904,8 @@
 		ctx.strokeStyle = "rgba(0, 0, 0, 0.6)"; ctx.lineWidth = 1;
 		ctx.beginPath(); ctx.arc(q.x, q.y, r, 0, Math.PI * 2); ctx.stroke();
 	}
-	const CAM_LABEL = { top: "Camera: overhead", tv: "Camera: TV", "3d": "Camera: 3D" };
-	const CAM_NAME = { top: "Overhead camera", tv: "TV camera", "3d": "3D camera" };
+	const CAM_LABEL = { top: "Camera: overhead", tv: "Camera: TV", "3d": "Camera: 3D close" };
+	const CAM_NAME = { top: "Overhead camera", tv: "TV camera", "3d": "3D close camera" };
 	const nextCam = () => (camMode === "top" ? "tv" : camMode === "tv" && webglOK ? "3d" : "top");
 	// chosen: the player picked this camera (button or C), so remember it. Defaults and the
 	// fallback when 3D cannot be shown are not saved, so 3D comes back once it can.
@@ -11911,9 +11916,9 @@
 		if (chosen) { store.set(CAM_KEY, m); }
 		const b = $("camBtn");
 		b.textContent = CAM_LABEL[m];
-		b.title = webglOK ? "Switch camera (C): overhead, TV or 3D" : "Switch camera (C): overhead or TV";
+		b.title = webglOK ? "Switch camera (C): overhead, TV or 3D close" : "Switch camera (C): overhead or TV";
 		b.setAttribute("aria-pressed", String(m !== "top"));
-		show3D(m === "3d");
+		show3D(view3D());
 	}
 
 	/* ---------- the 3D camera (three.js) ----------
@@ -11954,7 +11959,7 @@
 	// feet: a soft contact shadow under each boot (Medium and High). grass: the fine blade grain close up.
 	// bloom: the broad halo round the floodlights at night, and the boards' light on the grass.
 	const GFX3 = {
-		light: { seat: 18, fill: 0.5, hiRows: 0, nearHiRows: 0, liteRow: 1, lattice: false, shadows: 1, ratio: 1, aa: false, fps: 30, budget: 1.3e6, minRatio: 0.75, hud: 1.25, glare: 0.6, wetLamps: 4, rain: 0.45, benches: true },
+		light: { seat: 18, fill: 0.5, hiRows: 0, nearHiRows: 0, liteRow: 1, lattice: false, shadows: 1, ratio: 1, aa: false, fps: 30, budget: 1.3e6, minRatio: 0.75, dyn: true, hud: 1.25, glare: 0.6, wetLamps: 4, rain: 0.45, benches: true },
 		low: { seat: 15, fill: 0.62, hiRows: 0, nearHiRows: 2, liteRow: 3, lattice: false, shadows: 1, ratio: 1, aa: false, benches: true },
 		medium: { seat: 12, fill: 0.9, hiRows: 0, nearHiRows: 4, liteRow: 6, lattice: true, shadows: 3, ratio: 1.5, aa: !coarse, dyn: true, feet: true, grass: true, bloom: true },
 		high: { seat: 10, fill: 1.15, hiRows: 2, nearHiRows: 5, liteRow: 8, lattice: true, shadows: 5, ratio: 2, aa: true, dyn: true, feet: true, grass: true, bloom: true }
@@ -12008,7 +12013,7 @@
 	// once there is room for the next step. Over budget for 2 s to step down, room for 5 s to step up, and
 	// a few seconds between steps, so it never flickers (each step also resizes the drawing buffer). The GPU's
 	// time comes from a timer query where the browser has one; elsewhere the frame time stands in for it.
-	// Light and Low keep their fixed scale. The 2D HUD is untouched.
+	// Light steps down the same way (so a wider TV shot drops detail, never to the 2D view); Low keeps its fixed scale. The 2D HUD is untouched.
 	const DYN3 = { s: 1, min: 0.6, step: 0.1, lvl: "", ms: 0, has: false, over: 0, under: 0, at: -1e9, ext: undefined, q: null, gl: null, budget: 7, room: 5 };
 	function gpuBegin3D () {
 		if (!gfx3().dyn || window.__ffNoGpuTimer || DYN3.q) { return null; }
@@ -12028,7 +12033,7 @@
 	}
 	// Once a drawn frame in play: judge the GPU time (or, without a timer, the frame time) and step the scale.
 	function dynTick3D (dt, now, cap) {
-		if (!gfx3().dyn || !G3.renderer || state !== "play" || camMode !== "3d") { return; }
+		if (!gfx3().dyn || !G3.renderer || state !== "play" || !view3D()) { return; }
 		const sec = Math.min(dt, 100) / 1000;
 		let over, room;
 		if (DYN3.has) {
@@ -15248,7 +15253,7 @@
 	}
 	// How far a spot on the pitch is from the 3D camera (sounds fade with it); 0 when not in 3D.
 	function listenerDist3D (x, y) {
-		if (camMode !== "3d" || !G3.cam) { return 0; }
+		if (!view3D() || !G3.cam) { return 0; }
 		const sw = endsSwapped(), p = G3.cam.position;
 		return Math.hypot((sw ? FW - x : x) - p.x, y - p.z, p.y);
 	}
@@ -15315,6 +15320,7 @@
 			return out;
 		}
 		const fx0 = o ? o.x : ball.x, fy0 = o ? o.y : ball.y, vx = o ? o.vx : ball.vx, vy = o ? o.vy : ball.vy;
+		if (camMode === "tv") { return tvShot3D(out, fx0 + vx * 14, fy0 + vy * 14, WX); }
 		let tx = fx0 + vx * 14;
 		const ty = clamp(fy0 + vy * 14, FH * 0.22, FH * 0.78);
 		// The near touchline is closest to the lens, so the view is narrowest there. Clamp the camera
@@ -15329,6 +15335,36 @@
 		out.look.set(WX(tx), 0, ty);
 		return out;
 	}
+	// The TV camera: high in the main stand on the halfway side with a longer lens, like the broadcast
+	// ("tele") view. It shows about the width of the action (two fifths of the pitch on a wide screen,
+	// a little less on a portrait phone, where it climbs higher and pulls back so the pitch still fills
+	// the picture). It glides along the touchline, never faster than about two thirds of the pitch a
+	// second, and barely tilts: the depth it looks at follows the ball across the pitch only a quarter
+	// of the way, slowly, which is what keeps it from making anyone queasy.
+	const TVC = { x: 0, z: 0, at: -1e9 };
+	function tvShot3D (out, bx, by, WX) {
+		const asp = G3.cam.aspect, tall = asp < 1;
+		const fov = tall ? 46 : asp < 1.5 ? 36 : 30, tanX = Math.tan(fov * Math.PI / 360) * asp;
+		// Wider than 16:9 (a phone on its side) the picture is shallower: a touch more pitch across and a
+		// lower angle, so both touchlines still fit.
+		const k = Math.sqrt(Math.max(1, asp / 1.78)), cover = FW * (tall ? 0.13 : 0.36 * k), elev = tall ? 42 * Math.PI / 180 : Math.asin(Math.sin(28 * Math.PI / 180) / k);
+		const dist = cover / tanX, eyeH = dist * Math.sin(elev), back = dist * Math.cos(elev);
+		const half = cover, halfNear = Math.hypot(eyeH, back - FH / 2) * tanX;
+		const wantX = half * 2 >= FW ? FW / 2 : clamp(bx, Math.min(FW / 2, halfNear - MX * 0.55), Math.max(FW / 2, FW - halfNear + MX * 0.55));
+		const wantZ = FH * (tall ? 0.5 : 0.66) + (clamp(by, 0, FH) - FH / 2) * (tall ? 0.6 : 0.25);   // on a wide screen centred a little toward the near side, so both touchlines are in
+		const now = performance.now();
+		if (G3.shot !== "tv" || now - TVC.at > 1000 || reduceMotion) { TVC.x = wantX; TVC.z = wantZ; }   // a cut into the shot
+		else {
+			const dt = Math.min(frameDt, 50), ex = 1 - Math.exp(-dt / 420), ez = 1 - Math.exp(-dt / 1100), cap = FW * 0.65 * dt / 1000;
+			TVC.x += clamp((wantX - TVC.x) * ex, -cap, cap);
+			TVC.z += (wantZ - TVC.z) * ez;
+		}
+		TVC.at = now;
+		out.kind = "tv"; out.fov = fov;
+		out.eye.set(WX(TVC.x), eyeH, TVC.z + back);
+		out.look.set(WX(TVC.x), 0, TVC.z);
+		return out;
+	}
 	const shotWant = { kind: "", eye: null, look: null };
 	function camera3D () {
 		if (!shotWant.eye) { shotWant.eye = new THREE.Vector3(); shotWant.look = new THREE.Vector3(); }
@@ -15338,7 +15374,8 @@
 		G3.cam.fov = shotWant.fov || (shotWant.kind === "follow" ? FOLLOW_FOV : 36);
 		G3.cam.updateProjectionMatrix();
 		// A new shot is a cut; within a shot the camera glides, eased by elapsed time.
-		if (shotWant.kind !== G3.shot) { G3.shot = shotWant.kind; G3.eye.copy(shotWant.eye); G3.look.copy(shotWant.look); }
+		// The TV shot does its own gliding (along the line, and slower in depth), so it is taken as it is.
+		if (shotWant.kind !== G3.shot || shotWant.kind === "tv") { G3.shot = shotWant.kind; G3.eye.copy(shotWant.eye); G3.look.copy(shotWant.look); }
 		else {
 			const ease = reduceMotion ? 1 : 1 - Math.exp(-frameDt / 240);
 			G3.eye.lerp(shotWant.eye, ease); G3.look.lerp(shotWant.look, ease);
@@ -15733,8 +15770,9 @@
 	function drawScene3D () {
 		const st = threeState();
 		if (st === "failed") {
-			setCam(wideScreen ? "tv" : "top");
-			toast("3D view unavailable here (three.js did not load): showing the " + (wideScreen ? "TV" : "overhead") + " camera", "#eef6ea");
+			// The 3D close camera falls back to TV; TV itself (and the saved choice) stays, drawn in 2D from now on.
+			setCam(camMode === "3d" ? (wideScreen ? "tv" : "top") : camMode);
+			toast("3D view unavailable here (three.js did not load): showing the " + (camMode === "top" ? "overhead" : "painted TV") + " camera", "#eef6ea");
 			return false;
 		}
 		if (st === "loading") {
@@ -15809,11 +15847,11 @@
 	// A goal: plan a replay if the 3D view is on and there is enough of the build-up to show.
 	function cueReplay (scorer) {
 		replay = null;
-		if (camMode !== "3d" || !G3.renderer || threeFailed || rec.n < 60 || mode === "tutorial") { return 0; }
+		if (!view3D() || !G3.renderer || threeFailed || rec.n < 60 || mode === "tutorial") { return 0; }
 		replay = { left: REPLAY_AFTER, end: -1, len: 0, angle: (score[0] + score[1]) % 2, goalX: scorer === 0 ? FW : 0, shotY: ball.y };
 		return REPLAY_FR;
 	}
-	const replayOn = () => !!(replay && replay.len > 0 && state === "goal" && celeb && celeb.t >= REPLAY_AT && celeb.t < REPLAY_AT + REPLAY_FR && goalTimer > 70 && camMode === "3d");
+	const replayOn = () => !!(replay && replay.len > 0 && state === "goal" && celeb && celeb.t >= REPLAY_AT && celeb.t < REPLAY_AT + REPLAY_FR && goalTimer > 70 && view3D());
 	// Where the clip is: a fractional frame, 0 at the start.
 	const replayPos = () => clamp((celeb.t - REPLAY_AT) * REPLAY_SPEED, 0, replay.len - 1.001);
 	// Put the recorded moment onto the players, the ball and the officials for drawing; returns
@@ -16685,7 +16723,7 @@
 	const gfxAuto = { on: false, top: "high", ms: 16.7, slow: 0, good: 0, wait: 30, lastUp: -1e9 };
 	const gfxLabel = () => (gfxAuto.on ? `Auto (${GFX_NAME[gfxLevel]})` : GFX_NAME[gfxLevel]);
 	function gfxAutoTick (dt, now) {
-		if (!gfxAuto.on || state !== "play" || camMode !== "3d" || document.hidden || dt > 80) { return; }
+		if (!gfxAuto.on || state !== "play" || !view3D() || document.hidden || dt > 80) { return; }
 		gfxAuto.ms += (dt - gfxAuto.ms) * 0.05;
 		const order = [ "low", "medium", "high" ], i = order.indexOf(gfxLevel), floor = coarse ? 0 : 1;
 		if (i < 0) { return; }   // Light is only ever chosen, never stepped into
@@ -16740,7 +16778,7 @@
 			canvas3d.replaceWith(fresh); canvas3d = fresh; watchCanvas3D(fresh);
 			G3.renderer = null; G3.scene = null; G3.stadium = null; G3.stadiumKey = ""; G3.mats.clear(); G3.fig = null; G3.crowd = null; G3.nets = null; G3.w = 0; G3.shot = ""; G3.lost = false;
 			crowdMat3 = null;
-			show3D(camMode === "3d");
+			show3D(view3D());
 		} else {
 			resize3D();
 		}
@@ -17082,7 +17120,7 @@
 			get restartWalk () { return restartWalk; }, get review () { return review; }, get cpuSubs () { return cpuSubs; }, get surge () { return surge; }, get pressI () { return press; }, formBonus, get lastRatings () { return lastRatings; }, get stretcher () { return stretcher; }, injureTest (t, serious) { const v = outfield(t).find(p => !p.injured); const o = outfield(1 - t)[0]; if (v && o) { tackling[1 - t] = "hard"; const r = Math.random; Math.random = () => 0.01; try { commitFoul(o, v, true); } finally { Math.random = r; } } return v; }, staOf, get offside () { return offside; }, get deadBall () { return deadBall; }, get tally () { return tally; }, get freezeKind () { return freezeKind; }, fkDist () { return fkDist(); }, simExtra () { return { tally, poss: possFrames.slice() }; }, get setPieceKind () { return setPiece ? setPiece.kind : null; }, get gfxLevel () { return gfxLevel; }, get gfxAuto () { return gfxAuto; }, gfxAutoTick, setGfx, get dynScale () { return DYN3.s; }, get dyn () { return DYN3; }, dynSet (v) { DYN3.s = v; DYN3.at = performance.now(); resize3D(); }, dynTick3D, get lightAsk () { return lightAsk; }, lightAskTest () { showLightAsk(); }, lightAskTick, get musicBar () { return music ? music.bar : -1; }, get audioState () { return audio ? audio.state : "none"; }, get replayOn () { return replayOn(); }, get replay () { return replay; }, get recFrames () { return rec.n; }, REPLAY_AT, REPLAY_FR, GOAL_CELEB, get lastCaption () { return lastCaption; }, get lastCommentary () { return lastCommentary; }, moment, commReset () { commAt = -1e9; commRecent = []; },
 			// Pose one player on a spare figure, n frames in a row, right now (no simulation step in between).
 			staffProbe (kind, o = {}) { const F3 = G3.fig; if (!F3) { return null; } const r = F3.rigs[F3.rigs.length - 1], m = { x: FW / 2, y: FH + 13, vx: 0, vy: 0, dir: 0, stride: 0, runAmt: o.run || 0, idlePh: o.ph || 0, role: "staff", team: 0, celebA: o.celebA || 0, kneel: o.kneel || 0 }; r.mir = 1; resetRig3D(r); pose3D(r, m, m.x, m.y, 0, 0, 0); if (kind === "bench") { benchPose3D(r, o.st || 0, o.ph || 0, 0, 0); } else { staffGesture3D(r, kind === "sprint" ? "" : kind, o.ph || 0, kind === "sprint", o.kneel || 0); } r.root.updateMatrixWorld(true); return r; },
-			poseProbe (p, n = 30, ballNear = 0) { const F3 = G3.fig; if (!F3) { return null; } const r = F3.rigs[F3.rigs.length - 1]; r.mir = 1; animLag = 0; for (let k = 0; k < n; k++) { resetRig3D(r); pose3D(r, p, p.x, p.y, p.dir, 0, ballNear, 0, 0); } r.root.updateMatrixWorld(true); return r; }, caption, get camMode () { return camMode; }, get crowdMood () { return crowdMood; }, get frameDt () { return frameDt; }, get crowdBed () { return crowd; }, get soundOn () { return soundOn; },
+			poseProbe (p, n = 30, ballNear = 0) { const F3 = G3.fig; if (!F3) { return null; } const r = F3.rigs[F3.rigs.length - 1]; r.mir = 1; animLag = 0; for (let k = 0; k < n; k++) { resetRig3D(r); pose3D(r, p, p.x, p.y, p.dir, 0, ballNear, 0, 0); } r.root.updateMatrixWorld(true); return r; }, caption, get camMode () { return camMode; }, get view3D () { return view3D(); }, setCam, get crowdMood () { return crowdMood; }, get frameDt () { return frameDt; }, get crowdBed () { return crowd; }, get soundOn () { return soundOn; },
 			human, switchScore, outfield, dist, get cond () { return cond; }, clubSong, isDerby, celebrateTrophy, get fireworks () { return fireworks; }, goalSongTest (id) { const s = goalSong(id); playGoalSong(id); return s; }, chantTest (away) { ensureAudio(); chant(1, !!away); }, stepBallTest () { stepBall(); }, climateTest (n, nat) { return { weather: genForecast(n, nat), wind: genWind(n, nat), ko: genKickoff(n, nat) }; }, rematchTest () { clearLive(); state = "intro"; newMatch(); showIntro(); renderLeague(); },
 			get officials () { return officials3; }, get flagCall () { return flagCall; }, refKit, deltaE,
 			proj (x, y, z) { return G3.cam ? proj3D(x, y, z) : null; }, get viewScale () { return scale; },

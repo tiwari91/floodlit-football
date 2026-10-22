@@ -38,11 +38,11 @@
 	// A goal: plan a replay if the 3D view is on and there is enough of the build-up to show.
 	function cueReplay (scorer) {
 		replay = null;
-		if (camMode !== "3d" || !G3.renderer || threeFailed || rec.n < 60 || mode === "tutorial") { return 0; }
+		if (!view3D() || !G3.renderer || threeFailed || rec.n < 60 || mode === "tutorial") { return 0; }
 		replay = { left: REPLAY_AFTER, end: -1, len: 0, angle: (score[0] + score[1]) % 2, goalX: scorer === 0 ? FW : 0, shotY: ball.y };
 		return REPLAY_FR;
 	}
-	const replayOn = () => !!(replay && replay.len > 0 && state === "goal" && celeb && celeb.t >= REPLAY_AT && celeb.t < REPLAY_AT + REPLAY_FR && goalTimer > 70 && camMode === "3d");
+	const replayOn = () => !!(replay && replay.len > 0 && state === "goal" && celeb && celeb.t >= REPLAY_AT && celeb.t < REPLAY_AT + REPLAY_FR && goalTimer > 70 && view3D());
 	// Where the clip is: a fractional frame, 0 at the start.
 	const replayPos = () => clamp((celeb.t - REPLAY_AT) * REPLAY_SPEED, 0, replay.len - 1.001);
 	// Put the recorded moment onto the players, the ball and the officials for drawing; returns

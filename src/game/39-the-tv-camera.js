@@ -3,8 +3,10 @@
 	// The pitch (with everything painted on it: shadows, rings, lines) is drawn flat into an
 	// offscreen picture, then laid down in perspective one strip at a time; players, the ball,
 	// the goals and the far stand stand up on top of it.
-	// The 3D camera by default on a laptop or desktop with WebGL (TV without it); on a phone the
-	// players would be tiny, so overhead.
+	// That painted picture is now only the stand-in: with WebGL the TV camera is drawn in 3D (three.js),
+	// from a raised broadcast position on the halfway side, and this painted version is used while
+	// three.js loads or where it cannot run.
+	// The TV camera by default on a wide screen; on a portrait phone the players would be tiny, so overhead.
 	const wideScreen = (() => { try { return window.matchMedia("(min-width: 700px)").matches; } catch (e) { return false; } })();
 	const webglOK = (() => {
 		try { const c = document.createElement("canvas"); return !!(window.WebGLRenderingContext && (c.getContext("webgl2") || c.getContext("webgl"))); } catch (e) { return false; }
@@ -14,7 +16,10 @@
 	// Older builds saved under "ff-cam" with a 2D default; that value is ignored (except an explicit
 	// 3D) so it cannot hide the 3D view from someone who never chose a camera at all.
 	const CAM_KEY = "ff-cam2";
-	const defaultCam = () => (wideScreen && !coarse && webglOK ? "3d" : wideScreen ? "tv" : "top");
+	const defaultCam = () => (wideScreen ? "tv" : "top");
+	// Whether the picture is the three.js one: the 3D camera, or the TV camera where WebGL and three.js work.
+	// (threeFailed is set further down, before anything draws.)
+	const view3D = () => (camMode === "3d" || camMode === "tv") && webglOK && !threeFailed;
 	let camMode = (() => {
 		const s = store.get(CAM_KEY) || (store.get("ff-cam") === "3d" ? "3d" : null);
 		return s === "tv" || s === "top" || s === "3d" ? s : defaultCam();
@@ -582,8 +587,8 @@
 		ctx.strokeStyle = "rgba(0, 0, 0, 0.6)"; ctx.lineWidth = 1;
 		ctx.beginPath(); ctx.arc(q.x, q.y, r, 0, Math.PI * 2); ctx.stroke();
 	}
-	const CAM_LABEL = { top: "Camera: overhead", tv: "Camera: TV", "3d": "Camera: 3D" };
-	const CAM_NAME = { top: "Overhead camera", tv: "TV camera", "3d": "3D camera" };
+	const CAM_LABEL = { top: "Camera: overhead", tv: "Camera: TV", "3d": "Camera: 3D close" };
+	const CAM_NAME = { top: "Overhead camera", tv: "TV camera", "3d": "3D close camera" };
 	const nextCam = () => (camMode === "top" ? "tv" : camMode === "tv" && webglOK ? "3d" : "top");
 	// chosen: the player picked this camera (button or C), so remember it. Defaults and the
 	// fallback when 3D cannot be shown are not saved, so 3D comes back once it can.
@@ -594,8 +599,8 @@
 		if (chosen) { store.set(CAM_KEY, m); }
 		const b = $("camBtn");
 		b.textContent = CAM_LABEL[m];
-		b.title = webglOK ? "Switch camera (C): overhead, TV or 3D" : "Switch camera (C): overhead or TV";
+		b.title = webglOK ? "Switch camera (C): overhead, TV or 3D close" : "Switch camera (C): overhead or TV";
 		b.setAttribute("aria-pressed", String(m !== "top"));
-		show3D(m === "3d");
+		show3D(view3D());
 	}
 

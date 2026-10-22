@@ -45,9 +45,9 @@
 	const replayTagEl = $("replayTag");
 	function drawScene () {
 		// The REPLAY tag over the picture while one runs (and no GOAL banner over the replay).
-		const rp = (camMode === "3d" && replayOn()) || !!odr;
+		const rp = (view3D() && replayOn()) || !!odr;
 		if (replayTagEl && replayTagEl.hidden === rp) { replayTagEl.hidden = !rp; if (rp) { banner.hidden = true; } }
-		if (camMode === "3d" && drawScene3D()) { return; }   // while three.js loads, the TV camera stands in
+		if (view3D() && drawScene3D()) { return; }   // while three.js loads, the painted TV camera stands in
 		if ((camMode === "tv" || camMode === "3d") && !benchCam()) { drawSceneTV(); return; }
 		drawSceneTop();
 	}
