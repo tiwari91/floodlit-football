@@ -4166,10 +4166,11 @@
 	function renewPlan (pl, c) {
 		const role = roleOf(pl, c), starter = role === "key" || role === "first", worth = renewWorth(pl, c), o = ovrNow(pl);
 		const prospect = role === "prospect" && (pl.pot || 0) >= o + 6;
+		const backupGk = pl.pos === "gk" && [ ...c.squad, ...c.bench ].filter(q => q.pos === "gk").length <= 2;   // never leave one keeper
 		if (lastSeason(pl)) { return { keep: false, worth, why: `${pl.age}, retiring at the end of the season` }; }
 		if (pl.morale < 40) { return { keep: false, worth, sulk: true, why: `unhappy (morale ${pl.morale}), so he won't talk about a new deal yet` }; }
-		if (!starter && !prospect && pl.age >= 33) { return { keep: false, worth, free: true, why: `${pl.age} and not in the side` }; }
-		if (!starter && !prospect && worth < -4) { return { keep: false, worth, free: true, why: "not needed, others cover his position" }; }
+		if (!starter && !prospect && pl.age >= 33 && !backupGk) { return { keep: false, worth, free: true, why: `${pl.age} and not in the side` }; }
+		if (!starter && !prospect && worth < -4 && !backupGk) { return { keep: false, worth, free: true, why: "not needed, others cover his position" }; }
 		const years = oneYearOnly(pl) || pl.age >= 31 || (!starter && !prospect && (worth < 2 || pl.age > 24)) ? 1 : pl.age <= 25 && (starter || prospect) ? 3 : 2;
 		const rise = role === "key" ? 1.2 : starter ? 1.1 : pl.age >= 31 ? 0.9 : 1;
 		const fee = round1(valueOf(pl) * 0.15 * (years === 1 ? 0.5 : years === 3 ? 1.2 : 1));
@@ -4310,7 +4311,7 @@
 		const plan = assistMode !== "off" && assistDoes("contracts")
 			? stuck.length ? `the assistant can't sign ${listNames(stuck)} yet, see Your team` : "the assistant is sorting their deals"
 			: "offer new deals from the squad list, or the club tries to keep them on in the summer if the money is there";
-		lastDeal = `Contracts ending in ${gamesLeft()} games for ${listNames(names)}: ${plan}.`;
+		lastDeal = `Deals up at the end of the season (${gamesLeft()} games left): ${listNames(names)}. ${plan[0].toUpperCase()}${plan.slice(1)}.`;
 		c.log = [ ...(c.log || []), lastDeal ].slice(-10);
 		league.news = `${league.news || ""} ${lastDeal}`.trim();
 		toast(`Contracts ending: ${due.length} key player${due.length === 1 ? "" : "s"}, see League notes`, "#f2b52e");
@@ -4426,6 +4427,8 @@
 		if (!p) { return; }
 		if (assistMode === "off") { p.textContent = "Off: you renew contracts, answer bids and sign players yourself. Starters in their last year are still kept on in the summer if the money is there."; return; }
 		const c = league && league.club, rep = c && assistDoes("contracts") ? league.assistReport : null;
+		// Saves from before the plain-words report can hold the old note: drop it rather than show it.
+		if (c && /your call|reserve spent|is kept for wages\)|no money yet for new deals/.test(league.assistNote || "")) { league.assistNote = null; if (!rep) { league.assistShort = null; } }
 		if (!rep) { p.textContent = c ? (league.assistNote || `Assistant: nothing to do right now (${assistIdleWhy(c)}). It looks again after every match and when a window opens.`) : ""; return; }
 		// The contracts report as a short list: who signed, who hasn't and why, who is leaving, what next.
 		p.replaceChildren(el("b", "", `Contracts${rep.when ? `, ${rep.when}` : ""}`));
@@ -4897,7 +4900,7 @@
 		const lg = league, c = lg.club, all = [ ...c.squad, ...c.bench ], minApps = Math.max(3, Math.round(lg.round * 0.3));
 		const rated = all.filter(pl => (pl.apps || 0) >= minApps && seasonAvgOf(pl) !== null).sort((a, b) => seasonAvgOf(b) - seasonAvgOf(a));
 		const scorers = all.filter(pl => (pl.goals || 0) > 0).sort((a, b) => b.goals - a.goals || (b.apps || 0) - (a.apps || 0));
-		const young = rated.filter(pl => pl.age <= 21);
+		const young = rated.filter(pl => pl.age <= 21).sort((a, b) => (a === rated[0]) - (b === rated[0]));   // someone else if there is one
 		const rows = standings(), pos = rows.findIndex(r => r.id === 0) + 1;
 		// Manager of the season: the one whose side finished furthest above its standing at the start.
 		const byStr = lg.members.slice().sort((a, b) => getStr(b) - getStr(a)), over = rows.map((r, i) => ({ id: r.id, gain: byStr.indexOf(r.id) - i, i })).sort((a, b) => b.gain - a.gain || a.i - b.i);

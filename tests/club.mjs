@@ -196,6 +196,12 @@ const oldSave = await (async () => {
 	await page.reload(); await page.waitForFunction(() => window.__ff && window.__ff.league && window.__ff.league.club, null, { timeout: 60000 });
 	return page.evaluate(() => { const F = window.__ff; F.renderLeagueTest(); return { cup: F.league.cup && (F.league.cup.none ? "none" : "cup"), card: (document.getElementById("lgExtras") || {}).innerText || "" }; });
 })();
+const oldNote = await (async () => {
+	await page.evaluate(() => { const raw = JSON.parse(localStorage.getItem("ff-league")); raw.assistNote = "Assistant (your call, reserve spent): O. Osei signed on to 3 seasons; no money yet for new deals for U. Ruiz (£0.0m is kept for wages)."; delete raw.assistReport; localStorage.setItem("ff-league", JSON.stringify(raw)); localStorage.setItem("ff-assist", "contracts"); });
+	await page.reload(); await page.waitForFunction(() => window.__ff && window.__ff.league && window.__ff.league.club, null, { timeout: 60000 });
+	return page.evaluate(() => { window.__ff.renderLeagueTest(); return document.getElementById("assistNote").innerText; });
+})();
+check("an old save's jargon note is not shown after the update", !/your call|reserve spent|£0\.0m/.test(oldNote), oldNote);
 check("an old save mid-season loads with no cup this season and an empty academy, no errors", oldSave.cup === "none" && /starts again next season/.test(oldSave.card) && /Academy/.test(oldSave.card), JSON.stringify(oldSave));
 
 // Offers for the manager: a title-winner hears from the big clubs, a bottom finisher only from below.
@@ -310,7 +316,7 @@ const keys = await page.evaluate(() => {
 	const skint = F.keyContracts(c);
 	return { role: F.roleOf(star, c), alerted, news, kept, after, skint, skintNote: F.lastDeal };
 });
-check("the January alert names the important players in their last year", keys.alerted.length >= 1 && /Contracts ending in \d+ games for/.test(keys.news), JSON.stringify(keys));
+check("the January alert names the important players in their last year", keys.alerted.length >= 1 && /Deals up at the end of the season \(\d+ games left\)/.test(keys.news), JSON.stringify(keys));
 check("with the assistant off, a key starter is still kept on in the summer when the money is there", keys.kept.length >= 1 && keys.after.contract >= 2 && keys.after.budget < 5 && /kept on before their deals ran out/.test(keys.after.note), JSON.stringify(keys));
 // The assistant always says something under its control: what it did, or why there was nothing to do.
 const note = await page.evaluate(() => {

@@ -98,7 +98,7 @@
 		const lg = league, c = lg.club, all = [ ...c.squad, ...c.bench ], minApps = Math.max(3, Math.round(lg.round * 0.3));
 		const rated = all.filter(pl => (pl.apps || 0) >= minApps && seasonAvgOf(pl) !== null).sort((a, b) => seasonAvgOf(b) - seasonAvgOf(a));
 		const scorers = all.filter(pl => (pl.goals || 0) > 0).sort((a, b) => b.goals - a.goals || (b.apps || 0) - (a.apps || 0));
-		const young = rated.filter(pl => pl.age <= 21);
+		const young = rated.filter(pl => pl.age <= 21).sort((a, b) => (a === rated[0]) - (b === rated[0]));   // someone else if there is one
 		const rows = standings(), pos = rows.findIndex(r => r.id === 0) + 1;
 		// Manager of the season: the one whose side finished furthest above its standing at the start.
 		const byStr = lg.members.slice().sort((a, b) => getStr(b) - getStr(a)), over = rows.map((r, i) => ({ id: r.id, gain: byStr.indexOf(r.id) - i, i })).sort((a, b) => b.gain - a.gain || a.i - b.i);
