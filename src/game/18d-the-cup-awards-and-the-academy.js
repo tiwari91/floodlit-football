@@ -109,7 +109,7 @@
 			player: line(rated[0], rated[0] ? `average rating ${seasonAvgOf(rated[0]).toFixed(2)} in ${rated[0].apps} games` : ""),
 			scorer: line(scorers[0], scorers[0] ? `${scorers[0].goals} goal${scorers[0].goals === 1 ? "" : "s"}` : ""),
 			young: line(young[0], young[0] ? `${young[0].age}, average rating ${seasonAvgOf(young[0]).toFixed(2)}` : ""),
-			manager: { id: mgr, name: mgr === 0 ? "You" : `${TEAMS[mgr].name}'s manager`, what: mgr === rows[0].id ? `champions with ${rows[0].pts} points` : `${ordinal(rows.findIndex(r => r.id === mgr) + 1)}, well above where they were expected to finish` },
+			manager: { id: mgr, name: mgr === 0 ? "You" : `the ${TEAMS[mgr].name} manager`, what: mgr === rows[0].id ? `champions with ${rows[0].pts} points` : `${ordinal(rows.findIndex(r => r.id === mgr) + 1)}, well above where they were expected to finish` },
 			finish: pos,
 			cup: lg.cup && lg.cup.winner !== null && lg.cup.winner !== undefined ? lg.cup.winner : null
 		};
