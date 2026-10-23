@@ -1318,3 +1318,42 @@
 	/* The ground's name: on the kick-off line-ups and beside each upcoming fixture. */
 	.bc-venue { grid-column: 1 / -1; padding: 6px 12px 0; font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #c9d4cc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	.lg-upcoming .venue, #lgUpcoming .venue { display: block; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	/* The match centre: a small button under the menu toggle, and a compact card on the right of the pitch. */
+	.mc-toggle { position: absolute; top: 46px; right: 10px; z-index: 4; padding: 4px 10px; font-size: 12px; background: rgba(7, 12, 10, 0.82); border: 1px solid var(--rule); border-radius: 4px; color: var(--chalk, #eef6ea); }
+	.mc-toggle[aria-expanded="true"] { border-color: var(--opp-text); }
+	.mc { position: absolute; top: 78px; right: 10px; z-index: 7; width: min(290px, calc(100% - 20px)); max-height: calc(100% - 130px); display: flex; flex-direction: column;
+		background: rgba(9, 14, 12, 0.9); border: 1px solid var(--rule); border-top: 3px solid var(--opp); border-radius: 6px; color: var(--chalk, #eef6ea); font-size: 13px; line-height: 1.35;
+		box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45); backdrop-filter: blur(3px); }
+	.mc[hidden] { display: none; }
+	.mc-head { display: flex; align-items: center; gap: 6px; padding: 6px 6px 4px 8px; border-bottom: 1px solid var(--rule); }
+	.mc-tabs { display: flex; gap: 4px; flex: 1; }
+	.mc-tabs button { padding: 3px 8px; font-size: 12px; border-radius: 3px; background: transparent; border: 1px solid transparent; color: var(--muted); }
+	.mc-tabs button[aria-pressed="true"] { color: var(--chalk, #eef6ea); border-color: var(--rule); background: rgba(255, 255, 255, 0.06); }
+	.mc-close { padding: 0 8px; font-size: 18px; line-height: 1.2; background: transparent; border: 0; color: var(--muted); }
+	.mc-body { overflow-y: auto; padding: 8px 10px 10px; overscroll-behavior: contain; }
+	.mc-team { display: flex; align-items: center; gap: 7px; font-size: 15px; margin-bottom: 6px; }
+	.mc-facts { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 0 0 8px; }
+	.mc-facts dt { color: var(--muted); font-size: 12px; }
+	.mc-facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+	.mc-form { display: inline-flex; gap: 3px; }
+	.mc-form i { font-style: normal; font-weight: 700; font-size: 11px; width: 17px; text-align: center; border-radius: 3px; color: #0d1612; }
+	.mc-form .f-w { background: #5fe08f; } .mc-form .f-d { background: #b9c2c9; } .mc-form .f-l { background: #ef6f79; }
+	.mc h5 { margin: 4px 0 4px; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+	.mc-xi { list-style: none; margin: 0; padding: 0; }
+	.mc-xi li { display: grid; grid-template-columns: 2.1em 2.9em 1fr auto; gap: 4px; padding: 1px 0; border-bottom: 1px solid rgba(238, 246, 234, 0.06); }
+	.mc-xi li.off { opacity: 0.45; text-decoration: line-through; }
+	.mc-xi .num { color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+	.mc-xi .pos { color: var(--opp-text); font-size: 11px; font-weight: 700; align-self: center; }
+	.mc-xi .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.mc-xi .ovr { font-variant-numeric: tabular-nums; }
+	.mc-stats { display: grid; gap: 3px; }
+	.mc-srow { display: grid; grid-template-columns: 4.6em 1fr 4.6em; align-items: center; text-align: center; font-variant-numeric: tabular-nums; }
+	.mc-srow > span { color: var(--muted); font-size: 12px; }
+	.mc-srow .you { text-align: left; color: var(--you-text); } .mc-srow .them { text-align: right; color: var(--opp-text); }
+	.mc-srow b:not(.lead) { font-weight: 500; }
+	.mc-srow .cmp-bar { grid-column: 1 / -1; }
+	.mc-shead { border-bottom: 1px solid var(--rule); padding-bottom: 3px; margin-bottom: 2px; }
+	@media (max-width: 640px) {
+		.mc-toggle { top: 40px; padding: 3px 8px; font-size: 11px; }
+		.mc { top: 68px; right: 6px; width: min(240px, 64%); max-height: calc(100% - 84px); font-size: 12px; }
+	}

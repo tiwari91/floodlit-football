@@ -59,6 +59,7 @@
 44a-trophy-ceremony.js
 45-broadcast-overlays.js
 45a-the-touchline-cam.js
+45b-match-centre.js
 46-replay-on-demand-and-slow-motion.js
 47-loop.js
 48-game-controller-standard-mapping-xbox-pl.js

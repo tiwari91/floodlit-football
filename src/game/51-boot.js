@@ -125,7 +125,7 @@
 	// Offside, the two commentators and the chants.
 	if (window.__ff) { Object.assign(window.__ff, { kickTest (p, x, y, sp, restart) { if (restart) { deadBall = { kind: restart, taker: p }; } ball.owner = null; kick(p, x, y, sp); }, aerialTest (t) { lastTouch = t; return aerial(); }, chantLogTest () { return chantLog.slice(); }, CALLERS, COLOUR, GOAL_SHOUT, goalShout }); }
 	if (window.__ff) { Object.assign(window.__ff, { trophyCeremony, ceremonySeek, ceremonyInfo, endCeremony, queueTrophy, trophyDue, lastCeremony: () => lastCeremony }); }
-	if (window.__ff) { Object.assign(window.__ff, { setOpponent, yourKit, matchGround, welcomeCall }); }
+	if (window.__ff) { Object.assign(window.__ff, { setOpponent, yourKit, matchGround, welcomeCall, openMatchCentre, closeMatchCentre, formOf }); }
 	if (window.__ff) { Object.assign(window.__ff, { ensureCont, contNight, contFixture, contSimAll, contQualify, contNext, ccTable, ccAgg, ccWinner, renderCont, CC_NIGHTS, currentFixture, simulateMine, restoreGuest, saveLeague, renderLeague }); }
 
 	const hot = window.claude && window.claude.hot;

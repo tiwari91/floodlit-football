@@ -1339,6 +1339,45 @@
 	/* The ground's name: on the kick-off line-ups and beside each upcoming fixture. */
 	.bc-venue { grid-column: 1 / -1; padding: 6px 12px 0; font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #c9d4cc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	.lg-upcoming .venue, #lgUpcoming .venue { display: block; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	/* The match centre: a small button under the menu toggle, and a compact card on the right of the pitch. */
+	.mc-toggle { position: absolute; top: 46px; right: 10px; z-index: 4; padding: 4px 10px; font-size: 12px; background: rgba(7, 12, 10, 0.82); border: 1px solid var(--rule); border-radius: 4px; color: var(--chalk, #eef6ea); }
+	.mc-toggle[aria-expanded="true"] { border-color: var(--opp-text); }
+	.mc { position: absolute; top: 78px; right: 10px; z-index: 7; width: min(290px, calc(100% - 20px)); max-height: calc(100% - 130px); display: flex; flex-direction: column;
+		background: rgba(9, 14, 12, 0.9); border: 1px solid var(--rule); border-top: 3px solid var(--opp); border-radius: 6px; color: var(--chalk, #eef6ea); font-size: 13px; line-height: 1.35;
+		box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45); backdrop-filter: blur(3px); }
+	.mc[hidden] { display: none; }
+	.mc-head { display: flex; align-items: center; gap: 6px; padding: 6px 6px 4px 8px; border-bottom: 1px solid var(--rule); }
+	.mc-tabs { display: flex; gap: 4px; flex: 1; }
+	.mc-tabs button { padding: 3px 8px; font-size: 12px; border-radius: 3px; background: transparent; border: 1px solid transparent; color: var(--muted); }
+	.mc-tabs button[aria-pressed="true"] { color: var(--chalk, #eef6ea); border-color: var(--rule); background: rgba(255, 255, 255, 0.06); }
+	.mc-close { padding: 0 8px; font-size: 18px; line-height: 1.2; background: transparent; border: 0; color: var(--muted); }
+	.mc-body { overflow-y: auto; padding: 8px 10px 10px; overscroll-behavior: contain; }
+	.mc-team { display: flex; align-items: center; gap: 7px; font-size: 15px; margin-bottom: 6px; }
+	.mc-facts { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 0 0 8px; }
+	.mc-facts dt { color: var(--muted); font-size: 12px; }
+	.mc-facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+	.mc-form { display: inline-flex; gap: 3px; }
+	.mc-form i { font-style: normal; font-weight: 700; font-size: 11px; width: 17px; text-align: center; border-radius: 3px; color: #0d1612; }
+	.mc-form .f-w { background: #5fe08f; } .mc-form .f-d { background: #b9c2c9; } .mc-form .f-l { background: #ef6f79; }
+	.mc h5 { margin: 4px 0 4px; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+	.mc-xi { list-style: none; margin: 0; padding: 0; }
+	.mc-xi li { display: grid; grid-template-columns: 2.1em 2.9em 1fr auto; gap: 4px; padding: 1px 0; border-bottom: 1px solid rgba(238, 246, 234, 0.06); }
+	.mc-xi li.off { opacity: 0.45; text-decoration: line-through; }
+	.mc-xi .num { color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+	.mc-xi .pos { color: var(--opp-text); font-size: 11px; font-weight: 700; align-self: center; }
+	.mc-xi .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.mc-xi .ovr { font-variant-numeric: tabular-nums; }
+	.mc-stats { display: grid; gap: 3px; }
+	.mc-srow { display: grid; grid-template-columns: 4.6em 1fr 4.6em; align-items: center; text-align: center; font-variant-numeric: tabular-nums; }
+	.mc-srow > span { color: var(--muted); font-size: 12px; }
+	.mc-srow .you { text-align: left; color: var(--you-text); } .mc-srow .them { text-align: right; color: var(--opp-text); }
+	.mc-srow b:not(.lead) { font-weight: 500; }
+	.mc-srow .cmp-bar { grid-column: 1 / -1; }
+	.mc-shead { border-bottom: 1px solid var(--rule); padding-bottom: 3px; margin-bottom: 2px; }
+	@media (max-width: 640px) {
+		.mc-toggle { top: 40px; padding: 3px 8px; font-size: 11px; }
+		.mc { top: 68px; right: 6px; width: min(240px, 64%); max-height: calc(100% - 84px); font-size: 12px; }
+	}
 </style>
 
 <main class="wrap">
@@ -1374,6 +1413,11 @@
 		<button class="simchip" id="simChip" type="button" hidden title="Let the computer play out the rest of this match">Simulate the rest</button>
 		<div class="coachmark lightask" id="lightAsk" role="dialog" aria-label="Graphics suggestion" hidden><span>Switch to Light graphics to keep things cooler?</span><button id="lightAskYes" type="button" class="primary">Switch</button><button id="lightAskNo" type="button">Not now</button></div>
 		<button class="menutoggle" id="menuToggle" type="button" aria-pressed="true" title="Show or hide the page menu and settings (F)">Show menu</button>
+		<button class="mc-toggle" id="mcToggle" type="button" aria-expanded="false" aria-controls="matchCentre" title="The other side and the live match stats (O)" hidden>Match info</button>
+		<aside class="mc" id="matchCentre" aria-label="Match centre" hidden>
+			<div class="mc-head"><div class="mc-tabs" role="group" aria-label="Show"><button type="button" data-mc="opp" aria-pressed="true">Opponent</button><button type="button" data-mc="stats" aria-pressed="false">Live stats</button></div><button type="button" class="mc-close" id="mcClose" aria-label="Close match info" title="Close (O)">&times;</button></div>
+			<div class="mc-body" id="mcBody"></div>
+		</aside>
 		<div class="scorebug" id="scoreBug" aria-hidden="true"><i class="chip l"></i><span id="bugHome">You</span><b id="bugScore">0 – 0</b><span id="bugAway">CPU</span><i class="chip r"></i><span class="t" id="bugClock">03:00</span><span class="add" id="bugAdded" hidden>+1</span><span class="bugbar"><span class="mfill" id="bugFill"></span></span><span class="bugmood" id="bugMood" hidden></span></div>
 		<div class="lower" id="lowerThird" aria-hidden="true" hidden><span class="lt-tag" id="ltTag">Goal</span><span class="lt-main"><b id="ltName"></b><small id="ltSub"></small></span></div>
 		<div class="comm" id="commLine" aria-live="polite" hidden><span class="comm-mic" aria-hidden="true"></span><span id="commText"></span></div>
@@ -19903,6 +19947,110 @@
 			});
 		}
 	}
+	/* ---------- the match centre ----------
+	   While you play, a small button under the menu toggle (or the O key) opens a compact card on the
+	   right of the pitch: the other side (their shape and style, the eleven on the pitch with positions
+	   and ratings, their form, manager and place in the table) and the live numbers for both sides.
+	   It is closed by default, never opens by itself, scrolls inside itself and refreshes once a second
+	   while it is open, so the pitch stays yours. */
+	let mcTab = "opp", mcTimer = 0;
+	const mcLive = () => (mode === "league" || mode === "friendly") && [ "play", "goal", "paused", "half" ].includes(state) && !bulkSim;
+	// Their last five league results, oldest first.
+	function formOf (id) {
+		if (!league || !Array.isArray(league.results)) { return []; }
+		const out = [];
+		for (let r = league.round - 1; r >= 0 && out.length < 5; r--) {
+			const g = (league.results[r] || []).find(([ h, a ]) => h === id || a === id);
+			if (!g) { continue; }
+			const d = g[0] === id ? g[2] - g[3] : g[3] - g[2];
+			out.push(d > 0 ? "W" : d < 0 ? "L" : "D");
+		}
+		return out.reverse();
+	}
+	function mcOpp () {
+		const id = leagueMatch ? leagueMatch.opp : null, box = el("div", "mc-opp");
+		const head = el("div", "mc-team");
+		head.append(dotFor(opp), el("b", "", opp.name));
+		box.append(head);
+		const facts = el("dl", "mc-facts"), fact = (k, v) => { if (v) { facts.append(el("dt", "", k), el("dd", "", v)); } };
+		const shape = SHAPES[fmtKey] && SHAPES[fmtKey][teamShape[1]] ? SHAPES[fmtKey][teamShape[1]].label : FMT.label;
+		fact("Shape", shape);
+		fact("Style", `${STYLES[style[1]] || ""}${PRESSES[press[1]] ? `, ${PRESSES[press[1]].toLowerCase()}` : ""}`);
+		if (id !== null && league) {
+			const rows = standings(), pos = rows.findIndex(r => r.id === id) + 1;
+			if (pos) { fact("League", `${ordinal(pos)} of ${rows.length}, ${rows[pos - 1].pts} pts`); }
+			const f = formOf(id);
+			if (f.length) {
+				const dd = el("span", "mc-form");
+				for (const x of f) { dd.append(el("i", `f-${x.toLowerCase()}`, x)); }
+				const v = el("dd");
+				v.setAttribute("aria-label", `Last ${f.length}: ${f.join(" ")}`);
+				v.append(dd);
+				facts.append(el("dt", "", "Form"), v);
+			}
+		}
+		fact("Manager", opp.manager ? `${opp.manager}${NATIONS[opp.managerNat] ? ` (${NATIONS[opp.managerNat][0]})` : ""}` : "");
+		box.append(facts);
+		const ol = el("ol", "mc-xi");
+		for (const p of team(1)) {
+			const src = typeof oppSquad !== "undefined" && oppSquad ? oppSquad[p.sqi] : null;
+			const role = FMT.roles[p.idx] || (src && src.pos) || "";
+			const li = el("li", dismissed.some(d => Array.isArray(d) && d[0] === 1 && d[1] === p.idx) ? "off" : "");
+			li.append(el("span", "num", String(p.num || "")), el("span", "pos", POS_LABEL[role] || ""), el("span", "nm", p.name || (p.role === "gk" ? "Keeper" : "Player")), el("b", "ovr", src ? String(ovrOf(src)) : ""));
+			ol.append(li);
+		}
+		box.append(el("h5", "", "On the pitch"), ol);
+		return box;
+	}
+	function mcStats () {
+		const tot = possFrames[0] + possFrames[1], poss = tot ? Math.round(100 * possFrames[0] / tot) : 50, s = matchStats(poss);
+		const tb = el("div", "mc-stats");
+		const head = el("div", "mc-srow mc-shead");
+		head.append(el("b", "you", s.you), el("span", "", fmtClock(timeLeft, matchLen)), el("b", "them", s.them));
+		tb.append(head);
+		for (const [ label, a, b, na, nb, kind ] of s.rows) {
+			const row = el("div", "mc-srow"), va = Number.isFinite(na) ? na : Number(a), vb = Number.isFinite(nb) ? nb : Number(b);
+			const A = el("b", "you", String(a)), B = el("b", "them", String(b));
+			if (Number.isFinite(va) && Number.isFinite(vb) && va !== vb) { (va > vb ? A : B).classList.add("lead"); }
+			row.append(A, el("span", "", label), B);
+			if (kind === "poss") { const bar = el("i", "cmp-bar"), fill = el("em"); fill.style.width = `${clamp(poss, 0, 100)}%`; bar.append(fill); row.append(bar); }
+			tb.append(row);
+		}
+		return tb;
+	}
+	function renderMatchCentre () {
+		const box = $("matchCentre");
+		if (!box || box.hidden) { return; }
+		if (!mcLive() || !opp) { closeMatchCentre(); return; }
+		for (const b of box.querySelectorAll("[data-mc]")) { b.setAttribute("aria-pressed", String(b.dataset.mc === mcTab)); }
+		$("mcBody").replaceChildren(mcTab === "opp" ? mcOpp() : mcStats());
+	}
+	function openMatchCentre (tab) {
+		if (!mcLive()) { return false; }
+		if (tab) { mcTab = tab; }
+		$("matchCentre").hidden = false;
+		$("mcToggle").setAttribute("aria-expanded", "true");
+		renderMatchCentre();
+		clearInterval(mcTimer);
+		mcTimer = setInterval(renderMatchCentre, 1000);
+		return true;
+	}
+	function closeMatchCentre () {
+		clearInterval(mcTimer);
+		$("matchCentre").hidden = true;
+		$("mcToggle").setAttribute("aria-expanded", "false");
+	}
+	const toggleMatchCentre = tab => ($("matchCentre").hidden ? openMatchCentre(tab) : closeMatchCentre());
+	$("mcToggle").addEventListener("click", e => { toggleMatchCentre(); e.currentTarget.blur(); canvas.focus?.(); });
+	$("mcClose").addEventListener("click", () => { closeMatchCentre(); canvas.focus?.(); });
+	for (const b of document.querySelectorAll("#matchCentre [data-mc]")) { b.addEventListener("click", () => { mcTab = b.dataset.mc; renderMatchCentre(); }); }
+	window.addEventListener("keydown", e => {
+		if (e.code !== "KeyO" || e.repeat || e.ctrlKey || e.metaKey || e.altKey || /^(INPUT|SELECT|TEXTAREA)$/.test((e.target && e.target.tagName) || "")) { return; }
+		if (!mcLive()) { return; }
+		toggleMatchCentre();
+	});
+	// The button shows only while a match is on (not the tutorial or the shootout).
+	setInterval(() => { const on = mcLive(), t = $("mcToggle"); if (t.hidden === on) { t.hidden = !on; } if (!on && !$("matchCentre").hidden) { closeMatchCentre(); } }, 500);
 	/* ---------- replay on demand, and slow motion ----------
 	   R (or the Replay pad) shows the last six seconds again from the same recording, a touch slower
 	   than life, in whichever view is on. Nothing moves on meanwhile and the clock stands still. Any
@@ -20762,7 +20910,7 @@
 	// Offside, the two commentators and the chants.
 	if (window.__ff) { Object.assign(window.__ff, { kickTest (p, x, y, sp, restart) { if (restart) { deadBall = { kind: restart, taker: p }; } ball.owner = null; kick(p, x, y, sp); }, aerialTest (t) { lastTouch = t; return aerial(); }, chantLogTest () { return chantLog.slice(); }, CALLERS, COLOUR, GOAL_SHOUT, goalShout }); }
 	if (window.__ff) { Object.assign(window.__ff, { trophyCeremony, ceremonySeek, ceremonyInfo, endCeremony, queueTrophy, trophyDue, lastCeremony: () => lastCeremony }); }
-	if (window.__ff) { Object.assign(window.__ff, { setOpponent, yourKit, matchGround, welcomeCall }); }
+	if (window.__ff) { Object.assign(window.__ff, { setOpponent, yourKit, matchGround, welcomeCall, openMatchCentre, closeMatchCentre, formOf }); }
 	if (window.__ff) { Object.assign(window.__ff, { ensureCont, contNight, contFixture, contSimAll, contQualify, contNext, ccTable, ccAgg, ccWinner, renderCont, CC_NIGHTS, currentFixture, simulateMine, restoreGuest, saveLeague, renderLeague }); }
 
 	const hot = window.claude && window.claude.hot;

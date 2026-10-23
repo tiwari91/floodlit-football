@@ -32,6 +32,11 @@
 		<button class="simchip" id="simChip" type="button" hidden title="Let the computer play out the rest of this match">Simulate the rest</button>
 		<div class="coachmark lightask" id="lightAsk" role="dialog" aria-label="Graphics suggestion" hidden><span>Switch to Light graphics to keep things cooler?</span><button id="lightAskYes" type="button" class="primary">Switch</button><button id="lightAskNo" type="button">Not now</button></div>
 		<button class="menutoggle" id="menuToggle" type="button" aria-pressed="true" title="Show or hide the page menu and settings (F)">Show menu</button>
+		<button class="mc-toggle" id="mcToggle" type="button" aria-expanded="false" aria-controls="matchCentre" title="The other side and the live match stats (O)" hidden>Match info</button>
+		<aside class="mc" id="matchCentre" aria-label="Match centre" hidden>
+			<div class="mc-head"><div class="mc-tabs" role="group" aria-label="Show"><button type="button" data-mc="opp" aria-pressed="true">Opponent</button><button type="button" data-mc="stats" aria-pressed="false">Live stats</button></div><button type="button" class="mc-close" id="mcClose" aria-label="Close match info" title="Close (O)">&times;</button></div>
+			<div class="mc-body" id="mcBody"></div>
+		</aside>
 		<div class="scorebug" id="scoreBug" aria-hidden="true"><i class="chip l"></i><span id="bugHome">You</span><b id="bugScore">0 – 0</b><span id="bugAway">CPU</span><i class="chip r"></i><span class="t" id="bugClock">03:00</span><span class="add" id="bugAdded" hidden>+1</span><span class="bugbar"><span class="mfill" id="bugFill"></span></span><span class="bugmood" id="bugMood" hidden></span></div>
 		<div class="lower" id="lowerThird" aria-hidden="true" hidden><span class="lt-tag" id="ltTag">Goal</span><span class="lt-main"><b id="ltName"></b><small id="ltSub"></small></span></div>
 		<div class="comm" id="commLine" aria-live="polite" hidden><span class="comm-mic" aria-hidden="true"></span><span id="commText"></span></div>
