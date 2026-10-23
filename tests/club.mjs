@@ -269,11 +269,12 @@ const agent = await page.evaluate(() => {
 	const shown = document.querySelectorAll("#agentOffers li").length, title = document.getElementById("agentTitle").hidden;
 	const key = home ? `club:${home.id}` : null;
 	const ok = key ? F.agreeApproach(key) : false;
-	const end = F.offerJobs(10);
-	return { n: offers.length, kinds: offers.map(o => o.kind), shown, title, ok, agreedFirst: end[0] && end[0].agreed === true && end[0].id === (home && home.id), agreedCleared: !lg.agreed };
+	const homeName = home ? F.TEAMS[home.id].name : null;
+	F.offerJobs(10);
+	return { n: offers.length, kinds: offers.map(o => o.kind), shown, title, ok, moved: F.YOU.name === homeName && (F.league.jobOffers || []).length === 0, note: F.lastDeal, agreedCleared: !F.league.agreed };
 });
 check("the agent brings January approaches, shown under Your agent", agent.n >= 1 && agent.kinds.includes("home") && agent.shown === agent.n && !agent.title, JSON.stringify(agent));
-check("an agreed approach heads the season-end offers", agent.ok && agent.agreedFirst && agent.agreedCleared, JSON.stringify(agent));
+check("an agreed approach goes through on its own when the season ends", agent.ok && agent.moved && agent.agreedCleared && /^As agreed in January, you have moved to /.test(agent.note), JSON.stringify(agent));
 
 // Abroad: a new identity, a fresh squad from the region, a new league, the career kept.
 const abroad = await page.evaluate(() => {

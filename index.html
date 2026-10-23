@@ -4551,7 +4551,18 @@
 		// What you agreed with your agent in January comes first.
 		if (lg.agreed) { lg.jobOffers.unshift({ ...lg.agreed, agreed: true }); lg.agreed = null; }
 		lg.career = { ...(lg.career || { clubs: [ YOU.name ] }), history: [ ...((lg.career && lg.career.history) || []), { season: lg.season, club: YOU.name, pos } ] };
-		return lg.jobOffers;
+		honourAgreed();
+		return (league && league.jobOffers) || [];
+	}
+	// A move you agreed in January goes through on its own when the season ends: no second click.
+	// Also run at load, for a save that stopped with an agreed offer still waiting in the list.
+	function honourAgreed () {
+		const o = league && (league.jobOffers || []).find(x => x.agreed);
+		if (!o) { return false; }
+		const name = o.name || TEAMS[o.id].name;
+		if (!takeOffer(offerKey(o))) { return false; }
+		lastDeal = `As agreed in January, you have moved to ${name}. ${lastDeal}`;
+		return true;
 	}
 	// A club abroad: its region, country and name from the markets, its stature from how you did.
 	function abroadOffer (pos) {
@@ -17011,6 +17022,7 @@
 		$("modeFriendly").setAttribute("aria-pressed", String(mode === "friendly"));
 		diffSel.disabled = weatherSel.disabled = groundSel.disabled = mode === "league";
 		if (mode === "league" && !league) { newSeason(fmtSel.value); }
+		if (league && typeof honourAgreed === "function") { honourAgreed(); }
 
 		newMatch();
 		showIntro();
@@ -17044,7 +17056,7 @@
 			get autoSwitchMode () { return autoSwitchMode; }, set autoSwitchMode (v) { autoSwitchMode = v; autoSwitchSel.value = v; },
 			get assistMode () { return assistMode; }, setAssist, assistRun, get lastDeal () { return lastDeal; }, valueOf, ovrNow, windowOpen,
 			offerJobs, takeJob, declineJob, get YOU () { return YOU; }, get TEAMS () { return TEAMS; },
-			agentApproaches, agreeApproach, moveAbroad, takeOffer, assistShortlist, assistBuy, scoutShortlist, bestOffer, inheritSetup, keyContracts, contractAlerts, roleOf, slotsFor, renderAssistNote, assistRenewAnyway, retireVeterans, renewDeal, benchReact, get tlc () { return tlc; }, set tlcLast (v) { tlcLast = v; }, divisionName, applyForeignLeague, commitFoul, board, halfTime, toast, staffReact, get staff3 () { return staff3; }, get setPiece () { return setPiece; }, simulateMineTest () { simulateMine(); }, ensureClub, validLeague: typeof validLeague === "function" ? validLeague : null, get mode () { return mode; }, finishTutorialTest () { if (!tut) { return false; } tut.step = TUT.length - 1; nextTutStep(); return true; },
+			agentApproaches, agreeApproach, honourAgreed, moveAbroad, takeOffer, assistShortlist, assistBuy, scoutShortlist, bestOffer, inheritSetup, keyContracts, contractAlerts, roleOf, slotsFor, renderAssistNote, assistRenewAnyway, retireVeterans, renewDeal, benchReact, get tlc () { return tlc; }, set tlcLast (v) { tlcLast = v; }, divisionName, applyForeignLeague, commitFoul, board, halfTime, toast, staffReact, get staff3 () { return staff3; }, get setPiece () { return setPiece; }, simulateMineTest () { simulateMine(); }, ensureClub, validLeague: typeof validLeague === "function" ? validLeague : null, get mode () { return mode; }, finishTutorialTest () { if (!tut) { return false; } tut.step = TUT.length - 1; nextTutStep(); return true; },
 			get autoHold () { return autoHold; }, set autoHold (v) { autoHold = v; },
 			get charging () { return charging; }, get passCharge () { return passCharge; }, get meterRect () { return meterRect; }, get drawMs () { return drawMs; }, get drawn () { return drawn; }, frameDue, get scale () { return scale; }, get kits () { return KITS; }, get stats () { return stats; }, get oppStats () { return oppStats; }, get steerAt () { return steerAt; }, set steerAt (v) { steerAt = v; }, set possTeam (v) { possTeam = v; },
 			set steerSwitchDone (v) { steerSwitchDone = !!v; },

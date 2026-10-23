@@ -38,7 +38,18 @@
 		// What you agreed with your agent in January comes first.
 		if (lg.agreed) { lg.jobOffers.unshift({ ...lg.agreed, agreed: true }); lg.agreed = null; }
 		lg.career = { ...(lg.career || { clubs: [ YOU.name ] }), history: [ ...((lg.career && lg.career.history) || []), { season: lg.season, club: YOU.name, pos } ] };
-		return lg.jobOffers;
+		honourAgreed();
+		return (league && league.jobOffers) || [];
+	}
+	// A move you agreed in January goes through on its own when the season ends: no second click.
+	// Also run at load, for a save that stopped with an agreed offer still waiting in the list.
+	function honourAgreed () {
+		const o = league && (league.jobOffers || []).find(x => x.agreed);
+		if (!o) { return false; }
+		const name = o.name || TEAMS[o.id].name;
+		if (!takeOffer(offerKey(o))) { return false; }
+		lastDeal = `As agreed in January, you have moved to ${name}. ${lastDeal}`;
+		return true;
 	}
 	// A club abroad: its region, country and name from the markets, its stature from how you did.
 	function abroadOffer (pos) {
