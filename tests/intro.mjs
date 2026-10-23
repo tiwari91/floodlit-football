@@ -131,6 +131,17 @@ const run = await page.evaluate(async () => {
 	return { shot, moved: Math.round(moved), kneel: +(m.kneel || 0).toFixed(2) };
 });
 check("a goal can send the manager down the touchline, and the broadcast cuts to him", run.skip !== undefined || (run.shot === "boss" && run.moved > 60), JSON.stringify(run));
+const chip = await page.evaluate(async () => {
+	const F = window.__ff; for (let i = 0; i < 4000 && F.state !== "play"; i++) { F.step(1); }
+	document.body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+	const fresh = F.renderSimChip(performance.now());
+	const idle = F.renderSimChip(performance.now() + 60000);
+	const shown = !document.getElementById("simChip").hidden;
+	document.getElementById("simChip").click();
+	await new Promise(r => setTimeout(r, 300));
+	return { fresh, idle, shown, after: F.state };
+});
+check("after a spell with no input, a Simulate the rest button on the pitch plays out the match", !chip.fresh && chip.idle && chip.shown && chip.after !== "play", JSON.stringify(chip));
 await ctx.close();
 
 check("no console errors", errs.length === 0, errs.join(" | "));

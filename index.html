@@ -1215,6 +1215,10 @@
 }
 .wipe.go::before { animation: wipe 0.56s cubic-bezier(0.55, 0, 0.35, 1) forwards; }
 @keyframes wipe { from { left: -70%; } to { left: 115%; } }
+
+/* Simulate the rest, on the pitch itself once the computer has been playing for you a while. */
+.simchip { position: absolute; right: 12px; top: 12px; z-index: 6; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--amber); background: rgba(12, 18, 24, 0.82); color: var(--amber); font-weight: 600; font-size: 14px; cursor: pointer; }
+.simchip:hover, .simchip:focus-visible { background: rgba(12, 18, 24, 0.95); }
 </style>
 
 <main class="wrap">
@@ -1247,6 +1251,7 @@
 		<canvas id="pitch3d" hidden aria-hidden="true"></canvas>
 		<canvas id="pitch" aria-label="Football pitch"></canvas>
 		<div class="coachmark" id="coachMark" role="note" hidden><span>Hold <kbd>D</kbd> to shoot, <kbd>S</kbd> to pass, <kbd>E</kbd> to sprint</span><button id="coachClose" type="button" aria-label="Dismiss tip" title="Got it">Got it</button></div>
+		<button class="simchip" id="simChip" type="button" hidden title="Let the computer play out the rest of this match">Simulate the rest</button>
 		<div class="coachmark lightask" id="lightAsk" role="dialog" aria-label="Graphics suggestion" hidden><span>Switch to Light graphics to keep things cooler?</span><button id="lightAskYes" type="button" class="primary">Switch</button><button id="lightAskNo" type="button">Not now</button></div>
 		<button class="menutoggle" id="menuToggle" type="button" aria-pressed="true" title="Show or hide the page menu and settings (F)">Show menu</button>
 		<div class="scorebug" id="scoreBug" aria-hidden="true"><i class="chip l"></i><span id="bugHome">You</span><b id="bugScore">0 – 0</b><span id="bugAway">CPU</span><i class="chip r"></i><span class="t" id="bugClock">03:00</span><span class="add" id="bugAdded" hidden>+1</span><span class="bugbar"><span class="mfill" id="bugFill"></span></span><span class="bugmood" id="bugMood" hidden></span></div>
@@ -16602,6 +16607,23 @@
 		if (state === "play") { state = "paused"; charging = false; }
 		simulateMine();
 	});
+	// Left the computer to it? After a few seconds with no key, click or touch, a button on the pitch
+	// itself offers to simulate the rest: the bar's Simulate button sits below the fold in full screen.
+	const SIM_CHIP_IDLE_MS = 8000;
+	let lastHumanInput = performance.now();
+	for (const t of [ "keydown", "pointerdown", "touchstart" ]) { window.addEventListener(t, () => { lastHumanInput = performance.now(); }, { passive: true, capture: true }); }
+	function renderSimChip (now = performance.now()) {
+		const chip = $("simChip");
+		const show = state === "play" && mode !== "tutorial" && mode !== "corners" && now - lastHumanInput > SIM_CHIP_IDLE_MS;
+		if (chip.hidden === show) { chip.hidden = !show; }
+		return show;
+	}
+	setInterval(renderSimChip, 500);
+	$("simChip").addEventListener("click", e => {
+		e.currentTarget.blur(); e.currentTarget.hidden = true;
+		if (state === "play") { state = "paused"; charging = false; }
+		simulateMine();
+	});
 	pauseBtn.addEventListener("click", () => {
 		if (state === "play") { pause(); } else if (state === "paused") { startPlay(); }
 	});
@@ -17143,7 +17165,7 @@
 			get autoSwitchMode () { return autoSwitchMode; }, set autoSwitchMode (v) { autoSwitchMode = v; autoSwitchSel.value = v; },
 			get assistMode () { return assistMode; }, setAssist, assistRun, get lastDeal () { return lastDeal; }, valueOf, ovrNow, windowOpen,
 			offerJobs, takeJob, declineJob, get YOU () { return YOU; }, get TEAMS () { return TEAMS; },
-			agentApproaches, agreeApproach, honourAgreed, moveAbroad, takeOffer, assistShortlist, assistBuy, scoutShortlist, bestOffer, inheritSetup, keyContracts, contractAlerts, roleOf, slotsFor, renderAssistNote, assistRenewAnyway, retireVeterans, renewDeal, benchReact, get tlc () { return tlc; }, set tlcLast (v) { tlcLast = v; }, divisionName, applyForeignLeague, commitFoul, board, halfTime, toast, staffReact, get staff3 () { return staff3; }, get setPiece () { return setPiece; }, simulateMineTest () { simulateMine(); }, ensureClub, validLeague: typeof validLeague === "function" ? validLeague : null, get mode () { return mode; }, finishTutorialTest () { if (!tut) { return false; } tut.step = TUT.length - 1; nextTutStep(); return true; },
+			agentApproaches, agreeApproach, honourAgreed, renderSimChip, moveAbroad, takeOffer, assistShortlist, assistBuy, scoutShortlist, bestOffer, inheritSetup, keyContracts, contractAlerts, roleOf, slotsFor, renderAssistNote, assistRenewAnyway, retireVeterans, renewDeal, benchReact, get tlc () { return tlc; }, set tlcLast (v) { tlcLast = v; }, divisionName, applyForeignLeague, commitFoul, board, halfTime, toast, staffReact, get staff3 () { return staff3; }, get setPiece () { return setPiece; }, simulateMineTest () { simulateMine(); }, ensureClub, validLeague: typeof validLeague === "function" ? validLeague : null, get mode () { return mode; }, finishTutorialTest () { if (!tut) { return false; } tut.step = TUT.length - 1; nextTutStep(); return true; },
 			get autoHold () { return autoHold; }, set autoHold (v) { autoHold = v; },
 			get charging () { return charging; }, get passCharge () { return passCharge; }, get meterRect () { return meterRect; }, get drawMs () { return drawMs; }, get drawn () { return drawn; }, frameDue, get scale () { return scale; }, get kits () { return KITS; }, get stats () { return stats; }, get oppStats () { return oppStats; }, get steerAt () { return steerAt; }, set steerAt (v) { steerAt = v; }, set possTeam (v) { possTeam = v; },
 			set steerSwitchDone (v) { steerSwitchDone = !!v; },

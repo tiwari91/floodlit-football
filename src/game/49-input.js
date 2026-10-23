@@ -119,6 +119,23 @@
 		if (state === "play") { state = "paused"; charging = false; }
 		simulateMine();
 	});
+	// Left the computer to it? After a few seconds with no key, click or touch, a button on the pitch
+	// itself offers to simulate the rest: the bar's Simulate button sits below the fold in full screen.
+	const SIM_CHIP_IDLE_MS = 8000;
+	let lastHumanInput = performance.now();
+	for (const t of [ "keydown", "pointerdown", "touchstart" ]) { window.addEventListener(t, () => { lastHumanInput = performance.now(); }, { passive: true, capture: true }); }
+	function renderSimChip (now = performance.now()) {
+		const chip = $("simChip");
+		const show = state === "play" && mode !== "tutorial" && mode !== "corners" && now - lastHumanInput > SIM_CHIP_IDLE_MS;
+		if (chip.hidden === show) { chip.hidden = !show; }
+		return show;
+	}
+	setInterval(renderSimChip, 500);
+	$("simChip").addEventListener("click", e => {
+		e.currentTarget.blur(); e.currentTarget.hidden = true;
+		if (state === "play") { state = "paused"; charging = false; }
+		simulateMine();
+	});
 	pauseBtn.addEventListener("click", () => {
 		if (state === "play") { pause(); } else if (state === "paused") { startPlay(); }
 	});
