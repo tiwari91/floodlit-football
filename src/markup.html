@@ -97,196 +97,83 @@
 			<button id="moreBtn" type="button" aria-expanded="false">More…</button>
 			<span class="note" id="nextNote" hidden>Applies from the next match</span>
 		</div>
-		<div class="bargroups">
-			<div class="bargroup" role="group" aria-labelledby="bgTeam">
-			<span class="eyebrow" id="bgTeam">Your team</span>
-			<label class="field" for="format">Teams
-				<select id="format">
-					<option value="11" selected>11-a-side</option>
-					<option value="6">6-a-side</option>
-					<option value="5">5-a-side</option>
-				</select>
-			</label>
-			<label class="field" for="shape" id="shapeField">Shape
-				<select id="shape"></select>
-			</label>
-			<label class="field" for="style">Style
-				<select id="style">
-					<option value="possession">Possession</option>
-					<option value="balanced" selected>Balanced</option>
-					<option value="direct">Direct</option>
-					<option value="counter">Counter-attack</option>
-				</select>
-			</label>
-			<label class="field" for="press">Defending
-				<select id="press">
-					<option value="high">High press</option>
-					<option value="mid" selected>Mid block</option>
-					<option value="low">Low block</option>
-				</select>
-			</label>
-			<label class="field" for="line" title="How high the back line holds: high squeezes the pitch and plays offside, deep protects the space behind">Line
-				<select id="line">
-					<option value="high">High line</option>
-					<option value="normal" selected>Normal line</option>
-					<option value="deep">Deep line</option>
-				</select>
-			</label>
-			<label class="field" for="tackling" title="How your defenders challenge: stay on their feet (fewer tackles, fewer fouls) or get stuck in (more tackles, more slides, more fouls)">Tackling
-				<select id="tackling">
-					<option value="careful">Stay on feet</option>
-					<option value="normal" selected>Normal</option>
-					<option value="hard">Get stuck in</option>
-				</select>
-			</label>
-			<label class="field" for="assist" title="Your assistant manager does the paperwork between matches: a new contract for every player in his last year, bids answered, and in a window a signing where the market offers a clear step up">Assistant
-				<select id="assist">
-					<option value="off" selected>Off</option>
-					<option value="contracts">Contracts</option>
-					<option value="transfers">Transfers</option>
-					<option value="both">Contracts and transfers</option>
-				</select>
-			</label>
-			<p class="fine" id="assistNote"></p>
-			</div>
-			<div class="bargroup" role="group" aria-labelledby="bgMatch">
-			<span class="eyebrow" id="bgMatch">Match</span>
-			<label class="field" for="level" title="How sharp the computer side is: how quickly it plays, how true its passes and shots go, how hard it presses and how far its keeper reaches. In the league it is kept with the season">Difficulty
-				<select id="level">
-					<option value="easy">Easy</option>
-					<option value="normal" selected>Normal</option>
-					<option value="hard">Hard</option>
-				</select>
-			</label>
-			<label class="field" for="difficulty" id="diffField">Opponent
-				<select id="difficulty">
-					<option value="easy">Sunday league</option>
-					<option value="normal" selected>Club</option>
-					<option value="hard">Academy</option>
-				</select>
-			</label>
-			<label class="field" for="weather" id="weatherField">Weather
-				<select id="weather">
-					<option value="clear" selected>Clear</option>
-					<option value="rain">Rain</option>
-					<option value="heavy">Heavy rain</option>
-					<option value="windy">Windy</option>
-					<option value="snow">Snow</option>
-					<option value="hot">Heat</option>
-					<option value="fog">Fog</option>
-				</select>
-			</label>
-			<label class="field" for="ground" id="groundField">Ground
-				<select id="ground">
-					<option value="grass" selected>Grass</option>
-					<option value="mud">Muddy</option>
-					<option value="turf">Artificial turf</option>
-				</select>
-			</label>
-			<label class="field" for="length">Match
-				<select id="length">
-					<option value="120">2 minutes</option>
-					<option value="180">3 minutes</option>
-					<option value="300" selected>5 minutes</option>
-					<option value="420">7 minutes</option>
-					<option value="600">10 minutes</option>
-					<option value="900">15 minutes</option>
-					<option value="1200">20 minutes</option>
-				</select>
-			</label>
-			</div>
-			<div class="bargroup rows" role="group" aria-labelledby="bgView">
-			<span class="eyebrow" id="bgView">Controls and view</span>
-			<label class="row-label" for="autoswitch">Auto switch</label>
-			<div class="row-ctl">
-				<select id="autoswitch">
-					<option value="assisted" selected>Assisted</option>
-					<option value="manual">Manual only</option>
-					<option value="aggressive">Aggressive</option>
-				</select>
-			</div>
-			<span class="row-label">Camera</span>
-			<div class="row-ctl"><button id="camBtn" type="button" aria-pressed="false" title="Camera (C): click to cycle overhead, TV and 3D">Camera: overhead</button></div>
-			<label class="row-label" for="gfx" title="How much the 3D view draws: crowd density and detail, floodlight shadows, sharpness and smoothing. Light also draws 30 frames a second, for a laptop that runs warm">Graphics</label>
-			<div class="row-ctl">
-				<select id="gfx">
-					<option value="auto">Auto</option>
-					<option value="light">Light (cooler laptop)</option>
-					<option value="low">Low</option>
-					<option value="medium">Medium</option>
-					<option value="high">High</option>
-				</select>
-			</div>
-			<span class="row-label">Display</span>
-			<div class="row-ctl">
-			<button id="hintsBtn" type="button" aria-pressed="true" title="On-screen key hints and coaching tips">Hints on</button>
-			<button id="mapBtn" type="button" aria-pressed="true" title="A small radar of the whole pitch in the corner">Minimap on</button>
-			</div>
-			<span class="row-label">Pitch</span>
-			<div class="row-ctl">
-			<button id="bigBtn" type="button" aria-pressed="false" title="Big pitch (F): the ground fills the screen, the menu hides behind Show menu">Big pitch off</button>
-			<button id="contrastBtn" type="button" aria-pressed="false" title="High-contrast kits: the other side plays in white or black, with a dashed ring, so the teams never blur together">Kit contrast off</button>
-			</div>
-			</div>
-			<div class="bargroup rows" role="group" aria-labelledby="bgSound">
-			<span class="eyebrow" id="bgSound">Sound and rules</span>
-			<span class="row-label">Sound</span>
-			<div class="row-ctl" id="soundRow">
-			<button id="soundBtn" type="button" aria-pressed="true" title="All sound: crowd, whistle and effects">Sound on</button>
-			<button id="musicBtn" type="button" aria-pressed="true" title="Club songs and menu music">Music on</button>
-			</div>
-			<label class="row-label" for="musicVol">Music volume</label>
-			<div class="row-ctl" id="musicVolRow"></div>
-			<span class="row-label">Rules</span>
-			<div class="row-ctl"><button id="offsideBtn" type="button" aria-pressed="true" title="Play the offside rule">Offside on</button></div>
-			</div>
-		</div>
 	</div>
 
-	<section class="league" id="league" aria-label="League">
-		<div class="lg-head">
-			<h3 id="lgDivName">Premier Division</h3>
-			<span class="lg-meta" id="lgMeta">Season 1</span>
-			<span class="spacer"></span>
-			<div class="lg-actions">
-			<span class="lg-sync" id="lgSync">Saved in this browser</span>
-			<button type="button" id="lgNew">New season</button>
-			<button type="button" id="lgExport" title="Save your season to a file you can keep or move to another device">Export league</button>
-			<button type="button" id="lgImport" title="Load a season from an exported file">Import league</button>
-			<button type="button" id="lgEdit" title="Rename clubs, kits and players, and share your edits as an option file">Edit names</button>
-			<button type="button" id="lgLeagues" title="Start a career in another country, or take your club there">Play in another league</button>
-			</div>
-			<input type="file" id="lgFile" accept=".json,application/json" hidden>
+	<div class="hub" id="hub">
+		<div class="hub-tabs" role="tablist" aria-label="Manager hub" id="hubTabs">
+			<button type="button" role="tab" class="hub-tab" id="tab-overview" data-tab="overview" data-league aria-controls="panel-overview" aria-selected="false" tabindex="-1">Overview<span class="hub-badge" id="badge-overview" hidden></span></button>
+			<button type="button" role="tab" class="hub-tab" id="tab-squad" data-tab="squad" data-league aria-controls="panel-squad" aria-selected="false" tabindex="-1">Squad<span class="hub-badge" id="badge-squad" hidden></span></button>
+			<button type="button" role="tab" class="hub-tab" id="tab-league" data-tab="league" data-league aria-controls="panel-league" aria-selected="false" tabindex="-1">League<span class="hub-badge" id="badge-league" hidden></span></button>
+			<button type="button" role="tab" class="hub-tab" id="tab-cups" data-tab="cups" data-league aria-controls="panel-cups" aria-selected="false" tabindex="-1">Cups<span class="hub-badge" id="badge-cups" hidden></span></button>
+			<button type="button" role="tab" class="hub-tab" id="tab-transfers" data-tab="transfers" data-league aria-controls="panel-transfers" aria-selected="false" tabindex="-1">Transfers<span class="hub-badge" id="badge-transfers" hidden></span></button>
+			<button type="button" role="tab" class="hub-tab" id="tab-club" data-tab="club" data-league aria-controls="panel-club" aria-selected="false" tabindex="-1">Club<span class="hub-badge" id="badge-club" hidden></span></button>
+			<button type="button" role="tab" class="hub-tab" id="tab-settings" data-tab="settings" aria-controls="panel-settings" aria-selected="false" tabindex="-1">Settings<span class="hub-badge" id="badge-settings" hidden></span></button>
+			<button type="button" role="tab" class="hub-tab" id="tab-help" data-tab="help" aria-controls="panel-help" aria-selected="false" tabindex="-1">Help<span class="hub-badge" id="badge-help" hidden></span></button>
 		</div>
-		<div class="lg-grid">
-			<div class="lg-side">
+		<section class="league" id="league" aria-label="League">
+			<div class="lg-head">
+				<h3 id="lgDivName">Premier Division</h3>
+				<span class="lg-meta" id="lgMeta">Season 1</span>
+				<span class="spacer"></span>
+			</div>
+			<div class="hub-panel" role="tabpanel" id="panel-overview" aria-labelledby="tab-overview" tabindex="0" hidden>
+				<div class="ov-grid">
+				<div class="lg-side">
 				<div class="lg-next" id="lgNext"></div>
-				<div class="lg-up"><h4 id="lgRecord">Upcoming</h4><ol class="upcoming" id="lgUpcoming"></ol></div>
-				<div class="lg-fc"><h4>Forecast <span class="rainy">Rainy season: matchdays 10 to 26 · ☾ night · ☀ afternoon · ≈ windy</span></h4><ol class="forecast" id="lgForecast"></ol></div>
-				<div class="lg-round"><h4 id="lgRoundTitle">Latest results</h4><ul id="lgRound"></ul></div>
+				<div class="lg-drama" id="lgDrama"></div>
+				</div>
+				<div class="ov-col">
+				<div class="ov-card"><div class="sq-head"><h4>Table</h4><button type="button" class="linkish" data-goto="league">Full table</button></div><table class="lg-table ov-table" aria-label="Table snippet"><tbody class="ov-table-body"></tbody></table></div>
+				<div class="ov-card"><div class="sq-head"><h4 class="ov-round-title">Latest results</h4><button type="button" class="linkish" data-goto="league">All fixtures</button></div><ul class="ov-round"></ul></div>
+				<div class="ov-card"><div class="sq-head"><h4>Cups</h4><button type="button" class="linkish" data-goto="cups">Cups</button></div><ul class="ov-cups"></ul></div>
+				</div>
+				</div>
 			</div>
-			<div class="lg-tablewrap">
-				<table class="lg-table" aria-label="League table">
-					<thead><tr><th>#</th><th class="club">Club</th><th>P</th><th>W</th><th>D</th><th>L</th><th class="wide">GF</th><th class="wide">GA</th><th>GD</th><th>Pts</th><th class="wide">Form</th></tr></thead>
-					<tbody id="lgBody"></tbody>
-				</table>
-				<p class="zones"><span class="zk z-cl"></span>Champions Cup <span class="zk z-el"></span>Continental Cup <span class="zk z-rel"></span>Relegation</p>
-			</div>
-		</div>
-		<div class="lg-club">
-			<div class="sq">
+			<div class="hub-panel" role="tabpanel" id="panel-squad" aria-labelledby="tab-squad" tabindex="0" hidden>
+				<div class="sq">
 				<div class="sq-head"><h4>Your squad</h4><span class="lg-meta" id="sqMeta"></span><button type="button" id="autoPick">Auto-pick best XI</button><button type="button" id="autoRot" aria-pressed="false">Auto-rotate off</button></div>
 				<p class="win-note">Drag a player onto another position or to and from the bench, or tap one and then another to swap them. Starters lose fitness each match and rested players recover, so rotate before legs go.</p>
 				<div class="lineup" id="lineup" aria-label="Line-up"></div>
 				<div class="lg-tablewrap">
-					<table class="lg-table sq-table" aria-label="Your squad">
-						<thead><tr><th>No</th><th class="club">Player</th><th class="club">Pos</th><th>Fit</th><th class="wide">PAC</th><th class="wide">SHO</th><th class="wide">PAS</th><th class="wide" title="Defending; handling for keepers">DEF</th><th>OVR</th></tr></thead>
-						<tbody id="sqBody"></tbody>
-					</table>
+				<table class="lg-table sq-table" aria-label="Your squad">
+				<thead><tr><th>No</th><th class="club">Player</th><th class="club">Pos</th><th>Fit</th><th class="wide">PAC</th><th class="wide">SHO</th><th class="wide">PAS</th><th class="wide" title="Defending; handling for keepers">DEF</th><th>OVR</th></tr></thead>
+				<tbody id="sqBody"></tbody>
+				</table>
+				</div>
 				</div>
 			</div>
-			<div class="side-col">
-			<div class="win">
+			<div class="hub-panel" role="tabpanel" id="panel-league" aria-labelledby="tab-league" tabindex="0" hidden>
+				<div class="lg-grid">
+				<div class="lg-col">
+				<div class="lg-round"><h4 id="lgRoundTitle">Latest results</h4><ul id="lgRound"></ul></div>
+				<div class="lg-up"><h4 id="lgRecord">Upcoming</h4><ol class="upcoming" id="lgUpcoming"></ol></div>
+				<div class="lg-fc"><h4>Forecast <span class="rainy">Rainy season: matchdays 10 to 26 · ☾ night · ☀ afternoon · ≈ windy</span></h4><ol class="forecast" id="lgForecast"></ol></div>
+				</div>
+				<div class="lg-tablewrap">
+				<table class="lg-table" aria-label="League table">
+				<thead><tr><th>#</th><th class="club">Club</th><th>P</th><th>W</th><th>D</th><th>L</th><th class="wide">GF</th><th class="wide">GA</th><th>GD</th><th>Pts</th><th class="wide">Form</th></tr></thead>
+				<tbody id="lgBody"></tbody>
+				</table>
+				<p class="zones"><span class="zk z-cl"></span>Champions Cup <span class="zk z-el"></span>Continental Cup <span class="zk z-rel"></span>Relegation</p>
+				</div>
+				</div>
+				<div class="lg-clubs">
+				<div class="sq-head">
+				<h4>Clubs</h4>
+				<div class="tabs" role="group" aria-label="Which clubs">
+				<button type="button" id="clubsDiv" aria-pressed="true">This division</button>
+				<button type="button" id="clubsBelow" aria-pressed="false">Division below</button>
+				</div>
+				</div>
+				<p class="win-note" id="clubsNote">Tap a club to see its squad.</p>
+				<div class="club-grid" id="clubGrid"></div>
+				</div>
+			</div>
+			<div class="hub-panel" role="tabpanel" id="panel-cups" aria-labelledby="tab-cups" tabindex="0" hidden>
+				<div class="lg-extras" id="lgExtras"></div>
+			</div>
+			<div class="hub-panel" role="tabpanel" id="panel-transfers" aria-labelledby="tab-transfers" tabindex="0" hidden>
+				<div class="win">
 				<div class="sq-head"><h4 id="winTitle">Transfer window</h4><span class="budget" id="winBudget"></span></div>
 				<p class="win-note" id="winNote"></p>
 				<div class="tabs mk-tabs" id="mkTabs" role="group" aria-label="Which market"></div>
@@ -296,6 +183,38 @@
 				<ul class="market" id="bidsIn"></ul>
 				<ul class="market" id="winMarket"></ul>
 				<p class="win-note" id="trNews"></p>
+				</div>
+			</div>
+			<div class="hub-panel" role="tabpanel" id="panel-club" aria-labelledby="tab-club" tabindex="0" hidden>
+				<div class="club-grid-hub">
+				<div class="win coachp" id="coachPanel">
+				<div class="sq-head"><h4>Coaching</h4><span class="lg-meta" id="drillMeta"></span></div>
+				<p class="win-note">Train every week between matches. Focus picks what improves; young players improve fastest and players past 30 slowly lose pace. Hard training improves them quicker but tires them and risks knocks. Your coaches multiply it all.</p>
+				<div class="coach-sel">
+				<label class="field" for="trFocus">Focus
+				<select id="trFocus">
+				<option value="balanced">Balanced</option>
+				<option value="attack">Attacking: shooting, passing</option>
+				<option value="defence">Defending</option>
+				<option value="fitness">Fitness and pace</option>
+				<option value="tactics">Tactics: shape and drills</option>
+				<option value="youth">Youth: the under-22s</option>
+				</select>
+				</label>
+				<label class="field" for="trLoad">Intensity
+				<select id="trLoad">
+				<option value="light">Light</option>
+				<option value="normal" selected>Normal</option>
+				<option value="hard">Hard</option>
+				</select>
+				</label>
+				</div>
+				<p class="win-note" id="trReport"></p>
+				<h4 class="up-title">Staff</h4>
+				<ul class="upgrades staff" id="staffList"></ul>
+				</div>
+				<div class="win">
+				<div class="sq-head"><h4>Career</h4></div>
 				<h4 class="up-title" id="jobsTitle" hidden>Offers for you</h4>
 				<ul class="market" id="jobOffers"></ul>
 				<h4 class="up-title" id="agentTitle" hidden>Your agent</h4>
@@ -303,113 +222,237 @@
 				<p class="win-note" id="careerLine"></p>
 				<h4 class="up-title">Club upgrades</h4>
 				<ul class="upgrades" id="winUpgrades"></ul>
-			</div>
-			<div class="win coachp" id="coachPanel">
-				<div class="sq-head"><h4>Coaching</h4><span class="lg-meta" id="drillMeta"></span></div>
-				<p class="win-note">Train every week between matches. Focus picks what improves; young players improve fastest and players past 30 slowly lose pace. Hard training improves them quicker but tires them and risks knocks. Your coaches multiply it all.</p>
+				</div>
+				<div class="win">
+				<div class="sq-head"><h4>Assistant manager</h4></div>
 				<div class="coach-sel">
-					<label class="field" for="trFocus">Focus
-						<select id="trFocus">
-							<option value="balanced">Balanced</option>
-							<option value="attack">Attacking: shooting, passing</option>
-							<option value="defence">Defending</option>
-							<option value="fitness">Fitness and pace</option>
-							<option value="tactics">Tactics: shape and drills</option>
-							<option value="youth">Youth: the under-22s</option>
-						</select>
-					</label>
-					<label class="field" for="trLoad">Intensity
-						<select id="trLoad">
-							<option value="light">Light</option>
-							<option value="normal" selected>Normal</option>
-							<option value="hard">Hard</option>
-						</select>
-					</label>
+				<label class="field" for="assist" title="Your assistant manager does the paperwork between matches: a new contract for every player in his last year, bids answered, and in a window a signing where the market offers a clear step up">Assistant
+				<select id="assist">
+				<option value="off" selected>Off</option>
+				<option value="contracts">Contracts</option>
+				<option value="transfers">Transfers</option>
+				<option value="both">Contracts and transfers</option>
+				</select>
+				</label>
 				</div>
-				<p class="win-note" id="trReport"></p>
-				<h4 class="up-title">Staff</h4>
-				<ul class="upgrades staff" id="staffList"></ul>
-			</div>
-			</div>
-		</div>
-		<div class="lg-clubs">
-			<div class="sq-head">
-				<h4>Clubs</h4>
-				<div class="tabs" role="group" aria-label="Which clubs">
-					<button type="button" id="clubsDiv" aria-pressed="true">This division</button>
-					<button type="button" id="clubsBelow" aria-pressed="false">Division below</button>
+				<p class="fine" id="assistNote"></p>
+				</div>
+				<div class="win lg-academy-box" id="lgAcademy"></div>
 				</div>
 			</div>
-			<p class="win-note" id="clubsNote">Tap a club to see its squad.</p>
-			<div class="club-grid" id="clubGrid"></div>
-		</div>
-	</section>
-
-	<section class="help" aria-label="Controls">
-		<h3>Controls</h3>
-		<div class="key"><kbd>Arrows</kbd><b>Move</b></div>
-		<div class="key"><kbd>E</kbd> or <kbd>Shift</kbd><b>Sprint</b>: hold it while you move. The bar under your player shows how much sprint is left; run it dry and you jog until it refills</div>
-		<div class="key"><kbd>A</kbd><b>Tackle</b>: tap it for a shoulder challenge when you're right alongside the carrier, a slide tackle (aimed for you) from further out. <b>Hold</b> it and your man closes the carrier down by himself, goal-side, from any distance, and jockeys him until you let go</div>
-		<div class="key"><kbd>S</kbd> or <kbd>Space</kbd><b>Pass</b>, or switch player without the ball (press again to cycle to the next best)</div>
-		<div class="key"><kbd>W</kbd><b>Through ball</b> into the space ahead of a teammate</div>
-		<div class="key"><kbd>Q</kbd><b>Long ball</b> to the striker marked Q, into space toward goal. Along the ground when the lane is open, over the top when it isn't.</div>
-		<div class="key"><kbd>D</kbd><b>Shoot</b>, hold for power. While you hold it, <kbd>↑</kbd> <kbd>↓</kbd> move the crosshair along the goal: pick your corner. The amber band shows how far it could stray; it widens with power.</div>
-		<div class="key"><kbd>1</kbd>–<kbd>4</kbd> or <kbd>T</kbd><b>Tactic</b>: Defensive, Balanced, Attacking, All-out attack</div>
-		<div class="key"><kbd>P</kbd> or <kbd>Esc</kbd><b>Pause</b></div>
-		<div class="key"><kbd>C</kbd><b>Camera</b>: cycle overhead, TV and 3D (the Camera button does the same; it names the view you are on)</div>
-		<div class="key"><kbd>H</kbd><b>How to play</b>: every control for the keyboard, touch or a controller, and what the markers on the pitch mean. It pauses the match; <kbd>Esc</kbd> closes it. The How to play buttons (on the kick-off, pause and full-time cards, and next to Pause) do the same</div>
-		<div class="key"><kbd>F</kbd><b>Big pitch</b>: the ground fills the screen; Show menu brings the page back</div>
-		<div class="key"><b>Simulate</b> button (next to Pause): the whole match before kick-off, or the rest of it once it's on. The score so far stands.</div>
-		<div class="key"><b>Simulate to January / whole season</b> (on the matchday card): every fixture up to the January window so you can do business, or every fixture left in one go. The whole season leaves January's transfers to the Assistant, if it is on.</div>
-		<p class="fine"><b>Controller.</b> Plug in or pair an Xbox or PlayStation controller and press a button. Left stick moves; A (✕) passes or switches; B (○) shoots, hold for power; X (□) slide tackles; Y (△) plays a through ball; RB (R1) hits a long ball; RT or LT sprints; Back (Share) replays the last six seconds; Start pauses. The hints at the bottom of the pitch show what each button does at that moment; turn them off with Hints.</p>
-		<p class="fine"><b>Home and away.</b> The home side has the crowd behind it: it starts with a little momentum and the visitors play slightly below their rating. The stands fill with the home club's colours, with a corner of away fans. On a kit clash the away side changes, so you'll wear white on some away days. The scoreboard lists the home team first.</p>
-		<p class="fine"><b>Pass and they wilt.</b> String passes together and your side grows in confidence: sharper passing and touches, and the momentum bar swings your way (5 in a row gets a mention, 10 gets an Olé). The side chasing the ball gets tense: stray passes, heavy first touches, late and rash challenges, shakier keeping. It works both ways, so if the computer keeps it off you, your players get nervy too. Win the ball back, keep it for a few passes or score, and the nerves settle; a goal against the run of play flips the game.</p>
-		<p class="fine"><b>Crowd and music.</b> The crowd swells as the ball nears a goal, the home end sings with a drum beating under it, goals get a roar (or a groan from the home fans), and hard saves get an "ooh". After a long quiet spell, or with the home side cruising, the 3D crowd starts a Mexican wave that runs round the bowl. The menus play a stadium anthem: strings, a horn carrying the tune with a choir under it, bass, timpani and snare, in a hall; turn it off with Music.</p>
-		<p class="fine"><b>Goals.</b> The scorer wheels away to the corner, slides on his knees in front of the fans and is mobbed by his teammates while the other side trudges back and their keeper fetches the ball out of the net, which bulges and swings where the ball hit it. A caption names the scorer and the minute, and the score bug flashes. In the 3D view the celebration then gives way to an instant replay of the build-up in slow motion, from high behind the goal or low beside it, before the camera goes back to the scorer and cuts wide for the restart. The match clock is stopped throughout. Any key, button or tap skips the celebration and the replay. Cards and substitutions get captions too.</p>
-		<p class="fine"><b>Weather and grounds.</b> Every club has a home ground: grass, muddy or artificial turf. Mud slows the ball and the players and kills the bounce. Turf is quick and true. Rain holds the ball up (heavy rain and mud most of all), costs players grip on the turn, sends passes a little astray and makes shots harder for keepers to hold, so they spill more. Wind pushes the ball while it is in the air: long balls, crosses, corners and lofted shots carry with it and hang against it; the arrow and speed at the top left of the pitch show which way it blows. League fixtures kick off in the afternoon or at night under the floodlights, with the stands dark around a lit pitch. In the league, matchdays 10 to 26 are the rainy season, windier and mostly at night, and the forecast is shown in advance (☾ night, ☀ afternoon, ≈ windy); the kick-off card gives the time, the rain and which way the wind blows for you. In a friendly, pick the weather (including Windy, and Fog, which only thickens the air: the far side fades but the ball plays as on a dry night) and ground yourself.</p>
-		<p class="fine"><b>Your season, backed up.</b> Your league saves in this browser. Export league saves it to a file; Import league loads a file back (press twice to confirm, since it replaces the season you have). Use it to keep a backup or carry your season to another browser or device.</p>
-		<p class="fine"><b>Assistant.</b> Under Your team, the Assistant setting hands the club's paperwork to your assistant manager. Contracts: between matches he goes through everyone in the last year of his deal, the most important first (rating, age, how much he plays and who else can play there). Young key men get three more seasons, men past 31 and the fringe one, older squad men take a pay cut, and a squad man of 33 or more, or one the squad doesn't need, is let go on a free. He keeps £0.4m back for wages. When the money runs short, a key man who would otherwise walk signs with no signing-on fee and a bigger rise instead; with Transfers on too and a window open he sells a squad player to pay for the rest, otherwise he suggests one. His report says who renewed, for how long and at what wage, who hasn't signed yet, when their deals end and why, and what you can do: spend the wage money, sell, or offer the deal yourself from the squad list. Transfers: when a window is open he answers bids (cashing in only well over a player's value, or on anyone past 31 at a fair price, never the only keeper), and signs at most two players a window where a known quantity, scouted or from home, is a clear step up on your weakest starter in that position. Everything he does appears in the notes on the League panel. Off by default.</p>
-		<p class="fine"><b>The transfer window.</b> The market opens on the For you tab: a shortlist of the players who would improve your eleven, each with the gain over the starter he would replace (an estimate until he is scouted). "Sign the best for me" lets the assistant buy up to two known step-ups at the asking price, keeping money for wages; "Scout the shortlist" spends the window's reports on it, best first. The line above the tabs says where the eleven is thinnest. The other tabs show every market as before.</p>
-		<p class="fine"><b>Offers for you, and your agent.</b> You are the manager, not the club. When a season ends, clubs who liked your work come calling in the League panel: finish in the top four and the big clubs in the division want you, finish mid-table and a club at your level does, finish low and only the division below will, and a good season draws a club abroad. Take a job and you inherit that club's squad, ground and colours with a budget to match its size; your old club carries on under its own name. Move abroad and you start afresh in a new country: a new squad of mostly local players, and a new league of that country's clubs under its own name (La Liga-style Primera División in Spain, Ligue 1 in France, the J1 League in Japan and so on), your career intact. Your agent also sounds clubs out at the January window: agree to an approach and you join when the season ends. Decline, or start the next season, and the offers lapse. With several offers on the table your agent marks the <b>best move</b> and says why: the strongest squad, the most to spend, a new country on your record. Your coaching staff, training plan and facilities come with you to any new club, and a bigger club's facilities are already built to its standing. The career line under them keeps your record.</p>
-		<p class="fine"><b>Contracts ending.</b> At the January window, with ten games to go and with two, you get a heads-up naming the starters in the last year of their deals, how many games are left and, with the Assistant on, any he couldn't sign yet. Renew them under Your team, or leave it: in the summer the club keeps its last-year starters on anyway, most valuable first, as far as the money allows (£0.4m is always kept for wages), and the League notes say who could not be kept. A happy player under 34 otherwise takes the club's standard two-year deal in the summer; anyone else leaves on a free.</p>
-		<p class="fine"><b>Touchline cam.</b> On a foul, a card, a near miss or a big save, the director cuts to the touchline for a couple of seconds in the bottom-right corner while play carries on: the manager in his technical area lets the referee have it, or holds his head, with the bench and a coach behind him and a caption of what he is shouting. Not shown on phones, in simulated matches or in the tutorial.</p>
-		<p class="fine"><b>Careers end.</b> Players may retire each summer from 34 and all have by 38; keepers last two years longer. From 33 (keepers 35) a new contract is for one more season at a time, and a player in his final season gets none. The League notes list who retired, and academy players fill the gaps.</p>
-		<p class="fine"><b>On a phone.</b> Held upright, the overhead camera turns the pitch on its side so its whole width fits: you attack down the screen in the first half and up it in the second, and the joystick follows the picture. The settings, league table and help sit behind More under the pads.</p>
-		<p class="fine"><b>Big pitch.</b> The ground fills the screen with just a small score bug for the score and the clock. "Show menu" at the top right of the pitch (or F) brings back the title, the mode tabs and the full scoreboard; "Hide menu" puts it away again.</p>
-		<p class="fine"><b>Pause card.</b> Pause (P or Esc) stops the clock and puts the match settings in reach: tactic, camera, auto switch, sound, music, hints, kit contrast and Graphics, plus substitutions, Simulate the rest and How to play. The half-time card has the same switches.</p>
-		<p class="fine"><b>Kit contrast.</b> For colour vision that struggles with red against green, or any two kits that blur together: turn on Kit contrast and the other side plays in white (black when you are in white) with a dashed ring under every player, whatever club they are. It is remembered.</p>
-		<p class="fine"><b>Charged passes.</b> Hold S, W or Q instead of tapping it and the pass charges: a small arrow from your player points where it is going and a power bar fills just under him. A tap rolls it softly to feet; a full hold drives it hard, and a through ball goes further into the space. It is played the moment you let go. <b>Tab</b> switches player at any time without the ball; with a ball in the air it gives you whoever is nearest where it will come down.</p>
-		<p class="fine"><b>Line-up.</b> The squad panel shows your side on a pitch with the bench underneath. Drag a player onto another position, or to and from the bench, to swap them (or tap one, then the other). The preset buttons (4-4-2, 4-3-3, 3-5-2, 4-2-3-1 in eleven-a-side) set the shape in one go. Anyone out of position is flagged, with a count under the pitch, because he plays below his best there.</p>
-		<p class="fine"><b>Shot power.</b> While you hold D the arc round your player fills and a power bar runs along the bottom of the pitch; the mark near the end is where the ball starts to rise. Harder shots stray further, so a three-quarter strike is usually the one.</p>
-		<p class="fine"><b>Phones.</b> Turn the phone sideways and the pitch fills the screen with the joystick and the pads floating over it; upright, the pitch is nearly square and the controls sit below it. Tackles, fouls and goals give a short buzz where the phone allows it.</p>
-		<p class="fine"><b>Camera.</b> On a laptop or desktop the match opens in 3D; on a phone, overhead. 3D draws the ground, the players and the ball in real 3D (three.js). The players are jointed figures in their kits, numbers on their backs and keepers in their own colours, who jog, sprint, turn, pass, shoot, head, slide in, dive, take throw-ins and go down when fouled. A referee and two assistants keep up with play, in a bright kit picked to clash with neither side; the assistants run the far touchline and raise their flags for offside (straight up) and when the ball goes out. Every seat holds a fan in the home or away colours, swaying, rising for a chance, holding their heads at a near miss and leaping at a goal. At the start of each half the camera sweeps in from high over the stadium during the countdown; then a broadcast camera follows the ball along the near stand, cuts in close for free kicks and penalties, and pulls out wide at the breaks; lofted balls and headers show their true height. Overhead follows the ball from above. TV watches from high in the main stand, like a broadcast, and cuts to the benches at kick-off, the breaks and after goals. 3D needs WebGL and loads three.js from cdnjs; if either is missing or blocked you are told and the 2D cameras stay. Press C, or the Camera button (it reads "Camera: 3D", "Camera: TV" or "Camera: overhead" for the view you are on), to cycle overhead, TV and 3D; the camera you pick is remembered.</p>
-		<p class="fine"><b>Graphics.</b> Low, Medium or High (under the pitch with the camera, and on the pause card) sets how much the 3D view draws: how full the stands are and how many fans get the detailed shape, the floodlight towers' lattice, how many floodlight shadows each player throws (four on High), and the sharpness and smoothing of the picture. Phones start on Low (a big tablet on Medium) and computers on High; the setting you pick is remembered.</p>
-		<p class="fine"><b>Free kicks.</b> The other side stands 9.15 m back, and near your goal they build a wall. From shooting range, press W to curl it over the wall (up or down picks the corner, the far post if you don't choose), or D to drive it low and hard. S plays it short. Hold E (or Shift) to sprint at any time: you'll see speed streaks behind your player.</p>
-		<p class="fine"><b>Fouls and cards.</b> A slide that misses the ball and takes the man, above all from behind, is a foul: a free kick where it happened, or a penalty in the box (pick a side with ↑ ↓ and press D; the keeper guesses). Reckless tackles get a yellow card, a second yellow is a red, and a bad one from behind can be a straight red: the player walks off and his side plays a man down. In the league a red card is a ban (two games for a straight red), five yellows in a season is one, and a player hurt in a foul limps on and then misses one to three games. Banned and injured players come off the team sheet by themselves and go back on it when they're available.</p>
-		<p class="fine"><b>Throw-ins.</b> When the ball goes over a touchline, the other side throws it back in from that spot. On yours, aim with the arrows and press S for a short throw to feet or Q for a long throw. Opponents stand off the thrower, and there is no offside from a throw-in.</p>
-		<p class="fine"><b>Corners and goal kicks.</b> If a defender puts the ball over their own goal line it's a corner; if an attacker does, it's a goal kick. On your corners, S whips an in-swinger at the near post, Q floats an out-swinger to the far post and W drops one on the penalty spot; the ball bends in the air and comes down where you picked, give or take your taker's passing. Your runners wait in a knot around the spot and attack the near post, far post, spot and six-yard box as it is struck, each with a man goal-side of him, while two defenders hold the near post and the six-yard line and a keeper comes for anything dropping into his area: he catches it, punches it clear or flaps and misses. Whoever gets up highest wins the header, and in the box that can be a goal. The same goes for crosses from out wide (Q from near the byline) and long balls over the top. Central and in range, Q chips the keeper instead. There is no offside from a corner.</p>
-		<p class="fine"><b>Offside</b> (every format; switch it off with the Offside button). A teammate is offside if, when the ball is played, they are in the other half and nearer the goal line than both the ball and the second-last defender, and they are the next to touch it. The defenders get a free kick. While you have the ball, a red dashed line shows the offside line and anyone beyond it is marked OFF. Your pass markers prefer onside teammates.</p>
-		<p class="fine"><b>Keepers.</b> A keeper holding the ball in their own area can't be challenged. Nobody presses them: both teams drop back into shape, opponents must stay outside the faint ring, and the keeper releases it within a second or two.</p>
-		<p class="fine"><b>The stadium and the clubs.</b> Every ground is built in the Mexican manner, in one of three shapes: a two-tier bowl with a ring of lit private boxes between the tiers under a ring roof on masts, one tall oval tier under a ring roof, or a tight rectangle of two tiers with roofs on the long sides and mountains behind. Floodlights run along the roof or stand on lattice towers at the corners; aisles climb through the seats; the grass is mown in the ground's own pattern, worn in the goalmouths (churned and puddled on a muddy pitch) and glistens under the lights in the rain. The stands fill with the home club's fans (with an away corner), the ground's name runs across the far side, and on the near touchline both benches sit in their dugouts with each manager in his technical area. In the league panel, Clubs shows every club in the Premier Division (and the division below): rating, ground, how they play, danger man and best defender; tap one for its squad.</p>
-		<p class="fine"><b>Modes.</b> League matches count toward your Premier Division season. Friendly matches are practice: the result doesn't count, and you can pick the opponent's level, the weather and the ground. Tutorial walks you through every control step by step. The label above the score always shows which one you're playing.</p>
-		<p class="fine"><b>Half time.</b> At half time the whistle goes and you get the score, possession, passes, shots and tackles so far. Change your tactic, formation or style, then start the second half; the teams change ends, so you attack the other goal, and the other side kicks off.</p>
-		<p class="fine"><b>Keepers.</b> When your keeper has the ball, control switches to him: aim with the arrows, then S to roll it out to the teammate in the dashed ring, W to play a runner in, Q or D to kick it long. Do nothing for six seconds and he plays it himself. Goal kicks work the same way, and there is no offside from a goal kick.</p>
-		<p class="fine"><b>Saving.</b> Your season, squad, budget and upgrades are saved after every result and every change, to your account when the page can and always in this browser, so a refresh or another visit carries on the same season. A match in progress is kept too: reopen the page and it comes back paused at the same score and time.</p>
-		<p class="fine"><b>Premier Division.</b> Twenty clubs play each other home and away over 38 matchdays, three points for a win. The top four finish in the Champions Cup places and fifth in the Continental Cup place. The bottom three are relegated and replaced by three promoted clubs. If you finish in the bottom three, the board keeps you up but halves your budget. The transfer window opens before the season, in January before matchday 20, and at the end of the season. Short on time? Simulate a fixture from the kick-off card.</p>
-		<p class="fine"><b>Headers.</b> When a high ball drops toward your player, he jumps for it. Press D as it comes down to head it at goal, S to head it on to a teammate (the way you're facing), or Q to head it clear. Press nothing and he goes for it himself, or brings it down. The nearest man from each side goes up together, and the one better placed, and better in the air, wins it. The keeper claims high balls in his own area.</p>
-		<p class="fine"><b>How the teams play.</b> Players keep their spacing and wide players hold the width when their side has the ball. In eleven-a-side the full-back overlaps when the winger carries it down his flank. Wide in the final third, sides cross it in, and the forwards attack the near post, far post and penalty spot; press Q out wide to whip in your own cross. A cross that drops at head height in the box is headed at goal (or cleared by the defence). After you pass, the passer runs on for the return, so press S again for a one-two. Under pressure the computer may switch play to an open player on the far side.</p>
-		<p class="fine"><b>Team instructions.</b> Set how you play with Style and Defending, any time, even mid-match. Possession: teammates come short to support you, short passes are more accurate, and keeping the ball builds momentum much faster, so dominating the ball rattles the other side. Direct and Counter-attack: runners go early and long balls are more accurate (counter sides also sit deeper without the ball). High press: two players close the ball down and the team squeezes up the pitch, but space opens behind. Low block: deep and compact, with the covering player staying goal-side. Every computer club has its own style, shown on the kick-off card, and possession is shown live under the scoreboard.</p>
-		<p class="fine"><b>Tactics.</b> Change your team's mentality at any moment with 1 to 4 (or T to cycle, D-pad up/down on a controller). Attacking pushes the whole team up. All-out attack sends the centre-backs to halfway, brings the keeper off his line as a sweeper and leaves fewer players marking, which is great for chasing a late goal and risky on the break. Defensive drops everyone deep. The computer does the same: it chases a game it is losing late on and sits deep on a lead.</p>
-		<p class="fine"><b>Formations.</b> Pick a formation with Shape. 11-a-side: 4-4-2, 4-3-3, 4-2-3-1, 3-5-2, 5-3-2, 4-5-1. 6-a-side: 2-2-1, 2-1-2, 3-1-1, 1-3-1, 1-2-2. 5-a-side: 2-1-1, 1-2-1, 2-2, 3-1, 1-1-2. Change it at any moment, even mid-match, and your team re-forms at once. "Auto (follows tactic)" switches formation with your tactic: Defensive drops into 5-3-2 / 3-1-1 / 3-1, All-out attack goes 4-3-3 / 1-2-2 / 1-1-2. The computer re-forms too when it changes tactic late on. Your squad is a 4-4-2, so some formations play a player out of his line (a full-back at wing-back): one line out costs a little, a keeper out of goal a lot.</p>
-		<p class="fine"><b>Formats and shapes.</b> 11-a-side plays a 4-4-2 on a full pitch, with offside. Change Teams at any time, in a friendly or mid-season in the league (the season switches from the next match; results so far stand). 6-a-side plays 2-2-1 (two defenders, a holding midfielder, an attacking midfielder behind a lone striker) or 2-1-2, on a mid-sized pitch. 5-a-side plays 2-1-1 (with an attacking midfielder), a 1-2-1 diamond, or 2-2. Pick the shape with Shape. The attacking midfielder finds space between the carrier and the striker for a short pass. Your squad panel shows who starts in the shape you're playing.</p>
-		<p class="fine"><b>Every player has their own quality.</b> Every club's players have pace, shooting, passing and defending ratings, and a stronger club has better players. Defenders with high defending ratings read passes and cut them out from further away, block shots (a block that goes behind is a corner), win more tackles, slide in, and mark tighter. Strikers with high shooting ratings hit it harder and more accurately. The kick-off card tells you who to watch.</p>
-		<p class="fine"><b>Auto-rotate.</b> Turn on Auto-rotate in the squad panel and it stays on for every season until you turn it off. After every league match (played or simulated), starters under 70% fitness are rested for fresh players from the bench (the more tired a player is, the more readily he is rested). The full-time card tells you who was rested. Or press Rotate now on the full-time card, or Rest tired players on the kick-off card, to do it once.</p>
-		<p class="fine"><b>Rotation.</b> Your squad has a starting eleven and a bench of seven. In the squad panel, tap a player and then another to swap them. Starters lose fitness each league match and everyone else recovers, and tired players are slower. Playing someone out of position costs them, and a lot in goal. Auto-pick fields the strongest fit team.</p>
-		<p class="fine"><b>Transfers and upgrades.</b> Your players have pace, shooting, passing and defending ratings that change how they play. When a season ends you earn prize money by where you finish. Until your first match of the next season, sign players from the transfer list (they join the bench, or replace your weakest player in that position once it is full) and build club upgrades that lift the whole squad. Rival clubs get stronger or weaker between seasons too.</p>
-		<p class="fine"><b>Eleven-a-side.</b> The camera follows the ball, and an arrow at the screen edge points to your player when they are out of view. Turn on the Minimap button for a small view of the whole pitch.</p>
-		<p class="fine"><b>Momentum.</b> Keep the ball and the bar under the clock swings your way. Tackles, completed passes and goals push it further. Once you are on top, the CPU gets rattled: it reacts slower, misplaces passes, shoots wider and tackles less, and your players run a little quicker. The same happens to you if the CPU keeps the ball.</p>
-		<p class="fine">The dashed ring shows who your pass will reach, and it avoids teammates with a red shirt in the way. Your receiver runs onto the ball by itself, and the arrows take over once they have it. When you defend, the Auto switch setting decides who you control. <b>Assisted</b> (the default) switches you once when the ball is lost, to the defender who can get to it first (allowing for where it is going, and preferring players goal-side of the attacker), and then leaves you alone: while you hold the arrows or A, control stays with your man unless he is clearly out of the play (at most once a spell, with a message on screen), or the ball arrives at a teammate's feet while your man is well off it, when that teammate is yours at once. Let go of the arrows and the game moves you to a clearly better-placed defender, never more than twice a second and never straight back to the man you just left. <b>Manual only</b> never switches by itself (except at restarts, or if your man is sent off or subbed): S is the only way to change player. <b>Aggressive</b> switches as soon as another defender is better placed, whatever you are doing. A white pulse shows who you now control. The dashed ring with an S shows who S will switch you to; press S again to cycle to the next best, and control stays with your choice for two and a half seconds or until the ball changes hands. Your teammates cover and mark while you press: chase the ball with E, or hold A and your man closes the carrier down and jockeys him for you.</p>
-	</section>
+		</section>
+			<div class="hub-panel" role="tabpanel" id="panel-settings" aria-labelledby="tab-settings" tabindex="0" hidden>
+				<div class="lg-actions" id="lgActions" role="group" aria-label="League actions">
+				<span class="lg-sync" id="lgSync">Saved in this browser</span>
+				<button type="button" id="lgNew">New season</button>
+				<button type="button" id="lgExport" title="Save your season to a file you can keep or move to another device">Export league</button>
+				<button type="button" id="lgImport" title="Load a season from an exported file">Import league</button>
+				<button type="button" id="lgEdit" title="Rename clubs, kits and players, and share your edits as an option file">Edit names</button>
+				<button type="button" id="lgLeagues" title="Start a career in another country, or take your club there">Play in another league</button>
+				</div>
+				<input type="file" id="lgFile" accept=".json,application/json" hidden>
+				<div class="bargroups">
+				<div class="bargroup" role="group" aria-labelledby="bgTeam">
+				<span class="eyebrow" id="bgTeam">Your team</span>
+				<label class="field" for="format">Teams
+				<select id="format">
+				<option value="11" selected>11-a-side</option>
+				<option value="6">6-a-side</option>
+				<option value="5">5-a-side</option>
+				</select>
+				</label>
+				<label class="field" for="shape" id="shapeField">Shape
+				<select id="shape"></select>
+				</label>
+				<label class="field" for="style">Style
+				<select id="style">
+				<option value="possession">Possession</option>
+				<option value="balanced" selected>Balanced</option>
+				<option value="direct">Direct</option>
+				<option value="counter">Counter-attack</option>
+				</select>
+				</label>
+				<label class="field" for="press">Defending
+				<select id="press">
+				<option value="high">High press</option>
+				<option value="mid" selected>Mid block</option>
+				<option value="low">Low block</option>
+				</select>
+				</label>
+				<label class="field" for="line" title="How high the back line holds: high squeezes the pitch and plays offside, deep protects the space behind">Line
+				<select id="line">
+				<option value="high">High line</option>
+				<option value="normal" selected>Normal line</option>
+				<option value="deep">Deep line</option>
+				</select>
+				</label>
+				<label class="field" for="tackling" title="How your defenders challenge: stay on their feet (fewer tackles, fewer fouls) or get stuck in (more tackles, more slides, more fouls)">Tackling
+				<select id="tackling">
+				<option value="careful">Stay on feet</option>
+				<option value="normal" selected>Normal</option>
+				<option value="hard">Get stuck in</option>
+				</select>
+				</label>
+				</div>
+				<div class="bargroup" role="group" aria-labelledby="bgMatch">
+				<span class="eyebrow" id="bgMatch">Match</span>
+				<label class="field" for="level" title="How sharp the computer side is: how quickly it plays, how true its passes and shots go, how hard it presses and how far its keeper reaches. In the league it is kept with the season">Difficulty
+				<select id="level">
+				<option value="easy">Easy</option>
+				<option value="normal" selected>Normal</option>
+				<option value="hard">Hard</option>
+				</select>
+				</label>
+				<label class="field" for="difficulty" id="diffField">Opponent
+				<select id="difficulty">
+				<option value="easy">Sunday league</option>
+				<option value="normal" selected>Club</option>
+				<option value="hard">Academy</option>
+				</select>
+				</label>
+				<label class="field" for="weather" id="weatherField">Weather
+				<select id="weather">
+				<option value="clear" selected>Clear</option>
+				<option value="rain">Rain</option>
+				<option value="heavy">Heavy rain</option>
+				<option value="windy">Windy</option>
+				<option value="snow">Snow</option>
+				<option value="hot">Heat</option>
+				<option value="fog">Fog</option>
+				</select>
+				</label>
+				<label class="field" for="ground" id="groundField">Ground
+				<select id="ground">
+				<option value="grass" selected>Grass</option>
+				<option value="mud">Muddy</option>
+				<option value="turf">Artificial turf</option>
+				</select>
+				</label>
+				<label class="field" for="length">Match
+				<select id="length">
+				<option value="120">2 minutes</option>
+				<option value="180">3 minutes</option>
+				<option value="300" selected>5 minutes</option>
+				<option value="420">7 minutes</option>
+				<option value="600">10 minutes</option>
+				<option value="900">15 minutes</option>
+				<option value="1200">20 minutes</option>
+				</select>
+				</label>
+				</div>
+				<div class="bargroup rows" role="group" aria-labelledby="bgView">
+				<span class="eyebrow" id="bgView">Controls and view</span>
+				<label class="row-label" for="autoswitch">Auto switch</label>
+				<div class="row-ctl">
+				<select id="autoswitch">
+				<option value="assisted" selected>Assisted</option>
+				<option value="manual">Manual only</option>
+				<option value="aggressive">Aggressive</option>
+				</select>
+				</div>
+				<span class="row-label">Camera</span>
+				<div class="row-ctl"><button id="camBtn" type="button" aria-pressed="false" title="Camera (C): click to cycle overhead, TV and 3D">Camera: overhead</button></div>
+				<label class="row-label" for="gfx" title="How much the 3D view draws: crowd density and detail, floodlight shadows, sharpness and smoothing. Light also draws 30 frames a second, for a laptop that runs warm">Graphics</label>
+				<div class="row-ctl">
+				<select id="gfx">
+				<option value="auto">Auto</option>
+				<option value="light">Light (cooler laptop)</option>
+				<option value="low">Low</option>
+				<option value="medium">Medium</option>
+				<option value="high">High</option>
+				</select>
+				</div>
+				<span class="row-label">Display</span>
+				<div class="row-ctl">
+				<button id="hintsBtn" type="button" aria-pressed="true" title="On-screen key hints and coaching tips">Hints on</button>
+				<button id="mapBtn" type="button" aria-pressed="true" title="A small radar of the whole pitch in the corner">Minimap on</button>
+				</div>
+				<span class="row-label">Pitch</span>
+				<div class="row-ctl">
+				<button id="bigBtn" type="button" aria-pressed="false" title="Big pitch (F): the ground fills the screen, the menu hides behind Show menu">Big pitch off</button>
+				<button id="contrastBtn" type="button" aria-pressed="false" title="High-contrast kits: the other side plays in white or black, with a dashed ring, so the teams never blur together">Kit contrast off</button>
+				</div>
+				</div>
+				<div class="bargroup rows" role="group" aria-labelledby="bgSound">
+				<span class="eyebrow" id="bgSound">Sound and rules</span>
+				<span class="row-label">Sound</span>
+				<div class="row-ctl" id="soundRow">
+				<button id="soundBtn" type="button" aria-pressed="true" title="All sound: crowd, whistle and effects">Sound on</button>
+				<button id="musicBtn" type="button" aria-pressed="true" title="Club songs and menu music">Music on</button>
+				</div>
+				<label class="row-label" for="musicVol">Music volume</label>
+				<div class="row-ctl" id="musicVolRow"></div>
+				<span class="row-label">Rules</span>
+				<div class="row-ctl"><button id="offsideBtn" type="button" aria-pressed="true" title="Play the offside rule">Offside on</button></div>
+				</div>
+				</div>
+			</div>
+			<section class="hub-panel help" role="tabpanel" id="panel-help" aria-labelledby="tab-help" aria-label="Controls" tabindex="0" hidden>
+				<h3>Controls</h3>
+				<div class="key"><kbd>Arrows</kbd><b>Move</b></div>
+				<div class="key"><kbd>E</kbd> or <kbd>Shift</kbd><b>Sprint</b>: hold it while you move. The bar under your player shows how much sprint is left; run it dry and you jog until it refills</div>
+				<div class="key"><kbd>A</kbd><b>Tackle</b>: tap it for a shoulder challenge when you're right alongside the carrier, a slide tackle (aimed for you) from further out. <b>Hold</b> it and your man closes the carrier down by himself, goal-side, from any distance, and jockeys him until you let go</div>
+				<div class="key"><kbd>S</kbd> or <kbd>Space</kbd><b>Pass</b>, or switch player without the ball (press again to cycle to the next best)</div>
+				<div class="key"><kbd>W</kbd><b>Through ball</b> into the space ahead of a teammate</div>
+				<div class="key"><kbd>Q</kbd><b>Long ball</b> to the striker marked Q, into space toward goal. Along the ground when the lane is open, over the top when it isn't.</div>
+				<div class="key"><kbd>D</kbd><b>Shoot</b>, hold for power. While you hold it, <kbd>↑</kbd> <kbd>↓</kbd> move the crosshair along the goal: pick your corner. The amber band shows how far it could stray; it widens with power.</div>
+				<div class="key"><kbd>1</kbd>–<kbd>4</kbd> or <kbd>T</kbd><b>Tactic</b>: Defensive, Balanced, Attacking, All-out attack</div>
+				<div class="key"><kbd>P</kbd> or <kbd>Esc</kbd><b>Pause</b></div>
+				<div class="key"><kbd>C</kbd><b>Camera</b>: cycle overhead, TV and 3D (the Camera button does the same; it names the view you are on)</div>
+				<div class="key"><kbd>H</kbd><b>How to play</b>: every control for the keyboard, touch or a controller, and what the markers on the pitch mean. It pauses the match; <kbd>Esc</kbd> closes it. The How to play buttons (on the kick-off, pause and full-time cards, and next to Pause) do the same</div>
+				<div class="key"><kbd>F</kbd><b>Big pitch</b>: the ground fills the screen; Show menu brings the page back</div>
+				<div class="key"><b>Simulate</b> button (next to Pause): the whole match before kick-off, or the rest of it once it's on. The score so far stands.</div>
+				<div class="key"><b>Simulate to January / whole season</b> (on the matchday card): every fixture up to the January window so you can do business, or every fixture left in one go. The whole season leaves January's transfers to the Assistant, if it is on.</div>
+				<p class="fine"><b>Controller.</b> Plug in or pair an Xbox or PlayStation controller and press a button. Left stick moves; A (✕) passes or switches; B (○) shoots, hold for power; X (□) slide tackles; Y (△) plays a through ball; RB (R1) hits a long ball; RT or LT sprints; Back (Share) replays the last six seconds; Start pauses. The hints at the bottom of the pitch show what each button does at that moment; turn them off with Hints.</p>
+				<p class="fine"><b>Home and away.</b> The home side has the crowd behind it: it starts with a little momentum and the visitors play slightly below their rating. The stands fill with the home club's colours, with a corner of away fans. On a kit clash the away side changes, so you'll wear white on some away days. The scoreboard lists the home team first.</p>
+				<p class="fine"><b>Pass and they wilt.</b> String passes together and your side grows in confidence: sharper passing and touches, and the momentum bar swings your way (5 in a row gets a mention, 10 gets an Olé). The side chasing the ball gets tense: stray passes, heavy first touches, late and rash challenges, shakier keeping. It works both ways, so if the computer keeps it off you, your players get nervy too. Win the ball back, keep it for a few passes or score, and the nerves settle; a goal against the run of play flips the game.</p>
+				<p class="fine"><b>Crowd and music.</b> The crowd swells as the ball nears a goal, the home end sings with a drum beating under it, goals get a roar (or a groan from the home fans), and hard saves get an "ooh". After a long quiet spell, or with the home side cruising, the 3D crowd starts a Mexican wave that runs round the bowl. The menus play a stadium anthem: strings, a horn carrying the tune with a choir under it, bass, timpani and snare, in a hall; turn it off with Music.</p>
+				<p class="fine"><b>Goals.</b> The scorer wheels away to the corner, slides on his knees in front of the fans and is mobbed by his teammates while the other side trudges back and their keeper fetches the ball out of the net, which bulges and swings where the ball hit it. A caption names the scorer and the minute, and the score bug flashes. In the 3D view the celebration then gives way to an instant replay of the build-up in slow motion, from high behind the goal or low beside it, before the camera goes back to the scorer and cuts wide for the restart. The match clock is stopped throughout. Any key, button or tap skips the celebration and the replay. Cards and substitutions get captions too.</p>
+				<p class="fine"><b>Weather and grounds.</b> Every club has a home ground: grass, muddy or artificial turf. Mud slows the ball and the players and kills the bounce. Turf is quick and true. Rain holds the ball up (heavy rain and mud most of all), costs players grip on the turn, sends passes a little astray and makes shots harder for keepers to hold, so they spill more. Wind pushes the ball while it is in the air: long balls, crosses, corners and lofted shots carry with it and hang against it; the arrow and speed at the top left of the pitch show which way it blows. League fixtures kick off in the afternoon or at night under the floodlights, with the stands dark around a lit pitch. In the league, matchdays 10 to 26 are the rainy season, windier and mostly at night, and the forecast is shown in advance (☾ night, ☀ afternoon, ≈ windy); the kick-off card gives the time, the rain and which way the wind blows for you. In a friendly, pick the weather (including Windy, and Fog, which only thickens the air: the far side fades but the ball plays as on a dry night) and ground yourself.</p>
+				<p class="fine"><b>Your season, backed up.</b> Your league saves in this browser. Export league saves it to a file; Import league loads a file back (press twice to confirm, since it replaces the season you have). Use it to keep a backup or carry your season to another browser or device.</p>
+				<p class="fine"><b>Assistant.</b> Under Your team, the Assistant setting hands the club's paperwork to your assistant manager. Contracts: between matches he goes through everyone in the last year of his deal, the most important first (rating, age, how much he plays and who else can play there). Young key men get three more seasons, men past 31 and the fringe one, older squad men take a pay cut, and a squad man of 33 or more, or one the squad doesn't need, is let go on a free. He keeps £0.4m back for wages. When the money runs short, a key man who would otherwise walk signs with no signing-on fee and a bigger rise instead; with Transfers on too and a window open he sells a squad player to pay for the rest, otherwise he suggests one. His report says who renewed, for how long and at what wage, who hasn't signed yet, when their deals end and why, and what you can do: spend the wage money, sell, or offer the deal yourself from the squad list. Transfers: when a window is open he answers bids (cashing in only well over a player's value, or on anyone past 31 at a fair price, never the only keeper), and signs at most two players a window where a known quantity, scouted or from home, is a clear step up on your weakest starter in that position. Everything he does appears in the notes on the League panel. Off by default.</p>
+				<p class="fine"><b>The transfer window.</b> The market opens on the For you tab: a shortlist of the players who would improve your eleven, each with the gain over the starter he would replace (an estimate until he is scouted). "Sign the best for me" lets the assistant buy up to two known step-ups at the asking price, keeping money for wages; "Scout the shortlist" spends the window's reports on it, best first. The line above the tabs says where the eleven is thinnest. The other tabs show every market as before.</p>
+				<p class="fine"><b>Offers for you, and your agent.</b> You are the manager, not the club. When a season ends, clubs who liked your work come calling in the League panel: finish in the top four and the big clubs in the division want you, finish mid-table and a club at your level does, finish low and only the division below will, and a good season draws a club abroad. Take a job and you inherit that club's squad, ground and colours with a budget to match its size; your old club carries on under its own name. Move abroad and you start afresh in a new country: a new squad of mostly local players, and a new league of that country's clubs under its own name (La Liga-style Primera División in Spain, Ligue 1 in France, the J1 League in Japan and so on), your career intact. Your agent also sounds clubs out at the January window: agree to an approach and you join when the season ends. Decline, or start the next season, and the offers lapse. With several offers on the table your agent marks the <b>best move</b> and says why: the strongest squad, the most to spend, a new country on your record. Your coaching staff, training plan and facilities come with you to any new club, and a bigger club's facilities are already built to its standing. The career line under them keeps your record.</p>
+				<p class="fine"><b>Contracts ending.</b> At the January window, with ten games to go and with two, you get a heads-up naming the starters in the last year of their deals, how many games are left and, with the Assistant on, any he couldn't sign yet. Renew them under Your team, or leave it: in the summer the club keeps its last-year starters on anyway, most valuable first, as far as the money allows (£0.4m is always kept for wages), and the League notes say who could not be kept. A happy player under 34 otherwise takes the club's standard two-year deal in the summer; anyone else leaves on a free.</p>
+				<p class="fine"><b>Touchline cam.</b> On a foul, a card, a near miss or a big save, the director cuts to the touchline for a couple of seconds in the bottom-right corner while play carries on: the manager in his technical area lets the referee have it, or holds his head, with the bench and a coach behind him and a caption of what he is shouting. Not shown on phones, in simulated matches or in the tutorial.</p>
+				<p class="fine"><b>Careers end.</b> Players may retire each summer from 34 and all have by 38; keepers last two years longer. From 33 (keepers 35) a new contract is for one more season at a time, and a player in his final season gets none. The League notes list who retired, and academy players fill the gaps.</p>
+				<p class="fine"><b>On a phone.</b> Held upright, the overhead camera turns the pitch on its side so its whole width fits: you attack down the screen in the first half and up it in the second, and the joystick follows the picture. The settings, league table and help sit behind More under the pads.</p>
+				<p class="fine"><b>Big pitch.</b> The ground fills the screen with just a small score bug for the score and the clock. "Show menu" at the top right of the pitch (or F) brings back the title, the mode tabs and the full scoreboard; "Hide menu" puts it away again.</p>
+				<p class="fine"><b>Pause card.</b> Pause (P or Esc) stops the clock and puts the match settings in reach: tactic, camera, auto switch, sound, music, hints, kit contrast and Graphics, plus substitutions, Simulate the rest and How to play. The half-time card has the same switches.</p>
+				<p class="fine"><b>Kit contrast.</b> For colour vision that struggles with red against green, or any two kits that blur together: turn on Kit contrast and the other side plays in white (black when you are in white) with a dashed ring under every player, whatever club they are. It is remembered.</p>
+				<p class="fine"><b>Charged passes.</b> Hold S, W or Q instead of tapping it and the pass charges: a small arrow from your player points where it is going and a power bar fills just under him. A tap rolls it softly to feet; a full hold drives it hard, and a through ball goes further into the space. It is played the moment you let go. <b>Tab</b> switches player at any time without the ball; with a ball in the air it gives you whoever is nearest where it will come down.</p>
+				<p class="fine"><b>Line-up.</b> The squad panel shows your side on a pitch with the bench underneath. Drag a player onto another position, or to and from the bench, to swap them (or tap one, then the other). The preset buttons (4-4-2, 4-3-3, 3-5-2, 4-2-3-1 in eleven-a-side) set the shape in one go. Anyone out of position is flagged, with a count under the pitch, because he plays below his best there.</p>
+				<p class="fine"><b>Shot power.</b> While you hold D the arc round your player fills and a power bar runs along the bottom of the pitch; the mark near the end is where the ball starts to rise. Harder shots stray further, so a three-quarter strike is usually the one.</p>
+				<p class="fine"><b>Phones.</b> Turn the phone sideways and the pitch fills the screen with the joystick and the pads floating over it; upright, the pitch is nearly square and the controls sit below it. Tackles, fouls and goals give a short buzz where the phone allows it.</p>
+				<p class="fine"><b>Camera.</b> On a laptop or desktop the match opens in 3D; on a phone, overhead. 3D draws the ground, the players and the ball in real 3D (three.js). The players are jointed figures in their kits, numbers on their backs and keepers in their own colours, who jog, sprint, turn, pass, shoot, head, slide in, dive, take throw-ins and go down when fouled. A referee and two assistants keep up with play, in a bright kit picked to clash with neither side; the assistants run the far touchline and raise their flags for offside (straight up) and when the ball goes out. Every seat holds a fan in the home or away colours, swaying, rising for a chance, holding their heads at a near miss and leaping at a goal. At the start of each half the camera sweeps in from high over the stadium during the countdown; then a broadcast camera follows the ball along the near stand, cuts in close for free kicks and penalties, and pulls out wide at the breaks; lofted balls and headers show their true height. Overhead follows the ball from above. TV watches from high in the main stand, like a broadcast, and cuts to the benches at kick-off, the breaks and after goals. 3D needs WebGL and loads three.js from cdnjs; if either is missing or blocked you are told and the 2D cameras stay. Press C, or the Camera button (it reads "Camera: 3D", "Camera: TV" or "Camera: overhead" for the view you are on), to cycle overhead, TV and 3D; the camera you pick is remembered.</p>
+				<p class="fine"><b>Graphics.</b> Low, Medium or High (under the pitch with the camera, and on the pause card) sets how much the 3D view draws: how full the stands are and how many fans get the detailed shape, the floodlight towers' lattice, how many floodlight shadows each player throws (four on High), and the sharpness and smoothing of the picture. Phones start on Low (a big tablet on Medium) and computers on High; the setting you pick is remembered.</p>
+				<p class="fine"><b>Free kicks.</b> The other side stands 9.15 m back, and near your goal they build a wall. From shooting range, press W to curl it over the wall (up or down picks the corner, the far post if you don't choose), or D to drive it low and hard. S plays it short. Hold E (or Shift) to sprint at any time: you'll see speed streaks behind your player.</p>
+				<p class="fine"><b>Fouls and cards.</b> A slide that misses the ball and takes the man, above all from behind, is a foul: a free kick where it happened, or a penalty in the box (pick a side with ↑ ↓ and press D; the keeper guesses). Reckless tackles get a yellow card, a second yellow is a red, and a bad one from behind can be a straight red: the player walks off and his side plays a man down. In the league a red card is a ban (two games for a straight red), five yellows in a season is one, and a player hurt in a foul limps on and then misses one to three games. Banned and injured players come off the team sheet by themselves and go back on it when they're available.</p>
+				<p class="fine"><b>Throw-ins.</b> When the ball goes over a touchline, the other side throws it back in from that spot. On yours, aim with the arrows and press S for a short throw to feet or Q for a long throw. Opponents stand off the thrower, and there is no offside from a throw-in.</p>
+				<p class="fine"><b>Corners and goal kicks.</b> If a defender puts the ball over their own goal line it's a corner; if an attacker does, it's a goal kick. On your corners, S whips an in-swinger at the near post, Q floats an out-swinger to the far post and W drops one on the penalty spot; the ball bends in the air and comes down where you picked, give or take your taker's passing. Your runners wait in a knot around the spot and attack the near post, far post, spot and six-yard box as it is struck, each with a man goal-side of him, while two defenders hold the near post and the six-yard line and a keeper comes for anything dropping into his area: he catches it, punches it clear or flaps and misses. Whoever gets up highest wins the header, and in the box that can be a goal. The same goes for crosses from out wide (Q from near the byline) and long balls over the top. Central and in range, Q chips the keeper instead. There is no offside from a corner.</p>
+				<p class="fine"><b>Offside</b> (every format; switch it off with the Offside button). A teammate is offside if, when the ball is played, they are in the other half and nearer the goal line than both the ball and the second-last defender, and they are the next to touch it. The defenders get a free kick. While you have the ball, a red dashed line shows the offside line and anyone beyond it is marked OFF. Your pass markers prefer onside teammates.</p>
+				<p class="fine"><b>Keepers.</b> A keeper holding the ball in their own area can't be challenged. Nobody presses them: both teams drop back into shape, opponents must stay outside the faint ring, and the keeper releases it within a second or two.</p>
+				<p class="fine"><b>The stadium and the clubs.</b> Every ground is built in the Mexican manner, in one of three shapes: a two-tier bowl with a ring of lit private boxes between the tiers under a ring roof on masts, one tall oval tier under a ring roof, or a tight rectangle of two tiers with roofs on the long sides and mountains behind. Floodlights run along the roof or stand on lattice towers at the corners; aisles climb through the seats; the grass is mown in the ground's own pattern, worn in the goalmouths (churned and puddled on a muddy pitch) and glistens under the lights in the rain. The stands fill with the home club's fans (with an away corner), the ground's name runs across the far side, and on the near touchline both benches sit in their dugouts with each manager in his technical area. In the league panel, Clubs shows every club in the Premier Division (and the division below): rating, ground, how they play, danger man and best defender; tap one for its squad.</p>
+				<p class="fine"><b>Modes.</b> League matches count toward your Premier Division season. Friendly matches are practice: the result doesn't count, and you can pick the opponent's level, the weather and the ground. Tutorial walks you through every control step by step. The label above the score always shows which one you're playing.</p>
+				<p class="fine"><b>Half time.</b> At half time the whistle goes and you get the score, possession, passes, shots and tackles so far. Change your tactic, formation or style, then start the second half; the teams change ends, so you attack the other goal, and the other side kicks off.</p>
+				<p class="fine"><b>Keepers.</b> When your keeper has the ball, control switches to him: aim with the arrows, then S to roll it out to the teammate in the dashed ring, W to play a runner in, Q or D to kick it long. Do nothing for six seconds and he plays it himself. Goal kicks work the same way, and there is no offside from a goal kick.</p>
+				<p class="fine"><b>Saving.</b> Your season, squad, budget and upgrades are saved after every result and every change, to your account when the page can and always in this browser, so a refresh or another visit carries on the same season. A match in progress is kept too: reopen the page and it comes back paused at the same score and time.</p>
+				<p class="fine"><b>Premier Division.</b> Twenty clubs play each other home and away over 38 matchdays, three points for a win. The top four finish in the Champions Cup places and fifth in the Continental Cup place. The bottom three are relegated and replaced by three promoted clubs. If you finish in the bottom three, the board keeps you up but halves your budget. The transfer window opens before the season, in January before matchday 20, and at the end of the season. Short on time? Simulate a fixture from the kick-off card.</p>
+				<p class="fine"><b>Headers.</b> When a high ball drops toward your player, he jumps for it. Press D as it comes down to head it at goal, S to head it on to a teammate (the way you're facing), or Q to head it clear. Press nothing and he goes for it himself, or brings it down. The nearest man from each side goes up together, and the one better placed, and better in the air, wins it. The keeper claims high balls in his own area.</p>
+				<p class="fine"><b>How the teams play.</b> Players keep their spacing and wide players hold the width when their side has the ball. In eleven-a-side the full-back overlaps when the winger carries it down his flank. Wide in the final third, sides cross it in, and the forwards attack the near post, far post and penalty spot; press Q out wide to whip in your own cross. A cross that drops at head height in the box is headed at goal (or cleared by the defence). After you pass, the passer runs on for the return, so press S again for a one-two. Under pressure the computer may switch play to an open player on the far side.</p>
+				<p class="fine"><b>Team instructions.</b> Set how you play with Style and Defending, any time, even mid-match. Possession: teammates come short to support you, short passes are more accurate, and keeping the ball builds momentum much faster, so dominating the ball rattles the other side. Direct and Counter-attack: runners go early and long balls are more accurate (counter sides also sit deeper without the ball). High press: two players close the ball down and the team squeezes up the pitch, but space opens behind. Low block: deep and compact, with the covering player staying goal-side. Every computer club has its own style, shown on the kick-off card, and possession is shown live under the scoreboard.</p>
+				<p class="fine"><b>Tactics.</b> Change your team's mentality at any moment with 1 to 4 (or T to cycle, D-pad up/down on a controller). Attacking pushes the whole team up. All-out attack sends the centre-backs to halfway, brings the keeper off his line as a sweeper and leaves fewer players marking, which is great for chasing a late goal and risky on the break. Defensive drops everyone deep. The computer does the same: it chases a game it is losing late on and sits deep on a lead.</p>
+				<p class="fine"><b>Formations.</b> Pick a formation with Shape. 11-a-side: 4-4-2, 4-3-3, 4-2-3-1, 3-5-2, 5-3-2, 4-5-1. 6-a-side: 2-2-1, 2-1-2, 3-1-1, 1-3-1, 1-2-2. 5-a-side: 2-1-1, 1-2-1, 2-2, 3-1, 1-1-2. Change it at any moment, even mid-match, and your team re-forms at once. "Auto (follows tactic)" switches formation with your tactic: Defensive drops into 5-3-2 / 3-1-1 / 3-1, All-out attack goes 4-3-3 / 1-2-2 / 1-1-2. The computer re-forms too when it changes tactic late on. Your squad is a 4-4-2, so some formations play a player out of his line (a full-back at wing-back): one line out costs a little, a keeper out of goal a lot.</p>
+				<p class="fine"><b>Formats and shapes.</b> 11-a-side plays a 4-4-2 on a full pitch, with offside. Change Teams at any time, in a friendly or mid-season in the league (the season switches from the next match; results so far stand). 6-a-side plays 2-2-1 (two defenders, a holding midfielder, an attacking midfielder behind a lone striker) or 2-1-2, on a mid-sized pitch. 5-a-side plays 2-1-1 (with an attacking midfielder), a 1-2-1 diamond, or 2-2. Pick the shape with Shape. The attacking midfielder finds space between the carrier and the striker for a short pass. Your squad panel shows who starts in the shape you're playing.</p>
+				<p class="fine"><b>Every player has their own quality.</b> Every club's players have pace, shooting, passing and defending ratings, and a stronger club has better players. Defenders with high defending ratings read passes and cut them out from further away, block shots (a block that goes behind is a corner), win more tackles, slide in, and mark tighter. Strikers with high shooting ratings hit it harder and more accurately. The kick-off card tells you who to watch.</p>
+				<p class="fine"><b>Auto-rotate.</b> Turn on Auto-rotate in the squad panel and it stays on for every season until you turn it off. After every league match (played or simulated), starters under 70% fitness are rested for fresh players from the bench (the more tired a player is, the more readily he is rested). The full-time card tells you who was rested. Or press Rotate now on the full-time card, or Rest tired players on the kick-off card, to do it once.</p>
+				<p class="fine"><b>Rotation.</b> Your squad has a starting eleven and a bench of seven. In the squad panel, tap a player and then another to swap them. Starters lose fitness each league match and everyone else recovers, and tired players are slower. Playing someone out of position costs them, and a lot in goal. Auto-pick fields the strongest fit team.</p>
+				<p class="fine"><b>Transfers and upgrades.</b> Your players have pace, shooting, passing and defending ratings that change how they play. When a season ends you earn prize money by where you finish. Until your first match of the next season, sign players from the transfer list (they join the bench, or replace your weakest player in that position once it is full) and build club upgrades that lift the whole squad. Rival clubs get stronger or weaker between seasons too.</p>
+				<p class="fine"><b>Eleven-a-side.</b> The camera follows the ball, and an arrow at the screen edge points to your player when they are out of view. Turn on the Minimap button for a small view of the whole pitch.</p>
+				<p class="fine"><b>Momentum.</b> Keep the ball and the bar under the clock swings your way. Tackles, completed passes and goals push it further. Once you are on top, the CPU gets rattled: it reacts slower, misplaces passes, shoots wider and tackles less, and your players run a little quicker. The same happens to you if the CPU keeps the ball.</p>
+				<p class="fine">The dashed ring shows who your pass will reach, and it avoids teammates with a red shirt in the way. Your receiver runs onto the ball by itself, and the arrows take over once they have it. When you defend, the Auto switch setting decides who you control. <b>Assisted</b> (the default) switches you once when the ball is lost, to the defender who can get to it first (allowing for where it is going, and preferring players goal-side of the attacker), and then leaves you alone: while you hold the arrows or A, control stays with your man unless he is clearly out of the play (at most once a spell, with a message on screen), or the ball arrives at a teammate's feet while your man is well off it, when that teammate is yours at once. Let go of the arrows and the game moves you to a clearly better-placed defender, never more than twice a second and never straight back to the man you just left. <b>Manual only</b> never switches by itself (except at restarts, or if your man is sent off or subbed): S is the only way to change player. <b>Aggressive</b> switches as soon as another defender is better placed, whatever you are doing. A white pulse shows who you now control. The dashed ring with an S shows who S will switch you to; press S again to cycle to the next best, and control stays with your choice for two and a half seconds or until the ball changes hands. Your teammates cover and mark while you press: chase the ball with E, or hold A and your man closes the carrier down and jockeys him for you.</p>
+			</section>
+	</div>
 </main>
 
 <div class="sheet" id="editSheet" role="dialog" aria-modal="true" aria-labelledby="editTitle" hidden>

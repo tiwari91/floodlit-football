@@ -194,6 +194,8 @@
 		let box = $("lgExtras");
 		if (!box) { box = el("div", "lg-extras"); box.id = "lgExtras"; side.append(box); }
 		box.replaceChildren();
+		const acHome = $("lgAcademy");   // the manager hub's Club tab holds the academy; the cups stay here
+		if (acHome) { acHome.replaceChildren(); }
 		const cup = ensureCup(league);
 		const cupBox = el("div", "lg-cup");
 		cupBox.append(el("h4", "", cupName()), el("p", "detail", cupNext()));
@@ -243,5 +245,5 @@
 			ul.append(li);
 		}
 		ac.append(ul);
-		box.append(ac);
+		(acHome || box).append(ac);
 	}
