@@ -18,9 +18,13 @@
 	// A stable id for each player, so edits can follow him (see 18g). Not from the seeded rnd: that would shift the computer's squads.
 	function newPid () { return `p${Date.now().toString(36).slice(-4)}${Math.random().toString(36).slice(2, 8)}`; }
 	const OVR_W = { gk: [ 0, 0, 0, 1 ], def: [ 0.25, 0.05, 0.2, 0.5 ], mid: [ 0.2, 0.2, 0.4, 0.2 ], fwd: [ 0.3, 0.35, 0.2, 0.15 ] };
-	function genPlayer (pos, ovr, name, rnd = Math.random) {
-		const j = () => Math.round((rnd() * 2 - 1) * 5), c = v => clamp(Math.round(v), 30, 96);
+	// st: the style to generate in (05a): { lg: the league's country, nat: his own }. Left out, the current
+	// league's; false, none at all.
+	function genPlayer (pos, ovr, name, rnd = Math.random, st) {
+		const lg = st === false ? null : (st && NAT_STYLE[st.lg] ? st.lg : leagueNat()), sty = lg ? styleOf(lg) : null, sp = sty ? sty.sp : 1;
+		const j = () => Math.round((rnd() * 2 - 1) * 5 * sp), c = v => clamp(Math.round(v), 30, 96);
 		const b = { def: [ 0, -12, -2, 10 ], mid: [ 0, -2, 8, -2 ], fwd: [ 4, 8, 0, -12 ] }[pos];
+		if (sty) { ovr += styleEmph(sty, pos); }   // where the league's quality sits, evened out over an eleven
 		// The position bias used to lift the overall 2 to 4 points above what was asked for, and the very
 		// best came out at 93 to 99: take the bias back out, and squeeze the top so the elite sit at 85 to 92.
 		if (pos !== "gk") { const w = OVR_W[pos]; ovr -= b.reduce((t, v, i) => t + v * w[i], 0); }
@@ -28,10 +32,21 @@
 		const p = pos === "gk"
 			? { pac: 45 + j(), sho: 30 + j(), pas: 55 + j(), def: ovr + j() }
 			: { pac: ovr + b[0] + j(), sho: ovr + b[1] + j(), pas: ovr + b[2] + j(), def: ovr + b[3] + j() };
-		return ensurePlayer({
+		const pl = {
 			id: newPid(),
 			name: name || `${String.fromCharCode(65 + Math.floor(rnd() * 26))}. ${SURNAMES[Math.floor(rnd() * SURNAMES.length)]}`,
 			pos, pac: c(p.pac), sho: c(p.sho), pas: c(p.pas), def: c(p.def)
-		});
+		};
+		if (!sty) { return ensurePlayer(pl); }
+		// His country (abroad, mostly the league's own), then the league's tilt with a little of his country's.
+		const nat = st && NATIONS[st.nat] ? st.nat : styleNatFor(pl.name, pos, lg);
+		if (nat) { pl.nat = nat; }
+		ensurePlayer(pl);
+		const tl = styleTilt(lg, pl.nat);
+		applyTilt(pl, pos, tl.r, p);
+		pl.trait = styleTrait(pl.name, pos, tl.t);
+		pl.age = styleAge(pl.age, lg);
+		const h = hashStr(String(pl.name) + "|" + pl.pos);
+		pl.pot = clamp(ovrOf(pl) + Math.max(0, 27 - pl.age) * 1.5 + ((h >>> 16) % 6), ovrOf(pl), 94);
+		return pl;
 	}
-
