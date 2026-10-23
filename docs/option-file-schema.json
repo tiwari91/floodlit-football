@@ -1,0 +1,143 @@
+{
+ "$comment": "Floodlit option file, version 2. Machine-readable description for tools that write option files. tests/leaguefile.mjs checks the game's own constants against the slot, position, country and cup facts here, so this file stays true to the game.",
+ "kind": "floodlit-option-file",
+ "version": 2,
+ "maxBytes": 3000000,
+ "topLevelKeys": {
+  "kind": "required, exactly \"floodlit-option-file\"",
+  "version": "required, integer 1 or 2 (a file with leagues or cup must say 2)",
+  "note": "optional string, ignored",
+  "customRatings": "optional boolean; with true the import offers 'Use its ratings'. Ratings are dropped unless the user ticks it.",
+  "leagues": "v2: object keyed by league country code (see leagueCountries) -> league",
+  "cup": "v2: object keyed by country code (see cup) -> array of cup clubs",
+  "clubs": "v1: object keyed by a club's default name -> club fields (renames in the current save)",
+  "markets": "v1: object keyed by a foreign market club's default name -> new name",
+  "slots": "v1: object keyed by '<club default name>#<squad slot 0-10>' -> player fields",
+  "players": "v1: object keyed by a player id of your own club -> player fields"
+ },
+ "league": {
+  "shape": { "clubs": "array of league clubs, at most 28, each with a distinct slot" },
+  "slotCount": 28,
+  "slots": "1 to 28. Slot 0 is the manager's own club and is never defined in a file. Slots 1-19 start in the top division (the division is always 20 clubs: yours plus 19); slots 20-28 start below it and come up through promotion. A 20-club league fits slots 1-20: when the user starts a career at one of slots 1-19, the club at slot 20 takes its place in the division.",
+  "divisionSize": 20,
+  "firstSlotBelowDivision": 20,
+  "startingStrengthBySlot": { "1": 3, "2": 2, "3": 4, "4": 5, "5": 3, "6": 1, "7": 2, "8": 5, "9": 4, "10": 4, "11": 4, "12": 3, "13": 3, "14": 3, "15": 3, "16": 3, "17": 2, "18": 2, "19": 2, "20": 2, "21": 2, "22": 2, "23": 1, "24": 2, "25": 2, "26": 2, "27": 1, "28": 2 },
+  "strengthNote": "1 (weakest) to 5 (strongest). A club takes the strength of the slot it sits in, so put the strongest real clubs in the strength 5 and 4 slots. Strengths drift a little between seasons.",
+  "derbiesBySlot": [ [ 0, 1 ], [ 4, 8 ], [ 5, 11 ], [ 2, 7 ], [ 3, 9 ], [ 12, 14 ], [ 10, 17 ], [ 13, 16 ], [ 6, 19 ], [ 15, 18 ], [ 20, 22 ], [ 21, 24 ], [ 23, 27 ], [ 25, 28 ] ],
+  "derbiesNote": "Pairs of slots that play derbies (loudest crowds). Slot 0 is your own club."
+ },
+ "club": {
+  "slot": "league clubs only: required integer 1-28, unique within the league",
+  "name": "required string, 2-28 characters, unique within the league (or within the cup list)",
+  "short": "optional string, 2-14 characters (table and scoreboard name)",
+  "color": "optional shirt colour, '#rrggbb'",
+  "color2": "optional second colour, '#rrggbb', clearly different from color (CIE76 delta E of at least 12)",
+  "ground": "optional string, 2-32 characters",
+  "manager": "optional manager or head coach name, 2-28 characters, same character rules as a player name. Shown on the club card and the matchday card.",
+  "managerNat": "optional nationality code of the manager, one of nationalities",
+  "players": "optional array of players, at most 11 (the computer's squad)",
+  "textRules": "Text may not contain < > { } or control characters; runs of spaces become one space."
+ },
+ "squad": {
+  "cpuSquadSize": 11,
+  "cpuBench": 0,
+  "cpuNote": "The computer's clubs field exactly 11 players and have no bench. Players beyond 11 are ignored.",
+  "positionBySlot": [ "gk", "def", "def", "def", "def", "mid", "mid", "mid", "mid", "fwd", "fwd" ],
+  "positionNote": "Squad slot 0 is the goalkeeper, 1-4 defenders, 5-8 midfielders, 9-10 forwards. The slot sets where he plays in the 4-4-2; pos only changes his label.",
+  "yourClubSize": 18,
+  "yourBenchPositions": [ "gk", "def", "def", "mid", "mid", "fwd", "fwd" ],
+  "yourClubNote": "When the user starts a career at a file club, its 11 file players become his first eleven and a bench of 7 is generated."
+ },
+ "player": {
+  "slot": "optional integer 0-10; defaults to the player's index in the array; unique within the club",
+  "name": "required string, 2-24 characters, letters (any script), spaces, full stops, apostrophes and hyphens only; unique within the club",
+  "nat": "optional nationality code, one of nationalities",
+  "shirt": "optional integer 1-99",
+  "foot": "optional 'left' or 'right'",
+  "pos": "optional 'gk', 'def', 'mid' or 'fwd'",
+  "lk": "optional look object, see look (the game has no height; the look is the whole appearance)",
+  "age": "optional integer 16-40",
+  "trait": "optional, one of traits, or \"\" for none. Without it a player's trait comes from his name.",
+  "pac": "optional rating 30-96 (pace)",
+  "sho": "optional rating 30-96 (shooting)",
+  "pas": "optional rating 30-96 (passing)",
+  "def": "optional rating 30-96 (defending; handling for a goalkeeper)",
+  "ratingsNote": "Ratings are whole numbers from 30 to 96 and are only used when the importer ticks 'Use its ratings'. Without them the game rates every player from his club's strength. These four are every rating the game has: a goalkeeper has no separate attributes, and his def is his handling (a generated keeper is near pac 45, sho 30, pas 55). Overall is worked out from the four by position.",
+  "notInFiles": "Morale, contract, potential, role and form belong to the season and are not set by files."
+ },
+ "traits": {
+  "pace": "Pace merchant: quicker, and makes runs in behind (any outfield position)",
+  "target": "Target man: wins headers and holds the ball up (forwards)",
+  "playmaker": "Playmaker: longer, more accurate passing and through balls (midfielders)",
+  "poacher": "Poacher: lives on the last defender, sharper finishing in the box (forwards)",
+  "winner": "Ball-winner: wins tackles and slides in more often (defenders, midfielders)",
+  "sweeper": "Sweeper keeper: plays high and rushes out to through balls (goalkeepers)"
+ },
+ "look": {
+  "skin": [ "#f1c9a5", "#e0ac86", "#c68a5e", "#9c6a44", "#6e4a30", "#4a3222" ],
+  "hair": [ "#1b1410", "#3b2616", "#6b4424", "#a0703a", "#d8b46a", "#2a2a2a" ],
+  "hairNames": [ "Black", "Dark brown", "Brown", "Light brown", "Blond", "Dark grey" ],
+  "style": [ "short", "crop", "curly", "afro", "long", "tied", "buzz", "shaved" ],
+  "face": "integer 0-15",
+  "note": "Every field is optional; values not in these lists are refused."
+ },
+ "leagueCountries": {
+  "ENG": "Premier Division (England, the home league)",
+  "ESP": "Primera División (Spain)",
+  "FRA": "Ligue 1 (France)",
+  "GER": "Bundesliga (Germany)",
+  "ITA": "Serie A (Italy)",
+  "NED": "Eredivisie (Netherlands)",
+  "POR": "Primeira Liga (Portugal)",
+  "BEL": "Pro League (Belgium)",
+  "CRO": "HNL (Croatia)",
+  "DEN": "Superliga (Denmark)",
+  "SWE": "Allsvenskan (Sweden)",
+  "POL": "Ekstraklasa (Poland)",
+  "SRB": "SuperLiga (Serbia)",
+  "BRA": "Série A (Brazil)",
+  "ARG": "Liga Profesional (Argentina)",
+  "URU": "Primera División (Uruguay)",
+  "COL": "Primera A (Colombia)",
+  "CHI": "Primera División (Chile)",
+  "NGA": "NPFL (Nigeria)",
+  "GHA": "Premier League (Ghana)",
+  "SEN": "Ligue 1 (Senegal)",
+  "CIV": "Ligue 1 (Ivory Coast)",
+  "CMR": "Elite One (Cameroon)",
+  "MAR": "Botola (Morocco)",
+  "JPN": "J1 League (Japan)",
+  "KOR": "K League 1 (South Korea)",
+  "AUS": "A-League (Australia)",
+  "USA": "Major League (United States)",
+  "MEX": "Liga Mexicana (Mexico)"
+ },
+ "leagueCountriesNote": "Every league the game has, each with the same 28 slots. Any other key in leagues (SCO, WAL, IRL and unknown codes included) is ignored and listed in the import summary.",
+ "nationalities": [ "ENG", "SCO", "WAL", "IRL", "ESP", "FRA", "GER", "ITA", "NED", "POR", "BEL", "CRO", "DEN", "SWE", "POL", "SRB", "BRA", "ARG", "URU", "COL", "CHI", "NGA", "GHA", "SEN", "CIV", "CMR", "MAR", "JPN", "KOR", "AUS", "USA", "MEX" ],
+ "cup": {
+  "name": "Continental Champions Cup",
+  "leaguePhaseClubs": 36,
+  "seatsByCountry": { "ESP": 4, "GER": 4, "ITA": 4, "FRA": 4, "POR": 3, "NED": 3, "BEL": 2, "CRO": 2, "DEN": 2, "SWE": 1, "POL": 1, "SRB": 2 },
+  "homeSeats": 4,
+  "maxClubsPerCountry": 8,
+  "rules": [
+   "36 clubs: the top four of your own league (whatever the country) plus 32 guests from seatsByCountry.",
+   "Your own league's country sends no guests; when it is one of seatsByCountry, England takes its seats (England is never a guest while you manage in England).",
+   "For each seat a country fills, the game takes, in order: the clubs in cup[country] (array order, best first), then the clubs of leagues[country] from the strongest slot down, then its own generated clubs.",
+   "Cup clubs use the same club and player fields as league clubs, without slot. Up to 8 per country are kept, but only as many as its seats are used. Countries without seats (and England while you manage in England) are accepted but unused."
+  ]
+ },
+ "limits": { "maxBytes": 3000000, "leagueClubs": 28, "playersPerClub": 11, "cupClubsPerCountry": 8, "v1EntriesPerSection": 3000 },
+ "storage": "League and cup data are kept in the browser (not in the saved season), so Export league does not carry them. Import the option file again on another device. Importing a file replaces the league and cup data only for the countries it has.",
+ "example": {
+  "kind": "floodlit-option-file",
+  "version": 2,
+  "customRatings": false,
+  "leagues": {
+   "ENG": { "clubs": [ { "slot": 4, "name": "Example Rovers", "short": "Example", "color": "#1d4fa0", "color2": "#ffffff", "ground": "Example Park", "manager": "D. Example", "managerNat": "SCO", "players": [ { "slot": 0, "name": "A. Keeper", "nat": "ENG", "shirt": 1, "foot": "right", "pos": "gk", "age": 29, "trait": "sweeper", "lk": { "skin": "#e0ac86", "hair": "#3b2616", "style": "short", "face": 3 } }, { "slot": 9, "name": "B. Striker", "nat": "WAL", "shirt": 9, "foot": "left", "pos": "fwd", "pac": 80, "sho": 84, "pas": 70, "def": 40 } ] } ] }
+  },
+  "cup": {
+   "GER": [ { "name": "Example SV", "short": "Example", "color": "#c8102e", "color2": "#ffffff", "ground": "Example-Stadion", "players": [ { "name": "C. Mittel", "nat": "GER", "pos": "mid" } ] } ]
+  }
+ }
+}

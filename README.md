@@ -82,6 +82,47 @@ are matched by a stable id, the other clubs' players by club and squad slot. Unk
 skipped; a file that is not an option file is refused with a message. The file is only ever parsed
 as JSON, never run. Revert to default names undoes every edit.
 
+## League option files
+
+Version 2 option files (`"version": 2`; version 1 files still import) can define whole leagues and the
+continental cup's guest clubs, not only the league you play in. The precise, machine-readable spec,
+with every field, range, code and slot, is [`docs/option-file-schema.json`](docs/option-file-schema.json);
+`tests/leaguefile.mjs` checks it against the game.
+
+- **`leagues`**: keyed by country code. The game has 29 leagues: `ENG` (home) and `ESP FRA GER ITA NED
+  POR BEL CRO DEN SWE POL SRB BRA ARG URU COL CHI NGA GHA SEN CIV CMR MAR JPN KOR AUS USA MEX`. Each is
+  `{ "clubs": [ ... ] }`, a club per **slot 1 to 28**: slots 1-19 start in the top division (always 20
+  clubs, yours plus 19) and 20-28 wait below it for promotion. Slot 0 is your own club and is never in a
+  file. A club takes its slot's starting strength (1 to 5, listed in the spec), so put the strongest
+  clubs in the strongest slots. A 20-club league fits slots 1-20.
+- **A club**: `name` (required), `short`, `color`, `color2`, `ground`, an optional `manager` and
+  `managerNat`, and `players`.
+- **Players**: the computer's squads are **11 with no bench**, by squad slot 0-10: goalkeeper, four
+  defenders (1-4), four midfielders (5-8), two forwards (9-10). Each player has `name` (required),
+  `nat`, `shirt`, `foot`, `pos`, `age`, `trait`, `lk` (skin, hair, hair style, face), and the ratings
+  `pac`, `sho`, `pas` and `def` (30 to 96; a goalkeeper's `def` is his handling). Ratings are used only
+  if you tick "Use its ratings" on import. Your own club has 11 plus a bench of 7.
+- **`cup`**: keyed by country code, a list of clubs (no slot) for the Continental Champions Cup's
+  36-club league phase. A country's seats (Spain, Germany, Italy and France 4, Portugal and the
+  Netherlands 3, Belgium, Croatia, Denmark and Serbia 2, Sweden and Poland 1) are filled from its cup
+  list first, then from its league in the file, strongest slots first, then from generated clubs. When
+  you manage abroad in one of those countries, England takes its seats.
+
+The import preview lists each country, for example "England 20 clubs / 220 players; Spain 20 clubs /
+220 players; Continental cup 36 clubs". It also names the countries the game has no league for (they
+are ignored) and the values that failed the checks. A file's leagues apply at once to the league you play in, and to
+any other league as soon as you play there. They are kept in this browser, apart from your season, so
+Export league does not carry them: import the option file again on another device. A league that
+appears in a newer file replaces the one you had for that country. Edit mode's own renames still win
+over a file, and Revert to default names clears the file as well.
+
+**Play in another league** (in the League panel, and the Leagues tab of edit mode) is how you reach
+a league from a file when your career is somewhere else, for example the English league while you
+manage in Spain. Pick the country and either start a new career there (at a club of your own, or at
+any club in that league, whose eleven from the file become your first team) or move your club there
+with its squad, budget, staff and career. A browser keeps one season, so your current season is
+downloaded first (untick it if you don't want that), and Import league brings it back at any time.
+
 ## Working on the game
 
 `index.html` is the one file GitHub Pages serves, and it is built, not edited. The source lives in
