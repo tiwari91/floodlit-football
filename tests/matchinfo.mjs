@@ -51,6 +51,31 @@ try {
 	await page.click("#mcClose"); await page.waitForTimeout(100);
 	const closed = await page.evaluate(() => document.getElementById("matchCentre").hidden);
 	check("the close button folds it away", closed);
+	// A substitution: the man going off walks to the touchline under applause, the new man jogs on, the clock waits.
+	const sub = await page.evaluate(() => {
+		const F = window.__ff;
+		F.state = "play"; F.freeze = 0;
+		for (const id of [ "lowerThird", "commLine" ]) { document.getElementById(id).hidden = true; }
+		F.commReset();
+		const p = F.outfield(0).find(q => F.ball.owner !== q), pl = F.subPool().find(q => q.pos !== "gk");
+		const off = p.name, at = { x: p.x, y: p.y }, t0 = F.timeLeft;
+		F.logGoalTest(0, off);
+		F.makeSub(p, pl);
+		const first = { kind: F.freezeKind, walks: F.subWalks.length, name: p.name, perf: F.lastApplause && F.lastApplause.perf };
+		let maxStep = 0, maxY = p.y, minY = p.y, steps = 0, handed = null;
+		while (F.subWalks.length && steps < 600) {
+			const x = p.x, y = p.y;
+			F.step(1); steps++;
+			maxStep = Math.max(maxStep, Math.hypot(p.x - x, p.y - y)); maxY = Math.max(maxY, p.y); minY = Math.min(minY, p.y);
+			if (!handed && p.name === pl.name) { handed = { steps, y: p.y, said: F.lastCommentary && F.lastCommentary.kind, text: F.lastCommentary && F.lastCommentary.text }; }
+		}
+		return { first, off, on: pl.name, steps, maxStep: +maxStep.toFixed(2), reachedLine: maxY > F.FH || minY < 0, back: Math.hypot(p.x - at.x, p.y - at.y) < 1, name: p.name, clock: F.timeLeft === t0, freeze: F.freeze, handed, plain: F.subPerf(1, "Nobody Atall") };
+	});
+	check("a substitution stops play and the man going off walks away under his own name, to applause", sub.first.kind === "sub" && sub.first.walks === 1 && sub.first.name === sub.off && sub.first.perf > 0, JSON.stringify(sub));
+	check("he walks to the touchline (no teleport), the new man jogs back to the spot, and the clock waits", sub.reachedLine && sub.maxStep < 3.5 && sub.back && sub.name === sub.on && sub.clock && sub.freeze === 0 && sub.steps > 100, JSON.stringify(sub));
+	check("at the line the commentator says who's on", sub.handed && sub.handed.said === "sub" && sub.handed.text.includes(sub.on), JSON.stringify(sub.handed));
+	check("a scorer gets louder applause than a quiet game", sub.first.perf > sub.plain, JSON.stringify({ scorer: sub.first.perf, plain: sub.plain }));
+
 	check("no page errors (desktop)", errs.length === 0, errs.slice(0, 3).join(" | "));
 	await ctx.close();
 

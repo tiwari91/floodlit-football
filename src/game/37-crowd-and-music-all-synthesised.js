@@ -184,6 +184,21 @@
 		dg.gain.setValueAtTime(g, at); dg.gain.exponentialRampToValueAtTime(0.0001, at + 0.3);
 		o.connect(dg); connectPan(dg, pan); o.start(at); o.stop(at + 0.32);
 	}
+	// Applause for a man coming off: a swell of claps from both ends, his own end louder, rising and
+	// dying away over three seconds or so; perf (0..1) is how well he played, and a hero gets a roar too.
+	let lastApplause = null;
+	function applause (perf, t) {
+		lastApplause = { perf, t, at: performance.now() };
+		ev3d("chant");
+		if (!audio || bulkSim) { return lastApplause; }
+		const now = audio.currentTime + 0.05, n = Math.round(30 + 70 * perf), dur = 2.2 + 1.6 * perf, g = 0.03 + 0.05 * perf, pan = t === homeSide ? -0.3 : 0.5;
+		for (let k = 0; k < n; k++) {
+			const u = Math.random(), at = now + u * dur, env = Math.sin(Math.PI * Math.min(1, u * 1.15));   // up, then away
+			clap1(at, g * (0.35 + 0.65 * env), pan + (Math.random() - 0.5) * 0.9);
+		}
+		if (perf > 0.7) { noiseBurst("pink", now + 0.4, dur * 0.8, 0.05 * perf, "bandpass", 700, 520, 0.6, pan); }
+		return lastApplause;
+	}
 	const clap1 = (at, g, pan) => noiseBurst("white", at, 0.07 + Math.random() * 0.03, g, "bandpass", 1600 + Math.random() * 500, 1500, 0.9, pan + (Math.random() - 0.5) * 0.15);
 	const hey = (at, g, pan, fans, f = 230) => { voices(at, fans.n, f, f * 0.92, 0.32, g * 0.55, fans.lp + 300, pan); noiseBurst("pink", at, 0.35, g * 1.4, "bandpass", 900, 700, 0.8, pan); };
 	// Clapped out: either slow claps that speed up into applause and a roar, or a fixed rhythm

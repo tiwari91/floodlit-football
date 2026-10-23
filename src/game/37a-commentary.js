@@ -25,6 +25,7 @@
 		flare: [ "Tempers flare! {n} and {m} go nose to nose", "{n} isn't having that. He's straight in the face of {m}", "Handbags! {n} and {m} have to be pulled apart", "It's all kicking off. {n} squares up to {m}" ],
 		red2: [ "Second yellow for {n}, and he's off", "{n} walks: a second booking, and a red", "That's two yellows, so {n} has to go" ],
 		attack: [ "Here they come! {n} on the charge!", "{n} drives forward, this is dangerous!", "Oh, this looks promising! {n} into the final third!", "{n} running at them, the crowd on its feet!", "Space opening up for {n}! Can he make it count?", "Danger here! {n} bearing down!" ],
+		sub: [ "A change: {n} comes on for {m}", "{m} makes way, and on comes {n}", "{m} gets a hand from the crowd as {n} comes on", "Fresh legs: {n} on, {m} off" ],
 		welcome: [ "Welcome to {g}, where {h} take on {a}", "Hello and welcome to {g}: {h} against {a}", "Good to be with you at {g}. {h} versus {a}, and we're under way", "And we're live from {g}, {h} and {a} ready to go" ],
 		offside: [ "Flag's up! {n} was offside", "Offside! {n} just a fraction too early", "The flag goes up against {n}!", "{n} strayed beyond the last man, and it's offside" ]
 	};
@@ -51,11 +52,12 @@
 		lateEq: [ "Never, ever give up. What a lesson", "They've stolen a point from the jaws of defeat!" ],
 		hattrick: [ "Take a bow, son. Take a bow", "He'll sleep with that match ball tonight" ],
 		own: [ "Oh, you feel for him. Nightmare", "Nothing he could do, it just hit him" ],
+		sub: [ "He's given everything out there", "Let's see what the new man can do", "A sensible change, that" ],
 		welcome: [ "A cracking atmosphere here already", "Should be a good one, this", "The pitch looks in great nick, Rory" ],
 		flare: [ "Calm down, gents, there's a game going on", "The referee needs to get a grip of this" ]
 	};
 	// How excited the calls are, 0..1: the voices go up and quicken with it.
-	const EXCITE = { goal: 1, lateWin: 1, lateEq: 1, hattrick: 1, equaliser: 0.95, ahead: 0.9, comeback: 1, own: 0.7, woodwork: 0.85, bar: 0.85, near: 0.8, save: 0.75, rocket: 0.7, attack: 0.65, tackle: 0.5, red: 0.6, red2: 0.6, flare: 0.6, offside: 0.4, welcome: 0.3 };
+	const EXCITE = { goal: 1, lateWin: 1, lateEq: 1, hattrick: 1, equaliser: 0.95, ahead: 0.9, comeback: 1, own: 0.7, woodwork: 0.85, bar: 0.85, near: 0.8, save: 0.75, rocket: 0.7, attack: 0.65, tackle: 0.5, red: 0.6, red2: 0.6, flare: 0.6, offside: 0.4, welcome: 0.3, sub: 0.3 };
 	const pickFresh = (pool, recent) => { const fresh = pool.filter(s => !recent.includes(s)); return fresh[Math.floor(Math.random() * fresh.length)] || pool[Math.floor(Math.random() * pool.length)]; };
 	let commAt = -1e9, commRecent = [], commTimer = 0, lastCommentary = null, lastColour = null, commKindAt = {}, colourTimer = 0, colourRecent = [], goalRecent = [];
 	const shortName = p => (p && (p.name || `No. ${p.num}`)) || "";

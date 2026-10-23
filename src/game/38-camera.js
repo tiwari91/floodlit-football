@@ -8,6 +8,7 @@
 		// After a goal the camera stays on the scorer.
 		if (celebTracking()) { const h = celeb.hero; return [ clamp(MX + h.x - VW / 2, 0, Math.max(0, WW - VW)), clamp(MY + h.y - VH / 2, 0, Math.max(0, WH - VH)) ]; }
 		if (stretcher) { const q = stretcherPos() || stretcher.at; return [ clamp(MX + q.x - VW / 2, 0, Math.max(0, WW - VW)), clamp(MY + q.y - VH / 2, 0, Math.max(0, WH - VH)) ]; }
+		if (subWalks.length && freezeKind === "sub") { const q = subWalks[0].p; return [ clamp(MX + q.x - VW / 2, 0, Math.max(0, WW - VW)), clamp(MY + q.y - VH / 2, 0, Math.max(0, WH - VH)) ]; }   // the walk-off
 		// Follow whoever has the ball (or the ball itself when loose), looking a little ahead.
 		const o = ball.owner, fx0 = o ? o.x : ball.x, fy0 = o ? o.y : ball.y, vx = o ? o.vx : ball.vx, vy = o ? o.vy : ball.vy;
 		const lx = fx0 + vx * 14, ly = fy0 + vy * 14;

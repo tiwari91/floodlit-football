@@ -15,12 +15,65 @@
 		return pool.filter(pl => !onNow.has(pl.name) && !wentOff.includes(pl.name) && !(pl.inj > 0) && !(pl.ban > 0));
 	}
 
+	/* The walk-off: play stops (the clock with it, as for the stretcher). The man going off walks to the
+	   nearest point of the touchline while the crowd applauds him, louder for a good game; at the line the
+	   new man takes over and jogs out to the spot, and the commentator says who's on. The figure is the
+	   same player object, so the side is never a man short and nothing in the simulation changes. */
+	let subWalks = [];
+	const SUB_HAND = 18;   // frames at the line while one hands over to the other
+	function subPerf (t, name) {
+		const goals = (t === 0 ? matchGoals : matchGoalsOpp).filter(g => g === name).length, st = (tally && tally.byName && tally.byName[name]) || {};
+		const cards = matchCards.filter(c => c.name === name).reduce((a, c) => a + (c.kind === "y" ? 1 : 3), 0);
+		return clamp(0.35 + 0.32 * goals + 0.04 * Math.min(8, st.tackle || 0) + 0.04 * Math.min(4, st.air || 0) - 0.2 * cards, 0.1, 1);
+	}
+	function startSubWalk (p, offName, onName) {
+		if (bulkSim || mode === "tutorial" || shoot || !players.includes(p)) { return false; }
+		if (freeze > 0 && freezeKind !== "sub") { return false; }   // another stoppage is on: the change is made in place
+		const edge = { x: clamp(p.x + subWalks.length * 16, 30, FW - 30), y: p.y < FH / 2 ? -12 : FH + 12 };   // off at the nearest point of the touchline, as the law asks
+		const perf = subPerf(p.team, offName);
+		const far = Math.hypot(edge.x - p.x, edge.y - p.y);
+		// A walk off (about 0.7 of a jog) and a jog back on, each a few seconds at most.
+		const a = Math.round(clamp(far / (BASE_SPD * 0.7), 45, 240)), c = Math.round(clamp(far / (BASE_SPD * 1.1), 40, 170));
+		subWalks.push({ p, off: offName, on: onName, at: { x: p.x, y: p.y }, edge, n: 0, perf, far, a, c, end: a + SUB_HAND + c });
+		p.name = offName;   // he walks off under his own name; the new man's comes on at the line
+		freeze = 1; freezeKind = "sub"; charging = false;
+		if (typeof applause === "function") { applause(perf, p.team); }
+		return true;
+	}
+	function stepSubWalk () {
+		const go = (q, x, y, spd) => {
+			const dx = x - q.x, dy = y - q.y, d = Math.hypot(dx, dy);
+			if (d <= spd) { q.x = x; q.y = y; q.vx = q.vy = 0; return; }
+			q.vx = dx / d * spd; q.vy = dy / d * spd; q.x += q.vx; q.y += q.vy;
+			q.dir = turnToward(q.dir, Math.atan2(dy, dx), 0.25);
+		};
+		for (const w of subWalks) {
+			const p = w.p, { a, c, far } = w;
+			w.n++;
+			if (!players.includes(p)) { w.n = w.end; continue; }
+			if (w.n <= a) { go(p, w.edge.x, w.edge.y, Math.max(BASE_SPD * 0.4, far / a)); }
+			else if (w.n <= a + SUB_HAND) {
+				p.vx = p.vy = 0;
+				if (w.n === a + 1) {
+					p.name = w.on;
+					const lt = $("lowerThird");
+					if (lt && !lt.hidden) { lt.hidden = true; }   // the board and caption have had their moment
+					if (typeof commentary === "function") { commentary("sub", { n: w.on, m: w.off }, p.team, true); }
+				}
+			} else { go(p, w.at.x, w.at.y, Math.max(BASE_SPD * 0.95, far / c)); }
+		}
+		for (const q of players) { if (!subWalks.some(w => w.p === q)) { q.vx *= 0.8; q.vy *= 0.8; } }
+		const done = subWalks.filter(w => w.n >= w.end);
+		for (const w of done) { if (players.includes(w.p)) { w.p.x = w.at.x; w.p.y = w.at.y; w.p.vx = w.p.vy = 0; w.p.name = w.on; } }
+		subWalks = subWalks.filter(w => w.n < w.end);
+		if (!subWalks.length) { freeze = 0; }
+	}
 	function makeSub (p, pl, quiet = false) {
 		if (subsLeft <= 0 || !players.includes(p) || p.team !== 0) { return; }
 		wentOff.push(p.name);
 		cameOn.push(pl.name);
 		subLog.push([ p.idx, pl.name ]);
-		const out = p.name;
+		const out = p.name, hurt = p.injured;
 		logEvent(0, "sub", `${pl.name} on for ${out}`);
 		p.name = pl.name;
 		p.attr = effective(pl, p.role);
@@ -33,6 +86,7 @@
 			caption("Substitution", "sub", pl.name, `On for ${out} · ${minuteNow()}'`, 0);
 			subBoard(0, p);
 			$("announce").textContent = `Substitution: ${pl.name} on for ${out}.`;
+			if (!hurt) { startSubWalk(p, out, pl.name); }
 		}
 		updateSubsBtn();
 		saveLive();
@@ -70,6 +124,7 @@
 		logEvent(1, "sub", `${np.name} on for ${was || "a tired man"}`);
 		caption("Substitution", "sub", np.name, `${opp.short} · off: ${was || "?"} (${why})`, 1);
 		subBoard(1, p);
+		if (why !== "injured" && was) { startSubWalk(p, was, np.name); }
 	}
 	// When one of yours is running on empty (or limping), say so once and point at the pause card.
 	function tiredNudge () {

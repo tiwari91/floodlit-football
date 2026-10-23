@@ -189,6 +189,11 @@
 			if (--freeze <= 0) { finishReview(); }
 			return;
 		}
+		if (freeze > 0 && freezeKind === "sub") {
+			stepSubWalk();
+			stepLimbs();
+			return;
+		}
 		if (freeze > 0 && freezeKind === "stretcher") {
 			stepStretcher();
 			stepLimbs();
