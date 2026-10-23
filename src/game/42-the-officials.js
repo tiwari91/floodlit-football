@@ -184,6 +184,7 @@
 			const ride = st3 && st3.man && stretcher.p === p ? st3.man : null;   // on the stretcher: lying along it
 			if (ride) { pose3D(rig, p, WX(ride.x), ride.y - st3.ax * 12.5, WD(st3.ax > 0 ? Math.PI / 2 : -Math.PI / 2), 0, 0); rig.root.position.y += ride.h; }   // the figure's root is at his feet: set back half his length so he lies within it
 			else { const ho = huddleOff3(p); pose3D(rig, p, WX(p.x + (ho ? ho[0] : 0)), p.y + (ho ? ho[1] : 0), WD(face), mir * turn, near, mir * yaw, mir * lead); }   // (ho: drawn apart in the goal huddle)
+			if (p.stageY) { rig.root.position.y += p.stageY; }   // up on the trophy stage or the bus (44a)
 			blendUpper3D(rig, ys, !!ride || acting || p.windUp > 0 || reduceMotion || replayOn() || frameDt > 100);
 			{ const bd = build(p), ht = 0.95 + 0.1 * bd.seed + (p.role === "gk" ? 0.03 : 0), gth = p.team >= 0 ? bd.girth : 1; rig.root.scale.set(ht * gth, ht, ht * gth); }   // tall and short, broad and slight
 			F.rigOf.set(p, rig);
@@ -196,6 +197,7 @@
 			if (F.n >= MAXF3) { return; }
 			const rig = F.rigs[F.n];
 			pose3D(rig, o, WX(o.x), o.y, WD(o.dir), 0, 0);
+			if (o.stageY) { rig.root.position.y += o.stageY; }
 			if (k > 0) {
 				// The flag hand: down by his side and a little forward, or up for a call (and waved).
 				const up = flagCall && flagCall.k === k ? flagCall : null, wave = reduceMotion || !up ? 0 : Math.sin(frame * 0.5) * 0.25;

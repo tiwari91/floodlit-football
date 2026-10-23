@@ -15,7 +15,7 @@
 	// (The simulation steps at 60 whatever the drawing does.)
 	const CAP_FRAME = 1000 / 30 - 2.5;
 	const smoothMoves = () => gfxLevel === "high" || gfxLevel === "medium";
-	const capped = () => !odr && !replayOn() && !(slowMo > 0) && (IDLE_STATES.has(state) || (!smoothMoves() && (state === "goal" || (state === "play" && freeze > 0))) || (gfx3().fps || 60) <= 30);
+	const capped = () => !odr && !replayOn() && !(slowMo > 0) && ((IDLE_STATES.has(state) && !(ceremonyActive() && smoothMoves())) || (!smoothMoves() && (state === "goal" || (state === "play" && freeze > 0))) || (gfx3().fps || 60) <= 30);
 	let wasCapped = false, parked = false;
 	// A hidden tab draws nothing at all: the loop parks and starts again when the tab is shown.
 	document.addEventListener("visibilitychange", () => {
@@ -44,7 +44,7 @@
 		// redrawn ten times a second instead of sixty and a laptop left on a menu stays cool. A replay still
 		// gets every frame.
 		if (state !== idleState) { idleState = state; idleSince = now; }
-		if (IDLE_STATES.has(state) && now - idleSince > IDLE_AFTER && !odr && !replayOn() && now - lastDrawAt < IDLE_FRAME) { renderHud(); renderTicker(); updateRainSound(); updateCrowd(); updateMusic(); requestAnimationFrame(loop); return; }
+		if (IDLE_STATES.has(state) && !ceremonyActive() && now - idleSince > IDLE_AFTER && !odr && !replayOn() && now - lastDrawAt < IDLE_FRAME) { renderHud(); renderTicker(); updateRainSound(); updateCrowd(); updateMusic(); requestAnimationFrame(loop); return; }
 		lastDrawAt = now;
 		const d0 = performance.now();
 		draw(odr ? 1 : acc / STEP);

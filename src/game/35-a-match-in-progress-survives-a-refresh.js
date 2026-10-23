@@ -155,6 +155,7 @@
 				const rep2 = league.club.report;
 				if (rep2 && rep2.round === league.round && rep2.gains.length) { nudge += ` Training: ${rep2.gains.slice(0, 4).join(", ")}${rep2.gains.length > 4 ? ` and ${rep2.gains.length - 4 + (rep2.more || 0)} more` : ""}.`; }
 				btn = `Play matchday ${league.round + 1}`;
+				{ const nf = currentFixture(); if (nf && nf.label) { btn = `Play: ${nf.label.replace(/^[^·]*· /, "")}`; } }   // a continental night next (18e)
 			}
 		}
 		if (!simulated) {
@@ -170,6 +171,7 @@
 			wasSim ? null : matchStats(Math.round(100 * possFrames[0] / Math.max(1, possFrames[0] + possFrames[1]))));
 		if (leagueMatch && !seasonDone() && tiredStarters().length) { $("ovFix").textContent = "Rotate now"; $("ovFix").hidden = false; }
 		if (leagueMatch && seasonDone() && standings()[0].id === 0) { celebrateTrophy("league trophy"); }
+		if (typeof trophyDue === "function") { trophyDue(); }   // a cup won on the night
 		$("ovHelp").hidden = false;
 		renderReport();
 		if (leagueMatch) { offerSeasonSim(); }
@@ -252,6 +254,7 @@
 		return k ? k.name : "Your captain";
 	}
 	function celebrateTrophy (what) {
+		if (typeof trophyCeremony === "function" && trophyCeremony(what)) { return; }   // the 3D presentation (44a)
 		const tr = $("ovTrophy");
 		tr.style.setProperty("--tr-kit", KITS[0].outfield || "#f2b52e");
 		$("ovTrophyText").textContent = `${captainName()} lifts the ${what}`;
@@ -349,7 +352,7 @@
 		const b = $("modeBadge");
 		if (mode === "tutorial") { b.textContent = "Tutorial · practice"; b.className = "modebadge tutorial"; }
 		else if (mode === "corners") { b.textContent = shoot ? `Corner shootout · corner ${Math.min(shoot.n + 1, shoot.total)} of ${shoot.total}` : "Corner shootout · practice"; b.className = "modebadge practice"; }
-		else if (mode === "league" && league && leagueMatch) { b.textContent = `${divisionName()} · Matchday ${leagueMatch.round + 1}`; b.className = "modebadge"; }
+		else if (mode === "league" && league && leagueMatch) { b.textContent = leagueMatch.label || `${divisionName()} · Matchday ${leagueMatch.round + 1}`; b.className = "modebadge"; }
 		else if (mode === "league") { b.textContent = divisionName(); b.className = "modebadge"; }
 		else { b.textContent = "Friendly · practice (doesn't count)"; b.className = "modebadge practice"; }
 	}

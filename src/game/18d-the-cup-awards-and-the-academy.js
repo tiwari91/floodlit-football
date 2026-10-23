@@ -78,7 +78,7 @@
 			note = `${cupName()}, ${CUP_ROUNDS[k].toLowerCase()}: ${tieLine(mine)}. ${won ? (k === CUP_ROUNDS.length - 1 ? "You've won the cup!" : "You're through.") : k === CUP_ROUNDS.length - 1 ? "Beaten in the final." : "You're out."}${prize ? ` ${money(prize)} in prize money.` : ""}`;
 			toast(won ? `Cup: through to the next round` : `Cup: knocked out by ${TEAMS[opp].name}`, won ? "#7fd49b" : "#de4f5a");
 		} else if (byes.includes(0)) { note = `${cupName()}: a bye in the ${CUP_ROUNDS[k].toLowerCase()}.`; }
-		if (k === CUP_ROUNDS.length - 1) { cup.winner = cup.alive[0]; if (!mine) { note = `${cupName()} final: ${tieLine(played[0])}.`; } }
+		if (k === CUP_ROUNDS.length - 1) { cup.winner = cup.alive[0]; if (cup.winner === 0 && typeof queueTrophy === "function") { queueTrophy("League Cup"); } if (!mine) { note = `${cupName()} final: ${tieLine(played[0])}.`; } }
 		if (note) { lg.news = `${lg.news || ""} ${note}`.trim(); lastDeal = note; }
 		return played;
 	}
@@ -187,6 +187,7 @@
 			cupBox.append(el("span", "eyebrow", last.name), ul);
 		}
 		box.append(cupBox);
+		if (typeof renderCont === "function") { renderCont(box); }   // the continental cup (18e)
 		const aw = league.awards;
 		if (aw && aw.season === league.season) {
 			const a = el("div", "lg-awards");

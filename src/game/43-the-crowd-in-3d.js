@@ -921,6 +921,7 @@
 		camX += (tx - camX) * ease; camY += (ty - camY) * ease;
 		let restore = null;
 		try {
+			if (typeof ceremony3D === "function" && ceremony3D()) { return true; }   // a trophy presentation draws its own frame (44a)
 			if (replayOn()) { restore = applyReplay(); }
 			try { sync3D(); if (window.__ffCam3D) { window.__ffCam3D(G3, THREE); } const q = gpuBegin3D(); G3.renderer.render(G3.scene, G3.cam); gpuEnd3D(q); } finally { if (restore) { restore(); } }
 			hud3D();
