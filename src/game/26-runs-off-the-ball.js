@@ -11,9 +11,17 @@
 		let running = 0;
 		for (const p of mine) {
 			if (p.run && (frame > p.run.until || !ours || p === c || p === receiver)) { p.run = null; p.runCd = frame + 90 + Math.floor(Math.random() * 60); }
-			if (p.run) { running++; }
+			if (p.run) { running++; if (p.run.kind === "behind" && ours && c) { runPhase(p, c, t); } }
 		}
 		if (!ours || !c || c.role === "gk" || state !== "play" || setPiece || (freeze > 0)) { return; }
+		// A forward already on the shoulder needs no plan: when the man on the ball looks up, he goes.
+		if (offsideOn() && headUp(c, t)) {
+			const ln = offsideLine(t);
+			for (const p of mine) {
+				if (p.run || p === c || p === receiver || (p.runCd || 0) > frame || !(p.role === "fwd" || tr(p, "pace")) || ln - rel(t, p.x) > 40 * Math.sqrt(S) || rel(t, p.x) - ln > 2) { continue; }
+				if (Math.random() < 0.09) { p.run = { kind: "behind", hold: true, t0: frame, x: p.x, y: p.y, until: frame + 60, chY: channelY(p, t, p.y) }; tallyBy(p, "behind"); }
+			}
+		}
 		const rp = runPlan[t];
 		if (running >= (N >= 11 ? 2 : 1) || frame < rp.next) { return; }
 		rp.next = frame + 30 + Math.floor(Math.random() * 40);   // a new idea about every second
@@ -35,7 +43,7 @@
 			};
 			// In behind: a forward, or an attacking midfielder once the ball is over halfway.
 			if ((p.role === "fwd" || p.cam || tr(p, "pace") || (p.role === "mid" && cr > FW * 0.5)) && pr > cr - 80 * S && cr > FW * 0.3) {
-				consider("behind", Math.max(line - 6, pr + 110 * S, cr + 90 * S), p.y + (p.y - c.y) * 0.3, (p.role === "fwd" ? 0.5 : 0.2) + (tr(p, "pace") ? 0.55 : 0) - (tr(p, "target") ? 0.3 : 0));
+				consider("behind", Math.max(line - 6, pr + 110 * S, cr + 90 * S), p.y + (p.y - c.y) * 0.3, (p.role === "fwd" ? 0.5 : 0.2) + (tr(p, "pace") ? 0.55 : 0) - (tr(p, "target") ? 0.3 : 0) + (A(p, "pac") - 65) * 0.02);
 			}
 			// Overlap: a wide player on the carrier's flank goes round the outside of him.
 			if (wide && isWide(c.y, 0.18) && Math.sign(c.y - FH / 2) === Math.sign(p.by - FH / 2) && pr < cr + 40 && cr > FW * 0.35 && style[t] !== "counter") {
@@ -46,7 +54,51 @@
 				consider("pocket", cr + 120 * S, FH / 2 + (p.by - FH / 2) * 0.5 + (c.y < FH / 2 ? 70 : -70) * root, 0.1);
 			}
 		}
-		if (best) { best.p.run = best.run; tallyBy(best.p, best.run.kind); }
+		if (best) {
+			const r = best.run;
+			if (r.kind === "behind") {
+				// He holds on the last man's shoulder in the channel beside him, then bends the run in behind.
+				r.hold = true; r.t0 = frame; r.until += 60; r.chY = channelY(best.p, t, r.y);
+			}
+			best.p.run = r; tallyBy(best.p, r.kind);
+		}
+	}
+	// The gap to run into: the channel between the two defenders nearest his line across the pitch.
+	function channelY (p, t, y) {
+		const back = players.filter(q => q.team !== t && q.role !== "gk").sort((a, b) => rel(t, b.x) - rel(t, a.x)).slice(0, N >= 11 ? 4 : 2).map(q => q.y).sort((a, b) => a - b);
+		let best = y, bd = Infinity;
+		for (let i = 0; i + 1 < back.length; i++) {
+			const m = (back[i] + back[i + 1]) / 2, gap = back[i + 1] - back[i];
+			if (gap < 50 * Math.sqrt(S)) { continue; }
+			const d = Math.abs(m - p.y) - gap * 0.3;
+			if (d < bd) { bd = d; best = m; }
+		}
+		return clamp(best, 60, FH - 60);
+	}
+	// A run in behind in two beats: hold onside on the shoulder until the man on the ball has his head
+	// up (time on it, nobody tight on him, facing forward), then burst. Reading the moment is the
+	// runner's pace and the passer's eye; a runner who goes too soon, or keeps going with no ball, is
+	// offside, and one left beyond the line with nothing played checks back.
+	// The man on the ball has his head up: time on it, nobody tight on him, facing forward.
+	const headUp = (c, t) => frame - (c.gotAt || 0) > 14 && openness(c) > 48 * Math.sqrt(S) && rel(t, c.x) > FW * 0.3 && (t === 0 ? c.vx > -0.6 : c.vx < 0.6);
+	function runPhase (p, c, t) {
+		const r = p.run, line = offsideOn() ? offsideLine(t) : FW - 60 * S;
+		if (r.hold) {
+
+			// Better passers are read sooner; an eager runner sometimes goes on a whim.
+			const read = 0.05 + (A(c, "pas") - 60) * 0.004 + (tr(c, "playmaker") ? 0.04 : 0);
+			const shoulder = line - rel(t, p.x) < 95 * Math.sqrt(S);   // he goes from the shoulder, not from deep
+			if (!shoulder && frame - r.t0 < 330) { r.until = Math.max(r.until, frame + 20); }   // still getting up there
+			if (shoulder && ((headUp(c, t) && Math.random() < read) || Math.random() < 0.006)) {
+				tally.bursts = (tally.bursts || 0) + 1; r.hold = false; r.burst = frame; r.until = Math.max(r.until, frame + 75);
+				const goalY = FH / 2 + (r.chY - FH / 2) * 0.55;
+				r.y = clamp(goalY, 60, FH - 60);
+				const beyond = Math.min(FW - 40, line + (150 + (A(p, "pac") - 65) * 2) * S);
+				r.x = t === 0 ? beyond : FW - beyond;
+			}
+		} else if (r.burst && isOffside(p, line) && frame - r.burst > 40) {
+			p.run = null; p.runCd = frame + 60;   // nothing came: back onside
+		}
 	}
 
 	// Where a player without the ball wants to be, and why (the kind). One idea at a time.
@@ -66,10 +118,14 @@
 			return [ p.team === 0 ? rr : FW - rr, p.oneTwoY, "onetwo" ];
 		}
 		// His run: to the spot he picked, held onside as the line moves.
-		if (p.run && inPoss) {
-			let rr = rel(p.team, p.run.x);
-			if (offsideOn()) { rr = Math.min(rr, offsideLine(p.team) - 8); }
-			return [ p.team === 0 ? rr : FW - rr, p.run.y, "run" ];
+		if (p.run && (inPoss || (!ball.owner && possTeam === p.team))) {   // (a pass on its way between two of ours doesn't stop the run)
+			let rr = rel(p.team, p.run.x), ry = p.run.y;
+			if (p.run.hold) {
+				// On the shoulder: level with the line less a stride, drifting into the channel.
+				rr = (offsideOn() ? offsideLine(p.team) : FW - 60 * S) - 10;
+				ry = p.y + (p.run.chY - p.y) * 0.5;
+			} else if (!p.run.burst && offsideOn()) { rr = Math.min(rr, offsideLine(p.team) - 8); }
+			return [ p.team === 0 ? rr : FW - rr, ry, p.run.burst ? "burst" : "run" ];
 		}
 		// The ball is wide in the final third: forwards attack the box (near post, far post, spot).
 		if (inPoss && p.role === "fwd" && ball.owner !== p && isWide(ball.owner.y) && rel(p.team, ball.owner.x) > FW * 0.68) {
@@ -156,7 +212,10 @@
 		const loose = !ball.owner;
 		const r = rel(p.team, ball.x);
 		const sweeperK = tr(p, "sweeper");
-		if (loose && r < (sweeperK ? 270 : 150) * GH && Math.abs(ball.y - FH / 2) < (sweeperK ? 260 : 170) * GH) {
+		// Behind a high line he covers the space in behind: the higher the line, the further he comes for a ball over it.
+		const shp = !setPiece && !(ball.owner ? ball.owner.team === p.team : possTeam === p.team) ? teamShapeInfo(p.team) : null;
+		const high = shp && rel(p.team, ball.x) > FW * 0.5 ? Math.max(0, shp.defX - FW * 0.22) : 0;   // (only while the ball is in their half: nobody can shoot over him from there)
+		if (loose && r < (sweeperK ? 270 : 150) * GH + high * 0.6 && Math.abs(ball.y - FH / 2) < (sweeperK ? 260 : 170) * GH + high * 0.3) {
 			const mates = team(p.team);
 			const nearest = mates.reduce((a, b) => (dist(a, ball) < dist(b, ball) ? a : b));
 			if (nearest === p) { return [ ball.x, ball.y ]; }
@@ -174,7 +233,7 @@
 			}
 		}
 		// All-out attack, or a sweeper keeper with his side on the ball: he stands well off his line.
-		const sweep = mentality[p.team] >= 2 ? 70 * S : sweeperK && (ball.owner ? ball.owner.team === p.team : possTeam === p.team) ? 85 * S : sweeperK ? 30 * S : 0;
+		const sweep = high > 0 ? Math.min(high * 0.4, 90 * S) + (sweeperK ? 20 * S : 0) : mentality[p.team] >= 2 ? 70 * S : sweeperK && (ball.owner ? ball.owner.team === p.team : possTeam === p.team) ? 85 * S : sweeperK ? 30 * S : 0;
 		const x = p.team === 0 ? ownLine + 22 + sweep : ownLine - 22 - sweep;
 		const y = FH / 2 + clamp((ball.y - FH / 2) * 0.45, -54 * GH, 54 * GH);
 		return [ x, y ];
@@ -215,6 +274,40 @@
 		const m = outfield(p.team).filter(q => dist(q, p) > 90 && !(offsideOn() && isOffside(q, offsideLine(p.team)))).sort((a, b) => openness(b) - openness(a))[0];
 		return m && openness(m) > 45 ? "keeper-short" : "keeper-long";
 	};
+	// The computer's through ball. A burst runner is the first look; a forward level with the line the
+	// second. The passer judges the runner onside to within his eye (a weaker passer misreads the line
+	// by more, and so plays men offside), leads him into the space behind and weights it to meet him.
+	function throughBall (p) {
+		const t = p.team, pas = A(p, "pas"), line = offsideLine(t), eye = (tr(p, "playmaker") ? 0.25 : 0) + (pas - 65) * 0.012;
+		const base = { possession: 0.13, balanced: 0.2, direct: 0.27, counter: 0.32 }[style[t]] + 0.08 * edge(t);
+		if (openness(p) < 40 * Math.sqrt(S) || Math.random() > clamp(base + eye, 0.05, 0.85)) { return false; }
+		let best = null, bs = 0;
+		// How far beyond the line he will still play it: his eye for the line, and the beat he takes to
+		// release it while the runner keeps going (a weaker passer is later, and misjudges by more).
+		const misread = Math.max(8, 46 - (pas - 60) * 1.2) * Math.random();
+		for (const m of outfield(t)) {
+			if (m === p || m.role === "gk") { continue; }
+			const lag = clamp(8 + (80 - pas) * 0.8, 4, 22) * Math.random(), off = rel(t, m.x) - line - Math.max(0, (t === 0 ? m.vx : -m.vx)) * lag, burst = m.run && m.run.burst && frame - m.run.burst < 60;
+			if (off > misread || (!burst && !(m.role === "fwd" || tr(m, "pace"))) || (!burst && line - rel(t, m.x) > 90)) { continue; }
+			if (rel(t, m.x) < rel(t, p.x) + 40 || dist(p, m) > 560 * Math.sqrt(S)) { continue; }
+			const s = (burst ? 1.2 : 0.4) + openness(m) / 150 + Math.hypot(m.vx, m.vy) / 6;
+			if (s > bs) { bs = s; best = m; }
+		}
+		if (!best) { return false; }
+		// Into his path: where he will be in a second, at least a few strides beyond the line.
+		const m = best, ahead = clamp(dist(p, m) / 9, 18, 45);
+		let lx = m.x + m.vx * ahead, ly = m.y + m.vy * ahead;
+		const lr = Math.max(rel(t, lx), line + 45 * S);
+		lx = t === 0 ? lr : FW - lr;
+		if (m.run && m.run.burst) { ly += (m.run.y - ly) * 0.3; }
+		lx = clamp(lx, 40, FW - 40); ly = clamp(ly, 40, FH - 40);
+		if (laneBlockers(p, { x: lx, y: ly }, 1 - t) > (eye > 0.2 ? 1 : 0)) { return false; }
+		const err = (12 + aiPassErr(p) * 0.6 + 45 * edge(1 - t)) * (1 + tiredness(p)), d = Math.hypot(lx - ball.x, ly - ball.y);
+		notePass(p);
+		tally.thru = (tally.thru || 0) + 1; if (isOffside(m, line)) { tally.thruOff = (tally.thruOff || 0) + 1; }
+		kick(p, lx + gauss() * err * 0.5, ly + gauss() * err * 0.5, clamp((d / 55 + 2) * cond.passComp, 6, 16)); aiHandOff(p, m, 130);
+		return true;
+	}
 	function aiHandOff (p, m, t) { if (m && m !== p) { ball.intended = m; } if (p.team === 0 && m && m !== p) { handOff(m, t); } }
 	function aiOwnerAct (p) {
 		const cfg = DIFF.normal;   // (how sharp each man is comes from his ratings now, for either side)
@@ -302,20 +395,11 @@
 				shootAt(p, clamp(0.55 + Math.random() * 0.45 + (A(p, "sho") - 66) * 0.008, 0.4, 1), aim);
 				return null;
 			}
-			// A forward timing a run on the offside line: slide a through ball into the space behind.
-			if (offsideOn() && Math.random() < (style[p.team] === "possession" ? 0.15 : style[p.team] === "balanced" ? 0.3 : 0.45) + 0.12 * edge(p.team) + (tr(p, "playmaker") ? 0.2 : 0) && openness(p) > 45) {
-				const line = offsideLine(p.team);
-				const runner = outfield(p.team).filter(m => m !== p && (m.role === "fwd" || tr(m, "pace")) && !isOffside(m, line) && line - rel(p.team, m.x) < 90 &&
-					rel(p.team, m.x) > rel(p.team, p.x) + 40).sort((a, b) => openness(b) - openness(a))[0];
-				if (runner) {
-					const [ lx, ly ] = leadPoint(p, runner);
-					if (laneBlockers(p, { x: lx, y: ly }, 1 - p.team) === 0) {
-						const err = 20 + 50 * edge(1 - p.team), d = Math.hypot(lx - ball.x, ly - ball.y);
-						notePass(p);
-						kick(p, lx + (Math.random() * 2 - 1) * err, ly + (Math.random() * 2 - 1) * err, clamp((d / 55 + 2) * cond.passComp, 6, 16)); aiHandOff(p, runner, 130);
-						return null;
-					}
-				}
+			// A runner bursting in behind (or a forward on the shoulder): slide the through ball into the
+			// space beyond the line. How often he sees it, and how well he weights it, is his passing.
+			if (offsideOn()) {
+				const thru = throughBall(p);
+				if (thru) { return null; }
 			}
 			// Now and then a defender or midfielder hits one over the top to a forward.
 			const longRate = { possession: 0.015, balanced: 0.05, direct: 0.12, counter: 0.1 }[style[p.team]];

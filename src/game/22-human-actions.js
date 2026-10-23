@@ -143,7 +143,7 @@
 			const [ lx, ly ] = leadPoint(p, m), d = Math.hypot(m.x - p.x, m.y - p.y);
 			if (d > 480 * Math.sqrt(S)) { continue; }   // further than that is a long ball (Q)
 			const space = Math.min(...players.filter(q => q.team === 1).map(q => Math.hypot(q.x - lx, q.y - ly)));
-			const s = (m.run ? (m.run.kind === "behind" ? 1.3 : 0.8) : 0) + (m.role === "fwd" ? 0.5 : m.role === "mid" ? 0.2 : -0.4)
+			const s = (m.run ? (m.run.kind === "behind" ? (m.run.burst ? 1.8 : 1.1) : 0.8) : 0) + (m.role === "fwd" ? 0.5 : m.role === "mid" ? 0.2 : -0.4)
 				+ clamp(space / 140, 0, 1.2) - laneBlockers(p, { x: lx, y: ly }) * 1.5 - laneBlockers(p, m) * 0.5 + face * 0.6 + (m.x - p.x) / 900 + clamp(Math.hypot(m.vx, m.vy) / 3, 0, 0.4);
 			if (s > bs) { bs = s; best = m; }
 		}
