@@ -106,6 +106,7 @@
 
 	function currentFixture () {
 		if (!league || seasonDone()) { return null; }
+		if (typeof contFixture === "function") { const cf = contFixture(); if (cf) { return cf; } }   // a continental night comes first (18f)
 		const pair = league.fixtures[league.round].find(([ a, b ]) => a === 0 || b === 0);
 		return { round: league.round, home: pair[0] === 0, opp: pair[0] === 0 ? pair[1] : pair[0] };
 	}
@@ -167,6 +168,7 @@
 	// Record your result and play out the rest of the matchday.
 	function recordLeagueResult (lm, h, a) {
 		if (!league || league.round !== lm.round) { return; }
+		if (lm.cont && typeof recordContResult === "function") { recordContResult(lm, h, a); updateFitness(); } else {   // a continental tie: its own table, not the league's
 		const mine = lm.home ? [ 0, lm.opp, h, a ] : [ lm.opp, 0, a, h ];
 		const others = tickPlan && tickPlan.round === lm.round ? tickPlan.res.map(r => r.slice()) : league.fixtures[lm.round].filter(([ x, y ]) => x !== 0 && y !== 0).map(([ x, y ]) => simMatch(x, y));
 		league.results[lm.round] = [ mine, ...others ];
@@ -178,7 +180,9 @@
 		if (league.round === JANUARY) { league.club.market = genMarket(); league.club.scoutLeft = 2 + staffLvl(league.club, "scout"); if (typeof windowEvents === "function") { windowEvents("January"); } if (typeof agentApproaches === "function") { agentApproaches("January"); } }
 		if (typeof assistRun === "function") { assistRun(league.round === JANUARY ? "January window" : "this week"); }
 		if (typeof cupNight === "function") { cupNight(); }   // a cup night between matchdays
+		if (typeof contNight === "function") { contNight(); }   // and a continental one
 		if (typeof contractAlerts === "function" && (league.round === JANUARY || league.round === league.fixtures.length - 10 || league.round === league.fixtures.length - 2)) { contractAlerts(); }
+		}
 		// Knocks from this match: out for one to three games, and off the team sheet.
 		const byName = n => [ ...league.club.squad, ...league.club.bench ].find(pl => pl.name === n);
 		for (const n of matchGoals) { const pl = byName(n); if (pl) { pl.goals = (pl.goals || 0) + 1; } }
@@ -214,6 +218,7 @@
 			league.club.scoutLeft = 2 + staffLvl(league.club, "scout");
 			league.paid = true;
 			if (typeof seasonAwards === "function") { seasonAwards(); }
+			if (typeof contQualify === "function") { contQualify(); }
 			if (typeof offerJobs === "function") { offerJobs(pos); }
 		}
 		saveLeague();

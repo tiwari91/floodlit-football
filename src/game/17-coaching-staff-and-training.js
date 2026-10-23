@@ -632,7 +632,7 @@
 			const o = TEAMS[leagueMatch.opp], derby = isDerby();
 			// One fact per line, so the card reads at a glance instead of as a paragraph.
 			const k = keyMenParts(), b = coachBrief(), first = firstVisit(), tired = tiredStarters();
-			showOverlay(`Matchday ${leagueMatch.round + 1}${derby ? " · Derby" : ""}`, "", "Kick off");
+			showOverlay(`${leagueMatch.label || `Matchday ${leagueMatch.round + 1}`}${derby ? " · Derby" : ""}`, "", "Kick off");
 			cardLines([
 				tired.length ? `Fitness: ⚠ ${tiredText(tired)} Tired players are slower and less sharp. Rest them: press "Rest tired players", or swap them yourself in the squad panel.` : "",
 				first ? "Welcome to Floodlit Football. You manage the club and play its matches. New to the controls? \"Learn the controls\" is a two-minute walk-through, then you're back here." : "",

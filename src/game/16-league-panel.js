@@ -31,7 +31,7 @@
 				: `You finished ${ordinal(myPos)} with ${me.pts} point${me.pts === 1 ? "" : "s"}. Start a new season from the pitch.`));
 		} else {
 			const f = currentFixture(), o = TEAMS[f.opp];
-			next.append(el("span", "eyebrow", `Next · Matchday ${f.round + 1} · ${f.home ? "Home" : "Away"}${derbyOf(0, f.opp) ? " · Derby" : ""}`));
+			next.append(el("span", "eyebrow", `Next · ${f.label || `Matchday ${f.round + 1}`} · ${f.neutral ? "Neutral ground" : f.home ? "Home" : "Away"}${derbyOf(0, f.opp) ? " · Derby" : ""}`));
 			const name = el("div", "opp"); name.append(dotFor(o), el("span", "", o.name)); next.append(name);
 			const det = el("span", "detail");
 			det.append(el("span", "stars", stars(getStr(f.opp))), document.createTextNode(` rating. You are ${ordinal(myPos)} on ${me.pts} point${me.pts === 1 ? "" : "s"}.`));

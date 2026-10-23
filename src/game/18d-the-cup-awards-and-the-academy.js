@@ -187,7 +187,7 @@
 			cupBox.append(el("span", "eyebrow", last.name), ul);
 		}
 		box.append(cupBox);
-		if (typeof renderCont === "function") { renderCont(box); }   // the continental cup (18e)
+		if (typeof renderCont === "function") { renderCont(box); }   // the continental cup (18f)
 		const aw = league.awards;
 		if (aw && aw.season === league.season) {
 			const a = el("div", "lg-awards");
