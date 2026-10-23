@@ -157,6 +157,8 @@
 	.comm.in { animation: commIn 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); }
 	@keyframes commIn { from { transform: translate(-50%, 10px); opacity: 0; } to { transform: translateX(-50%); opacity: 1; } }
 	.comm-mic { flex: none; width: 8px; height: 8px; border-radius: 50%; background: #e2463f; box-shadow: 0 0 0 3px rgba(226, 70, 63, 0.25); }
+	.comm-who { flex: none; font: normal 700 10px/1 var(--body, system-ui, sans-serif); letter-spacing: 0.08em; text-transform: uppercase; color: #f2b52e; }
+	.comm-who[data-role="colour"] { color: #8fd3ff; }
 	.pitchwrap:has(.overlay:not([hidden])) .comm, .pitchwrap:has(.lower:not([hidden])) .comm { display: none; }
 	@media (prefers-reduced-motion: reduce) { .comm.in { animation: none; } }
 	@media (pointer: coarse), (max-width: 640px) { .comm { bottom: 8px; max-width: 76%; font-size: 12px; padding: 5px 11px 5px 8px; } }
@@ -7282,10 +7284,12 @@
 		return Math.max(second, rel(t, ball.x), FW / 2);   // in "distance from own goal" terms
 	}
 	const isOffside = (p, line) => rel(p.team, p.x) > line + 2;
+	const OFFSIDE_FREE = new Set([ "throw", "goalkick", "corner" ]);
 
 	function markOffside (kicker) {
 		offside = { team: kicker.team, set: new Set(), margin: new Map(), line: 0 };
-		if (!offsideOn() || (setPiece && setPiece.taker === kicker)) { return; }   // no offside from a corner or a throw-in
+		// No offside from a throw-in, a goal kick or a corner (a free kick, though, can play a man offside).
+		if (!offsideOn() || (deadBall && deadBall.taker === kicker && OFFSIDE_FREE.has(deadBall.kind))) { return; }
 		const line = offsideLine(kicker.team);
 		offside.line = line;
 		for (const m of players) {
@@ -7424,6 +7428,7 @@
 		banner.hidden = false;
 		setTimeout(() => { if (banner.textContent === "Offside") { banner.hidden = true; } }, 1100);
 		$("announce").textContent = `Offside against ${p.team === 0 ? "you" : opp.name}. Indirect free kick.`;
+		if (typeof commentary === "function") { commentary("offside", { n: shortName(p) }, 1 - p.team, true); }
 		snapshotPrev();
 	}
 
@@ -7510,6 +7515,8 @@
 			}
 		}
 		p.kickA = KICK_T; p.kickCd = Math.max(p.kickCd, 12);
+		// Offside is judged when the ball is played: on the strike, not when he chose the pass a few frames ago.
+		if (offside.team === p.team && offside.line) { markOffside(p); }
 		sfx(...p.windSound);
 		return true;
 	}
@@ -7517,6 +7524,9 @@
 		ball.intended = null;   // aiHandOff names the man a computer-run pass is for, after the kick
 		p.kickLoft = false;   // loftTo, the chip and the lifted shot set it after: he leans back under those
 		const owned = ball.owner === p;
+		// A volley or a shot at a loose ball never passes through gainBall: a man who was offside when it
+		// was played is still the next to touch it, so it is offside before it is a kick.
+		if (!owned && offsideOn() && offside && offside.team === p.team && offside.set && offside.set.has(p) && state === "play") { callOffside(p); return; }
 		lastTouch = p.team;
 		markOffside(p);
 		if (p.team === 1) { switchCd = 0; }
@@ -10695,6 +10705,11 @@
 			// Now and then the man who lost it climbs all over the one who won it.
 			if (Math.random() < 0.04) { w.jump = JUMP; commitFoul(l, w, false); return true; }
 		}
+		// A man who was offside when the ball was played and now heads it, or goes up to challenge for it, is
+		// penalised: he has become involved (a header used to go straight through, never flagged).
+		const offAt = q => q && offsideOn() && offside.team === q.team && offside.set.has(q);
+		if (offAt(w)) { callOffside(w); return true; }
+		if (offAt(l) && db < 24) { callOffside(l); return true; }
 		if (act === "goal") { header(w); } else if (act === "clear") { clearance(w); } else { headPass(w); }
 		return true;
 	}
@@ -12896,8 +12911,10 @@
 		ev3d("groan");
 		if (!soundOn || !audio) { return; }
 		const t = audio.currentTime;
-		noiseBurst("brown", t, 1.8, 0.11, "lowpass", 800, 240);
-		voices(t, 5, 260, 185, 1.6, 0.014, 700);
+		const k = 0.88 + Math.random() * 0.24, len = 1.4 + Math.random() * 0.8;   // never quite the same groan twice
+		noiseBurst("brown", t, len + 0.2, 0.11, "lowpass", 800 * k, 240);
+		voices(t, 5, 260 * k, 185 * k * (0.95 + Math.random() * 0.1), len, 0.014, 700);
+		if (Math.random() < 0.5) { voices(t + 0.15, 4, 200 * k, 150 * k, len * 0.9, 0.009, 600, 0.2); }   // the deeper "awww" from the back of the stand
 	};
 	const ooh = () => {
 		ev3d("ooh");
@@ -12960,10 +12977,121 @@
 	// The team a set of fans follows: home or away end.
 	const clubIdOfTeam = t => (t === 0 ? 0 : leagueMatch ? leagueMatch.opp : 99);
 	const isDerby = () => !!leagueMatch && derbyOf(0, leagueMatch.opp);
-	function chant (loud, away = false) {
+	// The terrace repertoire. Every chant is a different shape, and none is sung twice running by the
+	// same end; each time it is pitched and paced a little differently (a semitone or two either way, a
+	// touch quicker or slower). The away end is fewer voices, thinner and off to one side.
+	//   song: the club's own song (claps, the bombo, then the tune, often called and answered)
+	//   clap: a rhythm clapped out, slow to fast, with a "Hey!" on the accents
+	//   call: call and response, a few voices shout a two-note call and the whole end bellows it back
+	//   swell: a long sustained "ohhh" that rises with the stand and dies away
+	//   ole: one "o-lé" per pass in a long passing move (sung from updateCrowd, not picked here)
+	//   party: the celebration song after a home goal, quick and bouncy, on a pentatonic tune
+	const CHANT_KINDS = [ "song", "clap", "call", "swell" ];
+	const lastChant = [ "", "" ];
+	let chantLog = [];
+	function chant (loud, away = false, kind = null) {
 		ev3d("chant");
-		const id = clubIdOfTeam(away ? 1 - homeSide : homeSide), song = clubSong(id);
-		const t = audio.currentTime + 0.05, g = 0.035 * loud * (isDerby() ? 1.3 : 1), pan = away ? 0.5 : -0.3;
+		if (!audio) { return null; }
+		const end = away ? 1 : 0;
+		if (!kind) {
+			const pool = CHANT_KINDS.filter(k => k !== lastChant[end]), w = pool.map(k => (k === "song" ? 1.6 : 1));
+			let r = Math.random() * w.reduce((a, b) => a + b, 0);
+			kind = pool[pool.length - 1];
+			for (let i = 0; i < pool.length; i++) { r -= w[i]; if (r < 0) { kind = pool[i]; break; } }
+		}
+		lastChant[end] = kind;
+		const shift = Math.floor(Math.random() * 5) - 2, tempo = 0.9 + Math.random() * 0.22;
+		chantLog = [ ...chantLog, { kind, away, shift, tempo } ].slice(-12);
+		const g = 0.035 * loud * (isDerby() ? 1.3 : 1) * (away ? 0.8 : 1), pan = (away ? 0.5 : -0.3) + (Math.random() - 0.5) * 0.12;
+		const fans = { n: away ? 4 : 6, lp: away ? 1350 : 1150 }, t = audio.currentTime + 0.05;
+		if (kind === "clap") { clapChant(t, g, pan, tempo, fans); }
+		else if (kind === "call") { callChant(t, g, pan, tempo, shift, fans, away); }
+		else if (kind === "swell") { swellChant(t, g, pan, shift, fans); }
+		else if (kind === "party") { partyChant(t, g, pan, tempo, shift, fans); }
+		else { songChant(t, g, pan, tempo, shift, away); }
+		return kind;
+	}
+	function bombo (at, g, pan, f = 95) {
+		const o = audio.createOscillator(), dg = audio.createGain();
+		o.type = "sine"; o.frequency.setValueAtTime(f, at); o.frequency.exponentialRampToValueAtTime(48, at + 0.25);
+		dg.gain.setValueAtTime(g, at); dg.gain.exponentialRampToValueAtTime(0.0001, at + 0.3);
+		o.connect(dg); connectPan(dg, pan); o.start(at); o.stop(at + 0.32);
+	}
+	const clap1 = (at, g, pan) => noiseBurst("white", at, 0.07 + Math.random() * 0.03, g, "bandpass", 1600 + Math.random() * 500, 1500, 0.9, pan + (Math.random() - 0.5) * 0.15);
+	const hey = (at, g, pan, fans, f = 230) => { voices(at, fans.n, f, f * 0.92, 0.32, g * 0.55, fans.lp + 300, pan); noiseBurst("pink", at, 0.35, g * 1.4, "bandpass", 900, 700, 0.8, pan); };
+	// Clapped out: either slow claps that speed up into applause and a roar, or a fixed rhythm
+	// (one of several) four times over with a shout on its last beat.
+	const CLAP_RHYTHMS = [ [ 0, 1, 2, 2.5, 3 ], [ 0, 0.5, 1, 2, 3 ], [ 0, 1, 1.5, 2.5, 3 ], [ 0, 0.75, 1.5, 2, 2.5, 3 ] ];
+	function clapChant (t, g, pan, tempo, fans) {
+		if (Math.random() < 0.4) {
+			let at = t, gap = 0.95 / tempo;
+			for (let k = 0; k < 22 && gap > 0.12; k++) { clap1(at, g * (1.2 + k * 0.05), pan); at += gap; gap *= 0.86; }
+			for (let k = 0; k < 16; k++) { clap1(at + Math.random() * 1.2, g * 1.4, pan); }
+			hey(at + 0.2, g * 1.3, pan, fans, 250);
+			return;
+		}
+		const beat = 0.42 / tempo, rh = CLAP_RHYTHMS[Math.floor(Math.random() * CLAP_RHYTHMS.length)];
+		for (let bar = 0; bar < 4; bar++) {
+			const t0 = t + bar * 4 * beat;
+			for (const b of rh) { clap1(t0 + b * beat, g * 1.6, pan); }
+			bombo(t0, g * 2.4, pan);
+			hey(t0 + rh[rh.length - 1] * beat, g * (bar === 3 ? 1.5 : 1), pan, fans, 220 + bar * 6);
+		}
+	}
+	// Call and response: the call a fifth or a fourth above the answer, sung four times, the answer louder each time.
+	function callChant (t, g, pan, tempo, shift, fans, away) {
+		const root = (away ? 57 : 55) + shift, beat = 0.3 / tempo, iv = Math.random() < 0.5 ? 7 : 5;
+		const call = { root, notes: [ iv, iv, 0 ], rhythm: [ 1, 1, 2 ], beat, wave: "sawtooth" };
+		const ans = { root: root - 12, notes: [ iv, 0, 0 ], rhythm: [ 1, 1, 2 ], beat, wave: away ? "square" : "sawtooth" };
+		let at = t;
+		for (let k = 0; k < 4; k++) {
+			at += sing(at, call, 0, 3, 2, g * 0.7, pan - 0.15) + 0.12;
+			bombo(at, g * 2.6, pan);
+			at += sing(at, ans, 0, 3, fans.n, g * (1 + k * 0.1), pan) + 0.3;
+		}
+	}
+	// A long "ohhh" on a chord, swelling for a few seconds as the whole stand comes in, then fading.
+	function swellChant (t, g, pan, shift, fans) {
+		const root = 50 + shift, chord = Math.random() < 0.5 ? [ 0, 4, 7, 12 ] : [ 0, 3, 7, 12 ], dur = 4 + Math.random() * 2.5;
+		const out1 = audio.createGain(), lp = audio.createBiquadFilter();
+		lp.type = "lowpass"; lp.frequency.setValueAtTime(500, t); lp.frequency.linearRampToValueAtTime(fans.lp + 200, t + dur * 0.6); lp.frequency.linearRampToValueAtTime(600, t + dur);
+		out1.gain.setValueAtTime(0.0001, t); out1.gain.linearRampToValueAtTime(g * 1.2, t + dur * 0.6); out1.gain.linearRampToValueAtTime(0.0001, t + dur);
+		out1.connect(lp); connectPan(lp, pan);
+		for (const n of chord) {
+			for (let v = 0; v < 3; v++) {
+				const o = audio.createOscillator();
+				o.type = "sawtooth"; o.detune.value = (Math.random() * 2 - 1) * 28;
+				o.frequency.setValueAtTime(midiHz(root + n), t);
+				o.frequency.linearRampToValueAtTime(midiHz(root + n + (Math.random() < 0.3 ? 2 : 0)), t + dur * 0.7);   // a few voices drift up as it peaks
+				o.connect(out1); o.start(t); o.stop(t + dur + 0.05);
+			}
+		}
+		noiseBurst("pink", t, dur, g * 1.4, "bandpass", 500, 900, 0.6, pan);
+	}
+	// The celebration: a bouncy "na-na-na" tune on a major pentatonic over quick claps and the drum, twice through.
+	function partyChant (t, g, pan, tempo, shift, fans) {
+		const pent = [ 0, 2, 4, 7, 9, 12 ], notes = [], rhythm = [];
+		let d = Math.floor(Math.random() * 3);
+		for (let i = 0; i < 8; i++) { d = clamp(d + [ -1, 1, 1, 2, -2, 0 ][Math.floor(Math.random() * 6)], 0, 5); notes.push(pent[d]); rhythm.push(i === 7 ? 2 : i % 4 === 3 ? 1.5 : 0.5); }
+		const tune = { root: 60 + shift, notes, rhythm, beat: 0.27 / tempo, wave: "sawtooth" };
+		let at = t;
+		for (let k = 0; k < 2; k++) {
+			const len = sing(at, tune, 0, notes.length, fans.n, g * 1.15, pan);
+			for (let c = 0; c < len / tune.beat; c++) { clap1(at + c * tune.beat, g * 1.5, pan); if (c % 2 === 0) { bombo(at + c * tune.beat, g * 2.2, pan); } }
+			at += len + 0.2;
+		}
+		hey(at, g * 1.5, pan, fans, 260);
+	}
+	// "Olé!": the home end sings one for each pass in a long move of theirs (from the fifth pass on).
+	function oleChant (n, away) {
+		if (!soundOn || !audio || bulkSim) { return; }
+		const t = audio.currentTime + 0.05, pan = away ? 0.5 : -0.3, g = 0.03 * Math.min(1.6, 0.8 + n * 0.1) * (away ? 0.8 : 1), root = 62 + (n % 2);
+		sing(t, { root, notes: [ 0, 4, 2 ], rhythm: [ 0.8, 1.4, 0.2 ], beat: 0.24 + Math.random() * 0.04, wave: "sawtooth" }, 0, 2, away ? 4 : 6, g, pan);
+		noiseBurst("pink", t + 0.15, 0.6, g * 1.2, "bandpass", 700, 1000, 0.7, pan);
+	}
+	function songChant (t, g, pan, tempo, shift, away) {
+		const id = clubIdOfTeam(away ? 1 - homeSide : homeSide), base = clubSong(id);
+		const song = { ...base, root: base.root + shift, beat: base.beat / tempo, drum: base.drum / tempo };
 		const bar = song.beat * 4;
 		for (let k = 0; k < 3; k++) {
 			for (const b of song.claps) { noiseBurst("white", t + k * bar + b * song.beat * 2, 0.09, g * 1.6, "bandpass", 1800, 1600, 0.9, pan); }
@@ -13039,6 +13167,8 @@
 		sing(t0 + 8 * E, { root: song.root - 12, notes, rhythm, beat: E, wave: "sawtooth" }, 0, notes.length, 6, 0.03, -0.25);
 		clapAlong(t0 + 8 * E, 24, 2 * E);
 		setTimeout(() => { try { bus.disconnect(); dl.disconnect(); fb.disconnect(); } catch (e) { /* already gone */ } }, (len + 6) * 1000);
+		// Then the home end's own celebration song as the PA fades (once play is back on, or still celebrating).
+		setTimeout(() => { if (soundOn && audio && !bulkSim && (state === "play" || state === "goal")) { chant(1.1, false, "party"); if (crowd) { crowd.nextChant = Math.max(crowd.nextChant, audio.currentTime + 14); } } }, (len + 1.8) * 1000);
 	}
 	// A gasp: the whole ground drawing breath at once, at the woodwork or a big save. Loudest from the
 	// end whose side had the shot; the other end lets out a lower sigh of relief.
@@ -13143,6 +13273,17 @@
 		crowd.air.g.gain.setTargetAtTime(live ? (0.004 + 0.01 * heat + 0.006 * up) * quiet : 0, t, 0.5);
 		crowd.vox.f.frequency.setTargetAtTime(620 + 650 * heat + 260 * up - 180 * crowdTense - 120 * worry + 70 * Math.sin(t * 0.9), t, 0.4);
 		if (crowd.pan) { crowd.pan.pan.setTargetAtTime(0.22 * Math.sin(t * 0.21), t, 0.5); }
+		// A passing move: each completed pass in a long spell of possession counts; from the fifth on the
+		// side's end sings "olé" with every one (the home end, or the away end when theirs is going).
+		const o = ball && ball.owner;
+		if (o && o !== crowd.oleLast) {
+			if (o.team !== crowd.oleTeam || !o.recv || state !== "play") { crowd.oleTeam = o.team; crowd.oleN = 0; }
+			else {
+				crowd.oleN = (crowd.oleN || 0) + 1;
+				if (crowd.oleN >= 5 && crowdHush <= 0) { oleChant(crowd.oleN, o.team !== homeSide); crowd.nextChant = Math.max(crowd.nextChant, t + 6); }
+			}
+			crowd.oleLast = o;
+		}
 		if (live && state === "play" && freeze <= 0 && crowdHush <= 0 && t > crowd.nextChant) {
 			// The home end sings, louder when the home side is on top; the away corner answers when theirs is.
 			// In a derby both ends sing all night, trading songs.
@@ -13632,9 +13773,12 @@
 
 	/* ---------- the big moments ----------
 	   A near miss, the woodwork, a save, a big tackle or a shot from distance: one call, moment(kind, p, o), and
-	   everything that should react does. The commentator gets a line (bottom centre, one at a time,
-	   never over a goal, card or substitution caption), the player reacts (hands on his head after
-	   a near miss, a fist pumped after a big tackle) and the home end lifts or groans. */
+	   everything that should react does. Two commentators call the match (bottom centre, one line at a
+	   time, never over a goal, card or substitution caption, the speaker's name beside it): the
+	   play-by-play man calls the action, and his co-commentator comes in a beat later with the analysis
+	   or a bit of banter after the key moments. The player reacts (hands on his head after a near
+	   miss, a fist pumped after a big tackle) and the home end lifts or groans. Fictional names. */
+	const CALLERS = [ { name: "Rory Halden", short: "Halden", role: "lead" }, { name: "Tess Marlow", short: "Marlow", role: "colour" } ];
 	const COMM = {
 		near: [ "{n} drags it just wide!", "Inches wide from {n}!", "So close! {n} will be kicking himself", "Whistles past the post! {n} so nearly had it", "Off target, but only just, from {n}" ],
 		over: [ "{n} gets under it and it flies over", "Just over the bar from {n}!", "{n} leans back and it clears the crossbar", "High and handsome from {n}, but over" ],
@@ -13652,28 +13796,97 @@
 		own: [ "Oh no, {n} turns it into his own net", "An own goal! {n} won't want to see that again", "Disaster for {n}, into his own net" ],
 		red: [ "{n} is off! Straight red, and no complaints", "Red card! {n} has let his side down there", "Off he goes, {n} sent off" ],
 		flare: [ "Tempers flare! {n} and {m} go nose to nose", "{n} isn't having that. He's straight in the face of {m}", "Handbags! {n} and {m} have to be pulled apart", "It's all kicking off. {n} squares up to {m}" ],
-		red2: [ "Second yellow for {n}, and he's off", "{n} walks: a second booking, and a red", "That's two yellows, so {n} has to go" ]
+		red2: [ "Second yellow for {n}, and he's off", "{n} walks: a second booking, and a red", "That's two yellows, so {n} has to go" ],
+		attack: [ "Here they come! {n} on the charge!", "{n} drives forward, this is dangerous!", "Oh, this looks promising! {n} into the final third!", "{n} running at them, the crowd on its feet!", "Space opening up for {n}! Can he make it count?", "Danger here! {n} bearing down!" ],
+		offside: [ "Flag's up! {n} was offside", "Offside! {n} just a fraction too early", "The flag goes up against {n}!", "{n} strayed beyond the last man, and it's offside" ]
 	};
-	let commAt = -1e9, commRecent = [], commTimer = 0, lastCommentary = null, commKindAt = {};
+	// The goal itself, called the moment it goes in (spoken; the caption shows it on screen).
+	const GOAL_SHOUT = [ "GOAL! {n}! What a strike!", "It's in! It's in! {n} has scored!", "GOAL! {n} finds the net, and the place erupts!", "{n}! Oh, you beauty! GOAL!", "And {n} scores! Get in!", "GOAL! {n}, cool as you like!" ];
+	// The co-commentator's word after the moment: analysis, and a bit of banter.
+	const COLOUR = {
+		goal: [ "Unstoppable. The keeper had no chance with that one", "Look at the movement before it, that's coaching", "That's what you pay your money for!", "Clinical. He didn't need a second invitation", "The defenders will be having words about that one", "Oh, I'm off my seat here, Rory!" ],
+		near: [ "He'll be having nightmares about that one tonight", "The goal was gaping, Rory, gaping!", "Wrong side of the post, but the build-up was lovely", "That should have been the breakthrough" ],
+		over: [ "Snatched at it, leaned back far too much", "Row Z is going to be busy tonight", "Head over the ball and that's in the net" ],
+		save: [ "Reactions like a cat, that keeper", "Strong wrists, and a great starting position", "That's a save worth a goal, honestly", "He made himself big, and it paid off" ],
+		woodwork: [ "You can't get closer than that without scoring", "The woodwork's having a better game than some out there", "The goalkeeper is very happy to see that post" ],
+		bar: [ "The crossbar is still shaking!", "A few inches lower and we're talking about a wonder goal" ],
+		tackle: [ "That's a defender's goal, that tackle", "Perfectly timed. You can't coach that", "Got all of the ball, and the crowd knows it" ],
+		rocket: [ "Why not? Hit the target and things happen", "He fancies himself from there, and why not" ],
+		attack: [ "They've got numbers forward here", "The full-back's bombing on as well, look", "This is where it gets interesting" ],
+		offside: [ "Mistimed the run, he had all the time in the world", "The defensive line stepped up beautifully there", "Has to stay onside, that's basics", "Good flag. He was clearly off" ],
+		red: [ "He's let his team-mates down, no question", "Rash, and he can have no complaints" ],
+		red2: [ "Reckless when you're already on a booking", "The manager will not be happy with that" ],
+		equaliser: [ "Game on! This has got everything", "They've deserved that, I have to say" ],
+		ahead: [ "That's huge. You can feel the relief around the ground", "Now can they hold on to it?" ],
+		comeback: [ "Unbelievable! I've seen it all now", "What character from this side!" ],
+		lateWin: [ "Scenes! Absolute scenes!", "You simply cannot write this, Rory!" ],
+		lateEq: [ "Never, ever give up. What a lesson", "They've stolen a point from the jaws of defeat!" ],
+		hattrick: [ "Take a bow, son. Take a bow", "He'll sleep with that match ball tonight" ],
+		own: [ "Oh, you feel for him. Nightmare", "Nothing he could do, it just hit him" ],
+		flare: [ "Calm down, gents, there's a game going on", "The referee needs to get a grip of this" ]
+	};
+	// How excited the calls are, 0..1: the voices go up and quicken with it.
+	const EXCITE = { goal: 1, lateWin: 1, lateEq: 1, hattrick: 1, equaliser: 0.95, ahead: 0.9, comeback: 1, own: 0.7, woodwork: 0.85, bar: 0.85, near: 0.8, save: 0.75, rocket: 0.7, attack: 0.65, tackle: 0.5, red: 0.6, red2: 0.6, flare: 0.6, offside: 0.4 };
+	const pickFresh = (pool, recent) => { const fresh = pool.filter(s => !recent.includes(s)); return fresh[Math.floor(Math.random() * fresh.length)] || pool[Math.floor(Math.random() * pool.length)]; };
+	let commAt = -1e9, commRecent = [], commTimer = 0, lastCommentary = null, lastColour = null, commKindAt = {}, colourTimer = 0, colourRecent = [], goalRecent = [];
 	const shortName = p => (p && (p.name || `No. ${p.num}`)) || "";
-	function commentary (kind, vars, t, priority = false) {
-		if (bulkSim || mode === "tutorial" || shoot || replayOn() || (state !== "play" && state !== "goal")) { return false; }
-		const pool = COMM[kind], el = $("commLine"), lt = $("lowerThird"), now = performance.now();
-		if (!pool || !el || (now - commAt < 6500 && !priority) || (lt && !lt.hidden)) { return false; }   // one at a time; captions come first
-		if (commAt === -1e9) { commKindAt = {}; }   // a fresh match (or the test hook's reset)
-		if (!priority && now - (commKindAt[kind] || -1e9) < 25000) { return false; }   // the same sort of line at most every 25 seconds
-		commKindAt[kind] = now;
-		const fresh = pool.filter(s => !commRecent.includes(s)), line = fresh[Math.floor(Math.random() * fresh.length)] || pool[0];
-		commRecent = [ line, ...commRecent ].slice(0, 6);
-		const text = line.replace(/\{(\w)\}/g, (_, k) => vars[k] || "");
+	// Who is speaking: a small name tag ahead of the line (made here, so the markup stays as it was).
+	function commWho (who) {
+		const el = $("commLine");
+		let w = $("commWho");
+		if (!w && el) { w = document.createElement("span"); w.id = "commWho"; w.className = "comm-who"; el.insertBefore(w, $("commText")); }
+		if (w) { w.textContent = CALLERS[who].short; w.dataset.role = CALLERS[who].role; }
+	}
+	function showCommLine (text, t, who, ms) {
+		const el = $("commLine");
+		commWho(who);
 		$("commText").textContent = text;
 		el.style.setProperty("--comm-kit", (KITS[t] || KITS[0]).outfield);
 		el.hidden = false; el.classList.remove("in"); void el.offsetWidth; el.classList.add("in");
-		commAt = now; lastCommentary = { kind, text, at: now };
-		if (typeof speakLine === "function") { speakLine(text, kind); }
 		clearTimeout(commTimer);
-		commTimer = setTimeout(() => { el.hidden = true; }, 4200);
+		commTimer = setTimeout(() => { el.hidden = true; }, ms);
+	}
+	function commentary (kind, vars, t, priority = false) {
+		if (bulkSim || mode === "tutorial" || shoot || replayOn() || (state !== "play" && state !== "goal")) { return false; }
+		const pool = COMM[kind], el = $("commLine"), lt = $("lowerThird"), now = performance.now();
+		// The build-up call is filler: a real moment a second or more after it talks over it.
+		const over = kind !== "attack" && lastCommentary && lastCommentary.kind === "attack" && now - commAt > 1200;
+		if (!pool || !el || (now - commAt < 6500 && !priority && !over) || (lt && !lt.hidden)) { return false; }   // one at a time; captions come first
+		if (commAt === -1e9) { commKindAt = {}; }   // a fresh match (or the test hook's reset)
+		if (!priority && now - (commKindAt[kind] || -1e9) < 25000) { return false; }   // the same sort of line at most every 25 seconds
+		commKindAt[kind] = now;
+		const line = pickFresh(pool, commRecent);
+		commRecent = [ line, ...commRecent ].slice(0, 6);
+		const text = line.replace(/\{(\w)\}/g, (_, k) => vars[k] || "");
+		showCommLine(text, t, 0, 4200);
+		commAt = now; lastCommentary = { kind, text, at: now, who: CALLERS[0].name };
+		if (typeof speakLine === "function") { speakLine(text, kind, 0); }
+		colourAfter(kind, t, now);
 		return true;
+	}
+	// The co-commentator, a beat after the lead: only if the lead has said nothing newer meanwhile and the
+	// match is still live; otherwise the line has gone stale and is dropped.
+	function colourAfter (kind, t, at, delay = 2700) {
+		clearTimeout(colourTimer);
+		const pool = COLOUR[kind];
+		if (!pool || Math.random() >= (EXCITE[kind] || 0.4) + 0.25) { return; }
+		colourTimer = setTimeout(() => {
+			if (commAt !== at || bulkSim || replayOn() || (state !== "play" && state !== "goal")) { return; }
+			const lt = $("lowerThird"), line = pickFresh(pool, colourRecent);
+			colourRecent = [ line, ...colourRecent ].slice(0, 8);
+			if (!lt || lt.hidden) { showCommLine(line, t, 1, 3800); }
+			lastColour = { kind, text: line, at: performance.now(), who: CALLERS[1].name };   // kept apart, so lastCommentary stays the lead's call
+			if (typeof speakLine === "function") { speakLine(line, kind, 1); }
+		}, delay);
+	}
+	// A goal: the lead's shout the moment it goes in (the caption has the screen), the co-commentator's word after.
+	function goalShout (name, t) {
+		const line = pickFresh(GOAL_SHOUT, goalRecent);
+		goalRecent = [ line, ...goalRecent ].slice(0, 3);
+		const text = line.replace(/\{n\}/g, name || "What a goal");
+		if (typeof speakLine === "function") { speakLine(text, "goal", 0); }
+		colourAfter("goal", t, commAt, 3600);
+		return text;
 	}
 	const hideCommentary = () => { const el = $("commLine"); if (el) { el.hidden = true; } clearTimeout(commTimer); };
 	function moment (kind, p, o = {}) {
@@ -13691,7 +13904,7 @@
 	// The match log as the commentator follows it: a goal that levels it, puts a side in front late on
 	// or finishes a comeback from two down, an own goal and a sending-off each get a line once the
 	// caption has gone. The late winner and equaliser and the hat-trick are called by the celebration.
-	let commSeen = 0, commWait = null;
+	let commSeen = 0, commWait = null, commAttack = -1;
 	function goalCall (log, i) {
 		const e = log[i], g = [ 0, 0 ];
 		let worst = 0;
@@ -13710,11 +13923,19 @@
 	function commTick () {
 		if (typeof flareTick === "function") { flareTick(); }
 		if (typeof voiceTick === "function") { voiceTick(); }
+		// The build-up: a side carrying the ball into the final third gets a call (once a spell of possession).
+		const o = ball && ball.owner;
+		if (o && (o.team !== commAttack || rel(o.team, ball.x) < FW * 0.5)) { commAttack = -1; }   // re-armed when the other side has it, or it's back in their own half
+		if (o && o.role !== "gk" && state === "play" && freeze <= 0 && commAttack !== o.team && rel(o.team, ball.x) > FW * 0.7 && Math.abs(ball.y - FH / 2) < FH * 0.38) {
+			commAttack = o.team;
+			commentary("attack", { n: shortName(o) }, o.team);
+		}
 		const log = typeof matchLog !== "undefined" && Array.isArray(matchLog) ? matchLog : null;
 		if (!log) { return; }
 		if (log.length < commSeen) { commSeen = 0; commWait = null; }   // a new match
 		for (; commSeen < log.length; commSeen++) {
 			const e = log[commSeen];
+			if (e.kind === "goal" && state === "goal" && commSeen === log.length - 1) { goalShout(String(e.text || "").replace(/ \(.*$/, ""), e.team); }   // only a goal just scored, not a restored log
 			if (e.kind === "goal") { const g = goalCall(log, commSeen); if (g) { commWait = { kind: g.kind, n: g.name, team: e.kind === "goal" && g.kind === "own" ? 1 - e.team : e.team, until: performance.now() + 14000 }; } }
 			else if (e.kind === "red") { commWait = { kind: /second yellow/.test(e.text) ? "red2" : "red", n: e.text.replace(/ \(.*\)$/, ""), team: e.team, until: performance.now() + 12000 }; }
 		}
@@ -13730,10 +13951,10 @@
 	   moments come out higher and quicker; the voice drops back under the crowd's roar. Off in the
 	   test mode and wherever speech or an English voice is missing, without a word. */
 	const VOICE_TEST = /[?&]test\b/.test(location.search);
-	const SPOKEN = { near: 1, over: 0, save: 1, tackle: 0.3, woodwork: 1, bar: 1, lateWin: 2, lateEq: 2, hattrick: 2, rocket: 0.4, equaliser: 2, ahead: 2, comeback: 2, own: 2, red: 1, red2: 1, flare: 1 };
+	const SPOKEN = { near: 1, over: 0, save: 1, tackle: 0.3, woodwork: 1, bar: 1, lateWin: 2, lateEq: 2, hattrick: 2, rocket: 0.4, equaliser: 2, ahead: 2, comeback: 2, own: 2, red: 1, red2: 1, flare: 1, attack: 0.6, offside: 0.7 };
 	const BIG = { lateWin: 1, lateEq: 1, hattrick: 1, equaliser: 1, ahead: 1, comeback: 1, own: 1, red: 1, red2: 1, goal: 1 };
 	const speech = () => (!VOICE_TEST && typeof window.speechSynthesis !== "undefined" && typeof window.SpeechSynthesisUtterance === "function" ? window.speechSynthesis : null);
-	let voicePick = null, voiceWaiting = 0, voiceSeenGoals = 0, voiceLastState = "", voiceGap = 0;
+	let voicePick = null, voiceWaiting = 0, voiceLastState = "", voiceGap = 0;
 	// The best English voice there is: British first, then any English; the fuller voices over the
 	// "compact" and novelty ones. null when there's no English voice at all.
 	function pickVoice () {
@@ -13744,6 +13965,20 @@
 		const en = list.filter(v => v && /^en[-_]/i.test(v.lang || ""));
 		if (!en.length) { return null; }
 		const score = v => (/^en[-_]GB/i.test(v.lang) ? 100 : /^en[-_](IE|AU)/i.test(v.lang) ? 60 : 40) + (/compact|whisper|bells|bubbles|zarvox|trinoids|bad news|good news|organ|jester|superstar|wobble|cellos/i.test(v.name) ? -80 : 0) + (/premium|enhanced|natural|neural|google uk|daniel|arthur|serena/i.test(v.name) ? 25 : 0) + (v.localService ? 5 : 0);
+		return en.sort((a, b) => score(b) - score(a))[0];
+	}
+	// The co-commentator's voice: the best English voice that isn't the lead's (a different speaker
+	// where the system has one, a female one preferred for contrast); the lead's own voice, pitched
+	// down, when there is only one.
+	let voicePick2 = null;
+	function pickVoice2 (lead) {
+		const s = speech();
+		if (!s || !lead) { return lead; }
+		let list = [];
+		try { list = s.getVoices() || []; } catch (e) { list = []; }
+		const en = list.filter(v => v && v !== lead && v.name !== lead.name && /^en[-_]/i.test(v.lang || "") && !/compact|whisper|bells|bubbles|zarvox|trinoids|bad news|good news|organ|jester|superstar|wobble|cellos|albert|fred|junior|ralph/i.test(v.name));
+		if (!en.length) { return lead; }
+		const score = v => (/^en[-_]GB/i.test(v.lang) ? 30 : /^en[-_](IE|AU)/i.test(v.lang) ? 25 : 10) + (/serena|kate|stephanie|female|karen|moira|tessa|samantha|fiona|martha|google uk english female/i.test(v.name) ? 40 : 0) + (/premium|enhanced|natural|neural/i.test(v.name) ? 15 : 0);
 		return en.sort((a, b) => score(b) - score(a))[0];
 	}
 	const phoneLike = () => (typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches) || innerWidth < 700;
@@ -13764,7 +13999,7 @@
 	}
 	function initVoice () {
 		const s = speech();
-		const apply = () => { voicePick = pickVoice(); const saved = store.get("ff-voice"); setVoice(saved === "1" ? true : saved === "0" ? false : voiceDefault(), false); };
+		const apply = () => { voicePick = pickVoice(); voicePick2 = pickVoice2(voicePick); const saved = store.get("ff-voice"); setVoice(saved === "1" ? true : saved === "0" ? false : voiceDefault(), false); };
 		if (s && !$("voiceBtn") && $("musicBtn")) {
 			const b = document.createElement("button");
 			b.id = "voiceBtn"; b.type = "button"; b.title = "A commentator's voice for the big moments (uses your browser's speech)";
@@ -13774,21 +14009,28 @@
 		apply();
 		if (s) { try { s.addEventListener("voiceschanged", apply); } catch (e) { /* older browsers: the first list is all there is */ } }
 	}
-	// Say one line. Big moments push out whatever was being said; anything else waits its turn, and
-	// only if nothing is waiting already. A line that hasn't started within three seconds is dropped.
-	function speakLine (text, kind) {
+	// Say one line, by the lead (who 0) or the co-commentator (1). Big moments push out whatever was
+	// being said; anything else waits its turn, and only if nothing is waiting already. A line that
+	// hasn't started within three seconds is dropped. The co-commentator only speaks into a gap after
+	// the lead, never over him. Excitement lifts the pitch and the pace.
+	function speakLine (text, kind, who = 0) {
 		const s = speech();
 		if (!voiceOn || !s || !text || bulkSim || (typeof replayOn === "function" && replayOn())) { return false; }
-		const big = !!BIG[kind], odds = SPOKEN[kind] === undefined ? (kind === "half" || kind === "full" ? 1 : 0) : SPOKEN[kind];
-		if (!big && Math.random() >= odds) { return false; }
-		if (!voicePick) { voicePick = pickVoice(); }
-		if (!voicePick) { return false; }
+		const big = !!BIG[kind] && who === 0, odds = SPOKEN[kind] === undefined ? (kind === "half" || kind === "full" ? 1 : 0) : SPOKEN[kind];
+		if (!big && Math.random() >= (who === 1 ? Math.min(1, odds + 0.3) : odds)) { return false; }
+		if (!voicePick) { voicePick = pickVoice(); voicePick2 = pickVoice2(voicePick); }
+		const v = who === 1 ? voicePick2 || voicePick : voicePick;
+		if (!v) { return false; }
 		try {
 			if (big && (s.speaking || s.pending)) { s.cancel(); voiceWaiting = 0; }
-			else if (voiceWaiting >= 1 || (!big && performance.now() < voiceGap)) { return false; }
+			else if (voiceWaiting >= 1 || (!big && who === 0 && performance.now() < voiceGap) || (who === 1 && (s.pending || performance.now() < voiceGap - 1800))) { return false; }
 			const u = new SpeechSynthesisUtterance(text.replace(/!+/g, "!"));
-			u.voice = voicePick; u.lang = voicePick.lang;
-			u.pitch = big ? 1.25 : 1; u.rate = big ? 1.12 : 1.02;
+			u.voice = v; u.lang = v.lang;
+			const ex = typeof EXCITE !== "undefined" ? (EXCITE[kind] || 0.3) : (big ? 1 : 0.3), same = who === 1 && v === voicePick;
+			// The lead: up and quicker with the moment, shouting at a goal. The co-commentator: lower and
+			// steadier, but still lifted by it (a shade lower again when she shares the lead's voice).
+			u.pitch = clamp(who === 0 ? 1 + 0.4 * ex : (same ? 0.78 : 1) + 0.18 * ex, 0.5, 1.6);
+			u.rate = clamp(who === 0 ? 1 + 0.22 * ex : 0.97 + 0.1 * ex, 0.8, 1.3);
 			const roar = typeof crowdMood !== "undefined" ? clamp(crowdMood.excite || 0, 0, 1) : 0;
 			u.volume = clamp(0.95 - roar * 0.35, 0.4, 1);   // under the crowd when it roars
 			const queued = performance.now();
@@ -13799,16 +14041,10 @@
 			return true;
 		} catch (e) { voiceOn = false; return false; }
 	}
-	// Each frame (from the commentary tick): a goal is called the moment it goes in, and the whistle at
-	// half-time and full-time gets a line.
+	// Each frame (from the commentary tick): the whistle at half-time and full-time gets a line (the goals
+	// are called by the commentary tick, goalShout).
 	function voiceTick () {
 		if (!voiceOn) { return; }
-		const log = typeof matchLog !== "undefined" && Array.isArray(matchLog) ? matchLog : [];
-		if (log.length < voiceSeenGoals) { voiceSeenGoals = 0; }
-		for (; voiceSeenGoals < log.length; voiceSeenGoals++) {
-			const e = log[voiceSeenGoals];
-			if (e && e.kind === "goal") { speakLine(`Goal! ${String(e.text || "").replace(/ \(.*$/, "")}!`, "goal"); }
-		}
 		if (state !== voiceLastState) {
 			const sc = Array.isArray(score) ? `${score[0]}, ${score[1]}` : "";
 			if (state === "half") { speakLine(`That's half-time. ${sc}.`, "half"); }
@@ -20393,7 +20629,7 @@
 	// Test hook (only with ?test in the URL): lets a headless harness step the sim and read it.
 	if (/[?&]test\b/.test(location.search)) {
 		window.__ff = {
-			get state () { return state; }, get frame () { return frame; }, get ctrl () { return ctrl; }, get players () { return players; },
+			get state () { return state; }, set state (v) { state = v; }, get frame () { return frame; }, get ctrl () { return ctrl; }, get players () { return players; },
 			get ball () { return ball; }, get score () { return score; }, get possFrames () { return possFrames; }, get possTeam () { return possTeam; },
 			get goalTimer () { return goalTimer; }, get timeLeft () { return timeLeft; }, get freeze () { return freeze; }, get FW () { return FW; }, get FH () { return FH; }, get GOAL_T () { return GOAL_T; }, get GOAL_B () { return GOAL_B; }, woodworkHit, celebPlan, faceCell: faceCell3D, headInfo () { return { ear: EAR3, fade: FACE_FADE3, pale: FACE_PALE3, centre: HEAD_C3, styles: HAIR_STYLES3 }; }, recvKind, gainBallTest (p) { gainBall(p); }, get matchLen () { return matchLen; },
 			get manualLock () { return manualLock; }, get receiver () { return receiver; }, get cond () { return cond; }, get celeb () { return typeof celeb === "undefined" ? null : celeb; },
@@ -20423,7 +20659,7 @@
 				passTo(c, f);
 				return f;
 			},
-			get restartWalk () { return restartWalk; }, get review () { return review; }, get cpuSubs () { return cpuSubs; }, get surge () { return surge; }, get pressI () { return press; }, get styleI () { return style; }, get cpuTacBase () { return cpuTacBase; }, saveLive, teamShapeInfo, formBonus, get lastRatings () { return lastRatings; }, get stretcher () { return stretcher; }, injureTest (t, serious) { const v = outfield(t).find(p => !p.injured); const o = outfield(1 - t)[0]; if (v && o) { tackling[1 - t] = "hard"; const r = Math.random; Math.random = () => 0.01; try { commitFoul(o, v, true); } finally { Math.random = r; } } return v; }, staOf, get offside () { return offside; }, get deadBall () { return deadBall; }, get tally () { return tally; }, get freezeKind () { return freezeKind; }, fkDist () { return fkDist(); }, simExtra () { return { tally, poss: possFrames.slice() }; }, get setPieceKind () { return setPiece ? setPiece.kind : null; }, get gfxLevel () { return gfxLevel; }, get gfxAuto () { return gfxAuto; }, gfxAutoTick, setGfx, get dynScale () { return DYN3.s; }, get dyn () { return DYN3; }, dynSet (v) { DYN3.s = v; DYN3.at = performance.now(); resize3D(); }, dynTick3D, get lightAsk () { return lightAsk; }, lightAskTest () { showLightAsk(); }, lightAskTick, get musicBar () { return music ? music.bar : -1; }, get audioState () { return audio ? audio.state : "none"; }, get replayOn () { return replayOn(); }, get replay () { return replay; }, get recFrames () { return rec.n; }, REPLAY_AT, REPLAY_FR, GOAL_CELEB, get lastCaption () { return lastCaption; }, get lastCommentary () { return lastCommentary; }, moment, commReset () { commAt = -1e9; commRecent = []; },
+			get restartWalk () { return restartWalk; }, get review () { return review; }, get cpuSubs () { return cpuSubs; }, get surge () { return surge; }, get pressI () { return press; }, get styleI () { return style; }, get cpuTacBase () { return cpuTacBase; }, saveLive, teamShapeInfo, formBonus, get lastRatings () { return lastRatings; }, get stretcher () { return stretcher; }, injureTest (t, serious) { const v = outfield(t).find(p => !p.injured); const o = outfield(1 - t)[0]; if (v && o) { tackling[1 - t] = "hard"; const r = Math.random; Math.random = () => 0.01; try { commitFoul(o, v, true); } finally { Math.random = r; } } return v; }, staOf, get offside () { return offside; }, get deadBall () { return deadBall; }, get tally () { return tally; }, get freezeKind () { return freezeKind; }, fkDist () { return fkDist(); }, simExtra () { return { tally, poss: possFrames.slice() }; }, get setPieceKind () { return setPiece ? setPiece.kind : null; }, get gfxLevel () { return gfxLevel; }, get gfxAuto () { return gfxAuto; }, gfxAutoTick, setGfx, get dynScale () { return DYN3.s; }, get dyn () { return DYN3; }, dynSet (v) { DYN3.s = v; DYN3.at = performance.now(); resize3D(); }, dynTick3D, get lightAsk () { return lightAsk; }, lightAskTest () { showLightAsk(); }, lightAskTick, get musicBar () { return music ? music.bar : -1; }, get audioState () { return audio ? audio.state : "none"; }, get replayOn () { return replayOn(); }, get replay () { return replay; }, get recFrames () { return rec.n; }, REPLAY_AT, REPLAY_FR, GOAL_CELEB, get lastCaption () { return lastCaption; }, get lastCommentary () { return lastCommentary; }, get lastColour () { return lastColour; }, moment, commReset () { commAt = -1e9; commRecent = []; },
 			// Pose one player on a spare figure, n frames in a row, right now (no simulation step in between).
 			staffProbe (kind, o = {}) { const F3 = G3.fig; if (!F3) { return null; } const r = F3.rigs[F3.rigs.length - 1], m = { x: FW / 2, y: FH + 13, vx: 0, vy: 0, dir: 0, stride: 0, runAmt: o.run || 0, idlePh: o.ph || 0, role: "staff", team: 0, celebA: o.celebA || 0, kneel: o.kneel || 0 }; r.mir = 1; resetRig3D(r); pose3D(r, m, m.x, m.y, 0, 0, 0); if (kind === "bench") { benchPose3D(r, o.st || 0, o.ph || 0, 0, 0); } else { staffGesture3D(r, kind === "sprint" ? "" : kind, o.ph || 0, kind === "sprint", o.kneel || 0); } r.root.updateMatrixWorld(true); return r; },
 			poseProbe (p, n = 30, ballNear = 0) { const F3 = G3.fig; if (!F3) { return null; } const r = F3.rigs[F3.rigs.length - 1]; r.mir = 1; animLag = 0; for (let k = 0; k < n; k++) { resetRig3D(r); pose3D(r, p, p.x, p.y, p.dir, 0, ballNear, 0, 0); } r.root.updateMatrixWorld(true); return r; }, caption, get camMode () { return camMode; }, get view3D () { return view3D(); }, setCam, startAdded, radarRect () { const r = canvas.getBoundingClientRect(), k = r.width / SW, w = RADAR_W, h = FH * w / FW, x0 = (SW - w) / 2, y0 = SH - h - 12 - tickerUp(); return { left: r.left + (x0 - 6) * k, top: r.top + (y0 - 6) * k, right: r.left + (x0 + w + 6) * k, bottom: r.top + (y0 + h + 6) * k, shown: radarShown() }; }, get crowdMood () { return crowdMood; }, get frameDt () { return frameDt; }, get crowdBed () { return crowd; }, get soundOn () { return soundOn; },
@@ -20453,6 +20689,8 @@
 
 	// More test hooks, kept apart from the big list above.
 	if (window.__ff) { Object.assign(window.__ff, { renewWorth, renewPlan, assistContracts, reportText, rolloverClub, showContract, goalCall, COMM, cupNight, cupTie, cupPens, ensureCup, seasonAwards, youthIntake, promoteYouth, releaseYouth, renderExtras, CUP_NIGHTS, ensureDrama, dramaAfterMatch, resolveIssue, renewRefusal, signRefusal, sellRefusal, renderDrama, temperOf, signPlayer, sellPlayer, rejectBid, weeklyClub, flareUp, flareTick, flareStats, flareChance, set flaresLive (v) { flaresLive = !!v; }, halfTimeRow, resolveHalfTime, musicState () { return { tracks: TRACKS.map(x => x.name), vol: musicVol, level: musicLevel(), sel: !!$("musicVol"), next: trackNext, playing: music ? music.track : null }; }, setMusicVol, grooveBarTest (k) { ensureAudio(); const was = music; music = { g: audio.createGain() }; try { grooveBar(audio.currentTime + 0.05, 9, TRACKS[k]); return true; } finally { music.g.disconnect(); music = was; } }, voiceState () { return { on: voiceOn, available: voiceAvailable(), button: !!$("voiceBtn"), spoke: speakLine("Test line", "goal") }; }, commitFoulTest (r) { if (state !== "play") { return null; } freeze = 0; const off = outfield(1)[0], vic = outfield(0).sort((a, b) => dist(a, off) - dist(b, off))[0]; return flareUp(off, vic, true, "", { force: true, rnd: () => r }); } }); }
+	// Offside, the two commentators and the chants.
+	if (window.__ff) { Object.assign(window.__ff, { kickTest (p, x, y, sp, restart) { if (restart) { deadBall = { kind: restart, taker: p }; } ball.owner = null; kick(p, x, y, sp); }, aerialTest (t) { lastTouch = t; return aerial(); }, chantLogTest () { return chantLog.slice(); }, CALLERS, COLOUR, GOAL_SHOUT, goalShout }); }
 	if (window.__ff) { Object.assign(window.__ff, { trophyCeremony, ceremonySeek, ceremonyInfo, endCeremony, queueTrophy, trophyDue, lastCeremony: () => lastCeremony }); }
 	if (window.__ff) { Object.assign(window.__ff, { ensureCont, contNight, contFixture, contSimAll, contQualify, contNext, ccTable, ccAgg, ccWinner, renderCont, CC_NIGHTS, currentFixture, simulateMine, restoreGuest, saveLeague, renderLeague }); }
 

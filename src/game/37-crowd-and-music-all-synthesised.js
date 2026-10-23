@@ -78,8 +78,10 @@
 		ev3d("groan");
 		if (!soundOn || !audio) { return; }
 		const t = audio.currentTime;
-		noiseBurst("brown", t, 1.8, 0.11, "lowpass", 800, 240);
-		voices(t, 5, 260, 185, 1.6, 0.014, 700);
+		const k = 0.88 + Math.random() * 0.24, len = 1.4 + Math.random() * 0.8;   // never quite the same groan twice
+		noiseBurst("brown", t, len + 0.2, 0.11, "lowpass", 800 * k, 240);
+		voices(t, 5, 260 * k, 185 * k * (0.95 + Math.random() * 0.1), len, 0.014, 700);
+		if (Math.random() < 0.5) { voices(t + 0.15, 4, 200 * k, 150 * k, len * 0.9, 0.009, 600, 0.2); }   // the deeper "awww" from the back of the stand
 	};
 	const ooh = () => {
 		ev3d("ooh");
@@ -142,10 +144,121 @@
 	// The team a set of fans follows: home or away end.
 	const clubIdOfTeam = t => (t === 0 ? 0 : leagueMatch ? leagueMatch.opp : 99);
 	const isDerby = () => !!leagueMatch && derbyOf(0, leagueMatch.opp);
-	function chant (loud, away = false) {
+	// The terrace repertoire. Every chant is a different shape, and none is sung twice running by the
+	// same end; each time it is pitched and paced a little differently (a semitone or two either way, a
+	// touch quicker or slower). The away end is fewer voices, thinner and off to one side.
+	//   song: the club's own song (claps, the bombo, then the tune, often called and answered)
+	//   clap: a rhythm clapped out, slow to fast, with a "Hey!" on the accents
+	//   call: call and response, a few voices shout a two-note call and the whole end bellows it back
+	//   swell: a long sustained "ohhh" that rises with the stand and dies away
+	//   ole: one "o-lé" per pass in a long passing move (sung from updateCrowd, not picked here)
+	//   party: the celebration song after a home goal, quick and bouncy, on a pentatonic tune
+	const CHANT_KINDS = [ "song", "clap", "call", "swell" ];
+	const lastChant = [ "", "" ];
+	let chantLog = [];
+	function chant (loud, away = false, kind = null) {
 		ev3d("chant");
-		const id = clubIdOfTeam(away ? 1 - homeSide : homeSide), song = clubSong(id);
-		const t = audio.currentTime + 0.05, g = 0.035 * loud * (isDerby() ? 1.3 : 1), pan = away ? 0.5 : -0.3;
+		if (!audio) { return null; }
+		const end = away ? 1 : 0;
+		if (!kind) {
+			const pool = CHANT_KINDS.filter(k => k !== lastChant[end]), w = pool.map(k => (k === "song" ? 1.6 : 1));
+			let r = Math.random() * w.reduce((a, b) => a + b, 0);
+			kind = pool[pool.length - 1];
+			for (let i = 0; i < pool.length; i++) { r -= w[i]; if (r < 0) { kind = pool[i]; break; } }
+		}
+		lastChant[end] = kind;
+		const shift = Math.floor(Math.random() * 5) - 2, tempo = 0.9 + Math.random() * 0.22;
+		chantLog = [ ...chantLog, { kind, away, shift, tempo } ].slice(-12);
+		const g = 0.035 * loud * (isDerby() ? 1.3 : 1) * (away ? 0.8 : 1), pan = (away ? 0.5 : -0.3) + (Math.random() - 0.5) * 0.12;
+		const fans = { n: away ? 4 : 6, lp: away ? 1350 : 1150 }, t = audio.currentTime + 0.05;
+		if (kind === "clap") { clapChant(t, g, pan, tempo, fans); }
+		else if (kind === "call") { callChant(t, g, pan, tempo, shift, fans, away); }
+		else if (kind === "swell") { swellChant(t, g, pan, shift, fans); }
+		else if (kind === "party") { partyChant(t, g, pan, tempo, shift, fans); }
+		else { songChant(t, g, pan, tempo, shift, away); }
+		return kind;
+	}
+	function bombo (at, g, pan, f = 95) {
+		const o = audio.createOscillator(), dg = audio.createGain();
+		o.type = "sine"; o.frequency.setValueAtTime(f, at); o.frequency.exponentialRampToValueAtTime(48, at + 0.25);
+		dg.gain.setValueAtTime(g, at); dg.gain.exponentialRampToValueAtTime(0.0001, at + 0.3);
+		o.connect(dg); connectPan(dg, pan); o.start(at); o.stop(at + 0.32);
+	}
+	const clap1 = (at, g, pan) => noiseBurst("white", at, 0.07 + Math.random() * 0.03, g, "bandpass", 1600 + Math.random() * 500, 1500, 0.9, pan + (Math.random() - 0.5) * 0.15);
+	const hey = (at, g, pan, fans, f = 230) => { voices(at, fans.n, f, f * 0.92, 0.32, g * 0.55, fans.lp + 300, pan); noiseBurst("pink", at, 0.35, g * 1.4, "bandpass", 900, 700, 0.8, pan); };
+	// Clapped out: either slow claps that speed up into applause and a roar, or a fixed rhythm
+	// (one of several) four times over with a shout on its last beat.
+	const CLAP_RHYTHMS = [ [ 0, 1, 2, 2.5, 3 ], [ 0, 0.5, 1, 2, 3 ], [ 0, 1, 1.5, 2.5, 3 ], [ 0, 0.75, 1.5, 2, 2.5, 3 ] ];
+	function clapChant (t, g, pan, tempo, fans) {
+		if (Math.random() < 0.4) {
+			let at = t, gap = 0.95 / tempo;
+			for (let k = 0; k < 22 && gap > 0.12; k++) { clap1(at, g * (1.2 + k * 0.05), pan); at += gap; gap *= 0.86; }
+			for (let k = 0; k < 16; k++) { clap1(at + Math.random() * 1.2, g * 1.4, pan); }
+			hey(at + 0.2, g * 1.3, pan, fans, 250);
+			return;
+		}
+		const beat = 0.42 / tempo, rh = CLAP_RHYTHMS[Math.floor(Math.random() * CLAP_RHYTHMS.length)];
+		for (let bar = 0; bar < 4; bar++) {
+			const t0 = t + bar * 4 * beat;
+			for (const b of rh) { clap1(t0 + b * beat, g * 1.6, pan); }
+			bombo(t0, g * 2.4, pan);
+			hey(t0 + rh[rh.length - 1] * beat, g * (bar === 3 ? 1.5 : 1), pan, fans, 220 + bar * 6);
+		}
+	}
+	// Call and response: the call a fifth or a fourth above the answer, sung four times, the answer louder each time.
+	function callChant (t, g, pan, tempo, shift, fans, away) {
+		const root = (away ? 57 : 55) + shift, beat = 0.3 / tempo, iv = Math.random() < 0.5 ? 7 : 5;
+		const call = { root, notes: [ iv, iv, 0 ], rhythm: [ 1, 1, 2 ], beat, wave: "sawtooth" };
+		const ans = { root: root - 12, notes: [ iv, 0, 0 ], rhythm: [ 1, 1, 2 ], beat, wave: away ? "square" : "sawtooth" };
+		let at = t;
+		for (let k = 0; k < 4; k++) {
+			at += sing(at, call, 0, 3, 2, g * 0.7, pan - 0.15) + 0.12;
+			bombo(at, g * 2.6, pan);
+			at += sing(at, ans, 0, 3, fans.n, g * (1 + k * 0.1), pan) + 0.3;
+		}
+	}
+	// A long "ohhh" on a chord, swelling for a few seconds as the whole stand comes in, then fading.
+	function swellChant (t, g, pan, shift, fans) {
+		const root = 50 + shift, chord = Math.random() < 0.5 ? [ 0, 4, 7, 12 ] : [ 0, 3, 7, 12 ], dur = 4 + Math.random() * 2.5;
+		const out1 = audio.createGain(), lp = audio.createBiquadFilter();
+		lp.type = "lowpass"; lp.frequency.setValueAtTime(500, t); lp.frequency.linearRampToValueAtTime(fans.lp + 200, t + dur * 0.6); lp.frequency.linearRampToValueAtTime(600, t + dur);
+		out1.gain.setValueAtTime(0.0001, t); out1.gain.linearRampToValueAtTime(g * 1.2, t + dur * 0.6); out1.gain.linearRampToValueAtTime(0.0001, t + dur);
+		out1.connect(lp); connectPan(lp, pan);
+		for (const n of chord) {
+			for (let v = 0; v < 3; v++) {
+				const o = audio.createOscillator();
+				o.type = "sawtooth"; o.detune.value = (Math.random() * 2 - 1) * 28;
+				o.frequency.setValueAtTime(midiHz(root + n), t);
+				o.frequency.linearRampToValueAtTime(midiHz(root + n + (Math.random() < 0.3 ? 2 : 0)), t + dur * 0.7);   // a few voices drift up as it peaks
+				o.connect(out1); o.start(t); o.stop(t + dur + 0.05);
+			}
+		}
+		noiseBurst("pink", t, dur, g * 1.4, "bandpass", 500, 900, 0.6, pan);
+	}
+	// The celebration: a bouncy "na-na-na" tune on a major pentatonic over quick claps and the drum, twice through.
+	function partyChant (t, g, pan, tempo, shift, fans) {
+		const pent = [ 0, 2, 4, 7, 9, 12 ], notes = [], rhythm = [];
+		let d = Math.floor(Math.random() * 3);
+		for (let i = 0; i < 8; i++) { d = clamp(d + [ -1, 1, 1, 2, -2, 0 ][Math.floor(Math.random() * 6)], 0, 5); notes.push(pent[d]); rhythm.push(i === 7 ? 2 : i % 4 === 3 ? 1.5 : 0.5); }
+		const tune = { root: 60 + shift, notes, rhythm, beat: 0.27 / tempo, wave: "sawtooth" };
+		let at = t;
+		for (let k = 0; k < 2; k++) {
+			const len = sing(at, tune, 0, notes.length, fans.n, g * 1.15, pan);
+			for (let c = 0; c < len / tune.beat; c++) { clap1(at + c * tune.beat, g * 1.5, pan); if (c % 2 === 0) { bombo(at + c * tune.beat, g * 2.2, pan); } }
+			at += len + 0.2;
+		}
+		hey(at, g * 1.5, pan, fans, 260);
+	}
+	// "Olé!": the home end sings one for each pass in a long move of theirs (from the fifth pass on).
+	function oleChant (n, away) {
+		if (!soundOn || !audio || bulkSim) { return; }
+		const t = audio.currentTime + 0.05, pan = away ? 0.5 : -0.3, g = 0.03 * Math.min(1.6, 0.8 + n * 0.1) * (away ? 0.8 : 1), root = 62 + (n % 2);
+		sing(t, { root, notes: [ 0, 4, 2 ], rhythm: [ 0.8, 1.4, 0.2 ], beat: 0.24 + Math.random() * 0.04, wave: "sawtooth" }, 0, 2, away ? 4 : 6, g, pan);
+		noiseBurst("pink", t + 0.15, 0.6, g * 1.2, "bandpass", 700, 1000, 0.7, pan);
+	}
+	function songChant (t, g, pan, tempo, shift, away) {
+		const id = clubIdOfTeam(away ? 1 - homeSide : homeSide), base = clubSong(id);
+		const song = { ...base, root: base.root + shift, beat: base.beat / tempo, drum: base.drum / tempo };
 		const bar = song.beat * 4;
 		for (let k = 0; k < 3; k++) {
 			for (const b of song.claps) { noiseBurst("white", t + k * bar + b * song.beat * 2, 0.09, g * 1.6, "bandpass", 1800, 1600, 0.9, pan); }
@@ -221,6 +334,8 @@
 		sing(t0 + 8 * E, { root: song.root - 12, notes, rhythm, beat: E, wave: "sawtooth" }, 0, notes.length, 6, 0.03, -0.25);
 		clapAlong(t0 + 8 * E, 24, 2 * E);
 		setTimeout(() => { try { bus.disconnect(); dl.disconnect(); fb.disconnect(); } catch (e) { /* already gone */ } }, (len + 6) * 1000);
+		// Then the home end's own celebration song as the PA fades (once play is back on, or still celebrating).
+		setTimeout(() => { if (soundOn && audio && !bulkSim && (state === "play" || state === "goal")) { chant(1.1, false, "party"); if (crowd) { crowd.nextChant = Math.max(crowd.nextChant, audio.currentTime + 14); } } }, (len + 1.8) * 1000);
 	}
 	// A gasp: the whole ground drawing breath at once, at the woodwork or a big save. Loudest from the
 	// end whose side had the shot; the other end lets out a lower sigh of relief.
@@ -325,6 +440,17 @@
 		crowd.air.g.gain.setTargetAtTime(live ? (0.004 + 0.01 * heat + 0.006 * up) * quiet : 0, t, 0.5);
 		crowd.vox.f.frequency.setTargetAtTime(620 + 650 * heat + 260 * up - 180 * crowdTense - 120 * worry + 70 * Math.sin(t * 0.9), t, 0.4);
 		if (crowd.pan) { crowd.pan.pan.setTargetAtTime(0.22 * Math.sin(t * 0.21), t, 0.5); }
+		// A passing move: each completed pass in a long spell of possession counts; from the fifth on the
+		// side's end sings "olé" with every one (the home end, or the away end when theirs is going).
+		const o = ball && ball.owner;
+		if (o && o !== crowd.oleLast) {
+			if (o.team !== crowd.oleTeam || !o.recv || state !== "play") { crowd.oleTeam = o.team; crowd.oleN = 0; }
+			else {
+				crowd.oleN = (crowd.oleN || 0) + 1;
+				if (crowd.oleN >= 5 && crowdHush <= 0) { oleChant(crowd.oleN, o.team !== homeSide); crowd.nextChant = Math.max(crowd.nextChant, t + 6); }
+			}
+			crowd.oleLast = o;
+		}
 		if (live && state === "play" && freeze <= 0 && crowdHush <= 0 && t > crowd.nextChant) {
 			// The home end sings, louder when the home side is on top; the away corner answers when theirs is.
 			// In a derby both ends sing all night, trading songs.

@@ -136,6 +136,8 @@
 	.comm.in { animation: commIn 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); }
 	@keyframes commIn { from { transform: translate(-50%, 10px); opacity: 0; } to { transform: translateX(-50%); opacity: 1; } }
 	.comm-mic { flex: none; width: 8px; height: 8px; border-radius: 50%; background: #e2463f; box-shadow: 0 0 0 3px rgba(226, 70, 63, 0.25); }
+	.comm-who { flex: none; font: normal 700 10px/1 var(--body, system-ui, sans-serif); letter-spacing: 0.08em; text-transform: uppercase; color: #f2b52e; }
+	.comm-who[data-role="colour"] { color: #8fd3ff; }
 	.pitchwrap:has(.overlay:not([hidden])) .comm, .pitchwrap:has(.lower:not([hidden])) .comm { display: none; }
 	@media (prefers-reduced-motion: reduce) { .comm.in { animation: none; } }
 	@media (pointer: coarse), (max-width: 640px) { .comm { bottom: 8px; max-width: 76%; font-size: 12px; padding: 5px 11px 5px 8px; } }

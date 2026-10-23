@@ -15,10 +15,12 @@
 		return Math.max(second, rel(t, ball.x), FW / 2);   // in "distance from own goal" terms
 	}
 	const isOffside = (p, line) => rel(p.team, p.x) > line + 2;
+	const OFFSIDE_FREE = new Set([ "throw", "goalkick", "corner" ]);
 
 	function markOffside (kicker) {
 		offside = { team: kicker.team, set: new Set(), margin: new Map(), line: 0 };
-		if (!offsideOn() || (setPiece && setPiece.taker === kicker)) { return; }   // no offside from a corner or a throw-in
+		// No offside from a throw-in, a goal kick or a corner (a free kick, though, can play a man offside).
+		if (!offsideOn() || (deadBall && deadBall.taker === kicker && OFFSIDE_FREE.has(deadBall.kind))) { return; }
 		const line = offsideLine(kicker.team);
 		offside.line = line;
 		for (const m of players) {
@@ -157,6 +159,7 @@
 		banner.hidden = false;
 		setTimeout(() => { if (banner.textContent === "Offside") { banner.hidden = true; } }, 1100);
 		$("announce").textContent = `Offside against ${p.team === 0 ? "you" : opp.name}. Indirect free kick.`;
+		if (typeof commentary === "function") { commentary("offside", { n: shortName(p) }, 1 - p.team, true); }
 		snapshotPrev();
 	}
 
@@ -243,6 +246,8 @@
 			}
 		}
 		p.kickA = KICK_T; p.kickCd = Math.max(p.kickCd, 12);
+		// Offside is judged when the ball is played: on the strike, not when he chose the pass a few frames ago.
+		if (offside.team === p.team && offside.line) { markOffside(p); }
 		sfx(...p.windSound);
 		return true;
 	}
@@ -250,6 +255,9 @@
 		ball.intended = null;   // aiHandOff names the man a computer-run pass is for, after the kick
 		p.kickLoft = false;   // loftTo, the chip and the lifted shot set it after: he leans back under those
 		const owned = ball.owner === p;
+		// A volley or a shot at a loose ball never passes through gainBall: a man who was offside when it
+		// was played is still the next to touch it, so it is offside before it is a kick.
+		if (!owned && offsideOn() && offside && offside.team === p.team && offside.set && offside.set.has(p) && state === "play") { callOffside(p); return; }
 		lastTouch = p.team;
 		markOffside(p);
 		if (p.team === 1) { switchCd = 0; }

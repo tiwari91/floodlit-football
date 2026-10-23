@@ -667,6 +667,11 @@
 			// Now and then the man who lost it climbs all over the one who won it.
 			if (Math.random() < 0.04) { w.jump = JUMP; commitFoul(l, w, false); return true; }
 		}
+		// A man who was offside when the ball was played and now heads it, or goes up to challenge for it, is
+		// penalised: he has become involved (a header used to go straight through, never flagged).
+		const offAt = q => q && offsideOn() && offside.team === q.team && offside.set.has(q);
+		if (offAt(w)) { callOffside(w); return true; }
+		if (offAt(l) && db < 24) { callOffside(l); return true; }
 		if (act === "goal") { header(w); } else if (act === "clear") { clearance(w); } else { headPass(w); }
 		return true;
 	}
