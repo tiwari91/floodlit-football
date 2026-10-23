@@ -1217,7 +1217,7 @@
 @keyframes wipe { from { left: -70%; } to { left: 115%; } }
 
 /* Simulate the rest, on the pitch itself once the computer has been playing for you a while. */
-.simchip { position: absolute; right: 12px; top: 12px; z-index: 6; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--amber); background: rgba(12, 18, 24, 0.82); color: var(--amber); font-weight: 600; font-size: 14px; cursor: pointer; }
+.simchip { position: absolute; right: 12px; top: 92px; z-index: 6; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--amber); background: rgba(12, 18, 24, 0.82); color: var(--amber); font-weight: 600; font-size: 14px; cursor: pointer; }
 .simchip:hover, .simchip:focus-visible { background: rgba(12, 18, 24, 0.95); }
 </style>
 
@@ -16615,7 +16615,7 @@
 	for (const t of [ "keydown", "pointerdown", "touchstart" ]) { window.addEventListener(t, () => { lastHumanInput = performance.now(); }, { passive: true, capture: true }); }
 	function renderSimChip (now = performance.now()) {
 		const chip = $("simChip");
-		const show = state === "play" && mode !== "tutorial" && mode !== "corners" && now - lastHumanInput > SIM_CHIP_IDLE_MS;
+		const show = state === "play" && mode !== "tutorial" && mode !== "corners" && $("bcLineups").hidden && now - lastHumanInput > SIM_CHIP_IDLE_MS;
 		if (chip.hidden === show) { chip.hidden = !show; }
 		return show;
 	}

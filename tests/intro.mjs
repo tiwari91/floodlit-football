@@ -133,6 +133,7 @@ const run = await page.evaluate(async () => {
 check("a goal can send the manager down the touchline, and the broadcast cuts to him", run.skip !== undefined || (run.shot === "boss" && run.moved > 60), JSON.stringify(run));
 const chip = await page.evaluate(async () => {
 	const F = window.__ff; for (let i = 0; i < 4000 && F.state !== "play"; i++) { F.step(1); }
+	document.getElementById("bcLineups").hidden = true;
 	document.body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
 	const fresh = F.renderSimChip(performance.now());
 	const idle = F.renderSimChip(performance.now() + 60000);

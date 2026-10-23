@@ -126,7 +126,7 @@
 	for (const t of [ "keydown", "pointerdown", "touchstart" ]) { window.addEventListener(t, () => { lastHumanInput = performance.now(); }, { passive: true, capture: true }); }
 	function renderSimChip (now = performance.now()) {
 		const chip = $("simChip");
-		const show = state === "play" && mode !== "tutorial" && mode !== "corners" && now - lastHumanInput > SIM_CHIP_IDLE_MS;
+		const show = state === "play" && mode !== "tutorial" && mode !== "corners" && $("bcLineups").hidden && now - lastHumanInput > SIM_CHIP_IDLE_MS;
 		if (chip.hidden === show) { chip.hidden = !show; }
 		return show;
 	}
