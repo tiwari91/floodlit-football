@@ -28,10 +28,11 @@ try {
 			return {
 				o0, o1: F.ovrOf(fwd), stored: "dri" in fwd || "phy" in fwd, f: [ F.driOf(fwd), F.phyOf(fwd) ], c: [ F.driOf(cb), F.phyOf(cb) ],
 				set: [ F.driOf({ ...fwd, dri: 91 }), F.phyOf({ ...fwd, phy: 33 }) ], bad: (() => { const p = F.ensurePlayer({ name: "X", pos: "mid", pac: 60, sho: 60, pas: 60, def: 60, dri: "x" }); return "dri" in p; })(),
-				g: [ mean(gen, F.driOf), mean(gen, F.phyOf) ], range: gen.every(p => [ F.driOf(p), F.phyOf(p) ].every(v => Number.isInteger(v) && v >= 30 && v <= 96)),
+				g: [ mean(gen, F.driOf), mean(gen, F.phyOf) ], pos: [ "def", "mid", "fwd" ].map(ps => { const a = gen.filter(p => p.pos === ps); return `${ps} ${Math.round(mean(a, F.driOf))}/${Math.round(mean(a, F.phyOf))}`; }).join(", "), range: gen.every(p => [ F.driOf(p), F.phyOf(p) ].every(v => Number.isInteger(v) && v >= 30 && v <= 96)),
 				attr: F.players.filter(p => p.team === 1 && p.attr).every(p => Number.isFinite(p.attr.dri) && Number.isFinite(p.attr.phy))
 			};
 		});
+		console.log(`generated at 70, dribbling/physical by position: ${d.pos}`);
 		check("an old save's player keeps his overall and nothing is written to him", d.o0 === d.o1 && !d.stored, JSON.stringify(d));
 		check("defaults follow the player: a quick forward dribbles better, a centre-back is stronger", d.f[0] > d.c[0] + 10 && d.c[1] > d.f[1] + 5, JSON.stringify([ d.f, d.c ]));
 		check("set values win; a bad one is dropped for the derived value", d.set[0] === 91 && d.set[1] === 33 && !d.bad);
