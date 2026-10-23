@@ -51,7 +51,15 @@
 		const sh = teamShapeInfo(p.team);
 		const stagger = (rel(p.team, p.bx) - sh.base[p.role]) * (p.role === "def" ? 0.3 : p.role === "mid" ? 0.7 : 0.8);
 		let r = sh[p.role + "X"] + stagger;
-		if (sh.inPoss && offsideOn()) { r = Math.min(r, offsideLine(p.team) - 10); }
+		if (sh.inPoss && offsideOn()) {
+			r = Math.min(r, offsideLine(p.team) - 10);
+			// A forward doesn't read the line perfectly: now and then he loiters a yard or two beyond it, or is
+			// slow back when it steps up (more often the slower he is), and a pass to him then is offside.
+			if (p.role === "fwd") {
+				if (!(p.lazyAt > frame)) { p.lazyAt = frame + 150 + Math.floor(Math.random() * 150); p.lazy = Math.random() < 0.22 + (65 - A(p, "pac")) * 0.005 ? 6 + Math.random() * 28 : 0; }
+				if (p.lazy) { r = Math.max(r, offsideLine(p.team) - 10 + p.lazy); }
+			}
+		}
 		const ty = FH / 2 + (p.by - FH / 2) * sh.width + sh.shiftY;
 		return [ p.team === 0 ? r : FW - r, clamp(ty, 40, FH - 40) ];
 	}

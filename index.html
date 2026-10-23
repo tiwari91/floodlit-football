@@ -7389,7 +7389,15 @@
 		const sh = teamShapeInfo(p.team);
 		const stagger = (rel(p.team, p.bx) - sh.base[p.role]) * (p.role === "def" ? 0.3 : p.role === "mid" ? 0.7 : 0.8);
 		let r = sh[p.role + "X"] + stagger;
-		if (sh.inPoss && offsideOn()) { r = Math.min(r, offsideLine(p.team) - 10); }
+		if (sh.inPoss && offsideOn()) {
+			r = Math.min(r, offsideLine(p.team) - 10);
+			// A forward doesn't read the line perfectly: now and then he loiters a yard or two beyond it, or is
+			// slow back when it steps up (more often the slower he is), and a pass to him then is offside.
+			if (p.role === "fwd") {
+				if (!(p.lazyAt > frame)) { p.lazyAt = frame + 150 + Math.floor(Math.random() * 150); p.lazy = Math.random() < 0.22 + (65 - A(p, "pac")) * 0.005 ? 6 + Math.random() * 28 : 0; }
+				if (p.lazy) { r = Math.max(r, offsideLine(p.team) - 10 + p.lazy); }
+			}
+		}
 		const ty = FH / 2 + (p.by - FH / 2) * sh.width + sh.shiftY;
 		return [ p.team === 0 ? r : FW - r, clamp(ty, 40, FH - 40) ];
 	}
@@ -7570,7 +7578,7 @@
 			if (p.run.hold) {
 				// On the shoulder: level with the line less a stride, drifting into the channel.
 				// (A man who times it badly drifts a yard or two beyond it while he waits: that is how most get caught.)
-				if (p.run.drift === undefined) { p.run.drift = Math.random() < 0.3 + (65 - A(p, "pac")) * 0.004 ? 8 + Math.random() * 26 : 0; }
+				if (p.run.drift === undefined) { p.run.drift = Math.random() < 0.5 + (65 - A(p, "pac")) * 0.004 ? 10 + Math.random() * 30 : 0; }
 				rr = (offsideOn() ? offsideLine(p.team) : FW - 60 * S) - 10 + p.run.drift;
 				ry = p.y + (p.run.chY - p.y) * 0.5;
 			} else if (!p.run.burst && offsideOn()) { rr = Math.min(rr, offsideLine(p.team) - 8); }
@@ -7726,6 +7734,8 @@
 	// The computer's through ball. A burst runner is the first look; a forward level with the line the
 	// second. The passer judges the runner onside to within his eye (a weaker passer misreads the line
 	// by more, and so plays men offside), leads him into the space behind and weights it to meet him.
+	// How far beyond the line a passer will still pick a man out, misjudging it: by more the weaker his passing.
+	const lineEye = p => Math.max(8, 40 - (A(p, "pas") - 60) * 0.9) * Math.random();
 	function throughBall (p) {
 		const t = p.team, pas = A(p, "pas"), line = offsideLine(t), eye = (tr(p, "playmaker") ? 0.25 : 0) + (pas - 65) * 0.012;
 		const base = { possession: 0.13, balanced: 0.2, direct: 0.27, counter: 0.32 }[style[t]] + 0.08 * edge(t);
@@ -7735,7 +7745,7 @@
 		let best = null, bs = 0;
 		// How far beyond the line he will still play it: his eye for the line, and the beat he takes to
 		// release it while the runner keeps going (a weaker passer is later, and misjudges by more).
-		const misread = Math.max(8, 46 - (pas - 60) * 1.2) * Math.random();
+		const misread = Math.max(10, 56 - (pas - 60) * 1.2) * Math.random();
 		for (const m of outfield(t)) {
 			if (m === p || m.role === "gk") { continue; }
 			const lag = clamp(8 + (80 - pas) * 0.8, 4, 22) * Math.random(), off = rel(t, m.x) - line - Math.max(0, (t === 0 ? m.vx : -m.vx)) * lag, burst = m.run && m.run.burst && frame - m.run.burst < 60;
@@ -7874,7 +7884,7 @@
 					if (d < 70 || d > (tr(p, "playmaker") ? 620 : 460) * Math.sqrt(S)) { continue; }
 					const adv = (rel(p.team, m.x) - rel(p.team, p.x)) / 300 * (style[p.team] === "possession" ? 0.5 : style[p.team] === "balanced" ? 1 : 1.6);
 					const s = adv + openness(m) / 120 - d / (style[p.team] === "possession" ? 400 : 800);
-					if (offsideOn() && isOffside(m, offsideLine(p.team))) { continue; }
+					if (offsideOn() && isOffside(m, offsideLine(p.team) + lineEye(p))) { continue; }   // (judged by his eye for the line)
 					if (openness(m) > 40 && s > bs) { bs = s; best = m; }
 				}
 				// Under pressure, look for the open player on the far side: switch the play.
