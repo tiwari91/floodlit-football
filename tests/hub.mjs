@@ -38,6 +38,21 @@ try {
 	check("the formation pitch draws at full size when its tab opens", lineup.w > 300 && lineup.h > 200, JSON.stringify(lineup));
 	check("with a tab open the page is far shorter than the one long page (11,908 px)", heights.overview < 3000 && heights.squad < 4000 && heights.league < 4000, JSON.stringify(heights));
 
+	// The assistant manager is the first card on the Club tab, and Settings > Your team points to it.
+	await showTab(page, "club");
+	const ac = await page.evaluate(() => {
+		const grid = document.querySelector("#panel-club .club-grid-hub"), first = grid.firstElementChild;
+		return { first: first.id, head: first.querySelector("h4").textContent, holds: first.contains(document.getElementById("assist")) };
+	});
+	check("the assistant manager is the first card on the Club tab, under its own heading", ac.first === "assistCard" && ac.head === "Assistant manager" && ac.holds, JSON.stringify(ac));
+	await page.evaluate(() => window.__ff.setAssist("contracts"));
+	await showTab(page, "settings");
+	const link = await page.evaluate(() => { const b = document.getElementById("assistLink"); return { seen: b.getClientRects().length > 0, text: b.textContent, inTeam: !!b.closest("[aria-labelledby=bgTeam]") }; });
+	await page.click("#assistLink"); await page.waitForTimeout(150);
+	const went = await page.evaluate(() => ({ sel: document.querySelector("[role=tab][aria-selected=true]").id, focus: document.activeElement.id, state: document.getElementById("assistState").textContent }));
+	check("Settings > Your team shows the assistant's mode and its shortcut lands on the setting in Club", link.seen && link.inTeam && /Contracts/.test(link.text) && went.sel === "tab-club" && went.focus === "assist" && went.state === "Contracts", JSON.stringify({ link, went }));
+	await page.evaluate(() => window.__ff.setAssist("off"));
+
 	// Arrow keys move along the tabs (and not the player); Home and End jump to the ends.
 	await showTab(page, "squad");
 	await page.focus("#tab-squad"); await page.keyboard.press("ArrowRight");

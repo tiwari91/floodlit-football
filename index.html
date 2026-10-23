@@ -1327,6 +1327,13 @@
 	}
 	.lg-academy h4, .lg-extras h4 { margin: 0 0 6px; font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
 	.lg-academy .detail { margin: 0; font-size: 13px; color: var(--muted); }
+	/* The assistant manager: first card on the Club tab, with a shortcut under Settings > Your team. */
+	.assist-card { border-color: rgba(242, 181, 46, 0.45); }
+	.assist-state { padding: 2px 8px; border-radius: 10px; border: 1px solid var(--rule); font-weight: 600; }
+	.assist-state.on, .assist-link b.on { color: #5fe08f; }
+	.assist-link { flex-basis: 100%; text-align: left; }
+	@keyframes assistFlash { 0% { box-shadow: 0 0 0 3px rgba(242, 181, 46, 0.9); } 100% { box-shadow: 0 0 0 3px rgba(242, 181, 46, 0); } }
+	.win.flash { animation: assistFlash 1.6s ease-out; }
 </style>
 
 <main class="wrap">
@@ -1517,6 +1524,21 @@
 			</div>
 			<div class="hub-panel" role="tabpanel" id="panel-club" aria-labelledby="tab-club" tabindex="0" hidden>
 				<div class="club-grid-hub">
+				<div class="win assist-card" id="assistCard">
+				<div class="sq-head"><h4 id="assistHead">Assistant manager</h4><span class="lg-meta assist-state" id="assistState">Off</span></div>
+				<p class="win-note">Hand the paperwork to your assistant: he renews contracts between matches, answers bids and, in a window, signs a clear step up. Everything he does is written up in the League notes.</p>
+				<div class="coach-sel">
+				<label class="field" for="assist" title="Your assistant manager does the paperwork between matches: a new contract for every player in his last year, bids answered, and in a window a signing where the market offers a clear step up">What he handles
+				<select id="assist" aria-describedby="assistNote">
+				<option value="off" selected>Nothing (off)</option>
+				<option value="contracts">Contracts</option>
+				<option value="transfers">Transfers</option>
+				<option value="both">Contracts and transfers</option>
+				</select>
+				</label>
+				</div>
+				<p class="fine" id="assistNote"></p>
+				</div>
 				<div class="win coachp" id="coachPanel">
 				<div class="sq-head"><h4>Coaching</h4><span class="lg-meta" id="drillMeta"></span></div>
 				<p class="win-note">Train every week between matches. Focus picks what improves; young players improve fastest and players past 30 slowly lose pace. Hard training improves them quicker but tires them and risks knocks. Your coaches multiply it all.</p>
@@ -1553,20 +1575,6 @@
 				<h4 class="up-title">Club upgrades</h4>
 				<ul class="upgrades" id="winUpgrades"></ul>
 				</div>
-				<div class="win">
-				<div class="sq-head"><h4>Assistant manager</h4></div>
-				<div class="coach-sel">
-				<label class="field" for="assist" title="Your assistant manager does the paperwork between matches: a new contract for every player in his last year, bids answered, and in a window a signing where the market offers a clear step up">Assistant
-				<select id="assist">
-				<option value="off" selected>Off</option>
-				<option value="contracts">Contracts</option>
-				<option value="transfers">Transfers</option>
-				<option value="both">Contracts and transfers</option>
-				</select>
-				</label>
-				</div>
-				<p class="fine" id="assistNote"></p>
-				</div>
 				<div class="win lg-academy-box" id="lgAcademy"></div>
 				</div>
 			</div>
@@ -1584,6 +1592,7 @@
 				<div class="bargroups">
 				<div class="bargroup" role="group" aria-labelledby="bgTeam">
 				<span class="eyebrow" id="bgTeam">Your team</span>
+				<button type="button" class="assist-link" id="assistLink" data-goto="club" data-focus="assist" title="The assistant manager lives on the Club tab, first card">Assistant manager: <b id="assistLinkState">Off</b> <span aria-hidden="true">&rarr;</span> Club tab</button>
 				<label class="field" for="format">Teams
 				<select id="format">
 				<option value="11" selected>11-a-side</option>
@@ -1740,7 +1749,7 @@
 				<p class="fine"><b>Goals.</b> The scorer wheels away to the corner, slides on his knees in front of the fans and is mobbed by his teammates while the other side trudges back and their keeper fetches the ball out of the net, which bulges and swings where the ball hit it. A caption names the scorer and the minute, and the score bug flashes. In the 3D view the celebration then gives way to an instant replay of the build-up in slow motion, from high behind the goal or low beside it, before the camera goes back to the scorer and cuts wide for the restart. The match clock is stopped throughout. Any key, button or tap skips the celebration and the replay. Cards and substitutions get captions too.</p>
 				<p class="fine"><b>Weather and grounds.</b> Every club has a home ground: grass, muddy or artificial turf. Mud slows the ball and the players and kills the bounce. Turf is quick and true. Rain holds the ball up (heavy rain and mud most of all), costs players grip on the turn, sends passes a little astray and makes shots harder for keepers to hold, so they spill more. Wind pushes the ball while it is in the air: long balls, crosses, corners and lofted shots carry with it and hang against it; the arrow and speed at the top left of the pitch show which way it blows. League fixtures kick off in the afternoon or at night under the floodlights, with the stands dark around a lit pitch. In the league, matchdays 10 to 26 are the rainy season, windier and mostly at night, and the forecast is shown in advance (☾ night, ☀ afternoon, ≈ windy); the kick-off card gives the time, the rain and which way the wind blows for you. In a friendly, pick the weather (including Windy, and Fog, which only thickens the air: the far side fades but the ball plays as on a dry night) and ground yourself.</p>
 				<p class="fine"><b>Your season, backed up.</b> Your league saves in this browser. Export league saves it to a file; Import league loads a file back (press twice to confirm, since it replaces the season you have). Use it to keep a backup or carry your season to another browser or device.</p>
-				<p class="fine"><b>Assistant.</b> In the Club tab, the Assistant setting hands the club's paperwork to your assistant manager. Contracts: between matches he goes through everyone in the last year of his deal, the most important first (rating, age, how much he plays and who else can play there). Young key men get three more seasons, men past 31 and the fringe one, older squad men take a pay cut, and a squad man of 33 or more, or one the squad doesn't need, is let go on a free. He keeps £0.4m back for wages. When the money runs short, a key man who would otherwise walk signs with no signing-on fee and a bigger rise instead; with Transfers on too and a window open he sells a squad player to pay for the rest, otherwise he suggests one. His report says who renewed, for how long and at what wage, who hasn't signed yet, when their deals end and why, and what you can do: spend the wage money, sell, or offer the deal yourself from the squad list. Transfers: when a window is open he answers bids (cashing in only well over a player's value, or on anyone past 31 at a fair price, never the only keeper), and signs at most two players a window where a known quantity, scouted or from home, is a clear step up on your weakest starter in that position. Everything he does appears in the notes on the League panel. Off by default.</p>
+				<p class="fine"><b>Assistant.</b> In the Club tab (the first card, "Assistant manager"; Settings has a shortcut under Your team), the Assistant setting hands the club's paperwork to your assistant manager. Contracts: between matches he goes through everyone in the last year of his deal, the most important first (rating, age, how much he plays and who else can play there). Young key men get three more seasons, men past 31 and the fringe one, older squad men take a pay cut, and a squad man of 33 or more, or one the squad doesn't need, is let go on a free. He keeps £0.4m back for wages. When the money runs short, a key man who would otherwise walk signs with no signing-on fee and a bigger rise instead; with Transfers on too and a window open he sells a squad player to pay for the rest, otherwise he suggests one. His report says who renewed, for how long and at what wage, who hasn't signed yet, when their deals end and why, and what you can do: spend the wage money, sell, or offer the deal yourself from the squad list. Transfers: when a window is open he answers bids (cashing in only well over a player's value, or on anyone past 31 at a fair price, never the only keeper), and signs at most two players a window where a known quantity, scouted or from home, is a clear step up on your weakest starter in that position. Everything he does appears in the notes on the League panel. Off by default.</p>
 				<p class="fine"><b>The transfer window.</b> The market opens on the For you tab: a shortlist of the players who would improve your eleven, each with the gain over the starter he would replace (an estimate until he is scouted). "Sign the best for me" lets the assistant buy up to two known step-ups at the asking price, keeping money for wages; "Scout the shortlist" spends the window's reports on it, best first. The line above the tabs says where the eleven is thinnest. The other tabs show every market as before.</p>
 				<p class="fine"><b>Offers for you, and your agent.</b> You are the manager, not the club. When a season ends, clubs who liked your work come calling in the League panel: finish in the top four and the big clubs in the division want you, finish mid-table and a club at your level does, finish low and only the division below will, and a good season draws a club abroad. Take a job and you inherit that club's squad, ground and colours with a budget to match its size; your old club carries on under its own name. Move abroad and you start afresh in a new country: a new squad of mostly local players, and a new league of that country's clubs under its own name (La Liga-style Primera División in Spain, Ligue 1 in France, the J1 League in Japan and so on), your career intact. Your agent also sounds clubs out at the January window: agree to an approach and you join when the season ends. Decline, or start the next season, and the offers lapse. With several offers on the table your agent marks the <b>best move</b> and says why: the strongest squad, the most to spend, a new country on your record. Your coaching staff, training plan and facilities come with you to any new club, and a bigger club's facilities are already built to its standing. The career line under them keeps your record.</p>
 				<p class="fine"><b>Contracts ending.</b> At the January window, with ten games to go and with two, you get a heads-up naming the starters in the last year of their deals, how many games are left and, with the Assistant on, any he couldn't sign yet. Renew them under Your team, or leave it: in the summer the club keeps its last-year starters on anyway, most valuable first, as far as the money allows (£0.4m is always kept for wages), and the League notes say who could not be kept. A happy player under 34 otherwise takes the club's standard two-year deal in the summer; anyone else leaves on a free.</p>
@@ -4519,7 +4528,7 @@
 	}
 
 	/* ---------- the assistant: contracts and transfers ----------
-	   Turned on under Your team, the assistant manager does the club's paperwork between matches:
+	   Turned on from the first card on the Club tab (Settings > Your team has a shortcut), the assistant manager does the club's paperwork between matches:
 	   new deals for the players worth keeping before their contracts run out, bids for your players
 	   answered, and in a window a signing or two where the market offers a clear step up at a price
 	   that leaves money for wages. Everything he does is written up in the League panel's notes. */
@@ -4886,6 +4895,9 @@
 	function setAssist (m, run = false) {
 		assistMode = ASSIST[m] ? m : "off";
 		if (assistSel) { assistSel.value = assistMode; }
+		// The mode reads at a glance on the card's heading and on the shortcut under Settings > Your team.
+		const label = { off: "Off", contracts: "Contracts", transfers: "Transfers", both: "Contracts and transfers" }[assistMode];
+		for (const id of [ "assistState", "assistLinkState" ]) { const e = $(id); if (e) { e.textContent = label; e.classList.toggle("on", assistMode !== "off"); } }
 		store.set("ff-assist", assistMode);
 		if (run) { assistRun("now"); }
 	}
@@ -7097,6 +7109,7 @@
 		const on = leagueOn();
 		for (const t of hubTabs) { if ("league" in t.dataset) { t.hidden = !on; } }
 		$("lgActions").hidden = !on;
+	$("assistLink").hidden = !on;
 		const want = store.get(HUB_KEY) || "overview";
 		if (!tabUsable(tabOf(hubTab)) || (hubTab !== want && tabUsable(tabOf(want)))) { showTab(want, { remember: false, scroll: false }); }
 	}
@@ -7176,7 +7189,19 @@
 		showTab(vis[j].dataset.tab, { focus: true });
 		vis[j].scrollIntoView?.({ block: "nearest", inline: "nearest" });
 	});
-	for (const b of document.querySelectorAll("#hub [data-goto]")) { b.addEventListener("click", () => showTab(b.dataset.goto, { focus: true })); }
+	// A shortcut can also name a control to land on (Settings > Your team > Assistant manager): open its tab,
+	// bring the control into view, focus it and flash its card so the eye finds it.
+	for (const b of document.querySelectorAll("#hub [data-goto]")) {
+		b.addEventListener("click", () => {
+			const target = b.dataset.focus && $(b.dataset.focus);
+			showTab(b.dataset.goto, { focus: !target });
+			if (!target) { return; }
+			const card = target.closest(".win") || target;
+			card.scrollIntoView?.({ block: "nearest" });
+			target.focus({ preventScroll: true });
+			card.classList.remove("flash"); void card.offsetWidth; card.classList.add("flash");
+		});
+	}
 
 	syncHubMode();
 	showTab(store.get(HUB_KEY) || "overview", { remember: false, scroll: false });

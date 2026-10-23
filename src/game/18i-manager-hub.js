@@ -34,6 +34,7 @@
 		const on = leagueOn();
 		for (const t of hubTabs) { if ("league" in t.dataset) { t.hidden = !on; } }
 		$("lgActions").hidden = !on;
+	$("assistLink").hidden = !on;
 		const want = store.get(HUB_KEY) || "overview";
 		if (!tabUsable(tabOf(hubTab)) || (hubTab !== want && tabUsable(tabOf(want)))) { showTab(want, { remember: false, scroll: false }); }
 	}
@@ -113,7 +114,19 @@
 		showTab(vis[j].dataset.tab, { focus: true });
 		vis[j].scrollIntoView?.({ block: "nearest", inline: "nearest" });
 	});
-	for (const b of document.querySelectorAll("#hub [data-goto]")) { b.addEventListener("click", () => showTab(b.dataset.goto, { focus: true })); }
+	// A shortcut can also name a control to land on (Settings > Your team > Assistant manager): open its tab,
+	// bring the control into view, focus it and flash its card so the eye finds it.
+	for (const b of document.querySelectorAll("#hub [data-goto]")) {
+		b.addEventListener("click", () => {
+			const target = b.dataset.focus && $(b.dataset.focus);
+			showTab(b.dataset.goto, { focus: !target });
+			if (!target) { return; }
+			const card = target.closest(".win") || target;
+			card.scrollIntoView?.({ block: "nearest" });
+			target.focus({ preventScroll: true });
+			card.classList.remove("flash"); void card.offsetWidth; card.classList.add("flash");
+		});
+	}
 
 	syncHubMode();
 	showTab(store.get(HUB_KEY) || "overview", { remember: false, scroll: false });

@@ -1306,3 +1306,10 @@
 	}
 	.lg-academy h4, .lg-extras h4 { margin: 0 0 6px; font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
 	.lg-academy .detail { margin: 0; font-size: 13px; color: var(--muted); }
+	/* The assistant manager: first card on the Club tab, with a shortcut under Settings > Your team. */
+	.assist-card { border-color: rgba(242, 181, 46, 0.45); }
+	.assist-state { padding: 2px 8px; border-radius: 10px; border: 1px solid var(--rule); font-weight: 600; }
+	.assist-state.on, .assist-link b.on { color: #5fe08f; }
+	.assist-link { flex-basis: 100%; text-align: left; }
+	@keyframes assistFlash { 0% { box-shadow: 0 0 0 3px rgba(242, 181, 46, 0.9); } 100% { box-shadow: 0 0 0 3px rgba(242, 181, 46, 0); } }
+	.win.flash { animation: assistFlash 1.6s ease-out; }

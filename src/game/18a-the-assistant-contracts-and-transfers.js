@@ -1,5 +1,5 @@
 	/* ---------- the assistant: contracts and transfers ----------
-	   Turned on under Your team, the assistant manager does the club's paperwork between matches:
+	   Turned on from the first card on the Club tab (Settings > Your team has a shortcut), the assistant manager does the club's paperwork between matches:
 	   new deals for the players worth keeping before their contracts run out, bids for your players
 	   answered, and in a window a signing or two where the market offers a clear step up at a price
 	   that leaves money for wages. Everything he does is written up in the League panel's notes. */
@@ -366,6 +366,9 @@
 	function setAssist (m, run = false) {
 		assistMode = ASSIST[m] ? m : "off";
 		if (assistSel) { assistSel.value = assistMode; }
+		// The mode reads at a glance on the card's heading and on the shortcut under Settings > Your team.
+		const label = { off: "Off", contracts: "Contracts", transfers: "Transfers", both: "Contracts and transfers" }[assistMode];
+		for (const id of [ "assistState", "assistLinkState" ]) { const e = $(id); if (e) { e.textContent = label; e.classList.toggle("on", assistMode !== "off"); } }
 		store.set("ff-assist", assistMode);
 		if (run) { assistRun("now"); }
 	}
