@@ -27,6 +27,7 @@ for (const [ label, opts ] of [
 	[ "portrait phone", { ...devices["iPhone 13"], viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 } ]
 ]) {
 	const { ctx, page, errs } = await open(label, opts, { "ff-cam2": "tv" });
+	for (let i = 0; i < 40 && (await page.evaluate(() => window.__ff.G3.shot)) !== "tv"; i++) { await sleep(250); }   // past any set piece's own shot
 	const f = await framing(page);
 	await page.screenshot({ path: `${OUT}/look-tv-${label.replace(/ /g, "-")}.png` });
 	check(`${label}: the TV camera draws the 3D scene with the TV shot`, f.cam === "tv" && f.v3 && f.shot === "tv" && f.canvas3d, JSON.stringify(f));
