@@ -56,6 +56,32 @@ Settings sit under the pitch in four groups (your team, the match, controls and 
 
 On a phone, landscape fills the screen with the pitch and floats the joystick and pads over it; portrait keeps a tall pitch with the controls below. Xbox and PlayStation controllers work too.
 
+## Option files: your own names
+
+Floodlit ships with invented players and clubs only. The project contains no real players' names
+or data and no ratings from any other game, and it never will: no sample option file with real
+names is shipped either.
+
+Edit names, in the League panel, opens edit mode:
+- **Clubs**: a club's name, short name, shirt and second colours and ground, for every club in
+  your league (yours too) and the foreign clubs on the transfer markets.
+- **Players**: name, nationality, shirt number, preferred foot, position, skin, hair colour and
+  hair style, for your squad, the transfer list and the other clubs' squads. Ratings (pace,
+  shooting, passing, defending, from 30 to 96) can only be changed with Custom ratings on, so a
+  career stays balanced unless you choose otherwise.
+
+Everything is checked as you save: lengths, colours, and no two clubs or players of yours with
+the same name. Edits are kept in your save, carry on through new seasons, follow a player you sell,
+and a renamed player keeps his face.
+
+Export option file saves the edits as a small JSON file (`"kind": "floodlit-option-file"`,
+`"version": 1`) that anyone can import from the file picker or by dropping it on the editor. Before
+anything changes, a preview says what the file renames ("This file renames 20 clubs and 412
+players") and what it ignores, and you choose to apply it now or from next season. Your own players
+are matched by a stable id, the other clubs' players by club and squad slot. Unknown entries are
+skipped; a file that is not an option file is refused with a message. The file is only ever parsed
+as JSON, never run. Revert to default names undoes every edit.
+
 ## Working on the game
 
 `index.html` is the one file GitHub Pages serves, and it is built, not edited. The source lives in
@@ -76,7 +102,7 @@ dependency of the game: set `FF_PLAYWRIGHT_FROM` to a `package.json` whose `node
 Playwright and `FF_CHROME` to a Chrome binary if the defaults in `tests/_env.mjs` do not fit.
 `tests/switch.mjs` covers who you control when the ball changes hands, `tests/phone.mjs` the
 portrait and landscape layouts, the settings drawer and the 60-a-second frame cap, and
-`tests/move.mjs` dribbling, planting, sprinting, challenges and the 3D renderer, and `tests/club.mjs` the assistant manager's contracts, bids and signings. Screenshots land
+`tests/move.mjs` dribbling, planting, sprinting, challenges and the 3D renderer, and `tests/club.mjs` the assistant manager's contracts, bids and signings. `tests/edit.mjs` covers edit mode and option files. Screenshots land
 in `tests/out/`.
 
 ## License
