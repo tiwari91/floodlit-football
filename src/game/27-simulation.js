@@ -241,6 +241,7 @@
 			const lead = score[1] - score[0], late = timeLeft < matchLen * 0.3;
 			setMentality(1, !late ? 0 : lead < -1 ? 2 : lead < 0 ? 1 : lead > 0 ? -1 : 0);
 		}
+		if (frame % 600 === 300 && leagueMatch !== undefined) { cpuTactics(); }
 		if (switchCd > 0) { switchCd--; }
 		if (manualLock > 0) { manualLock--; }
 		if (autoHold > 0) { autoHold--; }
@@ -477,7 +478,7 @@
 			}
 			const carrier = ball.owner;
 			if (carrier && carrier.team !== p.team && p.role !== "gk" && !inHands(carrier) && !(p.slideCd > 0) && dist(p, carrier) < 42 &&
-				!(steered(carrier) && frame - (carrier.gotAt || 0) < 22) && Math.random() < 0.008 * defMul(p) * (p.role === "def" ? 1.4 : 1) * TACKLE_FX[tackling[p.team]].slide * (tr(p, "winner") ? 1.6 : 1)) {
+				!(steered(carrier) && frame - (carrier.gotAt || 0) < 22) && Math.random() < 0.008 * slideOdds(p, carrier) * defMul(p) * (p.role === "def" ? 1.4 : 1) * TACKLE_FX[tackling[p.team]].slide * (tr(p, "winner") ? 1.6 : 1)) {
 				p.dir = Math.atan2(carrier.y + carrier.vy * 6 - p.y, carrier.x + carrier.vx * 6 - p.x);
 				p.slideAI = 12;
 				p.slideCd = 120;
@@ -495,13 +496,18 @@
 				target = cornerTarget(p); setRole = true;
 			} else if (airMen.has(p)) {
 				target = airMen.get(p); setRole = true;
+			} else if ((p === chaser1 || autoChaser(p)) && ball.owner && ball.owner.team !== p.team && !inHands(ball.owner)) {
+				// Against a man on the ball he jockeys rather than diving in: goal-side, showing him away from
+				// goal, tight when a teammate is covering behind him, a stride off to delay him when he is alone.
+				const o = ball.owner, helped = players.some(q => q.team === p.team && q !== p && q.role !== "gk" && rel(p.team, q.x) < rel(p.team, o.x) && dist(q, o) < 130 * Math.sqrt(S));
+				target = goalSide(o, p.team, dist(p, o) > 70 ? 10 : helped ? 5 : 13);
 			} else if (p === chaser1 || autoChaser(p)) {
 				// Read a ball in the air: run to where it will come down (his own side's pass: perhaps to meet it at chest height).
 				target = ball.z > 0 ? (lastTouch === p.team ? meetPoint() : [ ball.landX, ball.landY ]) : [ ball.x + ball.vx * 6, ball.y + ball.vy * 6 ];
 			} else if (p === cover1) {
 				const own = { x: FW, y: FH / 2 };
 				const k = press[1] === "high" ? 0.12 : press[1] === "low" ? 0.45 : 0.3;
-				const in1 = press[1] === "high" ? dist(p, ball) < 220 * lv.press : press[1] === "low" ? dist(p, ball) < 90 * lv.press : rel(1, ball.x) < FW * 0.5 && dist(p, ball) < 160 * lv.press;
+				const in1 = dist(p, ball) < pressReach(1, ball.owner) * 0.55 * lv.press;
 				target = in1 ? goalSide(ball.owner || ball, 1, dist(p, ball) > 70 ? 14 : 6) : [ ball.x + (own.x - ball.x) * k, ball.y + (own.y - ball.y) * k ];
 			} else if (p === second1 || p === second0) {
 				target = goalSide(ball.owner || ball, p.team, 80 * Math.sqrt(S));
@@ -510,9 +516,7 @@
 				const k = press[0] === "high" ? 0.12 : press[0] === "low" ? 0.45 : 0.3;
 				// Your teammate presses like the computer does: if he's nearer the carrier than you, he goes.
 				const dp = dist(p, ball), nearer = dp < dist(human(), ball);
-				const goes = press[0] === "high" ? dp < 480 || nearer
-					: press[0] === "low" ? dp < 90 || (nearer && rel(0, ball.x) < FW * 0.35 && dp < 200)
-						: (nearer && dp < 380 * Math.sqrt(S)) || (rel(0, ball.x) < FW * 0.5 && dp < 200);
+				const reach = pressReach(0, ball.owner), goes = (nearer && dp < reach) || dp < reach * 0.55;
 				target = goes ? goalSide(ball.owner || ball, 0, dist(p, ball) > 70 ? 14 : 6) : [ ball.x + (own.x - ball.x) * k, ball.y + (own.y - ball.y) * k ];
 			} else if (marks1.has(p)) {
 				const q = marks1.get(p), qx = q.x + q.vx * 8, qy = q.y + q.vy * 8, gx = FW - qx, gy = FH / 2 - qy, gd = Math.hypot(gx, gy) || 1;
@@ -548,6 +552,7 @@
 				if (marks0.has(p) || marks1.has(p)) { effort = Math.max(effort, (off > 50 ? 1 : 0.82) * work); }
 				p.effort = (p.effort || effort) + (effort - (p.effort || effort)) * 0.1;   // no sudden gear changes
 				sprint = p.effort;
+				if (p.run && p.run.kind === "behind" && ours) { sprint = p.run.burst ? 1.05 : off > 30 ? Math.max(sprint, 0.97) : sprint; }   // up to the shoulder briskly, the burst flat out
 			}
 			// At a stoppage nobody sprints about: they walk into place, and jog only if well out.
 			if (setPiece && !diving && p !== setPiece.taker && p.role !== "gk") {
@@ -565,7 +570,7 @@
 			// Everyone reads the play at his own speed, so a side never slides across in lockstep.
 			const ours = ball.owner ? ball.owner.team === p.team : possTeam === p.team;
 			// The shape glides after the ball rather than chasing it; getting back is quicker than pushing on.
-			const k = ball.owner === p || p === chaser1 ? 1 : p === cover1 || p === cover0 || p === second1 || p === second0 ? 0.3 : (0.03 + ((p.idx * 7 + p.team * 3) % 5) * 0.012) * (ours ? 1 : 1.8);
+			const k = ball.owner === p || p === chaser1 ? 1 : p.run && p.run.kind === "behind" && ours ? (p.run.burst ? 0.3 : 0.15) : p === cover1 || p === cover0 || p === second1 || p === second0 ? 0.3 : (0.03 + ((p.idx * 7 + p.team * 3) % 5) * 0.012) * (ours ? 1 : 1.8);
 			p.tx += (target[0] - p.tx) * k;
 			p.ty += (target[1] - p.ty) * k;
 			const [ dvx, dvy ] = steer(p, diving ? target[0] : p.tx, diving ? target[1] : p.ty, BASE_SPD * spdMul * sprint, Math.hypot(target[0] - p.x, target[1] - p.y));
