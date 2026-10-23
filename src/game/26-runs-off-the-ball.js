@@ -122,7 +122,9 @@
 			let rr = rel(p.team, p.run.x), ry = p.run.y;
 			if (p.run.hold) {
 				// On the shoulder: level with the line less a stride, drifting into the channel.
-				rr = (offsideOn() ? offsideLine(p.team) : FW - 60 * S) - 10;
+				// (A man who times it badly drifts a yard or two beyond it while he waits: that is how most get caught.)
+				if (p.run.drift === undefined) { p.run.drift = Math.random() < 0.3 + (65 - A(p, "pac")) * 0.004 ? 8 + Math.random() * 26 : 0; }
+				rr = (offsideOn() ? offsideLine(p.team) : FW - 60 * S) - 10 + p.run.drift;
 				ry = p.y + (p.run.chY - p.y) * 0.5;
 			} else if (!p.run.burst && offsideOn()) { rr = Math.min(rr, offsideLine(p.team) - 8); }
 			return [ p.team === 0 ? rr : FW - rr, ry, p.run.burst ? "burst" : "run" ];
@@ -280,7 +282,9 @@
 	function throughBall (p) {
 		const t = p.team, pas = A(p, "pas"), line = offsideLine(t), eye = (tr(p, "playmaker") ? 0.25 : 0) + (pas - 65) * 0.012;
 		const base = { possession: 0.13, balanced: 0.2, direct: 0.27, counter: 0.32 }[style[t]] + 0.08 * edge(t);
-		if (openness(p) < 40 * Math.sqrt(S) || Math.random() > clamp(base + eye, 0.05, 0.85)) { return false; }
+		// A runner who has just gone is the cue: he looks for him at once (and is a beat late, or early, by his eye).
+		const fresh = outfield(t).some(m => m.run && m.run.burst && frame - m.run.burst < 16);
+		if (openness(p) < 40 * Math.sqrt(S) || Math.random() > clamp((fresh ? 0.6 : base * 0.7) + eye, 0.05, 0.9)) { return false; }
 		let best = null, bs = 0;
 		// How far beyond the line he will still play it: his eye for the line, and the beat he takes to
 		// release it while the runner keeps going (a weaker passer is later, and misjudges by more).
