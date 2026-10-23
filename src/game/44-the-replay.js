@@ -97,9 +97,10 @@
 		const bx = sw ? FW - ball.x : ball.x, by = ball.y, bh = Math.max(0, ball.z || 0) * Z3;
 		out.kind = "replay" + replay.angle;
 		if (replayPos() >= replay.len - rpTail()) {
-			// The end of it, in slow motion, from low behind the net: the ball comes at the lens and into the goal.
+			// The end of it, in slow motion, from the back of the net (the lens inside the goal, under the bar):
+			// the ball comes at the camera and into the goal. Further back, the boards and the net's frame were in the way.
 			out.kind = "replayGoal";
-			out.eye.set(gx + side * (NET + 16), 30, FH / 2 + (replay.shotY - FH / 2) * 0.25);
+			out.eye.set(gx + side * NET * 0.6, 22, FH / 2 + clamp((replay.shotY - FH / 2) * 0.25, -50, 50));
 			if (reduceMotion) { out.look.set(gx - side * 200, 10, FH / 2); } else { out.look.set(bx, 10 + bh * 0.6, by); }
 			out.fov = 38;
 			return out;
