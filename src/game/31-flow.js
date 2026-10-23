@@ -55,7 +55,9 @@
 			}
 		}
 		// The computer's line follows its press, and each club has its own way of tackling.
-		line[1] = press[1] === "high" ? "high" : press[1] === "low" ? "deep" : "normal";
+		// (A side that likes a low block starts in a mid block; it drops deep only when the game calls for it.)
+		if (press[1] === "low") { press[1] = "mid"; }
+		line[1] = press[1] === "high" ? "high" : "normal";
 		cpuTacBase = null;
 		tackling[1] = leagueMatch ? [ "normal", "hard", "careful", "normal" ][leagueMatch.opp % 4] : [ "careful", "normal", "hard" ][Math.floor(Math.random() * 3)];
 		moodZone = 0;

@@ -14,6 +14,7 @@ async function open (init) {
 	return { ctx, page };
 }
 
+if (!process.env.FF_LINE_ONLY) {
 // 1. Runs in behind and offside, over whole matches.
 let bursts = 0, thru = 0, off = 0, goals = 0, spread = [], spreadN = 0;
 for (let i = 0; i < N; i++) {
@@ -68,7 +69,36 @@ console.log(`high press: line at ${(100 * avg(hi, "depth")).toFixed(1)}%, stamin
 check("a high press holds its line higher than a low block", avg(hi, "depth") > avg(lo, "depth") + 0.04);
 check("a high press tires a side more than a low block", avg(hi, "sta") < avg(lo, "sta"));
 
-// 3. The instructions are saved with a match in progress and come back after a refresh.
+}
+
+// 3. Where the back line stands out of possession: the ball held at halfway (and then in the box) by one of
+// yours, standing still, for each line setting. Depth is the median defender's distance from his own goal.
+async function lineDepth (ln, at) {
+	const { ctx, page } = await open();
+	const r = await page.evaluate(([ ln, at ]) => {
+		const F = window.__ff, c = F.players[F.ctrl];
+		F.autoPilot = false; F.setLine(1, ln); F.pressI[1] = ln === "high" ? "high" : ln === "deep" ? "low" : "mid";
+		const x = F.FW * at, pin = () => { c.x = x; c.y = F.FH / 2; c.vx = c.vy = 0; c.kickCd = 5; F.ball.owner = c; F.ball.x = x + 8; F.ball.y = F.FH / 2; F.ball.vx = F.ball.vy = 0; F.possTeam = 0; };
+		let d = 0, n = 0;
+		for (let s = 0; s < 420; s++) {
+			F.setLine(1, ln); F.pressI[1] = ln === "high" ? "high" : ln === "deep" ? "low" : "mid";
+			pin(); F.step(1);
+			if (s >= 300) { const defs = F.players.filter(p => p.team === 1 && p.role === "def").map(p => (F.FW - p.x) / F.FW).sort((a, b) => a - b); d += defs[Math.floor(defs.length / 2)]; n++; }   // (the median man: the one pressing the ball is not the line)
+		}
+		return d / n;
+	}, [ ln, at ]);
+	await ctx.close();
+	return r;
+}
+const bands = { deep: [ 0.15, 0.21 ], normal: [ 0.25, 0.35 ], high: [ 0.39, 0.46 ] };
+for (const ln of [ "deep", "normal", "high" ]) {
+	const half = await lineDepth(ln, 0.5), box = await lineDepth(ln, 0.92);
+	console.log(`line ${ln}: ${half.toFixed(3)} with the ball at halfway, ${box.toFixed(3)} with it in the box`);
+	check(`a ${ln} line with the ball at halfway sits at ${bands[ln].join("-")} of the pitch`, half >= bands[ln][0] && half <= bands[ln][1], half.toFixed(3));
+	check(`a ${ln} line drops toward the six-yard box with the ball in the box`, box < 0.085 && box < half, box.toFixed(3));
+}
+
+// 4. The instructions are saved with a match in progress and come back after a refresh.
 {
 	const ctx = await browser.newContext({ viewport: { width: 1000, height: 700 } });
 	await ctx.addInitScript(() => { try { if (!sessionStorage.getItem("seen")) { localStorage.setItem("ff-diff", "normal"); localStorage.setItem("ff-mode", "friendly"); sessionStorage.setItem("seen", "1"); } } catch (e) { /* none */ } });

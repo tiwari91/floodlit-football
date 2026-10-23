@@ -19,7 +19,7 @@
 			const ln = offsideLine(t);
 			for (const p of mine) {
 				if (p.run || p === c || p === receiver || (p.runCd || 0) > frame || !(p.role === "fwd" || tr(p, "pace")) || ln - rel(t, p.x) > 40 * Math.sqrt(S) || rel(t, p.x) - ln > 2) { continue; }
-				if (Math.random() < 0.09) { p.run = { kind: "behind", hold: true, t0: frame, x: p.x, y: p.y, until: frame + 60, chY: channelY(p, t, p.y) }; tallyBy(p, "behind"); }
+				if (Math.random() < 0.03) { p.run = { kind: "behind", hold: true, t0: frame, x: p.x, y: p.y, until: frame + 60, chY: channelY(p, t, p.y) }; tallyBy(p, "behind"); }
 			}
 		}
 		const rp = runPlan[t];
@@ -280,22 +280,23 @@
 	// second. The passer judges the runner onside to within his eye (a weaker passer misreads the line
 	// by more, and so plays men offside), leads him into the space behind and weights it to meet him.
 	// How far beyond the line a passer will still pick a man out, misjudging it: by more the weaker his passing.
-	const lineEye = p => Math.max(8, 40 - (A(p, "pas") - 60) * 0.9) * Math.random();
+	const lineEye = p => Math.max(8, 40 - (A(p, "pas") - 60) * 0.9) * Math.random() * Math.random();
 	function throughBall (p) {
 		const t = p.team, pas = A(p, "pas"), line = offsideLine(t), eye = (tr(p, "playmaker") ? 0.25 : 0) + (pas - 65) * 0.012;
 		const base = { possession: 0.13, balanced: 0.2, direct: 0.27, counter: 0.32 }[style[t]] + 0.08 * edge(t);
 		// A runner who has just gone is the cue: he looks for him at once (and is a beat late, or early, by his eye).
 		const fresh = outfield(t).some(m => m.run && m.run.burst && frame - m.run.burst < 16);
-		if (openness(p) < 40 * Math.sqrt(S) || Math.random() > clamp((fresh ? 0.6 : base * 0.7) + eye, 0.05, 0.9)) { return false; }
+		if (openness(p) < 40 * Math.sqrt(S) || Math.random() > clamp((fresh ? 0.2 : base * 0.25) + eye * 0.5, 0.03, 0.6)) { return false; }
 		let best = null, bs = 0;
 		// How far beyond the line he will still play it: his eye for the line, and the beat he takes to
 		// release it while the runner keeps going (a weaker passer is later, and misjudges by more).
-		const misread = Math.max(10, 56 - (pas - 60) * 1.2) * Math.random();
+		const misread = Math.max(8, 46 - (pas - 60) * 1.2) * Math.random();
 		for (const m of outfield(t)) {
 			if (m === p || m.role === "gk") { continue; }
 			const lag = clamp(8 + (80 - pas) * 0.8, 4, 22) * Math.random(), off = rel(t, m.x) - line - Math.max(0, (t === 0 ? m.vx : -m.vx)) * lag, burst = m.run && m.run.burst && frame - m.run.burst < 60;
 			if (off > misread || (!burst && !(m.role === "fwd" || tr(m, "pace"))) || (!burst && line - rel(t, m.x) > 90)) { continue; }
 			if (rel(t, m.x) < rel(t, p.x) + 40 || dist(p, m) > 560 * Math.sqrt(S)) { continue; }
+			if (openness(m) < 45 * Math.sqrt(S)) { continue; }
 			const s = (burst ? 1.2 : 0.4) + openness(m) / 150 + Math.hypot(m.vx, m.vy) / 6;
 			if (s > bs) { bs = s; best = m; }
 		}
