@@ -14,12 +14,13 @@
 		const pool = [ "gk", "def", "def", "mid", "mid", "fwd", "fwd" ], out = [];
 		for (const [ region, m ] of Object.entries(MARKETS)) {
 			for (let k = 0; k < m.n; k++) {
-				const pl = genPlayer(pool[Math.floor(Math.random() * pool.length)], m.lo + Math.floor(Math.random() * (m.hi - m.lo + 1)));
-				const nats = natsOf(region);
-				pl.nat = nats[Math.floor(Math.random() * nats.length)];
-				pl.age = 18 + Math.floor(Math.random() * 15);
+				// He plays the game of his club's country, with a little of his own (05a).
+				const nats = natsOf(region), nat = nats[Math.floor(Math.random() * nats.length)], from = m.clubs[Math.floor(Math.random() * m.clubs.length)];
+				const lg = region === "home" ? HOME_NAT : MARKET_CLUB_NAT[from] || nat;
+				const pl = genPlayer(pool[Math.floor(Math.random() * pool.length)], m.lo + Math.floor(Math.random() * (m.hi - m.lo + 1)), null, Math.random, { lg, nat });
+				pl.age = styleAge(18 + Math.floor(Math.random() * 15), lg);
 				pl.pot = clamp(ovrOf(pl) + Math.max(0, 27 - pl.age) * 1.5 + Math.floor(Math.random() * 6), ovrOf(pl), 94);
-				pl.region = region; pl.from = m.clubs[Math.floor(Math.random() * m.clubs.length)];
+				pl.region = region; pl.from = from;
 				pl.ask = Math.max(0.2, round1(valueOf(pl) * m.mult * (0.9 + Math.random() * 0.25)));
 				pl.contract = 3; pl.morale = 75; pl.bids = 0;
 				out.push(pl);

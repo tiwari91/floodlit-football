@@ -19,9 +19,11 @@
 			if (mine >= 0 && Math.random() < 0.5) { pl = c.market.splice(mine, 1)[0]; from = pl.from || "abroad"; fee = askOf(pl); }
 			else {
 				const regions = Object.keys(MARKETS), region = regions[Math.floor(Math.random() * regions.length)], m = MARKETS[region];
-				pl = genPlayer(pos, clamp(cpuOvr(str) + Math.floor(Math.random() * 7) - 1, 50, 92));
-				const nats = natsOf(region); pl.nat = nats[Math.floor(Math.random() * nats.length)]; pl.age = 19 + Math.floor(Math.random() * 13);
-				from = m.clubs[Math.floor(Math.random() * m.clubs.length)]; fee = round1(valueOf(pl) * m.mult);
+				const nats = natsOf(region), nat = nats[Math.floor(Math.random() * nats.length)];
+				from = m.clubs[Math.floor(Math.random() * m.clubs.length)];
+				const lg = region === "home" ? leagueNat() : MARKET_CLUB_NAT[from] || nat;   // schooled where he played (05a)
+				pl = genPlayer(pos, clamp(cpuOvr(str) + Math.floor(Math.random() * 7) - 1, 50, 92), null, Math.random, { lg, nat });
+				pl.age = styleAge(19 + Math.floor(Math.random() * 13), lg); fee = round1(valueOf(pl) * m.mult);
 			}
 			const keep = { name: pl.name, pos: pl.pos, pac: pl.pac, sho: pl.sho, pas: pl.pas, def: pl.def, age: pl.age, nat: pl.nat };
 			if (typeof carryEdits === "function") { carryEdits(pl, keep); }   // an edited player keeps his edits (18g)

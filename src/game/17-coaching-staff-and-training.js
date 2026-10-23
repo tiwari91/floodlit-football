@@ -701,8 +701,8 @@
 	function cpuSquad (clubId, str) {
 		let h = (clubId * 7919 + (league ? league.season : 1) * 104729) % 2147483647 || 1;
 		const rnd = () => { h = (h * 48271) % 2147483647; return h / 2147483647; };
-		const base = cpuOvr(str);
-		const sq = POS_OF_SLOT.map((pos, i) => genPlayer(pos, base + Math.round((rnd() * 2 - 1) * 4) + (i === 9 || i === 2 ? 3 : 0), null, rnd));
+		const base = cpuOvr(str), nat = clubNat(clubId), sp = styleOf(nat).sp;   // the club plays its country's game (05a)
+		const sq = POS_OF_SLOT.map((pos, i) => genPlayer(pos, base + Math.round((rnd() * 2 - 1) * 4 * sp) + (i === 9 || i === 2 ? 3 : 0), null, rnd, { lg: nat }));
 		if (typeof editCpuSquad === "function") { editCpuSquad(clubId, sq); }   // names edited by slot (18g)
 		// This season's signings, from the transfer windows, take their places.
 		const ins = league && league.cpuIn && league.cpuIn[clubId];

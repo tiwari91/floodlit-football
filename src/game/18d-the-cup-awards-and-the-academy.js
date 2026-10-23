@@ -122,9 +122,8 @@
 	function academyProspect () {
 		const pos = [ "gk", "def", "def", "mid", "mid", "fwd" ][Math.floor(Math.random() * 6)];
 		const coach = typeof staffLvl === "function" && league ? staffLvl(league.club, "youth") || 0 : 0;
-		const pl = genPlayer(pos, 46 + Math.floor(Math.random() * 10));
+		const pl = genPlayer(pos, 46 + Math.floor(Math.random() * 10), null, Math.random, { nat: localNat() });
 		pl.age = 16 + Math.floor(Math.random() * 2); pl.pot = Math.min(92, 64 + Math.floor(Math.random() * 20) + coach * 2); pl.contract = 3; pl.role = "prospect";
-		pl.nat = natsOf("home")[Math.floor(Math.random() * Math.min(4, natsOf("home").length))];
 		pl.morale = 75;
 		return ensurePlayer(pl);
 	}

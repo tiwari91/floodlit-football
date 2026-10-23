@@ -381,8 +381,8 @@
 	}
 	// A youngster from the academy, for when a position would otherwise be empty.
 	function youthPlayer (pos) {
-		const pl = genPlayer(pos, 50 + Math.floor(Math.random() * 6));
-		pl.age = 17 + Math.floor(Math.random() * 2); pl.pot = 66 + Math.floor(Math.random() * 18); pl.contract = 3; pl.role = "prospect"; pl.nat = natsOf("home")[Math.floor(Math.random() * 4)];
+		const pl = genPlayer(pos, 50 + Math.floor(Math.random() * 6), null, Math.random, { nat: localNat() });
+		pl.age = 17 + Math.floor(Math.random() * 2); pl.pot = 66 + Math.floor(Math.random() * 18); pl.contract = 3; pl.role = "prospect";
 		return pl;
 	}
 	// Eleven starters and a bench of at most seven, a keeper among them: fill any gap from the academy.

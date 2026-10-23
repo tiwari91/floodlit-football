@@ -127,7 +127,8 @@
 		const [ color, color2 ] = palette[hashStr(offer.name) % palette.length];
 		Object.assign(YOU, { name: offer.name, short: offer.name.split(" ")[0], color, color2, ground: `${offer.name} Stadium`, surface: offer.abroad === "europe" ? "grass" : "turf" });
 		const nats = natsOf(offer.abroad), base = cpuOvr(offer.str), c = inheritSetup(newClub(), lg.club, offer.str);
-		const pick = (pos, i) => { const pl = genPlayer(pos, base + ((i * 7) % 5) - 2); pl.nat = i % 3 ? offer.nat : nats[(i * 3 + 1) % nats.length]; pl.contract = 2 + (i % 2); return pl; };   // mostly locals
+		const lgNat = NAT_STYLE[offer.nat] ? offer.nat : HOME_NAT;   // the new league's game (05a); its country is set only below
+		const pick = (pos, i) => { const pl = genPlayer(pos, base + ((i * 7) % 5) - 2, null, Math.random, { lg: lgNat, nat: i % 3 ? offer.nat : nats[(i * 3 + 1) % nats.length] }); pl.contract = 2 + (i % 2); return pl; };   // mostly locals
 		c.squad = POS_OF_SLOT.map((pos, i) => pick(pos, i)); c.bench = BENCH_POS.map((pos, i) => pick(pos, i + POS_OF_SLOT.length));
 		c.budget = offer.budget; c.autoRotate = lg.club.autoRotate; c.scoutLeft = 2;
 		c.log = [ `You moved abroad: ${offer.name}, ${country}, from ${from} (budget ${money(offer.budget)})` ];

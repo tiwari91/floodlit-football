@@ -279,7 +279,7 @@
 		if (slot < 0) { return -1; }
 		const T = TEAMS[slot], orig = {};
 		for (const k of GUEST_KEYS) { orig[k] = T[k]; }
-		lg.contGuest = { slot, key: c.name, orig, str: lg.clubStr ? lg.clubStr[slot] : T.str };
+		lg.contGuest = { slot, key: c.name, nat: c.nat, orig, str: lg.clubStr ? lg.clubStr[slot] : T.str };   // nat: it plays its country's game (05a)
 		Object.assign(T, { name: c.name, short: c.short || c.name, color: c.color, color2: c.color2, text: textFor(c.color), ink: lum(c.color) > 0.55 ? "#1b2420" : "#ffffff", ground: c.ground, surface: "grass", pattern: undefined });
 		if (lg.clubStr) { lg.clubStr[slot] = c.str; }
 		return slot;
