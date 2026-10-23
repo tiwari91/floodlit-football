@@ -7,8 +7,10 @@
 	}
 
 	function dotFor (t) {
+		// The club's own kit: the shirt with a wedge of its second colour.
 		const d = el("span", "dot");
-		d.style.background = t.color;
+		d.style.background = t.color2 && t.color2 !== t.color ? `linear-gradient(135deg, ${t.color} 0 58%, ${t.color2} 58% 100%)` : t.color;
+		d.dataset.kit = t.color;
 		return d;
 	}
 

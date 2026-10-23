@@ -22,7 +22,7 @@
 	const HAIR_SHADES = [ "#1b1410", "#3b2616", "#6b4424", "#a0703a", "#d8b46a", "#2a2a2a" ];
 	const HAIR_NAMES = [ "Black", "Dark brown", "Brown", "Light brown", "Blond", "Dark grey" ];
 	const RATING_KEYS = [ "pac", "sho", "pas", "def", "dri", "phy" ], RATING_MIN = 30, RATING_MAX = 96;
-	const CLUB_EDIT_KEYS = [ "name", "short", "color", "color2", "ground", "manager", "managerNat" ], CLUB_SET_KEYS = [ ...CLUB_EDIT_KEYS, "text", "ink" ];
+	const CLUB_EDIT_KEYS = [ "name", "short", "color", "color2", "ground", "manager", "managerNat" ], CLUB_SET_KEYS = [ ...CLUB_EDIT_KEYS, "text", "ink", "pattern" ];
 	const PLAYER_EDIT_KEYS = [ "name", "nat", "shirt", "foot", "pos", "lk", "age", "trait", ...RATING_KEYS ];
 	const BAD_KEYS = new Set([ "__proto__", "constructor", "prototype" ]);
 	const own = (o, k) => !!o && typeof o === "object" && Object.prototype.hasOwnProperty.call(o, k);
@@ -145,6 +145,7 @@
 			const base = pick(t, CLUB_SET_KEYS);
 			Object.assign(t, own(fc, t.name) ? fc[t.name] : {}, own(e.clubs, t.name) ? e.clubs[t.name] : {});
 			if (t.color !== base.color) { t.text = textFor(t.color); t.ink = lum(t.color) > 0.55 ? "#1b2420" : "#ffffff"; }
+			if (t.color !== base.color || t.color2 !== base.color2) { t.pattern = "plain"; }   // its own colours, not the game's stripes or hoops in them
 			clubOverlay.set(t, { base, applied: pick(t, CLUB_SET_KEYS) });
 		}
 		for (const [ r, m ] of Object.entries(MARKETS)) {

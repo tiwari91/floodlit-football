@@ -8,25 +8,40 @@
 	const outfield = t => players.filter(p => p.team === t && p.role !== "gk");
 
 	const YOU_HOME_KIT = { outfield: "#f2b52e", second: "#1f2a36", gk: "#7ec8e3", ink: "#1d1604", pattern: "plain" };
-	const YOU_AWAY_KIT = { outfield: "#f4f4f4", second: "#1f2a36", gk: "#7ec8e3", ink: "#1b2420", pattern: "plain" };
+	// Your kit is your club's own colours (an edit, an option file or a move abroad can change them);
+	// the amber default keeps its dark number ink.
+	function yourKit () {
+		const shirt = YOU.color || YOU_HOME_KIT.outfield, second = YOU.color2 || YOU_HOME_KIT.second;
+		if (shirt === YOU_HOME_KIT.outfield && second === YOU_HOME_KIT.second) { return { ...YOU_HOME_KIT }; }
+		return { outfield: shirt, second, gk: YOU.gk || YOU_HOME_KIT.gk, ink: lum(shirt) > 0.55 ? "#1b2420" : "#ffffff", pattern: YOU.pattern || "plain" };
+	}
+	// The away side's change shirt on a clash: its own second colour when that stands apart from the
+	// home shirt, otherwise whichever of a few plain change kits stands out most.
+	const CHANGE_SHIRTS = [ "#f4f4f4", "#15171a", "#1d4fa0", "#6b2d8a", "#155e3a", "#8fc3e6" ];
 	let leftIsYou = true;   // the scoreboard lists the home side first
 	function setOpponent (o, youHome = true) {
 		opp = o;
 		// Kits are compared as people see them (CIE ΔE), and on a clash the AWAY side changes,
 		// as in the real rules: them at your ground, you at theirs.
-		const you = { ...YOU_HOME_KIT };
+		const you = yourKit();
 		let shirt = o.color, trim = o.color2 || "#ffffff", pattern = o.pattern || "plain";
 		const best = (cands, score) => cands.reduce((a, b) => (score(b) > score(a) ? b : a));
+		// A club's own second kit is worn if it reads clearly against the home shirt (ΔE 50: light against
+		// dark, or two distinct hues); only a second colour that is close as well falls back to a plain change.
+		const change = (second, against) => (second && deltaE(second, against) >= 50 ? second : best([ second || "#f4f4f4", ...CHANGE_SHIRTS ], c => deltaE(c, against)));
 		if (deltaE(shirt, you.outfield) < 72) {
 			if (youHome) {
-				// Their change shirt: whichever stands out most against amber (and its shorts to match).
-				shirt = best([ o.color2 || "#f4f4f4", "#f4f4f4", "#15171a", "#1d4fa0", "#6b2d8a", "#155e3a" ], c => deltaE(c, you.outfield));
-				trim = lum(shirt) > 0.5 ? "#1f2a36" : "#f4f4f4";
+				// Their change kit: their second colour as the shirt, their first as the shorts when it reads.
+				const first = shirt;
+				shirt = change(o.color2, you.outfield);
+				trim = shirt === o.color2 && deltaE(first, shirt) >= 25 ? first : lum(shirt) > 0.5 ? "#1f2a36" : "#f4f4f4";
 				pattern = "plain";
 			} else {
-				you.outfield = best([ "#f4f4f4", "#1f2a36", "#8fc3e6", "#15171a" ], c => deltaE(c, shirt));
-				you.second = lum(you.outfield) > 0.5 ? "#1f2a36" : "#f2b52e";
+				const first = you.outfield;
+				you.outfield = change(YOU.color2 || YOU_HOME_KIT.second, shirt);
+				you.second = you.outfield === (YOU.color2 || YOU_HOME_KIT.second) && deltaE(first, you.outfield) >= 25 ? first : lum(you.outfield) > 0.5 ? "#1f2a36" : "#f2b52e";
 				you.ink = lum(you.outfield) > 0.55 ? "#1b2420" : "#ffffff";
+				you.pattern = "plain";
 			}
 		}
 		// Kit contrast: the other side plays in white (or black when you are in white), which reads
@@ -51,6 +66,8 @@
 		KITS[1] = { outfield: shirt, second: trim, gk, ink: lum(shirt) > 0.55 ? "#1b2420" : "#ffffff", pattern };
 		document.documentElement.style.setProperty("--opp", shirt);
 		document.documentElement.style.setProperty("--opp-text", textFor(shirt));
+		document.documentElement.style.setProperty("--you-kit", you.outfield);
+		document.documentElement.style.setProperty("--you-text", textFor(you.outfield));
 		leftIsYou = youHome;
 		$("homeName").textContent = youHome ? "You" : o.short;
 		$("awayName").textContent = youHome ? o.short : "You";
