@@ -578,7 +578,11 @@
 		border-top: 1px solid var(--rule);
 	}
 
-	.lg-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
+	.lg-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
+	.lg-head .lg-meta { align-self: center; }
+	.lg-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px 8px; }
+	.lg-actions button { height: 32px; box-sizing: border-box; padding-top: 0; padding-bottom: 0; line-height: 1; white-space: nowrap; }
+	@media (max-width: 760px) { .lg-actions { justify-content: flex-start; } .lg-head .spacer { display: none; } }
 
 	.lg-head h3 {
 		margin: 0;
@@ -649,6 +653,10 @@
 	.lg-round h4, .lg-fc h4 { margin: 0 0 6px; }
 	.lg-fc h4 { font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 10px; }
 	.lg-fc .rainy { color: #8fb4d8; letter-spacing: 0.06em; }
+	.lg-drama h4 { margin: 0 0 6px; font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+	.lg-drama .detail { margin: 0 0 6px; font-size: 13px; }
+	.lg-drama .fine { margin: 0; }
+	.lg-drama ul { font-size: 13px; }
 	.lg-up h4 { margin: 0 0 6px; font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
 	.upcoming { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
 	.upcoming li { display: grid; grid-template-columns: 24px 22px 11px minmax(0, 1fr) auto; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
@@ -985,13 +993,14 @@
 	}
 	.baractions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
 	#pauseBtn { border-color: var(--amber); color: var(--amber); min-width: 6em; }
-	.bargroups { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr)); gap: 10px; align-items: start; }
+	.bargroups { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr)); gap: 10px; align-items: stretch; }
 
 	.bargroup {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
 		gap: 8px 12px;
+		align-content: flex-start;
 		padding: 10px 12px 12px;
 		background: var(--panel);
 		border: 1px solid var(--rule);
@@ -999,6 +1008,13 @@
 	}
 
 	.bargroup .eyebrow { flex-basis: 100%; }
+	/* The view and sound cards: a label column and a controls column, one setting (or one group of toggles) a row. */
+	.bargroup.rows { display: grid; grid-template-columns: minmax(6.5em, max-content) minmax(0, 1fr); align-items: center; gap: 8px 14px; align-content: start; }
+	.bargroup.rows .eyebrow { grid-column: 1 / -1; }
+	.row-label { color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; }
+	.row-ctl { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; min-width: 0; }
+	.bargroup button, .bargroup select { height: 32px; box-sizing: border-box; line-height: 1; }
+	.bargroup select { padding-top: 0; padding-bottom: 0; font-size: 13px; }
 	.bargroup button { padding: 6px 10px; font-size: 13px; }
 	.bargroup button[aria-pressed="true"]:not(#camBtn) { border-color: #3f8f5a; box-shadow: inset 3px 0 0 #3f8f5a; }
 	/* Every on/off toggle carries a state dot: filled green when on, a hollow ring and muted text when off. */
@@ -1440,17 +1456,20 @@
 				</select>
 			</label>
 			</div>
-			<div class="bargroup" role="group" aria-labelledby="bgView">
+			<div class="bargroup rows" role="group" aria-labelledby="bgView">
 			<span class="eyebrow" id="bgView">Controls and view</span>
-			<label class="field" for="autoswitch">Auto switch
+			<label class="row-label" for="autoswitch">Auto switch</label>
+			<div class="row-ctl">
 				<select id="autoswitch">
 					<option value="assisted" selected>Assisted</option>
 					<option value="manual">Manual only</option>
 					<option value="aggressive">Aggressive</option>
 				</select>
-			</label>
-			<button id="camBtn" type="button" aria-pressed="false" title="Camera (C): click to cycle overhead, TV and 3D">Camera: overhead</button>
-			<label class="field" for="gfx" title="How much the 3D view draws: crowd density and detail, floodlight shadows, sharpness and smoothing. Light also draws 30 frames a second, for a laptop that runs warm">Graphics
+			</div>
+			<span class="row-label">Camera</span>
+			<div class="row-ctl"><button id="camBtn" type="button" aria-pressed="false" title="Camera (C): click to cycle overhead, TV and 3D">Camera: overhead</button></div>
+			<label class="row-label" for="gfx" title="How much the 3D view draws: crowd density and detail, floodlight shadows, sharpness and smoothing. Light also draws 30 frames a second, for a laptop that runs warm">Graphics</label>
+			<div class="row-ctl">
 				<select id="gfx">
 					<option value="auto">Auto</option>
 					<option value="light">Light (cooler laptop)</option>
@@ -1458,17 +1477,29 @@
 					<option value="medium">Medium</option>
 					<option value="high">High</option>
 				</select>
-			</label>
+			</div>
+			<span class="row-label">Display</span>
+			<div class="row-ctl">
 			<button id="hintsBtn" type="button" aria-pressed="true" title="On-screen key hints and coaching tips">Hints on</button>
 			<button id="mapBtn" type="button" aria-pressed="true" title="A small radar of the whole pitch in the corner">Minimap on</button>
+			</div>
+			<span class="row-label">Pitch</span>
+			<div class="row-ctl">
 			<button id="bigBtn" type="button" aria-pressed="false" title="Big pitch (F): the ground fills the screen, the menu hides behind Show menu">Big pitch off</button>
 			<button id="contrastBtn" type="button" aria-pressed="false" title="High-contrast kits: the other side plays in white or black, with a dashed ring, so the teams never blur together">Kit contrast off</button>
 			</div>
-			<div class="bargroup" role="group" aria-labelledby="bgSound">
+			</div>
+			<div class="bargroup rows" role="group" aria-labelledby="bgSound">
 			<span class="eyebrow" id="bgSound">Sound and rules</span>
+			<span class="row-label">Sound</span>
+			<div class="row-ctl" id="soundRow">
 			<button id="soundBtn" type="button" aria-pressed="true" title="All sound: crowd, whistle and effects">Sound on</button>
 			<button id="musicBtn" type="button" aria-pressed="true" title="Club songs and menu music">Music on</button>
-			<button id="offsideBtn" type="button" aria-pressed="true" title="Play the offside rule">Offside on</button>
+			</div>
+			<label class="row-label" for="musicVol">Music volume</label>
+			<div class="row-ctl" id="musicVolRow"></div>
+			<span class="row-label">Rules</span>
+			<div class="row-ctl"><button id="offsideBtn" type="button" aria-pressed="true" title="Play the offside rule">Offside on</button></div>
 			</div>
 		</div>
 	</div>
@@ -1478,11 +1509,13 @@
 			<h3 id="lgDivName">Premier Division</h3>
 			<span class="lg-meta" id="lgMeta">Season 1</span>
 			<span class="spacer"></span>
+			<div class="lg-actions">
 			<span class="lg-sync" id="lgSync">Saved in this browser</span>
 			<button type="button" id="lgNew">New season</button>
 			<button type="button" id="lgExport" title="Save your season to a file you can keep or move to another device">Export league</button>
 			<button type="button" id="lgImport" title="Load a season from an exported file">Import league</button>
 			<button type="button" id="lgEdit" title="Rename clubs, kits and players, and share your edits as an option file">Edit names</button>
+			</div>
 			<input type="file" id="lgFile" accept=".json,application/json" hidden>
 		</div>
 		<div class="lg-grid">
@@ -12589,14 +12622,13 @@
 		musicVol = VOLUMES[store.get("ff-music-vol")] ? store.get("ff-music-vol") : "normal";
 		trackNext = (Number(store.get("ff-track")) || 0) % TRACKS.length;
 		if ($("musicVol") || !$("musicBtn")) { return; }
-		const label = document.createElement("label"), sel = document.createElement("select");
-		label.className = "field"; label.htmlFor = "musicVol"; label.textContent = "Music volume ";
-		sel.id = "musicVol";
+		const sel = document.createElement("select");
+		sel.id = "musicVol"; sel.setAttribute("aria-label", "Music volume");
 		for (const [ k, [ name ] ] of Object.entries(VOLUMES)) { const o = document.createElement("option"); o.value = k; o.textContent = name; sel.append(o); }
 		sel.value = musicVol;
 		sel.addEventListener("change", () => setMusicVol(sel.value));
-		label.append(sel);
-		$("musicBtn").after(label);
+		const row = $("musicVolRow");
+		if (row) { row.append(sel); } else { $("musicBtn").after(sel); }
 	}
 	function pad (t, notes, dur, gain) {   // a soft, slow pad: a triangle and a detuned sine per note
 		const g = audio.createGain(), f = audio.createBiquadFilter();

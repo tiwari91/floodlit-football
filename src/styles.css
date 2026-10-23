@@ -557,7 +557,11 @@
 		border-top: 1px solid var(--rule);
 	}
 
-	.lg-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
+	.lg-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
+	.lg-head .lg-meta { align-self: center; }
+	.lg-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px 8px; }
+	.lg-actions button { height: 32px; box-sizing: border-box; padding-top: 0; padding-bottom: 0; line-height: 1; white-space: nowrap; }
+	@media (max-width: 760px) { .lg-actions { justify-content: flex-start; } .lg-head .spacer { display: none; } }
 
 	.lg-head h3 {
 		margin: 0;
@@ -628,6 +632,10 @@
 	.lg-round h4, .lg-fc h4 { margin: 0 0 6px; }
 	.lg-fc h4 { font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 10px; }
 	.lg-fc .rainy { color: #8fb4d8; letter-spacing: 0.06em; }
+	.lg-drama h4 { margin: 0 0 6px; font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+	.lg-drama .detail { margin: 0 0 6px; font-size: 13px; }
+	.lg-drama .fine { margin: 0; }
+	.lg-drama ul { font-size: 13px; }
 	.lg-up h4 { margin: 0 0 6px; font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
 	.upcoming { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
 	.upcoming li { display: grid; grid-template-columns: 24px 22px 11px minmax(0, 1fr) auto; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
@@ -964,13 +972,14 @@
 	}
 	.baractions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
 	#pauseBtn { border-color: var(--amber); color: var(--amber); min-width: 6em; }
-	.bargroups { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr)); gap: 10px; align-items: start; }
+	.bargroups { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr)); gap: 10px; align-items: stretch; }
 
 	.bargroup {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
 		gap: 8px 12px;
+		align-content: flex-start;
 		padding: 10px 12px 12px;
 		background: var(--panel);
 		border: 1px solid var(--rule);
@@ -978,6 +987,13 @@
 	}
 
 	.bargroup .eyebrow { flex-basis: 100%; }
+	/* The view and sound cards: a label column and a controls column, one setting (or one group of toggles) a row. */
+	.bargroup.rows { display: grid; grid-template-columns: minmax(6.5em, max-content) minmax(0, 1fr); align-items: center; gap: 8px 14px; align-content: start; }
+	.bargroup.rows .eyebrow { grid-column: 1 / -1; }
+	.row-label { color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; }
+	.row-ctl { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; min-width: 0; }
+	.bargroup button, .bargroup select { height: 32px; box-sizing: border-box; line-height: 1; }
+	.bargroup select { padding-top: 0; padding-bottom: 0; font-size: 13px; }
 	.bargroup button { padding: 6px 10px; font-size: 13px; }
 	.bargroup button[aria-pressed="true"]:not(#camBtn) { border-color: #3f8f5a; box-shadow: inset 3px 0 0 #3f8f5a; }
 	/* Every on/off toggle carries a state dot: filled green when on, a hollow ring and muted text when off. */

@@ -503,14 +503,13 @@
 		musicVol = VOLUMES[store.get("ff-music-vol")] ? store.get("ff-music-vol") : "normal";
 		trackNext = (Number(store.get("ff-track")) || 0) % TRACKS.length;
 		if ($("musicVol") || !$("musicBtn")) { return; }
-		const label = document.createElement("label"), sel = document.createElement("select");
-		label.className = "field"; label.htmlFor = "musicVol"; label.textContent = "Music volume ";
-		sel.id = "musicVol";
+		const sel = document.createElement("select");
+		sel.id = "musicVol"; sel.setAttribute("aria-label", "Music volume");
 		for (const [ k, [ name ] ] of Object.entries(VOLUMES)) { const o = document.createElement("option"); o.value = k; o.textContent = name; sel.append(o); }
 		sel.value = musicVol;
 		sel.addEventListener("change", () => setMusicVol(sel.value));
-		label.append(sel);
-		$("musicBtn").after(label);
+		const row = $("musicVolRow");
+		if (row) { row.append(sel); } else { $("musicBtn").after(sel); }
 	}
 	function pad (t, notes, dur, gain) {   // a soft, slow pad: a triangle and a detuned sine per note
 		const g = audio.createGain(), f = audio.createBiquadFilter();

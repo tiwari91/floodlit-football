@@ -195,17 +195,20 @@
 				</select>
 			</label>
 			</div>
-			<div class="bargroup" role="group" aria-labelledby="bgView">
+			<div class="bargroup rows" role="group" aria-labelledby="bgView">
 			<span class="eyebrow" id="bgView">Controls and view</span>
-			<label class="field" for="autoswitch">Auto switch
+			<label class="row-label" for="autoswitch">Auto switch</label>
+			<div class="row-ctl">
 				<select id="autoswitch">
 					<option value="assisted" selected>Assisted</option>
 					<option value="manual">Manual only</option>
 					<option value="aggressive">Aggressive</option>
 				</select>
-			</label>
-			<button id="camBtn" type="button" aria-pressed="false" title="Camera (C): click to cycle overhead, TV and 3D">Camera: overhead</button>
-			<label class="field" for="gfx" title="How much the 3D view draws: crowd density and detail, floodlight shadows, sharpness and smoothing. Light also draws 30 frames a second, for a laptop that runs warm">Graphics
+			</div>
+			<span class="row-label">Camera</span>
+			<div class="row-ctl"><button id="camBtn" type="button" aria-pressed="false" title="Camera (C): click to cycle overhead, TV and 3D">Camera: overhead</button></div>
+			<label class="row-label" for="gfx" title="How much the 3D view draws: crowd density and detail, floodlight shadows, sharpness and smoothing. Light also draws 30 frames a second, for a laptop that runs warm">Graphics</label>
+			<div class="row-ctl">
 				<select id="gfx">
 					<option value="auto">Auto</option>
 					<option value="light">Light (cooler laptop)</option>
@@ -213,17 +216,29 @@
 					<option value="medium">Medium</option>
 					<option value="high">High</option>
 				</select>
-			</label>
+			</div>
+			<span class="row-label">Display</span>
+			<div class="row-ctl">
 			<button id="hintsBtn" type="button" aria-pressed="true" title="On-screen key hints and coaching tips">Hints on</button>
 			<button id="mapBtn" type="button" aria-pressed="true" title="A small radar of the whole pitch in the corner">Minimap on</button>
+			</div>
+			<span class="row-label">Pitch</span>
+			<div class="row-ctl">
 			<button id="bigBtn" type="button" aria-pressed="false" title="Big pitch (F): the ground fills the screen, the menu hides behind Show menu">Big pitch off</button>
 			<button id="contrastBtn" type="button" aria-pressed="false" title="High-contrast kits: the other side plays in white or black, with a dashed ring, so the teams never blur together">Kit contrast off</button>
 			</div>
-			<div class="bargroup" role="group" aria-labelledby="bgSound">
+			</div>
+			<div class="bargroup rows" role="group" aria-labelledby="bgSound">
 			<span class="eyebrow" id="bgSound">Sound and rules</span>
+			<span class="row-label">Sound</span>
+			<div class="row-ctl" id="soundRow">
 			<button id="soundBtn" type="button" aria-pressed="true" title="All sound: crowd, whistle and effects">Sound on</button>
 			<button id="musicBtn" type="button" aria-pressed="true" title="Club songs and menu music">Music on</button>
-			<button id="offsideBtn" type="button" aria-pressed="true" title="Play the offside rule">Offside on</button>
+			</div>
+			<label class="row-label" for="musicVol">Music volume</label>
+			<div class="row-ctl" id="musicVolRow"></div>
+			<span class="row-label">Rules</span>
+			<div class="row-ctl"><button id="offsideBtn" type="button" aria-pressed="true" title="Play the offside rule">Offside on</button></div>
 			</div>
 		</div>
 	</div>
@@ -233,11 +248,13 @@
 			<h3 id="lgDivName">Premier Division</h3>
 			<span class="lg-meta" id="lgMeta">Season 1</span>
 			<span class="spacer"></span>
+			<div class="lg-actions">
 			<span class="lg-sync" id="lgSync">Saved in this browser</span>
 			<button type="button" id="lgNew">New season</button>
 			<button type="button" id="lgExport" title="Save your season to a file you can keep or move to another device">Export league</button>
 			<button type="button" id="lgImport" title="Load a season from an exported file">Import league</button>
 			<button type="button" id="lgEdit" title="Rename clubs, kits and players, and share your edits as an option file">Edit names</button>
+			</div>
 			<input type="file" id="lgFile" accept=".json,application/json" hidden>
 		</div>
 		<div class="lg-grid">

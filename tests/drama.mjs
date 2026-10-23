@@ -11,6 +11,23 @@ page.on("console", m => { if (m.type() === "error" && !/GL Driver|ERR_NETWORK/.t
 await page.goto(URL); await page.waitForSelector("#ovButton");
 await page.waitForFunction(() => window.__ff && window.__ff.league && window.__ff.league.club, null, { timeout: 60000 });
 
+// Layout: the view and sound cards are a label column and a controls column, the same height side by side,
+// with every control the same height; the league header's buttons sit in one row.
+const layout = await page.evaluate(() => {
+	document.body.classList.add("more");
+	const box = e => e.getBoundingClientRect(), r1 = v => Math.round(v);
+	const cards = [ ...document.querySelectorAll(".bargroup.rows") ];
+	const cols = cards.map(c => ({ labels: new Set([ ...c.querySelectorAll(".row-label") ].map(e => r1(box(e).left))).size, ctls: new Set([ ...c.querySelectorAll(".row-ctl") ].map(e => r1(box(e).left))).size, rows: c.querySelectorAll(".row-label").length, ctlRows: c.querySelectorAll(".row-ctl").length }));
+	const heights = new Set([ ...document.querySelectorAll(".bargroup.rows button, .bargroup.rows select") ].filter(e => box(e).height > 0).map(e => r1(box(e).height)));
+	const tops = cards.map(c => r1(box(c).top)), hs = cards.map(c => r1(box(c).height));
+	const hb = [ ...document.querySelectorAll(".lg-actions button") ].map(b => ({ top: r1(box(b).top), h: r1(box(b).height) }));
+	return { n: cards.length, cols, heights: [ ...heights ], tops, hs, head: { tops: new Set(hb.map(b => b.top)).size, hs: new Set(hb.map(b => b.h)).size, n: hb.length } };
+});
+check("settings cards: one label column and one controls column each, every row labelled", layout.n === 2 && layout.cols.every(c => c.labels === 1 && c.ctls === 1 && c.rows === c.ctlRows), JSON.stringify(layout.cols));
+check("settings cards: every button and select the same height, the two cards level and the same height", layout.heights.length === 1 && layout.tops[0] === layout.tops[1] && layout.hs[0] === layout.hs[1], JSON.stringify(layout));
+check("league header: the four buttons in one row, the same height", layout.head.n === 4 && layout.head.tops === 1 && layout.head.hs === 1, JSON.stringify(layout.head));
+await page.evaluate(() => document.body.classList.remove("more"));
+
 // Every player has a temper, and the league a dressing room.
 const base = await page.evaluate(() => { const F = window.__ff, lg = F.league, all = [ ...lg.club.squad, ...lg.club.bench ]; return { room: lg.drama && lg.drama.room, tempers: all.every(p => Number.isFinite(p.temper) && p.temper >= 20 && p.temper < 90), spread: new Set(all.map(p => p.temper >= 75)).size }; });
 check("a new league has a dressing room and every player a temper", base.room === 70 && base.tempers, JSON.stringify(base));
