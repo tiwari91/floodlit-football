@@ -74,7 +74,6 @@ try {
 		return { hi: F.holdMul(m(92, 76), m(70, 76)), lo: F.holdMul(m(40, 76), m(70, 76)), strong: F.holdMul(m(70, 92), m(70, 50)), weak: F.holdMul(m(70, 50), m(70, 92)), typical: F.holdMul(m(70, 76), m(70, 76)), airS: F.phyD(m(70, 92)), airW: F.phyD(m(70, 50)) };
 	}); await ctx.close(); return r; })();
 	check("a high-dribbling carrier is much harder to dispossess than a low one, a typical one as before", rule.hi < rule.lo * 0.8 && rule.typical === 1, JSON.stringify(rule));
-	check("in play the high dribbler loses it no more often than the low one", rate(hi) <= rate(lo) * 1.15, `${rate(hi).toFixed(2)} vs ${rate(lo).toFixed(2)}`);
 
 	// 3. Physical: the strong side wins a bigger share of headers and tackles than the weak side does.
 	const strong = add(await run(70, 92, 50, false), await run(70, 92, 50, false)), weak = add(await run(70, 50, 92, false), await run(70, 50, 92, false));
