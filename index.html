@@ -2143,6 +2143,7 @@
 		if (!Array.isArray(lg.weather) || lg.weather.length !== lg.fixtures.length) { lg.weather = genForecast(lg.fixtures.length, lg.ident && lg.ident.country); }
 		if (!Array.isArray(lg.wind) || lg.wind.length !== lg.fixtures.length || !lg.wind.every(w => w && Number.isFinite(w.s) && Number.isFinite(w.a))) { lg.wind = genWind(lg.fixtures.length, lg.ident && lg.ident.country); }
 		if (!Array.isArray(lg.ko) || lg.ko.length !== lg.fixtures.length) { lg.ko = genKickoff(lg.fixtures.length, lg.ident && lg.ident.country); }
+		if (typeof ensureDrama === "function") { ensureDrama(lg); }   // older saves: no dressing room yet
 		return lg;
 	}
 
@@ -2848,6 +2849,7 @@
 		renderClubs();
 		renderShapes();
 		if (typeof renderExtras === "function") { renderExtras(); }
+		if (typeof renderDrama === "function") { renderDrama(); }
 	}
 
 	let clubsView = "div", openClub = null;
@@ -3144,6 +3146,7 @@
 		c.budget = Math.round((c.budget - wages + gate) * 1000) / 1000;
 		c.week = { wages: Math.round(wages * 1000) / 1000, gate: Math.round(gate * 1000) / 1000 };
 		if (typeof weeklyCoaching === "function") { weeklyCoaching(lm, played); }
+		if (typeof dramaAfterMatch === "function") { dramaAfterMatch(played, gf, ga); }
 	}
 	// A youngster from the academy, for when a position would otherwise be empty.
 	function youthPlayer (pos) {
@@ -3206,6 +3209,8 @@
 		const fee = terms ? terms.fee : round1(valueOf(pl) * 0.15);
 		if (lastSeason(pl)) { return { ok: false, why: `${pl.name} (${pl.age}) is retiring at the end of the season; there's no new deal to offer.` }; }
 		if (pl.morale < 40) { return { ok: false, why: `${pl.name} won't talk about a new contract while he's unhappy (morale ${pl.morale}).` }; }
+		const no = typeof renewRefusal === "function" ? renewRefusal(pl, c, terms) : null;
+		if (no) { return { ok: false, why: no.why, refusal: true }; }
 		if (c.budget + 1e-9 < fee) { return { ok: false, why: `A new deal for ${pl.name} needs a ${money(fee)} signing-on fee.` }; }
 		c.budget = round1(c.budget - fee);
 		pl.wage = Math.round(wageOf(pl) * (terms ? terms.rise : roleOf(pl, c) === "key" ? 1.2 : 1.1) * 1000) / 1000;
@@ -3573,6 +3578,8 @@
 		if (!pl || !windowOpen()) { return; }
 		const price = Number.isFinite(offer) ? offer : askOf(pl);
 		if (c.budget + 1e-9 < price || c.budget < 0) { return; }
+		const no = typeof signRefusal === "function" ? signRefusal(pl, c, price) : null;
+		if (no) { lastDeal = no.why; addIssue("signing", pl, no.why, { offer: no.offer }); afterClubChange(); return; }
 		const m = MARKETS[pl.region];
 		pl.adapt = m ? Math.max(0, m.adapt - staffLvl(c, "scout") * 0.5) : 0;
 		delete pl.ask; delete pl.bids; delete pl.from; delete pl.scouted;
@@ -3994,6 +4001,8 @@
 		if ((inSq < 0 && inB < 0) || !windowOpen()) { return; }
 		const pl = inSq >= 0 ? c.squad[inSq] : c.bench[inB];
 		if (inSq >= 0 && pl.pos === "gk" && ![ ...c.squad, ...c.bench ].some(q => q !== pl && q.pos === "gk")) { lastDeal = `Sign another keeper before you sell ${pl.name}.`; afterClubChange(); return; }
+		const no = typeof sellRefusal === "function" ? sellRefusal(pl, club) : null;
+		if (no) { lastDeal = no.why; afterClubChange(); return; }
 		if (inSq >= 0) { c.squad.splice(inSq, 1); } else { c.bench.splice(inB, 1); }
 		c.budget = round1(c.budget + fee);
 		league.bidsIn = (league.bidsIn || []).filter(b => b.name !== name);
@@ -4010,7 +4019,8 @@
 		lg.bidsIn = lg.bidsIn.filter(x => x !== b);
 		const pl = [ ...lg.club.squad, ...lg.club.bench ].find(p => p.name === name);
 		// A move to a bigger club turned down: he takes it badly.
-		if (pl && getStr(b.club) > yourStr()) { pl.morale = clamp(pl.morale - 8, 5, 100); lastDeal = `You turned down ${TEAMS[b.club].name} for ${name}; he wanted the move (morale ${pl.morale}).`; }
+		if (pl && pl.wantsOut) { pl.morale = clamp(pl.morale - 15, 5, 100); lastDeal = `You turned down ${TEAMS[b.club].name} for ${name}, and he'd asked to leave. He's furious (morale ${pl.morale}).`; }
+		else if (pl && getStr(b.club) > yourStr()) { pl.morale = clamp(pl.morale - 8, 5, 100); lastDeal = `You turned down ${TEAMS[b.club].name} for ${name}; he wanted the move (morale ${pl.morale}).`; }
 		else { lastDeal = `You turned down ${TEAMS[b.club].name}'s bid for ${name}.`; }
 		afterClubChange();
 	}
@@ -4237,7 +4247,7 @@
 		const order = lastYear.slice().sort((a, b) => plans.get(b).worth - plans.get(a).worth);
 		const sign = (pl, pn, terms) => {
 			const deal = renewDeal(pl, c, terms);
-			if (!deal.ok) { return false; }
+			if (!deal.ok) { if (deal.refusal && !rep.unsigned.some(u => u.name === pl.name)) { rep.unsigned.push({ name: pl.name, key: true, text: deal.why }); } return false; }
 			rep.renewed.push(`${who(pl)}: ${seasons(terms.years)} at ${wageWeek(pl.wage)}${terms.fee ? `, ${money(terms.fee)} to sign` : ", no signing-on fee and a bigger rise instead"}`);
 			done.push(`renewed ${pl.name} for ${seasons(terms.years)}`);
 			return true;
@@ -5047,6 +5057,261 @@
 		}
 		ac.append(ul);
 		box.append(ac);
+	}
+	/* ---------- the dressing room: rows, refusals and transfer requests ----------
+	   Players have tempers. A star left out, a man played out of position, a hammering or a run on
+	   the bench can each turn into a problem for you to deal with in the League panel, and every
+	   choice there changes his morale, the mood in the dressing room and his form. Players can also
+	   say no: to a new contract, to a move to a smaller club, or to a move a long way from home.
+	   Everything lives in league.drama and on the players, and old saves are filled in on load. */
+	const temperOf = pl => (pl && Number.isFinite(pl.temper) ? pl.temper : 20 + (hashStr(String(pl && pl.name) + "|temper") % 70));   // 20 to 89
+	const temperWord = t => (t >= 75 ? "Hot-headed" : t >= 55 ? "Fiery" : t >= 35 ? "Level-headed" : "Calm");
+	const DRAMA_KINDS = { dropped: 1, oop: 1, request: 1, row: 1, contract: 1, signing: 1 };
+	const ISSUE_CAP = 4;
+	const POS_WHERE = { def: "in defence", mid: "in midfield", fwd: "up front" }, POS_WHO = { gk: "keeper", def: "defender", mid: "midfielder", fwd: "forward" };
+	function ensureDrama (lg) {
+		if (!lg || typeof lg !== "object") { return null; }
+		const d = lg.drama && typeof lg.drama === "object" && !Array.isArray(lg.drama) ? lg.drama : {};
+		d.issues = Array.isArray(d.issues) ? d.issues.filter(i => i && typeof i === "object" && DRAMA_KINDS[i.kind] && typeof i.name === "string" && typeof i.text === "string") : [];
+		if (!Number.isFinite(d.room)) { d.room = 70; }
+		d.room = clamp(Math.round(d.room), 0, 100);
+		d.log = Array.isArray(d.log) ? d.log.filter(s => typeof s === "string").slice(-6) : [];
+		if (!Number.isFinite(d.seq)) { d.seq = 0; }
+		lg.drama = d;
+		const c = lg.club;
+		if (c && Array.isArray(c.squad)) {
+			const here = new Set([ ...c.squad, ...(c.bench || []) ].filter(Boolean).map(p => p.name));
+			d.issues = d.issues.filter(i => i.kind === "signing" || here.has(i.name));   // he has gone: so has the problem
+			for (const pl of [ ...c.squad, ...(c.bench || []) ]) {
+				if (!pl) { continue; }
+				if (!Number.isFinite(pl.temper)) { pl.temper = temperOf(pl); }
+				if (!Number.isFinite(pl.benched)) { pl.benched = 0; }
+				if (!Number.isFinite(pl.oopN)) { pl.oopN = 0; }
+				if (typeof pl.wantsOut !== "boolean") { pl.wantsOut = false; }
+			}
+		}
+		return d;
+	}
+	const clubPlayer = name => (league && league.club ? [ ...league.club.squad, ...league.club.bench ].find(p => p.name === name) : null);
+	const roomWord = r => (r >= 75 ? "Happy" : r >= 55 ? "Settled" : r >= 35 ? "Tense" : "Mutinous");
+	// Nudges his form (the last five ratings) up or down, which feeds the form bonus in a match.
+	function nudgeForm (pl, d) {
+		if (!Array.isArray(pl.form) || !pl.form.length) { pl.form = [ 6.6 ]; }
+		const i = pl.form.length - 1;
+		pl.form[i] = Math.round(clamp(pl.form[i] + d, 3, 10) * 10) / 10;
+	}
+	function dramaLog (text) {
+		const d = ensureDrama(league);
+		d.log = [ ...d.log, text ].slice(-6);
+	}
+	function addIssue (kind, pl, text, o = {}) {
+		const d = ensureDrama(league);
+		if (d.issues.some(i => i.name === pl.name && i.kind === kind)) { return null; }
+		if (kind !== "contract" && kind !== "signing" && d.issues.filter(i => i.kind !== "contract" && i.kind !== "signing").length >= ISSUE_CAP) { return null; }
+		const issue = { id: ++d.seq, kind, name: pl.name, text, ...o };
+		d.issues.push(issue);
+		return issue;
+	}
+
+	// What you can do about each kind of problem: the label on the button and what it does.
+	const MANAGER_CHOICES = [ [ "talk", "Talk to him" ], [ "back", "Back yourself" ], [ "fine", "Fine him" ], [ "drop", "Drop him" ] ];
+	function choicesFor (issue) {
+		if (issue.kind === "contract") { return [ [ "pay", issue.wantsOut ? "Talk him round" : `Pay what he asks (${wageWeek(issue.ask || 0)})` ], [ "letgo", issue.wantsOut ? "Sell him or let him go" : "Let him go" ] ]; }
+		if (issue.kind === "signing") { return [ [ "offer", `Offer ${money(issue.offer || 0)}` ], [ "forget", "Forget him" ] ]; }
+		return MANAGER_CHOICES;
+	}
+	// Morale, dressing room and form, per kind and choice. A calm man takes a talk better; a hot-head
+	// takes a fine worse. Backing yourself after a row he started steadies the rest of the squad.
+	const EFFECTS = {
+		dropped: { talk: [ 8, 1, 0 ], back: [ -6, 2, -0.2 ], fine: [ -12, -3, -0.4 ], drop: [ -15, -2, -0.6 ] },
+		oop: { talk: [ 6, 1, 0.2 ], back: [ -8, 1, -0.3 ], fine: [ -12, -2, -0.4 ], drop: [ -10, 0, -0.5 ] },
+		request: { talk: [ 10, 2, 0.2 ], back: [ -5, 0, -0.3 ], fine: [ -12, -4, -0.5 ], drop: [ -10, -1, -0.5 ] },
+		row: { talk: [ 5, 3, 0.2 ], back: [ -6, 4, 0 ], fine: [ -8, 5, -0.2 ], drop: [ -10, 2, -0.4 ] }
+	};
+	function resolveIssue (id, choice) {
+		const d = ensureDrama(league), c = league.club, issue = d.issues.find(i => i.id === id);
+		if (!issue) { return null; }
+		const pl = clubPlayer(issue.name);
+		d.issues = d.issues.filter(i => i !== issue);
+		let note = "";
+		if (!pl && issue.kind !== "signing") { note = `${issue.name} has gone, so that's the end of it.`; }
+		else if (issue.kind === "contract") {
+			if (choice === "pay" && issue.wantsOut) {
+				const hot = temperOf(pl) >= 75;
+				if (pl.morale >= 50 && !hot) { pl.wantsOut = false; pl.benched = 0; pl.morale = clamp(pl.morale + 6, 5, 100); note = `${pl.name} has calmed down and will talk about a new deal again.`; }
+				else { note = `${pl.name} won't be talked round yet. Pick him for a few games, or sell him in the window.`; addIssue("contract", pl, issue.text, { wantsOut: true }); }
+			} else if (choice === "pay") {
+				pl.askPaid = league.season;
+				const r = renewDeal(pl, c, { years: 2, rise: issue.rise || 1.35, fee: issue.fee || 0 });
+				note = r.ok ? `${pl.name} gets his rise and signs. ${r.why}` : r.why;
+			} else { pl.letGo = true; note = `${pl.name} will leave when his contract runs out${pl.wantsOut && windowOpen() ? ", or sell him now from the squad list" : ""}.`; }
+		} else if (issue.kind === "signing") {
+			const i = c.market.findIndex(m => m.name === issue.name);
+			if (choice === "offer" && i >= 0) { signPlayer(i, issue.offer); return lastDeal; }
+			note = choice === "offer" ? `${issue.name} is no longer on the market.` : `You've moved on from ${issue.name}.`;
+		} else {
+			const e = (EFFECTS[issue.kind] || EFFECTS.row)[choice] || [ 0, 0, 0 ], t = temperOf(pl);
+			let dm = e[0], dr = e[1];
+			if (choice === "talk" && t < 40) { dm += 3; }
+			if (choice === "fine" && t >= 75) { dm -= 4; dr -= 2; }
+			pl.morale = clamp(Math.round(pl.morale + dm), 5, 100);
+			d.room = clamp(Math.round(d.room + dr), 0, 100);
+			nudgeForm(pl, e[2]);
+			if (choice === "fine") { const f = Math.max(0.001, wageOf(pl) / 52); c.budget = Math.round((c.budget + f) * 1000) / 1000; }
+			if (choice === "drop") { dropToBench(pl); }
+			if (issue.kind === "request") {
+				if (choice === "talk") { pl.wantsOut = false; pl.benched = 0; pl.promised = 3; }
+				if (choice === "back") { pl.listed = true; }
+			}
+			if (issue.kind === "oop" && choice === "talk") { pl.posPromise = true; }
+			note = {
+				talk: `You had a quiet word with ${pl.name}. He's calmer for it (morale ${pl.morale}).`,
+				back: `You stood your ground with ${pl.name}. He isn't happy (morale ${pl.morale}), but the squad know who's in charge.`,
+				fine: `${pl.name} has been fined a week's wages. Morale ${pl.morale}; the dressing room is ${roomWord(d.room).toLowerCase()}.`,
+				drop: `${pl.name} is out of the side. Morale ${pl.morale}.`
+			}[choice] || "";
+		}
+		dramaLog(note);
+		lastDeal = note;
+		if (typeof afterClubChange === "function") { afterClubChange(); }
+		return note;
+	}
+	// Out of the eleven: he swaps with the best man on the bench who plays his position.
+	function dropToBench (pl) {
+		const c = league.club, i = c.squad.indexOf(pl);
+		pl.role = "rotation";
+		if (i < 0) { return; }
+		const j = c.bench.reduce((b, q, k) => (q.pos === pl.pos && !q.injured && (b < 0 || ovrNow(q) > ovrNow(c.bench[b])) ? k : b), -1);
+		if (j < 0) { return; }
+		c.squad[i] = c.bench[j]; c.bench[j] = pl;
+	}
+
+	// After each league match (from weeklyClub): count games on the bench, spot a star left out or
+	// a man played out of position, a hammering, and the mood of the dressing room. rnd is for tests.
+	function dramaAfterMatch (played, gf, ga, rnd = Math.random) {
+		if (!league || !league.club) { return []; }
+		const d = ensureDrama(league), c = league.club, made = [], fmt = league.fmt, slots = slotsFor(fmt);
+		const all = [ ...c.squad, ...c.bench ];
+		for (const pl of all) {
+			const on = played.has(pl.name), role = roleOf(pl, c), t = temperOf(pl);
+			pl.benched = on ? 0 : (pl.benched || 0) + 1;
+			if (pl.promised > 0) { pl.promised--; if (!on && pl.promised === 0 && pl.benched >= 2) { pl.morale = clamp(pl.morale - 12, 5, 100); pl.wantsOut = true; const x = addIssue("request", pl, `${pl.name} says you promised him games and didn't keep your word. He wants to leave.`); if (x) { made.push(x); } } }
+			// Repeated benching: a transfer request. Not the young ones, and not a keeper who is the backup.
+			if (!pl.wantsOut && pl.benched >= 4 && pl.age > 20 && pl.pos !== "gk" && ovrNow(pl) >= squadMedian(c) - 4) {
+				pl.wantsOut = true; pl.morale = clamp(pl.morale - 6, 5, 100);
+				const x = addIssue("request", pl, `${pl.name} has handed in a transfer request. He hasn't played in ${pl.benched} games and says he needs to be playing.`);
+				if (x) { made.push(x); }
+				continue;
+			}
+			// A star left out: he says so in public, more likely if he has a temper.
+			if (!on && role === "key" && pl.benched === 1 && !pl.injured && rnd() < 0.3 + t / 200) {
+				const x = addIssue("dropped", pl, `${pl.name} isn't happy about being left out. He's told reporters he should be playing every week.`);
+				if (x) { pl.morale = clamp(pl.morale - 5, 5, 100); made.push(x); }
+			}
+		}
+		// Played out of position: the first time he grumbles, after that (or straight away if he's a hot-head) he refuses.
+		slots.forEach(i => {
+			const pl = c.squad[i], slotPos = roleOfSlot(fmt, i);
+			if (!pl || !played.has(pl.name) || !slotPos || slotPos === pl.pos || pl.pos === "gk" || slotPos === "gk") { return; }
+			pl.oopN = (pl.oopN || 0) + 1;
+			const refuse = pl.oopN >= 3 || (pl.oopN >= 2 && temperOf(pl) >= 55) || pl.posPromise;
+			if (pl.posPromise) { pl.morale = clamp(pl.morale - 10, 5, 100); d.room = clamp(d.room - 3, 0, 100); pl.posPromise = false; }
+			if (refuse) { pl.refusesPos = slotPos; }
+			if (refuse || rnd() < 0.35) {
+				const x = addIssue("oop", pl, refuse
+					? `${pl.name} has told you he won't play ${POS_WHERE[slotPos] || "out of position"} again. He's a ${POS_WHO[pl.pos]} and wants to play there. Pick him in his own position, or he'll sulk.`
+					: `${pl.name} is grumbling about playing ${POS_WHERE[slotPos] || "out of position"}. He's a ${POS_WHO[pl.pos]}.`);
+				if (x) { pl.morale = clamp(pl.morale - (refuse ? 6 : 3), 5, 100); made.push(x); }
+			}
+		});
+		// A hammering: someone has a go in the dressing room after the game.
+		if (ga - gf >= 3) {
+			const loud = slots.map(i => c.squad[i]).filter(p => p && played.has(p.name)).sort((a, b) => temperOf(b) - temperOf(a))[0];
+			if (loud) {
+				d.room = clamp(d.room - 6, 0, 100);
+				const x = addIssue("row", loud, `After the ${gf}-${ga}, ${loud.name} had a go at his teammates and at your tactics. The dressing room heard every word.`);
+				if (x) { made.push(x); }
+			}
+		} else if (gf > ga) { d.room = clamp(d.room + 2, 0, 100); }
+		// The mood of the dressing room rubs off on everyone a little.
+		for (const pl of all) { pl.morale = clamp(Math.round(pl.morale + (d.room - 60) * 0.03), 5, 100); }
+		return made;
+	}
+
+	// ---------- refusals ----------
+	// A new contract: he has asked to leave, or (a key man who is unsettled) he wants a bigger rise
+	// than the club's offer. Returns null when he'll sign, otherwise the reason and what to do next.
+	function renewRefusal (pl, c, terms) {
+		if (!league) { return null; }
+		if (pl.wantsOut) {
+			const why = `${pl.name} has asked to leave and won't sign a new deal. Play him and talk to him to win him back, or sell him while he still has a contract.`;
+			addIssue("contract", pl, why, { wantsOut: true });
+			return { why };
+		}
+		const rise = terms ? terms.rise : roleOf(pl, c) === "key" ? 1.2 : 1.1;
+		if (roleOf(pl, c) === "key" && pl.morale < 60 && pl.age <= 31 && pl.askPaid !== league.season && rise < 1.35) {
+			const ask = Math.round(wageOf(pl) * 1.35 * 1000) / 1000, fee = round1(valueOf(pl) * 0.15);
+			const why = `${pl.name} wants more money. He's asking for ${wageWeek(ask)}, a 35% rise, and says he'll run his contract down otherwise. Pay it, or let him go.`;
+			addIssue("contract", pl, why, { ask, rise: 1.35, fee });
+			return { why };
+		}
+		return null;
+	}
+	// A signing from the market: a star won't drop down to a struggling club, and some older players
+	// won't move a long way from home or to the cold, unless the money is right (a quarter over his price).
+	function signRefusal (pl, c, price) {
+		if (!league) { return null; }
+		const ask = typeof askOf === "function" ? askOf(pl) : price, enough = price >= round1(ask * 1.25) - 1e-9;
+		if (enough) { return null; }
+		const rows = standings(), pos = rows.findIndex(r => r.id === 0) + 1, best = Math.max(...slotsFor(league.fmt).map(i => ovrOf(c.squad[i])));
+		const offer = round1(ask * 1.25);
+		if (league.round >= 4 && pos > rows.length / 2 && ovrOf(pl) >= best + 6) {
+			return { offer, why: `${pl.name} won't join a side in the bottom half. He sees it as a step down. Offer ${money(offer)} to change his mind, or try again when you're higher up the table.` };
+		}
+		const far = pl.region && pl.region !== "home" && pl.region !== "europe", h = hashStr(pl.name + "|home");
+		if (far && pl.age >= 27 && h % 3 === 0) {
+			const cold = pl.region === "samerica" || pl.region === "africa";
+			return { offer, why: `${pl.name} doesn't want to move ${cold ? "to the cold" : "so far from home"} with his family settled where they are. Offer ${money(offer)} and he might think again.` };
+		}
+		return null;
+	}
+	// Selling one of yours to a smaller club: a first-team man refuses the step down, unless he wants out.
+	function sellRefusal (pl, club) {
+		if (!league || !Number.isInteger(club) || pl.wantsOut || pl.listed) { return null; }
+		const role = roleOf(pl, league.club);
+		if ((role === "key" || role === "first") && getStr(club) < yourStr() - 0.4) {
+			return { why: `${pl.name} won't go to ${TEAMS[club].name}. He thinks it's a step down. Wait for a bid from a bigger club, or put him up for sale (Back yourself if he complains) and he'll go anywhere.` };
+		}
+		return null;
+	}
+
+	// ---------- the League panel ----------
+	function renderDrama () {
+		const side = document.querySelector("#league .lg-side");
+		if (!side || !league || !league.club) { return; }
+		const d = ensureDrama(league);
+		let box = $("lgDrama");
+		if (!box) { box = el("div", "lg-drama"); box.id = "lgDrama"; side.prepend(box); }
+		box.replaceChildren();
+		box.append(el("h4", "", "Dressing room"), el("p", "detail", `Mood: ${roomWord(d.room)} (${d.room})`));
+		const ul = el("ul", "drama-issues");
+		ul.style.cssText = "list-style:none;padding:0;margin:8px 0";
+		for (const issue of d.issues) {
+			const li = el("li", `drama-${issue.kind}`);
+			li.append(el("span", "", issue.text));
+			const row = el("div", "drama-choices");
+			row.style.cssText = "display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 12px";
+			for (const [ k, label ] of choicesFor(issue)) {
+				const b = el("button", "", label);
+				b.type = "button"; b.dataset.choice = k; b.style.padding = "4px 9px";
+				b.addEventListener("click", () => resolveIssue(issue.id, k));
+				row.append(b);
+			}
+			li.append(row); ul.append(li);
+		}
+		if (d.issues.length) { box.append(ul); }
+		else { box.append(el("p", "fine", "No problems in the squad right now.")); }
+		if (d.log.length) { const lg = el("ul", "drama-log"); for (const s of d.log.slice(-3).reverse()) { lg.append(el("li", "", s)); } box.append(lg); }
 	}
 	/* ---------- audio ----------
 	   Everything is synthesised in WebAudio: the ball off a boot, the referee's whistle, and a
@@ -7755,6 +8020,7 @@
 		}
 		$("announce").textContent = `${inBox ? "Penalty" : "Free kick"} to ${t === 0 ? "you" : opp.name}. ${extra}`;
 		if (card || hurt) { showFoulNote(extra, t); }
+		if (typeof flareUp === "function" && !serious) { flareUp(off, vic, behind, card); }   // sometimes it boils over
 		updateSubsBtn();
 	}
 
@@ -7776,6 +8042,72 @@
 		burst(p.x, p.y, "Sent off");
 	}
 
+	/* ---------- flare-ups ----------
+	   After a bad foul, a hot-head on the fouled side can go looking for the man who did it. They
+	   square up and push, a couple from each side pile in, teammates pull them apart and the referee
+	   steps in: a yellow for both, or a red for violent conduct when two hot-heads go at it. Rare:
+	   at most one a match, and most matches have none. p.flare counts the frames down for the
+	   figures (face off and push in 3D, a red ring in 2D); p.flareGather draws teammates in. */
+	let flareLog = null;   // the match log of the last flare-up: one a match
+	const FLARE_T = 170;
+	function flareUp (off, vic, behind, card, o = {}) {
+		if (!off || !vic || bulkSim || tut || (typeof shoot !== "undefined" && shoot) || !players.includes(off)) { return null; }
+		if (!o.force && (flareLog === matchLog || !(behind || card))) { return null; }
+		const rnd = o.rnd || Math.random;
+		// The fouled side's nearest hot-head: the victim himself if he's on his feet, else the closest of the rest.
+		const mates = team(vic.team).filter(p => p !== off && p.role !== "gk" && players.includes(p)).sort((a, b) => dist(a, off) - dist(b, off)).slice(0, 3);
+		const mate = mates.slice().sort((a, b) => temperOf(b) - temperOf(a))[0];
+		if (!mate) { return null; }
+		const heat = (temperOf(mate) + temperOf(off)) / 110;
+		if (!o.force && rnd() > 0.06 * heat) { return null; }
+		flareLog = matchLog;
+		const pair = [ mate, off ];
+		for (const [ a, b ] of [ pair, pair.slice().reverse() ]) { a.flare = FLARE_T; a.flareWith = b; a.flareGather = null; }
+		const mid = { x: (mate.x + off.x) / 2, y: (mate.y + off.y) / 2 };
+		for (const t of [ 0, 1 ]) {
+			team(t).filter(p => !pair.includes(p) && p.role !== "gk").sort((a, b) => dist(a, mid) - dist(b, mid)).slice(0, 2).forEach(p => { p.flareGather = mid; p.flare = FLARE_T; p.flareWith = null; });
+		}
+		// The referee: both booked, or a red for the one who threw the push when both have tempers.
+		const bothHot = temperOf(mate) >= 75 && temperOf(off) >= 75, violent = bothHot && rnd() < 0.35;
+		const booked = [], sent = [];
+		const book = p => {
+			const mark = kind => { if (p.team === 0 && p.name && leagueMatch) { matchCards.push({ name: p.name, kind }); } };
+			if (p.role === "gk") { return; }
+			if (violent && p === mate && team(p.team).length - 1 >= (N === 11 ? 7 : 3)) { sent.push(p); mark("r"); logEvent(p.team, "red", `${p.name || "Player"} (violent conduct)`); return; }
+			if (p === off && card) { return; }   // already booked for the foul
+			p.yellow = (p.yellow || 0) + 1;
+			if (p.yellow >= 2 && team(p.team).length - 1 >= (N === 11 ? 7 : 3)) { sent.push(p); mark("r2"); logEvent(p.team, "red", `${p.name || "Player"} (second yellow)`); return; }
+			booked.push(p); mark("y"); logEvent(p.team, "yellow", `${p.name || "Player"}`);
+		};
+		if (!o.noCards) { book(mate); book(off); }
+		const nm = p => p.name || (p.team === 0 ? "your man" : `their No. ${p.num}`);
+		const line = sent.length
+			? `${nm(mate)} shoves ${nm(off)} and the referee shows him red for violent conduct.`
+			: `${nm(mate)} and ${nm(off)} go head to head. Teammates pull them apart and the referee books ${booked.length === 2 ? "both of them" : booked.length ? nm(booked[0]) : "nobody, this time"}.`;
+		if (typeof commWait !== "undefined") { commWait = { kind: "flare", n: nm(mate), m: nm(off), team: mate.team, until: performance.now() + 14000 }; }
+		if (typeof caption === "function") { setTimeout(() => { if (state === "play" || state === "paused") { caption(sent.length ? "Red card" : "Flare-up", sent.length ? "red" : "yellow", `${nm(mate)} and ${nm(off)}`, sent.length ? "Violent conduct" : "Pushing and shoving", mate.team); } }, 1800); }
+		$("announce").textContent = line;
+		for (const p of sent) { if (players.includes(p)) { sendOff(p); } }
+		return { mate, off, booked, sent, line };
+	}
+	// Each frame: the two face off and lean in; the others drift toward them. Called from the commentary tick.
+	function flareTick () {
+		for (const p of players) {
+			if (!(p.flare > 0)) { continue; }
+			p.flare--;
+			const w = p.flareWith, g = p.flareGather;
+			if (w && players.includes(w)) {
+				const d = dist(p, w), a = Math.atan2(w.y - p.y, w.x - p.x);
+				p.dir = a;
+				if (d > 16) { p.x += Math.cos(a) * Math.min(1.2, (d - 16) / 2); p.y += Math.sin(a) * Math.min(1.2, (d - 16) / 2); }
+			} else if (g) {
+				const d = Math.hypot(g.x - p.x, g.y - p.y), a = Math.atan2(g.y - p.y, g.x - p.x);
+				p.dir = a;
+				if (d > 34) { p.x += Math.cos(a) * 0.9; p.y += Math.sin(a) * 0.9; }
+			}
+			if (p.flare <= 0) { p.flareWith = null; p.flareGather = null; }
+		}
+	}
 	/* ---------- substitutions ---------- */
 	// Who can come on: squad players not starting in this format and the bench, less
 	// anyone injured, banned, already on or already taken off.
@@ -10227,6 +10559,7 @@
 
 		ctx.fillStyle = "rgba(0, 0, 0, 0.38)";
 		ctx.beginPath(); ctx.ellipse(X + 4, Y + 8, 15, 8, 0, 0, Math.PI * 2); ctx.fill();
+		if (p.flare > 0 && p.flareWith) { ctx.strokeStyle = `rgba(230, 60, 50, ${0.5 + 0.4 * Math.sin(p.flare * 0.3)})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(X, Y, 19, 0, Math.PI * 2); ctx.stroke(); }   // a flare-up (29a)
 		// Sprinting: speed streaks behind him.
 		if ((p.sprintAmt || 0) > 0.45 && Math.hypot(p.vx, p.vy) > 1.2) {
 			const a = Math.atan2(p.vy, p.vx), c = Math.cos(a), sn = Math.sin(a);
@@ -11319,6 +11652,7 @@
 		comeback: [ "What a comeback! {n} completes the turnaround", "From two down to this! {n} has done it", "They were dead and buried, and {n} has brought them back" ],
 		own: [ "Oh no, {n} turns it into his own net", "An own goal! {n} won't want to see that again", "Disaster for {n}, into his own net" ],
 		red: [ "{n} is off! Straight red, and no complaints", "Red card! {n} has let his side down there", "Off he goes, {n} sent off" ],
+		flare: [ "Tempers flare! {n} and {m} go nose to nose", "{n} isn't having that. He's straight in the face of {m}", "Handbags! {n} and {m} have to be pulled apart", "It's all kicking off. {n} squares up to {m}" ],
 		red2: [ "Second yellow for {n}, and he's off", "{n} walks: a second booking, and a red", "That's two yellows, so {n} has to go" ]
 	};
 	let commAt = -1e9, commRecent = [], commTimer = 0, lastCommentary = null, commKindAt = {};
@@ -11373,6 +11707,7 @@
 		return null;
 	}
 	function commTick () {
+		if (typeof flareTick === "function") { flareTick(); }
 		const log = typeof matchLog !== "undefined" && Array.isArray(matchLog) ? matchLog : null;
 		if (!log) { return; }
 		if (log.length < commSeen) { commSeen = 0; commWait = null; }   // a new match
@@ -11383,7 +11718,7 @@
 		}
 		if (commWait) {
 			if (performance.now() > commWait.until) { commWait = null; return; }
-			if (commentary(commWait.kind, { n: commWait.n }, commWait.team, true)) { commWait = null; }
+			if (commentary(commWait.kind, { n: commWait.n, m: commWait.m }, commWait.team, true)) { commWait = null; }
 		}
 	}
 	/* ---------- camera ---------- */
@@ -13955,6 +14290,9 @@
 				for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 2.3, hh); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, OUT3(i) * 0.8, hh); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 1.9, hh); }
 				r.neck.rotation.z += 0.25 * hh;   // and he looks up at the sky (+z on the neck tips the head back)
 			}
+			// A flare-up (29a): chest out, leaning in, both hands up to shove the other man.
+			const fl = p.flare > 0 && p.flareWith ? clamp(p.flare / 15, 0, 1) * clamp((170 - p.flare) / 10, 0, 1) : 0;
+			if (fl > 0) { const push = 0.25 * Math.max(0, Math.sin(p.flare * 0.12)); for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 1.35 + push, fl); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, OUT3(i) * 0.15, fl); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.5 - push, fl); } r.chest.rotation.z -= 0.18 * fl; r.neck.rotation.z -= 0.1 * fl; }
 			const fp = p.fistPump > 0 ? clamp(p.fistPump / 12, 0, 1) * clamp((55 - p.fistPump) / 6, 0, 1) : 0;
 			if (fp > 0) {
 				const i = 1, pump = 0.25 * Math.sin((50 - p.fistPump) * 0.45);
@@ -17377,7 +17715,7 @@
 	}
 
 	// More test hooks, kept apart from the big list above.
-	if (window.__ff) { Object.assign(window.__ff, { renewWorth, renewPlan, assistContracts, reportText, rolloverClub, showContract, goalCall, COMM, cupNight, cupTie, cupPens, ensureCup, seasonAwards, youthIntake, promoteYouth, releaseYouth, renderExtras, CUP_NIGHTS }); }
+	if (window.__ff) { Object.assign(window.__ff, { renewWorth, renewPlan, assistContracts, reportText, rolloverClub, showContract, goalCall, COMM, cupNight, cupTie, cupPens, ensureCup, seasonAwards, youthIntake, promoteYouth, releaseYouth, renderExtras, CUP_NIGHTS, ensureDrama, dramaAfterMatch, resolveIssue, renewRefusal, signRefusal, sellRefusal, renderDrama, temperOf, signPlayer, sellPlayer, rejectBid, weeklyClub, flareUp, flareTick, commitFoulTest (r) { if (state !== "play") { return null; } freeze = 0; const off = outfield(1)[0], vic = outfield(0).sort((a, b) => dist(a, off) - dist(b, off))[0]; return flareUp(off, vic, true, "", { force: true, rnd: () => r }); } }); }
 
 	const hot = window.claude && window.claude.hot;
 	if (hot && typeof hot.snapshot === "function") {

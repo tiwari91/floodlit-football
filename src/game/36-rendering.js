@@ -949,6 +949,7 @@
 
 		ctx.fillStyle = "rgba(0, 0, 0, 0.38)";
 		ctx.beginPath(); ctx.ellipse(X + 4, Y + 8, 15, 8, 0, 0, Math.PI * 2); ctx.fill();
+		if (p.flare > 0 && p.flareWith) { ctx.strokeStyle = `rgba(230, 60, 50, ${0.5 + 0.4 * Math.sin(p.flare * 0.3)})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(X, Y, 19, 0, Math.PI * 2); ctx.stroke(); }   // a flare-up (29a)
 		// Sprinting: speed streaks behind him.
 		if ((p.sprintAmt || 0) > 0.45 && Math.hypot(p.vx, p.vy) > 1.2) {
 			const a = Math.atan2(p.vy, p.vx), c = Math.cos(a), sn = Math.sin(a);

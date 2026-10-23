@@ -57,6 +57,7 @@
 		}
 		$("announce").textContent = `${inBox ? "Penalty" : "Free kick"} to ${t === 0 ? "you" : opp.name}. ${extra}`;
 		if (card || hurt) { showFoulNote(extra, t); }
+		if (typeof flareUp === "function" && !serious) { flareUp(off, vic, behind, card); }   // sometimes it boils over
 		updateSubsBtn();
 	}
 

@@ -88,6 +88,7 @@
 		if (!Array.isArray(lg.weather) || lg.weather.length !== lg.fixtures.length) { lg.weather = genForecast(lg.fixtures.length, lg.ident && lg.ident.country); }
 		if (!Array.isArray(lg.wind) || lg.wind.length !== lg.fixtures.length || !lg.wind.every(w => w && Number.isFinite(w.s) && Number.isFinite(w.a))) { lg.wind = genWind(lg.fixtures.length, lg.ident && lg.ident.country); }
 		if (!Array.isArray(lg.ko) || lg.ko.length !== lg.fixtures.length) { lg.ko = genKickoff(lg.fixtures.length, lg.ident && lg.ident.country); }
+		if (typeof ensureDrama === "function") { ensureDrama(lg); }   // older saves: no dressing room yet
 		return lg;
 	}
 

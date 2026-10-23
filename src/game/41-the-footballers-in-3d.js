@@ -754,6 +754,9 @@
 				for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 2.3, hh); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, OUT3(i) * 0.8, hh); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 1.9, hh); }
 				r.neck.rotation.z += 0.25 * hh;   // and he looks up at the sky (+z on the neck tips the head back)
 			}
+			// A flare-up (29a): chest out, leaning in, both hands up to shove the other man.
+			const fl = p.flare > 0 && p.flareWith ? clamp(p.flare / 15, 0, 1) * clamp((170 - p.flare) / 10, 0, 1) : 0;
+			if (fl > 0) { const push = 0.25 * Math.max(0, Math.sin(p.flare * 0.12)); for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 1.35 + push, fl); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, OUT3(i) * 0.15, fl); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.5 - push, fl); } r.chest.rotation.z -= 0.18 * fl; r.neck.rotation.z -= 0.1 * fl; }
 			const fp = p.fistPump > 0 ? clamp(p.fistPump / 12, 0, 1) * clamp((55 - p.fistPump) / 6, 0, 1) : 0;
 			if (fp > 0) {
 				const i = 1, pump = 0.25 * Math.sin((50 - p.fistPump) * 0.45);

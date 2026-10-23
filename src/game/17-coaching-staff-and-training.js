@@ -333,6 +333,8 @@
 		if (!pl || !windowOpen()) { return; }
 		const price = Number.isFinite(offer) ? offer : askOf(pl);
 		if (c.budget + 1e-9 < price || c.budget < 0) { return; }
+		const no = typeof signRefusal === "function" ? signRefusal(pl, c, price) : null;
+		if (no) { lastDeal = no.why; addIssue("signing", pl, no.why, { offer: no.offer }); afterClubChange(); return; }
 		const m = MARKETS[pl.region];
 		pl.adapt = m ? Math.max(0, m.adapt - staffLvl(c, "scout") * 0.5) : 0;
 		delete pl.ask; delete pl.bids; delete pl.from; delete pl.scouted;

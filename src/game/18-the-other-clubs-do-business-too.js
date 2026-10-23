@@ -46,6 +46,8 @@
 		if ((inSq < 0 && inB < 0) || !windowOpen()) { return; }
 		const pl = inSq >= 0 ? c.squad[inSq] : c.bench[inB];
 		if (inSq >= 0 && pl.pos === "gk" && ![ ...c.squad, ...c.bench ].some(q => q !== pl && q.pos === "gk")) { lastDeal = `Sign another keeper before you sell ${pl.name}.`; afterClubChange(); return; }
+		const no = typeof sellRefusal === "function" ? sellRefusal(pl, club) : null;
+		if (no) { lastDeal = no.why; afterClubChange(); return; }
 		if (inSq >= 0) { c.squad.splice(inSq, 1); } else { c.bench.splice(inB, 1); }
 		c.budget = round1(c.budget + fee);
 		league.bidsIn = (league.bidsIn || []).filter(b => b.name !== name);
@@ -62,7 +64,8 @@
 		lg.bidsIn = lg.bidsIn.filter(x => x !== b);
 		const pl = [ ...lg.club.squad, ...lg.club.bench ].find(p => p.name === name);
 		// A move to a bigger club turned down: he takes it badly.
-		if (pl && getStr(b.club) > yourStr()) { pl.morale = clamp(pl.morale - 8, 5, 100); lastDeal = `You turned down ${TEAMS[b.club].name} for ${name}; he wanted the move (morale ${pl.morale}).`; }
+		if (pl && pl.wantsOut) { pl.morale = clamp(pl.morale - 15, 5, 100); lastDeal = `You turned down ${TEAMS[b.club].name} for ${name}, and he'd asked to leave. He's furious (morale ${pl.morale}).`; }
+		else if (pl && getStr(b.club) > yourStr()) { pl.morale = clamp(pl.morale - 8, 5, 100); lastDeal = `You turned down ${TEAMS[b.club].name} for ${name}; he wanted the move (morale ${pl.morale}).`; }
 		else { lastDeal = `You turned down ${TEAMS[b.club].name}'s bid for ${name}.`; }
 		afterClubChange();
 	}

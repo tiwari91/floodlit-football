@@ -80,6 +80,7 @@
 		renderClubs();
 		renderShapes();
 		if (typeof renderExtras === "function") { renderExtras(); }
+		if (typeof renderDrama === "function") { renderDrama(); }
 	}
 
 	let clubsView = "div", openClub = null;
@@ -376,6 +377,7 @@
 		c.budget = Math.round((c.budget - wages + gate) * 1000) / 1000;
 		c.week = { wages: Math.round(wages * 1000) / 1000, gate: Math.round(gate * 1000) / 1000 };
 		if (typeof weeklyCoaching === "function") { weeklyCoaching(lm, played); }
+		if (typeof dramaAfterMatch === "function") { dramaAfterMatch(played, gf, ga); }
 	}
 	// A youngster from the academy, for when a position would otherwise be empty.
 	function youthPlayer (pos) {
@@ -438,6 +440,8 @@
 		const fee = terms ? terms.fee : round1(valueOf(pl) * 0.15);
 		if (lastSeason(pl)) { return { ok: false, why: `${pl.name} (${pl.age}) is retiring at the end of the season; there's no new deal to offer.` }; }
 		if (pl.morale < 40) { return { ok: false, why: `${pl.name} won't talk about a new contract while he's unhappy (morale ${pl.morale}).` }; }
+		const no = typeof renewRefusal === "function" ? renewRefusal(pl, c, terms) : null;
+		if (no) { return { ok: false, why: no.why, refusal: true }; }
 		if (c.budget + 1e-9 < fee) { return { ok: false, why: `A new deal for ${pl.name} needs a ${money(fee)} signing-on fee.` }; }
 		c.budget = round1(c.budget - fee);
 		pl.wage = Math.round(wageOf(pl) * (terms ? terms.rise : roleOf(pl, c) === "key" ? 1.2 : 1.1) * 1000) / 1000;

@@ -19,6 +19,7 @@
 		comeback: [ "What a comeback! {n} completes the turnaround", "From two down to this! {n} has done it", "They were dead and buried, and {n} has brought them back" ],
 		own: [ "Oh no, {n} turns it into his own net", "An own goal! {n} won't want to see that again", "Disaster for {n}, into his own net" ],
 		red: [ "{n} is off! Straight red, and no complaints", "Red card! {n} has let his side down there", "Off he goes, {n} sent off" ],
+		flare: [ "Tempers flare! {n} and {m} go nose to nose", "{n} isn't having that. He's straight in the face of {m}", "Handbags! {n} and {m} have to be pulled apart", "It's all kicking off. {n} squares up to {m}" ],
 		red2: [ "Second yellow for {n}, and he's off", "{n} walks: a second booking, and a red", "That's two yellows, so {n} has to go" ]
 	};
 	let commAt = -1e9, commRecent = [], commTimer = 0, lastCommentary = null, commKindAt = {};
@@ -73,6 +74,7 @@
 		return null;
 	}
 	function commTick () {
+		if (typeof flareTick === "function") { flareTick(); }
 		const log = typeof matchLog !== "undefined" && Array.isArray(matchLog) ? matchLog : null;
 		if (!log) { return; }
 		if (log.length < commSeen) { commSeen = 0; commWait = null; }   // a new match
@@ -83,6 +85,6 @@
 		}
 		if (commWait) {
 			if (performance.now() > commWait.until) { commWait = null; return; }
-			if (commentary(commWait.kind, { n: commWait.n }, commWait.team, true)) { commWait = null; }
+			if (commentary(commWait.kind, { n: commWait.n, m: commWait.m }, commWait.team, true)) { commWait = null; }
 		}
 	}

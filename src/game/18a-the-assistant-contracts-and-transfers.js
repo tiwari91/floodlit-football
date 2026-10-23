@@ -85,7 +85,7 @@
 		const order = lastYear.slice().sort((a, b) => plans.get(b).worth - plans.get(a).worth);
 		const sign = (pl, pn, terms) => {
 			const deal = renewDeal(pl, c, terms);
-			if (!deal.ok) { return false; }
+			if (!deal.ok) { if (deal.refusal && !rep.unsigned.some(u => u.name === pl.name)) { rep.unsigned.push({ name: pl.name, key: true, text: deal.why }); } return false; }
 			rep.renewed.push(`${who(pl)}: ${seasons(terms.years)} at ${wageWeek(pl.wage)}${terms.fee ? `, ${money(terms.fee)} to sign` : ", no signing-on fee and a bigger rise instead"}`);
 			done.push(`renewed ${pl.name} for ${seasons(terms.years)}`);
 			return true;

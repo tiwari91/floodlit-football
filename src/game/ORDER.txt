@@ -20,6 +20,7 @@
 18b-offers-for-the-manager.js
 18c-foreign-leagues.js
 18d-the-cup-awards-and-the-academy.js
+18e-the-dressing-room.js
 19-audio.js
 20-kicking.js
 21-offside.js
@@ -31,6 +32,7 @@
 27-simulation.js
 28-corners-and-goal-kicks.js
 29-fouls-free-kicks-penalties.js
+29a-flare-ups.js
 30-substitutions.js
 31-flow.js
 32-corner-shootout.js
