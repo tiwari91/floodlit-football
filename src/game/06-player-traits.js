@@ -31,8 +31,25 @@
 		if (!ROLES[pl.role]) { pl.role = ""; }   // "" = picked for him from his standing in the squad
 		if (!Number.isFinite(pl.adapt)) { pl.adapt = 0; }
 		if (typeof pl.trait !== "string" || (pl.trait && !TRAITS[pl.trait])) { pl.trait = traitFor(pl); }
+		for (const k of [ "dri", "phy" ]) { if (k in pl && !Number.isFinite(pl[k])) { delete pl[k]; } }   // (left out, they are derived: dpBase)
 		return pl;
 	}
+	// Dribbling (dri) and physical (phy) are optional. A player without them (an old save, a file that leaves
+	// them out, a generated player) gets them from his other ratings, position, age, trait and his country's
+	// style, so they follow him as he develops. Neither counts toward overall.
+	function dpBase (pl, k) {
+		const h = hashStr(String(pl.name) + "|" + k + "|" + pl.pos), j = ((h >>> 3) % 7) - 3, t = pl.trait || "";
+		const s = pl.nat && NAT_STYLE[pl.nat] ? styleOf(pl.nat) : null, sx = s ? s.dp[k === "dri" ? 0 : 1] : 0;
+		const r = q => (Number.isFinite(pl[q]) ? pl[q] : 65);
+		const v = k === "dri"
+			? (pl.pos === "gk" ? 0.5 * r("pas") + 0.3 * r("pac") + 5 : 0.4 * r("pac") + 0.35 * r("pas") + 0.25 * r("sho") + ({ def: -6, mid: 1, fwd: 3 }[pl.pos] || 0) + (t === "playmaker" || t === "pace" ? 3 : t === "target" ? -3 : 0))
+			: 0.45 * r("def") + 0.35 * r("pac") + 22 - Math.max(0, (Number.isFinite(pl.age) ? pl.age : 25) - 30) * 2 + (t === "target" ? 8 : t === "winner" ? 4 : t === "pace" ? -2 : 0) + (pl.pos === "gk" ? 6 : 0);
+		return clamp(Math.round(v + j + sx), 30, 96);
+	}
+	const driOf = pl => (Number.isFinite(pl.dri) ? pl.dri : dpBase(pl, "dri"));
+	const phyOf = pl => (Number.isFinite(pl.phy) ? pl.phy : dpBase(pl, "phy"));
+	// All six, for a man taking the field.
+	const ratingsOf = pl => ({ pac: pl.pac, sho: pl.sho, pas: pl.pas, def: pl.def, dri: driOf(pl), phy: phyOf(pl) });
 	const roleOf = (pl, c) => {
 		if (ROLES[pl.role]) { return pl.role; }
 		// Picked for him: a starter is first team (key if he is one of the best five), anyone on the bench rotation.

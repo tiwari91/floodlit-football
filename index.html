@@ -1464,7 +1464,7 @@
 				<div class="lineup" id="lineup" aria-label="Line-up"></div>
 				<div class="lg-tablewrap">
 				<table class="lg-table sq-table" aria-label="Your squad">
-				<thead><tr><th>No</th><th class="club">Player</th><th class="club">Pos</th><th>Fit</th><th class="wide">PAC</th><th class="wide">SHO</th><th class="wide">PAS</th><th class="wide" title="Defending; handling for keepers">DEF</th><th>OVR</th></tr></thead>
+				<thead><tr><th>No</th><th class="club">Player</th><th class="club">Pos</th><th>Fit</th><th class="wide">PAC</th><th class="wide">SHO</th><th class="wide">PAS</th><th class="wide" title="Dribbling">DRI</th><th class="wide" title="Defending; handling for keepers">DEF</th><th class="wide" title="Physical">PHY</th><th>OVR</th></tr></thead>
 				<tbody id="sqBody"></tbody>
 				</table>
 				</div>
@@ -2205,7 +2205,8 @@
 	   squads are strong, never how strong. These are original, generalised design values written from
 	   broad public knowledge of each country's game (pace here, passing there); they are not copied from
 	   any game, ratings database or real player, and no real player is modelled.
-	   Fields: tag (shown in the UI), r = offsets on pace/shooting/passing/defending, e = position
+	   Fields: tag (shown in the UI), r = offsets on pace/shooting/passing/defending (dribbling and physical
+	   are in STYLE_DP below), e = position
 	   emphasis (offsets on overall by line, evened out over a full eleven), sp = rating spread (1 as
 	   before; under 1 a deep league, over 1 a patchy one), age = shift on the typical age, t = trait
 	   weights, lvl = the league's standing, 1 to 5 (shown only: strengths keep their existing tiers).
@@ -2244,8 +2245,12 @@
 		NGA: [ "waf" ], GHA: [ "waf" ], SEN: [ "waf" ], CIV: [ "waf" ], CMR: [ "waf" ], MAR: [ "maf" ],
 		JPN: [ "jpn" ], KOR: [ "kor" ], AUS: [ "aus" ], USA: [ "mls" ], MEX: [ "mex" ]
 	};
+	// Dribbling and physical, the same way: offsets on a player's derived dri and phy (see dpBase in 06).
+	// Neither counts toward overall, so they need no evening out. Generic design values, like the rest.
+	const STYLE_DP = { eng: [ -1, 3 ], brit: [ -2, 4 ], esp: [ 3, -2 ], ita: [ -1, 1 ], ger: [ 0, 2 ], fra: [ 1, 3 ], ned: [ 3, -1 ], por: [ 3, -1 ], bel: [ 2, 0 ], cro: [ 2, -1 ],
+		scan: [ -2, 3 ], east: [ -1, 3 ], bra: [ 5, -2 ], arg: [ 3, 1 ], uru: [ 0, 3 ], and: [ 3, -1 ], mex: [ 2, -1 ], mls: [ -1, 3 ], aus: [ -2, 4 ], jpn: [ 2, -2 ], kor: [ 0, 1 ], waf: [ 1, 4 ], maf: [ 3, 0 ] };
 	const HOME_NAT = "ENG";
-	const styleOf = nat => { const s = NAT_STYLE[nat]; return s ? { ...STYLE_BASE[s[0]], key: s[0], lvl: s[1] || STYLE_BASE[s[0]].lvl } : null; };
+	const styleOf = nat => { const s = NAT_STYLE[nat]; return s ? { ...STYLE_BASE[s[0]], key: s[0], lvl: s[1] || STYLE_BASE[s[0]].lvl, dp: STYLE_DP[s[0]] || [ 0, 0 ] } : null; };
 	// The country whose game the current league plays: the one you manage in, or home.
 	const curLeague = () => { try { return league; } catch (e) { return null; } };   // (null before the save is read)
 	const leagueNat = () => { const lg = curLeague(); return lg && lg.ident && NAT_STYLE[lg.ident.country] ? lg.ident.country : HOME_NAT; };
@@ -2341,8 +2346,25 @@
 		if (!ROLES[pl.role]) { pl.role = ""; }   // "" = picked for him from his standing in the squad
 		if (!Number.isFinite(pl.adapt)) { pl.adapt = 0; }
 		if (typeof pl.trait !== "string" || (pl.trait && !TRAITS[pl.trait])) { pl.trait = traitFor(pl); }
+		for (const k of [ "dri", "phy" ]) { if (k in pl && !Number.isFinite(pl[k])) { delete pl[k]; } }   // (left out, they are derived: dpBase)
 		return pl;
 	}
+	// Dribbling (dri) and physical (phy) are optional. A player without them (an old save, a file that leaves
+	// them out, a generated player) gets them from his other ratings, position, age, trait and his country's
+	// style, so they follow him as he develops. Neither counts toward overall.
+	function dpBase (pl, k) {
+		const h = hashStr(String(pl.name) + "|" + k + "|" + pl.pos), j = ((h >>> 3) % 7) - 3, t = pl.trait || "";
+		const s = pl.nat && NAT_STYLE[pl.nat] ? styleOf(pl.nat) : null, sx = s ? s.dp[k === "dri" ? 0 : 1] : 0;
+		const r = q => (Number.isFinite(pl[q]) ? pl[q] : 65);
+		const v = k === "dri"
+			? (pl.pos === "gk" ? 0.5 * r("pas") + 0.3 * r("pac") + 5 : 0.4 * r("pac") + 0.35 * r("pas") + 0.25 * r("sho") + ({ def: -6, mid: 1, fwd: 3 }[pl.pos] || 0) + (t === "playmaker" || t === "pace" ? 3 : t === "target" ? -3 : 0))
+			: 0.45 * r("def") + 0.35 * r("pac") + 22 - Math.max(0, (Number.isFinite(pl.age) ? pl.age : 25) - 30) * 2 + (t === "target" ? 8 : t === "winner" ? 4 : t === "pace" ? -2 : 0) + (pl.pos === "gk" ? 6 : 0);
+		return clamp(Math.round(v + j + sx), 30, 96);
+	}
+	const driOf = pl => (Number.isFinite(pl.dri) ? pl.dri : dpBase(pl, "dri"));
+	const phyOf = pl => (Number.isFinite(pl.phy) ? pl.phy : dpBase(pl, "phy"));
+	// All six, for a man taking the field.
+	const ratingsOf = pl => ({ pac: pl.pac, sho: pl.sho, pas: pl.pas, def: pl.def, dri: driOf(pl), phy: phyOf(pl) });
 	const roleOf = (pl, c) => {
 		if (ROLES[pl.role]) { return pl.role; }
 		// Picked for him: a starter is first team (key if he is one of the best five), anyone on the bench rotation.
@@ -2479,7 +2501,8 @@
 			pac: Math.min(99, p.pac + 3 * u.training),
 			sho: Math.min(99, p.sho + 3 * u.coaching),
 			pas: Math.min(99, p.pas + 3 * u.coaching),
-			def: Math.min(99, p.def + 3 * u.defence)
+			def: Math.min(99, p.def + 3 * u.defence),
+			dri: driOf(p), phy: phyOf(p)
 		};
 		if (!slotPos) { return base; }
 		const LINE = { def: 0, mid: 1, fwd: 2 };
@@ -2491,9 +2514,9 @@
 		const drill = league && league.club && Number.isFinite(league.club.drill) && [ ...league.club.squad, ...league.club.bench ].includes(p) ? Math.floor(league.club.drill / 40) : 0;
 		base.pas = Math.min(99, base.pas + drill); base.def = Math.min(99, base.def + drill);
 		const fb = formBonus(p);
-		if (fb) { for (const k of [ "pac", "sho", "pas", "def" ]) { base[k] = clamp(base[k] + fb, 20, 99); } }
+		if (fb) { for (const k of [ "pac", "sho", "pas", "def", "dri", "phy" ]) { base[k] = clamp(base[k] + fb, 20, 99); } }
 		const f = (v, w) => Math.max(20, Math.round(v * w * (p.inj > 0 ? 0.85 : 1) * mor * settle) - oop);
-		return { pac: f(base.pac, 0.75 + 0.25 * fit), sho: f(base.sho, 0.9 + 0.1 * fit), pas: f(base.pas, 0.9 + 0.1 * fit), def: f(base.def, 0.9 + 0.1 * fit) };
+		return { pac: f(base.pac, 0.75 + 0.25 * fit), sho: f(base.sho, 0.9 + 0.1 * fit), pas: f(base.pas, 0.9 + 0.1 * fit), def: f(base.def, 0.9 + 0.1 * fit), dri: f(base.dri, 0.85 + 0.15 * fit), phy: f(base.phy, 0.8 + 0.2 * fit) };
 	}
 	const fitOf = p => (Number.isFinite(p.fit) ? p.fit : 100);
 	// Form: his last five match ratings (out of 10). Well above a 6.5 average adds up to two to
@@ -2582,7 +2605,7 @@
 	function noteInjury (p, info) {
 		p.injured = true; p.injInfo = info;
 		if (p.team === 0 && p.name && league && league.club && leagueMatch) { if (!matchInjuries.includes(p.name)) { matchInjuries.push(p.name); } matchInjInfo[p.name] = info; }
-		if (p.attr) { p.attr = { ...p.attr, pac: Math.round(p.attr.pac * 0.85), sho: Math.round(p.attr.sho * 0.92) }; }
+		if (p.attr) { p.attr = { ...p.attr, pac: Math.round(p.attr.pac * 0.85), sho: Math.round(p.attr.sho * 0.92), dri: Math.round((p.attr.dri || 65) * 0.9) }; }
 		logEvent(p.team, "injury", `${p.name || "Player"} (${info.type}${info.serious ? ", stretchered off" : ""})`);
 	}
 	// The stretcher: two medics jog on from the near touchline, lift him and carry him off.
@@ -3247,15 +3270,12 @@
 		});
 	}
 
-	// The player card: a five-axis radar (pace, shooting, passing, defending and physical; physical is
-	// read from his defending, pace, age and build) with his form, morale, traits, age, nation and contract.
-	function physicalOf (pl, e) {
-		return Math.round(clamp(0.45 * e.def + 0.35 * e.pac + 22 - Math.max(0, (pl.age || 25) - 30) * 2 + (pl.trait === "target" ? 8 : 0) + (pl.pos === "gk" ? 6 : 0), 30, 99));
-	}
+	// The player card: a six-axis radar (pace, shooting, passing, dribbling, defending and physical) with his
+	// form, morale, traits, age, nation and contract.
 	function playerCard (pl, e) {
 		const NS = "http://www.w3.org/2000/svg", mk = (t, a) => { const n = document.createElementNS(NS, t); for (const k in a) { n.setAttribute(k, a[k]); } return n; };
-		const axes = [ [ "PAC", e.pac ], [ "SHO", e.sho ], [ "PAS", e.pas ], [ "DEF", e.def ], [ "PHY", physicalOf(pl, e) ] ];
-		const cx = 100, cy = 80, R = 50, pt = (k, r) => { const a = -Math.PI / 2 + k * Math.PI * 2 / 5; return [ cx + Math.cos(a) * r, cy + Math.sin(a) * r ]; };
+		const axes = [ [ "PAC", e.pac ], [ "SHO", e.sho ], [ "PAS", e.pas ], [ "DRI", Number.isFinite(e.dri) ? e.dri : driOf(pl) ], [ "DEF", e.def ], [ "PHY", Number.isFinite(e.phy) ? e.phy : phyOf(pl) ] ];
+		const cx = 100, cy = 80, R = 50, pt = (k, r) => { const a = -Math.PI / 2 + k * Math.PI * 2 / axes.length; return [ cx + Math.cos(a) * r, cy + Math.sin(a) * r ]; };
 		const svg = mk("svg", { viewBox: "0 0 200 150", role: "img", "aria-label": `${pl.name}: ${axes.map(([ k, v ]) => `${k} ${v}`).join(", ")}` });
 		for (const f of [ 0.25, 0.5, 0.75, 1 ]) { svg.append(mk("polygon", { class: "rd-grid", points: axes.map((x, k) => pt(k, R * f).map(v => v.toFixed(1)).join(",")).join(" ") })); }
 		axes.forEach((x, k) => { const [ x2, y2 ] = pt(k, R); svg.append(mk("line", { class: "rd-grid", x1: cx, y1: cy, x2: x2.toFixed(1), y2: y2.toFixed(1) })); });
@@ -3333,7 +3353,7 @@
 			bar.title = `Fitness ${fv}`;
 			fitTd.append(bar);
 			tr.append(el("td", "", list === "squad" ? String(FORMATS["11"].nums[i]) : "–"), nameTd, pc, fitTd,
-				el("td", "wide", String(e.pac)), el("td", "wide", String(e.sho)), el("td", "wide", String(e.pas)), el("td", "wide", String(e.def)), el("td", "ovr", String(o)));
+				el("td", "wide", String(e.pac)), el("td", "wide", String(e.sho)), el("td", "wide", String(e.pas)), el("td", "wide", String(e.dri)), el("td", "wide", String(e.def)), el("td", "wide", String(e.phy)), el("td", "ovr", String(o)));
 			sq.append(tr);
 			if (openPl === pl.name) {
 				const dr = el("tr", "detail"), td = el("td");
@@ -3422,7 +3442,7 @@
 			btns.append(b, b2);
 			if (!pl.scouted && rr) { const b3 = el("button", "", "Scout"); b3.type = "button"; b3.disabled = !(c.scoutLeft > 0); b3.addEventListener("click", () => scoutPlayer(i)); btns.append(b3); }
 			li.append(btns);
-			li.append(el("span", "ratings", rr ? `OVR about ${rr[0]}–${rr[1]} · not scouted` : `OVR ${ovrOf(pl)} · PAC ${pl.pac} SHO ${pl.sho} PAS ${pl.pas} DEF ${pl.def} · potential ${Math.round(pl.pot)}`));
+			li.append(el("span", "ratings", rr ? `OVR about ${rr[0]}–${rr[1]} · not scouted` : `OVR ${ovrOf(pl)} · PAC ${pl.pac} SHO ${pl.sho} PAS ${pl.pas} DRI ${driOf(pl)} DEF ${pl.def} PHY ${phyOf(pl)} · potential ${Math.round(pl.pot)}`));
 			const m = MARKETS[pl.region];
 			li.append(el("span", "swap", `${pl.from ? `${pl.from}, ` : ""}${m ? m.label : "Home"}${m && m.permit ? (ok ? " · work permit: yes" : ` · work permit: refused (needs ${PERMIT_OVR}+)`) : ""}${styleOf(pl.nat) ? ` · ${styleLine(pl.nat).toLowerCase()}` : ""}${m && m.adapt ? ` · settles in about ${Math.max(0, Math.ceil(m.adapt - staffLvl(c, "scout") * 0.5))} games` : ""}${!talks ? " · talks broken off" : ""}`));
 			li.append(el("span", "swap", out ? `Replaces ${out.name} (${ovrNow(out)}), sold for ${money(round1(priceOf(out) * 0.5))}` : "Joins your bench"));
@@ -4084,7 +4104,7 @@
 				if (subsLeft > 0 && pool.length) { const saved = timeLeft; timeLeft = matchLen * (1 - m / 90); makeSub(p, pool[0], true); timeLeft = saved; } else { p.injured = true; }
 			} else if (cpuSubs > 0) {
 				const was = p.name, np = genPlayer(p.role, cpuOvr(clamp(Math.round(oppStrength), 1, 5)) - 3);
-				p.name = np.name; p.attr = { pac: np.pac, sho: np.sho, pas: np.pas, def: np.def };
+				p.name = np.name; p.attr = ratingsOf(np);
 				cpuSubs--;
 				logEvent(1, "sub", `${np.name} on for ${was || "the injured man"}`, m);
 			}
@@ -5748,7 +5768,7 @@
 		if (choice === "fine" && t >= 75) { dm -= 4; df -= 1; }
 		pl.morale = clamp(Math.round(pl.morale + dm), 5, 100);
 		d.room = clamp(Math.round(d.room + e[1]), 0, 100);
-		const lift = (q, n) => { if (q && q.attr && n) { for (const k of [ "pac", "sho", "pas", "def" ]) { if (Number.isFinite(q.attr[k])) { q.attr[k] = clamp(q.attr[k] + n, 20, 99); } } } };
+		const lift = (q, n) => { if (q && q.attr && n) { for (const k of [ "pac", "sho", "pas", "def", "dri", "phy" ]) { if (Number.isFinite(q.attr[k])) { q.attr[k] = clamp(q.attr[k] + n, 20, 99); } } } };
 		lift(p, df);
 		if (choice === "back") { for (const q of team(0)) { if (q !== p) { lift(q, 1); } } }
 		if (choice === "fine") { c.budget = Math.round((c.budget + Math.max(0.001, wageOf(pl) / 52)) * 1000) / 1000; }
@@ -6205,7 +6225,7 @@
 	const SKIN_TONES = [ "#f1c9a5", "#e0ac86", "#c68a5e", "#9c6a44", "#6e4a30", "#4a3222" ];   // the same as SKIN and HAIR in 36
 	const HAIR_SHADES = [ "#1b1410", "#3b2616", "#6b4424", "#a0703a", "#d8b46a", "#2a2a2a" ];
 	const HAIR_NAMES = [ "Black", "Dark brown", "Brown", "Light brown", "Blond", "Dark grey" ];
-	const RATING_KEYS = [ "pac", "sho", "pas", "def" ], RATING_MIN = 30, RATING_MAX = 96;
+	const RATING_KEYS = [ "pac", "sho", "pas", "def", "dri", "phy" ], RATING_MIN = 30, RATING_MAX = 96;
 	const CLUB_EDIT_KEYS = [ "name", "short", "color", "color2", "ground", "manager", "managerNat" ], CLUB_SET_KEYS = [ ...CLUB_EDIT_KEYS, "text", "ink" ];
 	const PLAYER_EDIT_KEYS = [ "name", "nat", "shirt", "foot", "pos", "lk", "age", "trait", ...RATING_KEYS ];
 	const BAD_KEYS = new Set([ "__proto__", "constructor", "prototype" ]);
@@ -6706,8 +6726,9 @@
 		const tog = el("label", "ed-toggle"); tog.append(custom, el("span", "", "Custom ratings"));
 		custom.addEventListener("change", () => { setCustomRatings(lg, custom.checked); afterEdit(); renderEditor(); });
 		const rIn = {};
-		for (const [ k, label ] of [ [ "pac", "Pace" ], [ "sho", "Shooting" ], [ "pas", "Passing" ], [ "def", pl.pos === "gk" ? "Handling" : "Defending" ] ]) {
-			rIn[k] = input("number", pl[k], { id: `edR${k}`, min: RATING_MIN, max: RATING_MAX, disabled: !e.custom });
+		const derived = { dri: driOf(pl), phy: phyOf(pl) };   // (dribbling and physical are worked out unless set)
+		for (const [ k, label ] of [ [ "pac", "Pace" ], [ "sho", "Shooting" ], [ "pas", "Passing" ], [ "def", pl.pos === "gk" ? "Handling" : "Defending" ], [ "dri", "Dribbling" ], [ "phy", "Physical" ] ]) {
+			rIn[k] = input("number", Number.isFinite(pl[k]) ? pl[k] : derived[k], { id: `edR${k}`, min: RATING_MIN, max: RATING_MAX, disabled: !e.custom });
 			rat.append(field(label, rIn[k]));
 		}
 		const err = note("ed-err", "");
@@ -6716,7 +6737,7 @@
 		save.addEventListener("click", () => {
 			const f = { name: name.value, nat: nat.value, foot: foot.value, pos: pos.value, lk: { skin: skin.value, hair: hair.value, style: style.value, face: lk.face } };
 			if (shirt.value !== "") { f.shirt = Number(shirt.value); }
-			if (e.custom) { for (const k of RATING_KEYS) { f[k] = Number(rIn[k].value); } }
+			if (e.custom) { for (const k of RATING_KEYS) { if (!(k in derived) || Number.isFinite(pl[k]) || Number(rIn[k].value) !== derived[k]) { f[k] = Number(rIn[k].value); } } }
 			const r = editPlayer(lg, editor.where, editor.idx, f);
 			if (r.error) { err.textContent = r.error; return; }
 			afterEdit(); renderEditor(); toast("Player saved", "#7fd49b");
@@ -9866,7 +9887,7 @@
 		let hurtText = hurt ? (serious ? `${vic.name || "He"} is badly hurt (${vic.injInfo.type}).` : `${vic.name || "He"} is hurt and limping (${vic.injInfo.type}).${t === 0 && subsLeft > 0 ? " Press Subs to bring someone on." : ""}`) : "";
 		if (hurt && !serious && t === 1 && cpuSubs > 0) {
 			const was = vic.name, np = genPlayer(vic.role, cpuOvr(clamp(Math.round(oppStrength), 1, 5)) - 3);
-			vic.name = np.name; vic.attr = { pac: np.pac, sho: np.sho, pas: np.pas, def: np.def }; vic.injured = false; vic.yellow = 0;
+			vic.name = np.name; vic.attr = ratingsOf(np); vic.injured = false; vic.yellow = 0;
 			cpuSubs--;
 			hurtText = `${was || "Their man"} is hurt: ${opp.short} bring on ${np.name}.`;
 			setTimeout(() => { caption("Substitution", "sub", np.name, `${opp.short} · off: ${was || "injured"}`, 1); subBoard(1, vic); }, 2600);
@@ -20369,7 +20390,7 @@
 			get charging () { return charging; }, get passCharge () { return passCharge; }, get meterRect () { return meterRect; }, get drawMs () { return drawMs; }, get drawn () { return drawn; }, frameDue, get scale () { return scale; }, get kits () { return KITS; }, get stats () { return stats; }, get oppStats () { return oppStats; }, get steerAt () { return steerAt; }, set steerAt (v) { steerAt = v; }, set possTeam (v) { possTeam = v; },
 			set steerSwitchDone (v) { steerSwitchDone = !!v; },
 			get lastSwitchKind () { return lastSwitchKind; }, get line () { return line; }, get tackling () { return tackling; }, setLine (t, v) { line[t] = v; }, setTackling (t, v) { tackling[t] = v; }, set lastSwitchKind (v) { lastSwitchKind = v; }, get setPiece () { return setPiece; },
-			get G3 () { return G3; }, get matchLog () { return matchLog; }, get league () { return league; }, simSeasonTest () { simulateSeason(); }, balanceTest () { const sl = slotsFor(league.fmt), avg = a => a.reduce((t, v) => t + v, 0) / a.length; const you = avg(sl.map(i => ovrOf(league.club.squad[i]))); const all = [], per = league.members.filter(id => id !== 0).map(id => { const sq = cpuSquad(id, getStr(id)); all.push(...sq.map(ovrOf)); return avg(sl.map(i => ovrOf(sq[i]))); }); all.sort((a, b) => b - a); return { season: league.season, you, lg: avg(per), max: all[0], top5: all.slice(0, 5).join("/") }; }, nextSeasonTest () { if (seasonDone()) { newSeason(league.fmt); newMatch(); renderLeague(); } }, renderLeagueTest () { renderLeague(); }, get crowdHush () { return crowdHush; }, get crowdHeat () { return crowdHeat; }, renderLineupTest () { renderLineup(); }, crowdReactTest (k, t) { crowdReactImpl(k, t); }, get shoot () { return shoot; }, cornerTest (att, top = true) { if (state !== "play") { return; } freeze = 0; awardCorner(att, att === 1, top); }, get cornerPlan () { return cornerPlan; },
+			get G3 () { return G3; }, get matchLog () { return matchLog; }, get league () { return league; }, driOf, phyOf, ratingsOf, genPlayer, ensurePlayer, simSeasonTest () { simulateSeason(); }, balanceTest () { const sl = slotsFor(league.fmt), avg = a => a.reduce((t, v) => t + v, 0) / a.length; const you = avg(sl.map(i => ovrOf(league.club.squad[i]))); const all = [], per = league.members.filter(id => id !== 0).map(id => { const sq = cpuSquad(id, getStr(id)); all.push(...sq.map(ovrOf)); return avg(sl.map(i => ovrOf(sq[i]))); }); all.sort((a, b) => b - a); return { season: league.season, you, lg: avg(per), max: all[0], top5: all.slice(0, 5).join("/") }; }, nextSeasonTest () { if (seasonDone()) { newSeason(league.fmt); newMatch(); renderLeague(); } }, renderLeagueTest () { renderLeague(); }, get crowdHush () { return crowdHush; }, get crowdHeat () { return crowdHeat; }, renderLineupTest () { renderLineup(); }, crowdReactTest (k, t) { crowdReactImpl(k, t); }, get shoot () { return shoot; }, cornerTest (att, top = true) { if (state !== "play") { return; } freeze = 0; awardCorner(att, att === 1, top); }, get cornerPlan () { return cornerPlan; },
 			fkTest (t, x, y, indirect = false) { if (state !== "play") { return; } freeze = 0; const v = outfield(t).sort((a, b) => Math.hypot(a.x - x, a.y - y) - Math.hypot(b.x - x, b.y - y))[0]; v.x = x; v.y = y; awardFreeKick(t, v, { indirect }); },
 			penTest (t) { if (state !== "play") { return; } freeze = 0; awardPenalty(t, outfield(t)[0]); },
 			throwTest (t, x, top) { if (state !== "play") { return; } freeze = 0; awardThrow(t, x, top); },

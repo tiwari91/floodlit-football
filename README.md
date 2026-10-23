@@ -67,7 +67,7 @@ Edit names, in the League panel, opens edit mode:
   your league (yours too) and the foreign clubs on the transfer markets.
 - **Players**: name, nationality, shirt number, preferred foot, position, skin, hair colour and
   hair style, for your squad, the transfer list and the other clubs' squads. Ratings (pace,
-  shooting, passing, defending, from 30 to 96) can only be changed with Custom ratings on, so a
+  shooting, passing, defending, dribbling and physical, from 30 to 96) can only be changed with Custom ratings on, so a
   career stays balanced unless you choose otherwise.
 
 Everything is checked as you save: lengths, colours, and no two clubs or players of yours with
@@ -100,8 +100,10 @@ with every field, range, code and slot, is [`docs/option-file-schema.json`](docs
 - **Players**: the computer's squads are **11 with no bench**, by squad slot 0-10: goalkeeper, four
   defenders (1-4), four midfielders (5-8), two forwards (9-10). Each player has `name` (required),
   `nat`, `shirt`, `foot`, `pos`, `age`, `trait`, `lk` (skin, hair, hair style, face), and the ratings
-  `pac`, `sho`, `pas` and `def` (30 to 96; a goalkeeper's `def` is his handling). Ratings are used only
-  if you tick "Use its ratings" on import. Your own club has 11 plus a bench of 7.
+  `pac`, `sho`, `pas` and `def` (30 to 96; a goalkeeper's `def` is his handling), plus the optional
+  `dri` (dribbling) and `phy` (physical), also 30 to 96. Left out, dribbling and physical are worked out
+  from his other ratings, position, age, trait and country, and neither counts toward overall. Ratings are
+  used only if you tick "Use its ratings" on import. Your own club has 11 plus a bench of 7.
 - **`cup`**: keyed by country code, a list of clubs (no slot) for the Continental Champions Cup's
   36-club league phase. A country's seats (Spain, Germany, Italy and France 4, Portugal and the
   Netherlands 3, Belgium, Croatia, Denmark and Serbia 2, Sweden and Poland 1) are filled from its cup

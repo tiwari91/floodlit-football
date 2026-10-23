@@ -37,7 +37,7 @@
 		let hurtText = hurt ? (serious ? `${vic.name || "He"} is badly hurt (${vic.injInfo.type}).` : `${vic.name || "He"} is hurt and limping (${vic.injInfo.type}).${t === 0 && subsLeft > 0 ? " Press Subs to bring someone on." : ""}`) : "";
 		if (hurt && !serious && t === 1 && cpuSubs > 0) {
 			const was = vic.name, np = genPlayer(vic.role, cpuOvr(clamp(Math.round(oppStrength), 1, 5)) - 3);
-			vic.name = np.name; vic.attr = { pac: np.pac, sho: np.sho, pas: np.pas, def: np.def }; vic.injured = false; vic.yellow = 0;
+			vic.name = np.name; vic.attr = ratingsOf(np); vic.injured = false; vic.yellow = 0;
 			cpuSubs--;
 			hurtText = `${was || "Their man"} is hurt: ${opp.short} bring on ${np.name}.`;
 			setTimeout(() => { caption("Substitution", "sub", np.name, `${opp.short} · off: ${was || "injured"}`, 1); subBoard(1, vic); }, 2600);

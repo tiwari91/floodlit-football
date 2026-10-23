@@ -158,15 +158,12 @@
 		});
 	}
 
-	// The player card: a five-axis radar (pace, shooting, passing, defending and physical; physical is
-	// read from his defending, pace, age and build) with his form, morale, traits, age, nation and contract.
-	function physicalOf (pl, e) {
-		return Math.round(clamp(0.45 * e.def + 0.35 * e.pac + 22 - Math.max(0, (pl.age || 25) - 30) * 2 + (pl.trait === "target" ? 8 : 0) + (pl.pos === "gk" ? 6 : 0), 30, 99));
-	}
+	// The player card: a six-axis radar (pace, shooting, passing, dribbling, defending and physical) with his
+	// form, morale, traits, age, nation and contract.
 	function playerCard (pl, e) {
 		const NS = "http://www.w3.org/2000/svg", mk = (t, a) => { const n = document.createElementNS(NS, t); for (const k in a) { n.setAttribute(k, a[k]); } return n; };
-		const axes = [ [ "PAC", e.pac ], [ "SHO", e.sho ], [ "PAS", e.pas ], [ "DEF", e.def ], [ "PHY", physicalOf(pl, e) ] ];
-		const cx = 100, cy = 80, R = 50, pt = (k, r) => { const a = -Math.PI / 2 + k * Math.PI * 2 / 5; return [ cx + Math.cos(a) * r, cy + Math.sin(a) * r ]; };
+		const axes = [ [ "PAC", e.pac ], [ "SHO", e.sho ], [ "PAS", e.pas ], [ "DRI", Number.isFinite(e.dri) ? e.dri : driOf(pl) ], [ "DEF", e.def ], [ "PHY", Number.isFinite(e.phy) ? e.phy : phyOf(pl) ] ];
+		const cx = 100, cy = 80, R = 50, pt = (k, r) => { const a = -Math.PI / 2 + k * Math.PI * 2 / axes.length; return [ cx + Math.cos(a) * r, cy + Math.sin(a) * r ]; };
 		const svg = mk("svg", { viewBox: "0 0 200 150", role: "img", "aria-label": `${pl.name}: ${axes.map(([ k, v ]) => `${k} ${v}`).join(", ")}` });
 		for (const f of [ 0.25, 0.5, 0.75, 1 ]) { svg.append(mk("polygon", { class: "rd-grid", points: axes.map((x, k) => pt(k, R * f).map(v => v.toFixed(1)).join(",")).join(" ") })); }
 		axes.forEach((x, k) => { const [ x2, y2 ] = pt(k, R); svg.append(mk("line", { class: "rd-grid", x1: cx, y1: cy, x2: x2.toFixed(1), y2: y2.toFixed(1) })); });
@@ -244,7 +241,7 @@
 			bar.title = `Fitness ${fv}`;
 			fitTd.append(bar);
 			tr.append(el("td", "", list === "squad" ? String(FORMATS["11"].nums[i]) : "–"), nameTd, pc, fitTd,
-				el("td", "wide", String(e.pac)), el("td", "wide", String(e.sho)), el("td", "wide", String(e.pas)), el("td", "wide", String(e.def)), el("td", "ovr", String(o)));
+				el("td", "wide", String(e.pac)), el("td", "wide", String(e.sho)), el("td", "wide", String(e.pas)), el("td", "wide", String(e.dri)), el("td", "wide", String(e.def)), el("td", "wide", String(e.phy)), el("td", "ovr", String(o)));
 			sq.append(tr);
 			if (openPl === pl.name) {
 				const dr = el("tr", "detail"), td = el("td");
@@ -333,7 +330,7 @@
 			btns.append(b, b2);
 			if (!pl.scouted && rr) { const b3 = el("button", "", "Scout"); b3.type = "button"; b3.disabled = !(c.scoutLeft > 0); b3.addEventListener("click", () => scoutPlayer(i)); btns.append(b3); }
 			li.append(btns);
-			li.append(el("span", "ratings", rr ? `OVR about ${rr[0]}–${rr[1]} · not scouted` : `OVR ${ovrOf(pl)} · PAC ${pl.pac} SHO ${pl.sho} PAS ${pl.pas} DEF ${pl.def} · potential ${Math.round(pl.pot)}`));
+			li.append(el("span", "ratings", rr ? `OVR about ${rr[0]}–${rr[1]} · not scouted` : `OVR ${ovrOf(pl)} · PAC ${pl.pac} SHO ${pl.sho} PAS ${pl.pas} DRI ${driOf(pl)} DEF ${pl.def} PHY ${phyOf(pl)} · potential ${Math.round(pl.pot)}`));
 			const m = MARKETS[pl.region];
 			li.append(el("span", "swap", `${pl.from ? `${pl.from}, ` : ""}${m ? m.label : "Home"}${m && m.permit ? (ok ? " · work permit: yes" : ` · work permit: refused (needs ${PERMIT_OVR}+)`) : ""}${styleOf(pl.nat) ? ` · ${styleLine(pl.nat).toLowerCase()}` : ""}${m && m.adapt ? ` · settles in about ${Math.max(0, Math.ceil(m.adapt - staffLvl(c, "scout") * 0.5))} games` : ""}${!talks ? " · talks broken off" : ""}`));
 			li.append(el("span", "swap", out ? `Replaces ${out.name} (${ovrNow(out)}), sold for ${money(round1(priceOf(out) * 0.5))}` : "Joins your bench"));

@@ -517,7 +517,7 @@
 				if (subsLeft > 0 && pool.length) { const saved = timeLeft; timeLeft = matchLen * (1 - m / 90); makeSub(p, pool[0], true); timeLeft = saved; } else { p.injured = true; }
 			} else if (cpuSubs > 0) {
 				const was = p.name, np = genPlayer(p.role, cpuOvr(clamp(Math.round(oppStrength), 1, 5)) - 3);
-				p.name = np.name; p.attr = { pac: np.pac, sho: np.sho, pas: np.pas, def: np.def };
+				p.name = np.name; p.attr = ratingsOf(np);
 				cpuSubs--;
 				logEvent(1, "sub", `${np.name} on for ${was || "the injured man"}`, m);
 			}

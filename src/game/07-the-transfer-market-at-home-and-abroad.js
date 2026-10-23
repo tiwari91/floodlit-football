@@ -111,7 +111,8 @@
 			pac: Math.min(99, p.pac + 3 * u.training),
 			sho: Math.min(99, p.sho + 3 * u.coaching),
 			pas: Math.min(99, p.pas + 3 * u.coaching),
-			def: Math.min(99, p.def + 3 * u.defence)
+			def: Math.min(99, p.def + 3 * u.defence),
+			dri: driOf(p), phy: phyOf(p)
 		};
 		if (!slotPos) { return base; }
 		const LINE = { def: 0, mid: 1, fwd: 2 };
@@ -123,9 +124,9 @@
 		const drill = league && league.club && Number.isFinite(league.club.drill) && [ ...league.club.squad, ...league.club.bench ].includes(p) ? Math.floor(league.club.drill / 40) : 0;
 		base.pas = Math.min(99, base.pas + drill); base.def = Math.min(99, base.def + drill);
 		const fb = formBonus(p);
-		if (fb) { for (const k of [ "pac", "sho", "pas", "def" ]) { base[k] = clamp(base[k] + fb, 20, 99); } }
+		if (fb) { for (const k of [ "pac", "sho", "pas", "def", "dri", "phy" ]) { base[k] = clamp(base[k] + fb, 20, 99); } }
 		const f = (v, w) => Math.max(20, Math.round(v * w * (p.inj > 0 ? 0.85 : 1) * mor * settle) - oop);
-		return { pac: f(base.pac, 0.75 + 0.25 * fit), sho: f(base.sho, 0.9 + 0.1 * fit), pas: f(base.pas, 0.9 + 0.1 * fit), def: f(base.def, 0.9 + 0.1 * fit) };
+		return { pac: f(base.pac, 0.75 + 0.25 * fit), sho: f(base.sho, 0.9 + 0.1 * fit), pas: f(base.pas, 0.9 + 0.1 * fit), def: f(base.def, 0.9 + 0.1 * fit), dri: f(base.dri, 0.85 + 0.15 * fit), phy: f(base.phy, 0.8 + 0.2 * fit) };
 	}
 	const fitOf = p => (Number.isFinite(p.fit) ? p.fit : 100);
 	// Form: his last five match ratings (out of 10). Well above a 6.5 average adds up to two to

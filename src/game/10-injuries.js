@@ -14,7 +14,7 @@
 	function noteInjury (p, info) {
 		p.injured = true; p.injInfo = info;
 		if (p.team === 0 && p.name && league && league.club && leagueMatch) { if (!matchInjuries.includes(p.name)) { matchInjuries.push(p.name); } matchInjInfo[p.name] = info; }
-		if (p.attr) { p.attr = { ...p.attr, pac: Math.round(p.attr.pac * 0.85), sho: Math.round(p.attr.sho * 0.92) }; }
+		if (p.attr) { p.attr = { ...p.attr, pac: Math.round(p.attr.pac * 0.85), sho: Math.round(p.attr.sho * 0.92), dri: Math.round((p.attr.dri || 65) * 0.9) }; }
 		logEvent(p.team, "injury", `${p.name || "Player"} (${info.type}${info.serious ? ", stretchered off" : ""})`);
 	}
 	// The stretcher: two medics jog on from the near touchline, lift him and carry him off.

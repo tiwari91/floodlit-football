@@ -64,7 +64,9 @@
   "sho": "optional rating 30-96 (shooting)",
   "pas": "optional rating 30-96 (passing)",
   "def": "optional rating 30-96 (defending; handling for a goalkeeper)",
-  "ratingsNote": "Ratings are whole numbers from 30 to 96 and are only used when the importer ticks 'Use its ratings'. Without them the game rates every player from his club's strength. These four are every rating the game has: a goalkeeper has no separate attributes, and his def is his handling (a generated keeper is near pac 45, sho 30, pas 55). Overall is worked out from the four by position.",
+  "dri": "optional rating 30-96 (dribbling: close control, beating a man, how often he carries the ball)",
+  "phy": "optional rating 30-96 (physical: shielding, shoulder-to-shoulder duels, headers, stamina)",
+  "ratingsNote": "Ratings are whole numbers from 30 to 96 and are only used when the importer ticks 'Use its ratings'. Without them the game rates every player from his club's strength. A goalkeeper has no separate attributes: his def is his handling (a generated keeper is near pac 45, sho 30, pas 55). Overall is worked out from pac, sho, pas and def by position. dri and phy are optional: left out, they are worked out from his other ratings, position, age, trait and nationality; neither counts toward overall.",
   "notInFiles": "Morale, contract, potential, role and form belong to the season and are not set by files."
  },
  "traits": {

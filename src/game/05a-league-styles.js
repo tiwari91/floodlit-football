@@ -3,7 +3,8 @@
 	   squads are strong, never how strong. These are original, generalised design values written from
 	   broad public knowledge of each country's game (pace here, passing there); they are not copied from
 	   any game, ratings database or real player, and no real player is modelled.
-	   Fields: tag (shown in the UI), r = offsets on pace/shooting/passing/defending, e = position
+	   Fields: tag (shown in the UI), r = offsets on pace/shooting/passing/defending (dribbling and physical
+	   are in STYLE_DP below), e = position
 	   emphasis (offsets on overall by line, evened out over a full eleven), sp = rating spread (1 as
 	   before; under 1 a deep league, over 1 a patchy one), age = shift on the typical age, t = trait
 	   weights, lvl = the league's standing, 1 to 5 (shown only: strengths keep their existing tiers).
@@ -42,8 +43,12 @@
 		NGA: [ "waf" ], GHA: [ "waf" ], SEN: [ "waf" ], CIV: [ "waf" ], CMR: [ "waf" ], MAR: [ "maf" ],
 		JPN: [ "jpn" ], KOR: [ "kor" ], AUS: [ "aus" ], USA: [ "mls" ], MEX: [ "mex" ]
 	};
+	// Dribbling and physical, the same way: offsets on a player's derived dri and phy (see dpBase in 06).
+	// Neither counts toward overall, so they need no evening out. Generic design values, like the rest.
+	const STYLE_DP = { eng: [ -1, 3 ], brit: [ -2, 4 ], esp: [ 3, -2 ], ita: [ -1, 1 ], ger: [ 0, 2 ], fra: [ 1, 3 ], ned: [ 3, -1 ], por: [ 3, -1 ], bel: [ 2, 0 ], cro: [ 2, -1 ],
+		scan: [ -2, 3 ], east: [ -1, 3 ], bra: [ 5, -2 ], arg: [ 3, 1 ], uru: [ 0, 3 ], and: [ 3, -1 ], mex: [ 2, -1 ], mls: [ -1, 3 ], aus: [ -2, 4 ], jpn: [ 2, -2 ], kor: [ 0, 1 ], waf: [ 1, 4 ], maf: [ 3, 0 ] };
 	const HOME_NAT = "ENG";
-	const styleOf = nat => { const s = NAT_STYLE[nat]; return s ? { ...STYLE_BASE[s[0]], key: s[0], lvl: s[1] || STYLE_BASE[s[0]].lvl } : null; };
+	const styleOf = nat => { const s = NAT_STYLE[nat]; return s ? { ...STYLE_BASE[s[0]], key: s[0], lvl: s[1] || STYLE_BASE[s[0]].lvl, dp: STYLE_DP[s[0]] || [ 0, 0 ] } : null; };
 	// The country whose game the current league plays: the one you manage in, or home.
 	const curLeague = () => { try { return league; } catch (e) { return null; } };   // (null before the save is read)
 	const leagueNat = () => { const lg = curLeague(); return lg && lg.ident && NAT_STYLE[lg.ident.country] ? lg.ident.country : HOME_NAT; };

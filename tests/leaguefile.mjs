@@ -17,7 +17,7 @@ const ready = async () => { await page.waitForSelector("#ovButton"); await page.
 // Invented names: letters only, so they pass the player-name check.
 const L = "abcdefghijklmnopqrstuvwxyz";
 const word = (n, k) => L[n % 26].toUpperCase() + L[(n * 7 + k) % 26] + L[(n * 3 + 5) % 26] + L[(n + k * 11) % 26] + "o";
-const players = (seed, n = 11) => Array.from({ length: n }, (_, j) => ({ slot: j, name: `${word(seed + j, 1)} ${word(seed * 3 + j, 2)}`, nat: "ENG", shirt: j + 1, foot: j % 3 ? "right" : "left", pos: [ "gk", "def", "def", "def", "def", "mid", "mid", "mid", "mid", "fwd", "fwd" ][j], age: 20 + j, trait: j === 9 ? "poacher" : "", lk: { skin: "#c68a5e", hair: "#1b1410", style: "short", face: j }, pac: 70, sho: 60 + j, pas: 70, def: 50 }));
+const players = (seed, n = 11) => Array.from({ length: n }, (_, j) => ({ slot: j, name: `${word(seed + j, 1)} ${word(seed * 3 + j, 2)}`, nat: "ENG", shirt: j + 1, foot: j % 3 ? "right" : "left", pos: [ "gk", "def", "def", "def", "def", "mid", "mid", "mid", "mid", "fwd", "fwd" ][j], age: 20 + j, trait: j === 9 ? "poacher" : "", lk: { skin: "#c68a5e", hair: "#1b1410", style: "short", face: j }, pac: 70, sho: 60 + j, pas: 70, def: 50, ...(j === 9 ? { dri: 88, phy: 61 } : {}) }));
 const league = (tag, n, seed) => ({ clubs: Array.from({ length: n }, (_, i) => ({ slot: i + 1, name: `${tag} Club ${word(seed + i, 3)}`, short: `${tag}${i + 1}`, color: "#1d4fa0", color2: "#ffffff", ground: `${tag} Ground ${i + 1}`, manager: `${word(seed + i, 4)} ${word(seed + i, 5)}`, managerNat: "ITA", players: players(seed + i * 13) })) });
 const v2 = {
 	kind: "floodlit-option-file", version: 2, customRatings: true,
@@ -57,7 +57,9 @@ try {
 		return { kept, names: lg.members.filter(i => i).map(i => F.TEAMS[i].name), mgr: F.TEAMS[1].manager, p0: sq[0].name, p9: { ...sq[9] }, stored: !!localStorage.getItem("ff-leaguefile") };
 	}, JSON.stringify(v2));
 	check("applying it while abroad shows the file's clubs in that league", applied.kept && applied.stored && applied.names.every(n => /^Esp Club/.test(n)), JSON.stringify(applied.names.slice(0, 3)));
-	check("their squads are the file's eleven, with age, trait, ratings and the manager", /^[A-Z]/.test(applied.p0) && applied.p9.trait === "poacher" && applied.p9.age === 29 && applied.p9.sho === 69 && /\w/.test(applied.mgr || ""), JSON.stringify({ p9: applied.p9.name, mgr: applied.mgr }));
+	check("their squads are the file's eleven, with age, trait, ratings and the manager", /^[A-Z]/.test(applied.p0) && applied.p9.trait === "poacher" && applied.p9.age === 29 && applied.p9.sho === 69 && applied.p9.dri === 88 && applied.p9.phy === 61 && /\w/.test(applied.mgr || ""), JSON.stringify({ p9: applied.p9.name, mgr: applied.mgr }));
+	const dp = await page.evaluate(() => { const F = window.__ff, f = JSON.parse(localStorage.getItem("ff-leaguefile") || "{}"), p = (((f.leagues || {}).ESP || {}).clubs || [])[0]; const q = p && p.players.find(x => x.slot === 9), r = p && p.players.find(x => x.slot === 8); return { q: q && [ q.dri, q.phy ], r: r && [ "dri" in r, "phy" in r ], sq: F.cpuSquad(1, F.getStr(1)).map(x => [ F.driOf(x), F.phyOf(x) ]).flat() }; });
+	check("dribbling and physical round-trip through the stored file; left out, they stay derived", JSON.stringify(dp.q) === "[88,61]" && JSON.stringify(dp.r) === "[false,false]" && dp.sq.every(v => v >= 30 && v <= 96), JSON.stringify(dp));
 	const panel = await page.evaluate(() => { window.__ff.renderLeagueTest(); return document.getElementById("clubGrid").textContent; });
 	check("the club card shows the manager", /Manager \w+ \w+ \(Italy\)/.test(panel), panel.slice(0, 120));
 

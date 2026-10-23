@@ -312,7 +312,7 @@
 		if (choice === "fine" && t >= 75) { dm -= 4; df -= 1; }
 		pl.morale = clamp(Math.round(pl.morale + dm), 5, 100);
 		d.room = clamp(Math.round(d.room + e[1]), 0, 100);
-		const lift = (q, n) => { if (q && q.attr && n) { for (const k of [ "pac", "sho", "pas", "def" ]) { if (Number.isFinite(q.attr[k])) { q.attr[k] = clamp(q.attr[k] + n, 20, 99); } } } };
+		const lift = (q, n) => { if (q && q.attr && n) { for (const k of [ "pac", "sho", "pas", "def", "dri", "phy" ]) { if (Number.isFinite(q.attr[k])) { q.attr[k] = clamp(q.attr[k] + n, 20, 99); } } } };
 		lift(p, df);
 		if (choice === "back") { for (const q of team(0)) { if (q !== p) { lift(q, 1); } } }
 		if (choice === "fine") { c.budget = Math.round((c.budget + Math.max(0.001, wageOf(pl) / 52)) * 1000) / 1000; }

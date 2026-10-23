@@ -21,7 +21,7 @@
 	const SKIN_TONES = [ "#f1c9a5", "#e0ac86", "#c68a5e", "#9c6a44", "#6e4a30", "#4a3222" ];   // the same as SKIN and HAIR in 36
 	const HAIR_SHADES = [ "#1b1410", "#3b2616", "#6b4424", "#a0703a", "#d8b46a", "#2a2a2a" ];
 	const HAIR_NAMES = [ "Black", "Dark brown", "Brown", "Light brown", "Blond", "Dark grey" ];
-	const RATING_KEYS = [ "pac", "sho", "pas", "def" ], RATING_MIN = 30, RATING_MAX = 96;
+	const RATING_KEYS = [ "pac", "sho", "pas", "def", "dri", "phy" ], RATING_MIN = 30, RATING_MAX = 96;
 	const CLUB_EDIT_KEYS = [ "name", "short", "color", "color2", "ground", "manager", "managerNat" ], CLUB_SET_KEYS = [ ...CLUB_EDIT_KEYS, "text", "ink" ];
 	const PLAYER_EDIT_KEYS = [ "name", "nat", "shirt", "foot", "pos", "lk", "age", "trait", ...RATING_KEYS ];
 	const BAD_KEYS = new Set([ "__proto__", "constructor", "prototype" ]);
@@ -522,8 +522,9 @@
 		const tog = el("label", "ed-toggle"); tog.append(custom, el("span", "", "Custom ratings"));
 		custom.addEventListener("change", () => { setCustomRatings(lg, custom.checked); afterEdit(); renderEditor(); });
 		const rIn = {};
-		for (const [ k, label ] of [ [ "pac", "Pace" ], [ "sho", "Shooting" ], [ "pas", "Passing" ], [ "def", pl.pos === "gk" ? "Handling" : "Defending" ] ]) {
-			rIn[k] = input("number", pl[k], { id: `edR${k}`, min: RATING_MIN, max: RATING_MAX, disabled: !e.custom });
+		const derived = { dri: driOf(pl), phy: phyOf(pl) };   // (dribbling and physical are worked out unless set)
+		for (const [ k, label ] of [ [ "pac", "Pace" ], [ "sho", "Shooting" ], [ "pas", "Passing" ], [ "def", pl.pos === "gk" ? "Handling" : "Defending" ], [ "dri", "Dribbling" ], [ "phy", "Physical" ] ]) {
+			rIn[k] = input("number", Number.isFinite(pl[k]) ? pl[k] : derived[k], { id: `edR${k}`, min: RATING_MIN, max: RATING_MAX, disabled: !e.custom });
 			rat.append(field(label, rIn[k]));
 		}
 		const err = note("ed-err", "");
@@ -532,7 +533,7 @@
 		save.addEventListener("click", () => {
 			const f = { name: name.value, nat: nat.value, foot: foot.value, pos: pos.value, lk: { skin: skin.value, hair: hair.value, style: style.value, face: lk.face } };
 			if (shirt.value !== "") { f.shirt = Number(shirt.value); }
-			if (e.custom) { for (const k of RATING_KEYS) { f[k] = Number(rIn[k].value); } }
+			if (e.custom) { for (const k of RATING_KEYS) { if (!(k in derived) || Number.isFinite(pl[k]) || Number(rIn[k].value) !== derived[k]) { f[k] = Number(rIn[k].value); } } }
 			const r = editPlayer(lg, editor.where, editor.idx, f);
 			if (r.error) { err.textContent = r.error; return; }
 			afterEdit(); renderEditor(); toast("Player saved", "#7fd49b");
