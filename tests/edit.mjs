@@ -113,10 +113,10 @@ try {
 		const F = window.__ff, lg = F.league, q = lg.club.squad[6], d0 = F.driOf(q);
 		F.setCustomRatings(lg, true); F.editPlayer(lg, "you", 6, { dri: 93, phy: 41 });
 		const file = F.buildOptionFile(lg), text = JSON.stringify(file);
-		F.revertEdits(lg); const gone = [ q.dri, q.phy, F.driOf(q) === d0 ];
+		F.resetPlayer(lg, "you", 6); const gone = [ q.dri, q.phy, F.driOf(q) === d0 ];
 		F.applyOptionFile(lg, F.readOptionFile(text, lg), "now", true);
 		const back = [ q.dri, q.phy ], others = !/"dri"|"phy"/.test(text.replace(/"dri":93,|"phy":41/g, ""));
-		F.revertEdits(lg); F.setCustomRatings(lg, false);
+		F.resetPlayer(lg, "you", 6); F.setCustomRatings(lg, false);   // only this player: the edits above are still in use below
 		return { gone, back, others };
 	});
 	check("dribbling and physical round-trip through the option file; unset, none are written", dp.gone[0] === undefined && dp.gone[1] === undefined && dp.gone[2] && dp.back[0] === 93 && dp.back[1] === 41 && dp.others, JSON.stringify(dp));

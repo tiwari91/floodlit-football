@@ -422,7 +422,7 @@
 			}
 			// A good dribbler is happy with a man close and sometimes takes him on instead of laying it off;
 			// a poor one moves it on sooner.
-			const dd = driD(p), pressure = openness(p) < 55 - 10 * dd, carry = dd > 0 && rel(p.team, p.x) > FW * 0.3 && Math.random() < 0.4 * dd;
+			const dd = driD(p), pressure = openness(p) < 55 - 10 * dd, carry = dd > 0 && rel(p.team, p.x) > FW * 0.3 && Math.random() < 0.2 * dd;
 			// Possession sides move it on short and often; direct sides look forward.
 			if (!carry && (pressure || Math.random() < (style[p.team] === "possession" ? 0.14 : 0.06) * (1 - 0.4 * dd))) {
 				let best = null, bs = -Infinity;

@@ -644,7 +644,7 @@
 		}
 		if (!a) { if (ball.z < 30 && ball.landT < 3) { tally.air.none++; } return false; }
 		// Attacking a ball is easier than defending it: the runner knows where he's going.
-		const air = (p, d) => (24 - d) * 0.5 + (Math.max(A(p, "def"), A(p, "sho")) - 65) * 0.08 + phyD(p) * 4 + Math.random() * 6 + (p.team === lastTouch ? (shoot ? 3.5 : 1.5) : 0) + (tr(p, "target") ? 5 : 0);
+		const air = (p, d) => (24 - d) * 0.5 + (Math.max(A(p, "def"), A(p, "sho")) - 65) * 0.08 + phyD(p) * 2 + Math.random() * 6 + (p.team === lastTouch ? (shoot ? 3.5 : 1.5) : 0) + (tr(p, "target") ? 5 : 0);
 		let w = a, l = b && b.team !== a.team && db < 28 ? b : null;
 		if (l && air(l, db) > air(a, da)) { w = l; l = a; }
 		const isYou = w.team === 0 && players.indexOf(w) === ctrl;
