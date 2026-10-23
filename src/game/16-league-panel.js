@@ -88,13 +88,13 @@
 		const grid = $("clubGrid");
 		grid.replaceChildren();
 		$("clubsDiv").setAttribute("aria-pressed", String(clubsView === "div"));
-		if ($("lgDivName")) { $("lgDivName").textContent = divisionName(); }
+		if ($("lgDivName")) { $("lgDivName").textContent = divisionName(); $("lgDivName").title = `${styleLine(leagueNat())} · league level ${styleOf(leagueNat()).lvl} of 5`; }
 		$("clubsBelow").setAttribute("aria-pressed", String(clubsView === "below"));
 		const rows = standings(), posOf = new Map(rows.map((r, i) => [ r.id, i + 1 ]));
 		const ids = clubsView === "div"
 			? rows.map(r => r.id).filter(id => id !== 0)
 			: TEAMS.map((t, i) => i).filter(i => i !== 0 && !league.members.includes(i)).sort((a, b) => getStr(b) - getStr(a));
-		$("clubsNote").textContent = clubsView === "div" ? "In table order. Tap a club to see its squad." : "The clubs below, strongest first: three of them come up at the end of each season.";
+		$("clubsNote").textContent = `${clubsView === "div" ? "In table order. Tap a club to see its squad." : "The clubs below, strongest first: three of them come up at the end of each season."} League ${styleLine(leagueNat()).toLowerCase()}.`;
 		for (const id of ids) {
 			const t = TEAMS[id], str = getStr(id), [ st, pr ] = cpuInstructions(id, str), sq = cpuSquad(id, str);
 			const fw = sq.filter(q => q.pos === "fwd").sort((a, b) => b.sho - a.sho)[0], df = sq.filter(q => q.pos === "def").sort((a, b) => b.def - a.def)[0];
@@ -108,6 +108,7 @@
 			card.append(name);
 			const l1 = el("div", "cc-line"); l1.append(el("span", "stars", stars(Math.round(str))), document.createTextNode(` · ${t.ground} (${SURFACES[t.surface].label.toLowerCase()})`)); card.append(l1);
 			card.append(el("div", "cc-line", `Plays ${STYLES[st].toLowerCase()} football, ${PRESSES[pr].toLowerCase()}`));
+			if (clubNat(id) !== leagueNat()) { card.append(el("div", "cc-line", `${styleLine(clubNat(id))} (${NATIONS[clubNat(id)][0]})`)); }   // a guest from abroad plays its own country's game
 			card.append(el("div", "cc-line", `Danger man ${fw.name} (SHO ${fw.sho}) · Rock ${df.name} (DEF ${df.def})`));
 			if (openClub === id) {
 				const ol = el("ol");
@@ -333,7 +334,7 @@
 			li.append(btns);
 			li.append(el("span", "ratings", rr ? `OVR about ${rr[0]}–${rr[1]} · not scouted` : `OVR ${ovrOf(pl)} · PAC ${pl.pac} SHO ${pl.sho} PAS ${pl.pas} DEF ${pl.def} · potential ${Math.round(pl.pot)}`));
 			const m = MARKETS[pl.region];
-			li.append(el("span", "swap", `${pl.from ? `${pl.from}, ` : ""}${m ? m.label : "Home"}${m && m.permit ? (ok ? " · work permit: yes" : ` · work permit: refused (needs ${PERMIT_OVR}+)`) : ""}${m && m.adapt ? ` · settles in about ${Math.max(0, Math.ceil(m.adapt - staffLvl(c, "scout") * 0.5))} games` : ""}${!talks ? " · talks broken off" : ""}`));
+			li.append(el("span", "swap", `${pl.from ? `${pl.from}, ` : ""}${m ? m.label : "Home"}${m && m.permit ? (ok ? " · work permit: yes" : ` · work permit: refused (needs ${PERMIT_OVR}+)`) : ""}${styleOf(pl.nat) ? ` · ${styleLine(pl.nat).toLowerCase()}` : ""}${m && m.adapt ? ` · settles in about ${Math.max(0, Math.ceil(m.adapt - staffLvl(c, "scout") * 0.5))} games` : ""}${!talks ? " · talks broken off" : ""}`));
 			li.append(el("span", "swap", out ? `Replaces ${out.name} (${ovrNow(out)}), sold for ${money(round1(priceOf(out) * 0.5))}` : "Joins your bench"));
 			if (pick) { li.append(el("span", "swap gain", `+${pick.gain} on ${pick.weak.name} (${pick.weakOvr})${pick.est ? " by the estimate: scout him to be sure" : ""}`)); }
 			mk.append(li);
