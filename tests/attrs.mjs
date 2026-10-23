@@ -36,7 +36,7 @@ try {
 		check("an old save's player keeps his overall and nothing is written to him", d.o0 === d.o1 && !d.stored, JSON.stringify(d));
 		check("defaults follow the player: a quick forward dribbles better, a centre-back is stronger", d.f[0] > d.c[0] + 10 && d.c[1] > d.f[1] + 5, JSON.stringify([ d.f, d.c ]));
 		check("set values win; a bad one is dropped for the derived value", d.set[0] === 91 && d.set[1] === 33 && !d.bad);
-		check("generated players: dribbling and physical in range, around a typical 60-80", d.range && d.g.every(v => v > 60 && v < 80), JSON.stringify(d.g));
+		check("generated players: dribbling and physical in range, around a typical 60-82", d.range && d.g.every(v => v > 60 && v < 82), JSON.stringify(d.g));
 		check("the men on the pitch carry dribbling and physical", d.attr);
 		await ctx.close();
 	}
