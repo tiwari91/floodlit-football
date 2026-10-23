@@ -2,7 +2,7 @@
 // FF_SHOTS=<dir> also saves screenshots of the editor and the import preview there.
 import fs from "node:fs";
 import path from "node:path";
-import { launch, serve, tally, OUT } from "./_env.mjs";
+import { launch, serve, tally, OUT, showTab } from "./_env.mjs";
 const server = serve(8793), URL = server.url;
 const { check, done } = tally();
 const SHOTS = process.env.FF_SHOTS || OUT;
@@ -35,6 +35,7 @@ try {
 
 	// Edit a club through the editor.
 	const orig = await page.evaluate(() => ({ club: window.__ff.TEAMS[1].name, player: window.__ff.league.club.squad[9].name, id: window.__ff.league.club.squad[9].id, buyer: window.__ff.league.members.find(id => id > 1) }));
+	await showTab(page, "settings");
 	await page.click("#lgEdit");
 	await page.selectOption("#edClubSel", "1");
 	await page.fill("#edClubName", "Port Wexham");

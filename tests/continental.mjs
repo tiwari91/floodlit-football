@@ -111,6 +111,7 @@ check("the draw is saved and comes back after a reload", saved === 144 && reload
 const panel = await page.evaluate(() => { window.__ff.renderLeague(); const c = document.querySelector(".lg-cont"); return c ? { h: c.querySelector("h4").textContent, rows: c.querySelectorAll(".cc-table tr").length } : null; });
 check("the panel has a card with the league-phase table", panel && panel.h === "Continental Champions Cup" && panel.rows === 37, JSON.stringify(panel));
 if (process.env.FF_SHOTS) {
+	await page.evaluate(() => document.getElementById("tab-cups").click());
 	await page.evaluate(() => { const c = document.querySelector(".lg-cont"); c.querySelectorAll("details").forEach(d => { d.open = true; }); c.scrollIntoView(); });
 	await sleep(300);
 	const c = await page.$(".lg-cont"); if (c) { await c.screenshot({ path: `${process.env.FF_SHOTS}/continental-panel.png` }); }

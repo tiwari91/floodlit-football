@@ -1,5 +1,5 @@
 // Run: node tests/drama.mjs   (the dressing room: rows, refusals, transfer requests, flare-ups, old saves)
-import { launch, serve, tally, OUT } from "./_env.mjs";
+import { launch, serve, tally, OUT, showTab } from "./_env.mjs";
 const server = serve(8800), URL = server.url;
 const { check, done } = tally();
 const browser = await launch();
@@ -13,6 +13,7 @@ await page.waitForFunction(() => window.__ff && window.__ff.league && window.__f
 
 // Layout: the view and sound cards are a label column and a controls column, the same height side by side,
 // with every control the same height; the league header's buttons sit in one row.
+await showTab(page, "settings");
 const layout = await page.evaluate(() => {
 	document.body.classList.add("more");
 	const box = e => e.getBoundingClientRect(), r1 = v => Math.round(v);
@@ -141,7 +142,7 @@ await page.evaluate(() => {
 const ui = await page.evaluate(() => { const b = document.getElementById("lgDrama"); return b ? { text: b.textContent.slice(0, 300), buttons: [ ...b.querySelectorAll("button") ].map(x => x.textContent) } : null; });
 check("the League panel lists the problems with talk, back, fine and drop", ui && [ "Talk to him", "Back yourself", "Fine him", "Drop him" ].every(l => ui.buttons.includes(l)), JSON.stringify(ui));
 const shot = process.env.FF_SHOTS;
-if (shot) { const box = await page.$("#lgDrama"); if (box) { await box.scrollIntoViewIfNeeded(); await page.screenshot({ path: `${shot}/drama-panel.png` }); } }
+if (shot) { await showTab(page, "overview"); const box = await page.$("#lgDrama"); if (box) { await box.scrollIntoViewIfNeeded(); await page.screenshot({ path: `${shot}/drama-panel.png` }); } }
 
 // An old save with none of this loads cleanly and is filled in.
 const old = await page.evaluate(() => {

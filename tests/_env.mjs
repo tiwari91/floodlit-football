@@ -29,3 +29,5 @@ export function tally () {
 	const done = () => { console.log(`\n${pass} passed, ${fail} failed`); return fail; };
 	return { check, done };
 }
+// The sections under the pitch sit in tabs (the manager hub): open one before clicking or measuring inside it.
+export const showTab = (page, name) => page.evaluate(n => document.getElementById(`tab-${n}`).click(), name);
