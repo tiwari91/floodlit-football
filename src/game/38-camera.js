@@ -42,11 +42,21 @@
 		}
 	}
 
-	const replayTagEl = $("replayTag");
+	const replayTagEl = $("replayTag"), wipeEl = $("replayWipe");
+	// A band sweeps across the picture as a replay starts and as it ends (a skip too). It is pure CSS and
+	// clears itself; with reduced motion there is none.
+	let wipeT = 0;
+	function replayWipe () {
+		if (!wipeEl || reduceMotion || bulkSim) { return; }
+		wipeEl.hidden = false;
+		wipeEl.classList.remove("go"); void wipeEl.offsetWidth; wipeEl.classList.add("go");
+		clearTimeout(wipeT);
+		wipeT = setTimeout(() => { wipeEl.hidden = true; wipeEl.classList.remove("go"); }, 620);
+	}
 	function drawScene () {
 		// The REPLAY tag over the picture while one runs (and no GOAL banner over the replay).
 		const rp = (view3D() && replayOn()) || !!odr;
-		if (replayTagEl && replayTagEl.hidden === rp) { replayTagEl.hidden = !rp; if (rp) { banner.hidden = true; } }
+		if (replayTagEl && replayTagEl.hidden === rp) { replayTagEl.hidden = !rp; if (rp) { banner.hidden = true; } replayWipe(); }
 		if (view3D() && drawScene3D()) { return; }   // while three.js loads, the painted TV camera stands in
 		if ((camMode === "tv" || camMode === "3d") && !benchCam()) { drawSceneTV(); return; }
 		drawSceneTop();

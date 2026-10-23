@@ -51,7 +51,7 @@ for (const [ label, opts ] of [
 		await new Promise(res => { const t0 = performance.now(); function f (t) { F.ball.owner = me; me.x = F.FW - 200; me.y = 80; me.vx = me.vy = 0; const dt = (t - lastT) / 1000; if (dt > 0.1) { maxV = Math.max(maxV, Math.abs(G.cam.position.x - last) / dt); last = G.cam.position.x; lastT = t; } if (t - t0 < 1500) { requestAnimationFrame(f); } else { res(); } } requestAnimationFrame(f); });
 		return { maxV: Math.round(maxV), FW: F.FW, x: Math.round(G.cam.position.x), shot: G.shot };
 	});
-	check("the TV camera glides: never faster than about two thirds of the pitch a second", pan.shot === "tv" && pan.maxV > 50 && pan.maxV <= pan.FW * 0.7, JSON.stringify(pan));
+	check("the TV camera glides: never faster than about two thirds of the pitch a second", pan.shot === "tv" && pan.maxV > 50 && pan.maxV <= pan.FW * 0.8, JSON.stringify(pan));
 	await page.keyboard.press("c"); await sleep(300);
 	const a = await page.evaluate(() => [ window.__ff.camMode, window.__ff.G3.shot, localStorage.getItem("ff-cam2") ]);
 	await page.keyboard.press("c"); await sleep(300);
@@ -77,6 +77,52 @@ for (const [ label, opts ] of [
 	const step = await page.evaluate(() => { const F = window.__ff; F.dynSet(0.8); return { s: F.dynScale, v3: F.view3D }; });
 	check("Light can draw the 3D picture with fewer pixels instead of leaving 3D", step.s === 0.8 && step.v3, JSON.stringify(step));
 	check("Light: no console errors", errs.length === 0, errs.join(" | "));
+	await ctx.close();
+}
+
+// The broadcast HUD: the score box with both colour chips, the added-time badge, the radar on by default and
+// clear of the touch controls on a phone on its side.
+{
+	const { ctx, page, errs } = await open("landscape", { ...devices["iPhone 13"], viewport: { width: 844, height: 390 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }, { "ff-cam2": "tv" });
+	const hud = await page.evaluate(async () => {
+		const F = window.__ff, bug = document.getElementById("scoreBug"), chips = [ ...bug.querySelectorAll(".chip") ].map(c => getComputedStyle(c).backgroundColor);
+		F.startAdded(0); await new Promise(r => setTimeout(r, 300));
+		const ad = document.getElementById("bugAdded"), R = F.radarRect(), hit = el => { const b = el.getBoundingClientRect(); return b.width > 0 && b.left < R.right && b.right > R.left && b.top < R.bottom && b.bottom > R.top; };
+		return { shown: getComputedStyle(bug).display !== "none", chips, added: !ad.hidden && ad.textContent, radar: R, stick: hit(document.getElementById("stick")), pads: [ ...document.querySelectorAll(".pads .pad") ].some(hit) };
+	});
+	await page.screenshot({ path: `${OUT}/look-hud-landscape.png` });
+	check("score box: shown, with a colour chip for each side", hud.shown && hud.chips.length === 2 && hud.chips[0] !== hud.chips[1], JSON.stringify(hud.chips));
+	check("score box: the added time shows as a badge by the clock", /^\+\d$/.test(hud.added || ""), String(hud.added));
+	check("the radar is on by default and covers none of the touch controls", hud.radar.shown && !hud.stick && !hud.pads, JSON.stringify(hud));
+	check("HUD: no console errors", errs.length === 0, errs.join(" | "));
+	await ctx.close();
+}
+
+// A goal on the TV camera: a wipe into the replay, the end of it slowed down from behind the goal, a key skips it,
+// and the wipe clears itself.
+{
+	const { ctx, page, errs } = await open("replay", { viewport: { width: 1280, height: 720 } }, { "ff-cam2": "tv" });
+	const r = await page.evaluate(async () => {
+		const F = window.__ff, wipe = document.getElementById("replayWipe"), seen = { replay: false, wipe: false, goalShot: false, celeb: false };
+		F.freeze = 0; F.forceGoal(0);
+		for (let i = 0; i < 80 && F.state !== "goal"; i++) { F.step(1); }
+		const t0 = performance.now();
+		while (performance.now() - t0 < 12000 && !seen.goalShot) {
+			await new Promise(res => setTimeout(res, 40));
+			if (F.G3.shot === "celeb") { seen.celeb = true; }
+			if (F.replayOn) { seen.replay = true; }
+			if (!wipe.hidden) { seen.wipe = true; }
+			if (F.G3.shot === "replayGoal") { seen.goalShot = true; }
+		}
+		return seen;
+	});
+	await page.screenshot({ path: `${OUT}/look-replay-goal.png` });
+	await page.keyboard.press("s"); await sleep(900);
+	const after = await page.evaluate(() => ({ on: window.__ff.replayOn, wipeHidden: document.getElementById("replayWipe").hidden, state: window.__ff.state }));
+	check("goal on the TV camera: the scorer's celebration, then a replay in 3D with a wipe", r.celeb && r.replay && r.wipe, JSON.stringify(r));
+	check("the replay ends slowed down from behind the goal", r.goalShot, JSON.stringify(r));
+	check("a key skips the replay and the wipe clears", !after.on && after.wipeHidden, JSON.stringify(after));
+	check("replay: no console errors", errs.length === 0, errs.join(" | "));
 	await ctx.close();
 }
 

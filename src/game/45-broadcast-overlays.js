@@ -4,6 +4,7 @@
 	   at 45 and 90 (the clock holds while it is played), and a ticker along the bottom with the other
 	   league games, their goals going in as they happen and the finals after your match. */
 	let bcLineT = 0, bcBoardT = 0, subNo = [ 0, 0 ], stall = 0, addedDone = [ false, false ], tickPlan = null, tickKey = "", tickNew = new Map();
+	let addedN = 0;   // the minutes added on, shown by the clock while they are played
 	const tickerUp = () => ($("bcTicker").hidden ? 0 : 24);   // canvas hints sit above the ticker
 	function hideLineups () { clearTimeout(bcLineT); $("bcLineups").hidden = true; }
 	function showLineups () {
@@ -46,7 +47,7 @@
 	function startAdded (h) {
 		addedDone[h] = true;
 		const n = clamp(1 + Math.round(matchLog.filter(e => (h === 0 ? e.min <= 45 : e.min > 45)).length * 0.5), 1, 6);
-		stall = n * matchLen / 90;
+		stall = n * matchLen / 90; addedN = n;
 		board([ [ "Added time", "add", `+${n}` ] ], Math.max(4000, stall * 1000));
 		if (!bulkSim) { $("announce").textContent = `${n} minute${n === 1 ? "" : "s"} added on.`; }
 	}

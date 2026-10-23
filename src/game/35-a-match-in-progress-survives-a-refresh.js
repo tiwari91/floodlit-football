@@ -382,7 +382,8 @@
 
 		const clock = shoot ? `C ${Math.min(shoot.n + 1, shoot.total)}/${shoot.total}` : fmtClock(timeLeft, matchLen);
 		const narrow = window.innerWidth <= 640;
-		const key = `${score[0]}|${score[1]}|${clock}|${narrow}`;
+		const added = stall > 0 && state !== "full" ? addedN : 0;
+		const key = `${score[0]}|${score[1]}|${clock}|${narrow}|${added}`;
 		if (key === lastHud) { return; }
 		lastHud = key;
 		scoreHomeEl.textContent = leftIsYou ? score[0] : score[1];
@@ -396,6 +397,8 @@
 		if (bs.textContent !== bugScore && state === "goal") { bs.classList.remove("flash"); void bs.offsetWidth; bs.classList.add("flash"); }
 		bs.textContent = bugScore;
 		$("bugClock").textContent = clock;
+		const ad = $("bugAdded");
+		ad.hidden = !added; if (added) { ad.textContent = `+${added}`; }
 		const tot = possFrames[0] + possFrames[1];
 		const mine = tot ? Math.round(100 * possFrames[0] / tot) : 50;
 		$("possLabel").textContent = leftIsYou ? `Possession ${mine}% : ${100 - mine}%` : `Possession ${100 - mine}% : ${mine}%`;

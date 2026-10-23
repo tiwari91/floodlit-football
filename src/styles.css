@@ -72,8 +72,12 @@
 		color: var(--chalk, #eef6ea); pointer-events: none; white-space: nowrap; line-height: 1;
 	}
 	.scorebug > span:not(.bugbar):not(.bugmood), .scorebug > b { display: inline-flex; align-items: center; padding: 6px 10px 6px; }
-	.scorebug #bugHome { border-left: 4px solid var(--left-kit, #f2b52e); border-radius: 4px 0 0 4px; }
-	.scorebug #bugAway { border-right: 4px solid var(--right-kit, #de4f5a); }
+	/* Each side's colour as a chip by its name, and the added time as a badge off the clock. */
+	.scorebug .chip { width: 6px; align-self: stretch; background: var(--left-kit, #f2b52e); }
+	.scorebug .chip.l { border-radius: 4px 0 0 4px; }
+	.scorebug .chip.r { background: var(--right-kit, #de4f5a); }
+	.scorebug .add { display: inline-flex; align-items: center; padding: 0 7px; margin-left: 3px; border-radius: 3px; background: var(--amber, #f2b52e); color: #0d1612; font-size: 13px; font-variant-numeric: tabular-nums; letter-spacing: 0.04em; }
+	.scorebug .add[hidden] { display: none; }
 	body.big .scorebug { display: inline-flex; }
 	.pitchwrap:has(.overlay:not([hidden])) .scorebug { display: none; }   /* the card over the pitch has the details */
 	.menutoggle {
@@ -1180,3 +1184,13 @@
 .coachmark kbd { display: inline-block; min-width: 20px; padding: 1px 6px; margin: 0 2px; border-radius: 3px; background: #f4f6f2; color: #10161c; font: 700 13px Barlow, Arial, sans-serif; text-align: center; }
 .coachmark button { pointer-events: auto; padding: 5px 12px; font-size: 13px; }
 .coachmark.lightask { bottom: auto; top: 64px; gap: 10px; white-space: normal; max-width: calc(100% - 32px); }
+
+/* The replay wipe: a skewed band in the house amber with a dark core, crossing the picture in half a second. */
+.wipe { position: absolute; inset: 0; z-index: 3; pointer-events: none; overflow: hidden; }
+.wipe[hidden] { display: none; }
+.wipe::before {
+	content: ""; position: absolute; top: -10%; bottom: -10%; left: -70%; width: 70%; transform: skewX(-16deg);
+	background: linear-gradient(90deg, rgba(242, 181, 46, 0) 0%, rgba(242, 181, 46, 0.95) 22%, #0d1612 40%, #0d1612 60%, rgba(242, 181, 46, 0.95) 78%, rgba(242, 181, 46, 0) 100%);
+}
+.wipe.go::before { animation: wipe 0.56s cubic-bezier(0.55, 0, 0.35, 1) forwards; }
+@keyframes wipe { from { left: -70%; } to { left: 115%; } }

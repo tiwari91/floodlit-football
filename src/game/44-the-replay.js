@@ -43,8 +43,15 @@
 		return REPLAY_FR;
 	}
 	const replayOn = () => !!(replay && replay.len > 0 && state === "goal" && celeb && celeb.t >= REPLAY_AT && celeb.t < REPLAY_AT + REPLAY_FR && goalTimer > 70 && view3D());
-	// Where the clip is: a fractional frame, 0 at the start.
-	const replayPos = () => clamp((celeb.t - REPLAY_AT) * REPLAY_SPEED, 0, replay.len - 1.001);
+	// Where the clip is: a fractional frame, 0 at the start. The build-up runs a little quicker, then the
+	// last second or so (the shot and the ball going in) slows right down for the angle from behind the goal;
+	// the whole thing still fits the time the plain slow motion took.
+	const RP_FAST = 0.85, RP_SLOW = 0.45;
+	const rpTail = () => Math.min(60, Math.floor(replay.len * 0.4));
+	const replayPos = () => {
+		const u = celeb.t - REPLAY_AT, lead = replay.len - rpTail(), head = lead / RP_FAST;
+		return clamp(u < head ? u * RP_FAST : lead + (u - head) * RP_SLOW, 0, replay.len - 1.001);
+	};
 	// Put the recorded moment onto the players, the ball and the officials for drawing; returns
 	// the function that puts everything back.
 	function applyReplay (clip = replay, f = replayPos(), spd = REPLAY_SPEED) {
@@ -89,6 +96,14 @@
 		const sw = endsSwapped(), gx = sw ? FW - replay.goalX : replay.goalX, side = gx > FW / 2 ? 1 : -1;
 		const bx = sw ? FW - ball.x : ball.x, by = ball.y, bh = Math.max(0, ball.z || 0) * Z3;
 		out.kind = "replay" + replay.angle;
+		if (replayPos() >= replay.len - rpTail()) {
+			// The end of it, in slow motion, from low behind the net: the ball comes at the lens and into the goal.
+			out.kind = "replayGoal";
+			out.eye.set(gx + side * (NET + 16), 30, FH / 2 + (replay.shotY - FH / 2) * 0.25);
+			if (reduceMotion) { out.look.set(gx - side * 200, 10, FH / 2); } else { out.look.set(bx, 10 + bh * 0.6, by); }
+			out.fov = 38;
+			return out;
+		}
 		if (replay.angle === 0) {
 			out.eye.set(gx + side * (F_END3 + 70), 96, clamp(FH / 2 - (replay.shotY - FH / 2) * 0.35, FH * 0.25, FH * 0.75));
 		} else {

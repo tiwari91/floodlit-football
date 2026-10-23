@@ -93,8 +93,12 @@
 		color: var(--chalk, #eef6ea); pointer-events: none; white-space: nowrap; line-height: 1;
 	}
 	.scorebug > span:not(.bugbar):not(.bugmood), .scorebug > b { display: inline-flex; align-items: center; padding: 6px 10px 6px; }
-	.scorebug #bugHome { border-left: 4px solid var(--left-kit, #f2b52e); border-radius: 4px 0 0 4px; }
-	.scorebug #bugAway { border-right: 4px solid var(--right-kit, #de4f5a); }
+	/* Each side's colour as a chip by its name, and the added time as a badge off the clock. */
+	.scorebug .chip { width: 6px; align-self: stretch; background: var(--left-kit, #f2b52e); }
+	.scorebug .chip.l { border-radius: 4px 0 0 4px; }
+	.scorebug .chip.r { background: var(--right-kit, #de4f5a); }
+	.scorebug .add { display: inline-flex; align-items: center; padding: 0 7px; margin-left: 3px; border-radius: 3px; background: var(--amber, #f2b52e); color: #0d1612; font-size: 13px; font-variant-numeric: tabular-nums; letter-spacing: 0.04em; }
+	.scorebug .add[hidden] { display: none; }
 	body.big .scorebug { display: inline-flex; }
 	.pitchwrap:has(.overlay:not([hidden])) .scorebug { display: none; }   /* the card over the pitch has the details */
 	.menutoggle {
@@ -1201,6 +1205,16 @@
 .coachmark kbd { display: inline-block; min-width: 20px; padding: 1px 6px; margin: 0 2px; border-radius: 3px; background: #f4f6f2; color: #10161c; font: 700 13px Barlow, Arial, sans-serif; text-align: center; }
 .coachmark button { pointer-events: auto; padding: 5px 12px; font-size: 13px; }
 .coachmark.lightask { bottom: auto; top: 64px; gap: 10px; white-space: normal; max-width: calc(100% - 32px); }
+
+/* The replay wipe: a skewed band in the house amber with a dark core, crossing the picture in half a second. */
+.wipe { position: absolute; inset: 0; z-index: 3; pointer-events: none; overflow: hidden; }
+.wipe[hidden] { display: none; }
+.wipe::before {
+	content: ""; position: absolute; top: -10%; bottom: -10%; left: -70%; width: 70%; transform: skewX(-16deg);
+	background: linear-gradient(90deg, rgba(242, 181, 46, 0) 0%, rgba(242, 181, 46, 0.95) 22%, #0d1612 40%, #0d1612 60%, rgba(242, 181, 46, 0.95) 78%, rgba(242, 181, 46, 0) 100%);
+}
+.wipe.go::before { animation: wipe 0.56s cubic-bezier(0.55, 0, 0.35, 1) forwards; }
+@keyframes wipe { from { left: -70%; } to { left: 115%; } }
 </style>
 
 <main class="wrap">
@@ -1235,9 +1249,10 @@
 		<div class="coachmark" id="coachMark" role="note" hidden><span>Hold <kbd>D</kbd> to shoot, <kbd>S</kbd> to pass, <kbd>E</kbd> to sprint</span><button id="coachClose" type="button" aria-label="Dismiss tip" title="Got it">Got it</button></div>
 		<div class="coachmark lightask" id="lightAsk" role="dialog" aria-label="Graphics suggestion" hidden><span>Switch to Light graphics to keep things cooler?</span><button id="lightAskYes" type="button" class="primary">Switch</button><button id="lightAskNo" type="button">Not now</button></div>
 		<button class="menutoggle" id="menuToggle" type="button" aria-pressed="true" title="Show or hide the page menu and settings (F)">Show menu</button>
-		<div class="scorebug" id="scoreBug" aria-hidden="true"><span id="bugHome">You</span><b id="bugScore">0 – 0</b><span id="bugAway">CPU</span><span class="t" id="bugClock">03:00</span><span class="bugbar"><span class="mfill" id="bugFill"></span></span><span class="bugmood" id="bugMood" hidden></span></div>
+		<div class="scorebug" id="scoreBug" aria-hidden="true"><i class="chip l"></i><span id="bugHome">You</span><b id="bugScore">0 – 0</b><span id="bugAway">CPU</span><i class="chip r"></i><span class="t" id="bugClock">03:00</span><span class="add" id="bugAdded" hidden>+1</span><span class="bugbar"><span class="mfill" id="bugFill"></span></span><span class="bugmood" id="bugMood" hidden></span></div>
 		<div class="lower" id="lowerThird" aria-hidden="true" hidden><span class="lt-tag" id="ltTag">Goal</span><span class="lt-main"><b id="ltName"></b><small id="ltSub"></small></span></div>
 		<div class="comm" id="commLine" aria-live="polite" hidden><span class="comm-mic" aria-hidden="true"></span><span id="commText"></span></div>
+		<div class="wipe" id="replayWipe" aria-hidden="true" hidden></div>
 		<div class="replaytag" id="replayTag" aria-hidden="true" hidden>Replay<small>any key skips</small></div>
 		<div class="bc-ticker" id="bcTicker" aria-hidden="true" hidden><span class="bc-tk-tag">Around the league</span><span class="bc-tk-run"><span id="bcTickerText"></span></span></div>
 		<div class="bc-board" id="bcBoard" aria-hidden="true" hidden></div>
@@ -9075,7 +9090,8 @@
 
 		const clock = shoot ? `C ${Math.min(shoot.n + 1, shoot.total)}/${shoot.total}` : fmtClock(timeLeft, matchLen);
 		const narrow = window.innerWidth <= 640;
-		const key = `${score[0]}|${score[1]}|${clock}|${narrow}`;
+		const added = stall > 0 && state !== "full" ? addedN : 0;
+		const key = `${score[0]}|${score[1]}|${clock}|${narrow}|${added}`;
 		if (key === lastHud) { return; }
 		lastHud = key;
 		scoreHomeEl.textContent = leftIsYou ? score[0] : score[1];
@@ -9089,6 +9105,8 @@
 		if (bs.textContent !== bugScore && state === "goal") { bs.classList.remove("flash"); void bs.offsetWidth; bs.classList.add("flash"); }
 		bs.textContent = bugScore;
 		$("bugClock").textContent = clock;
+		const ad = $("bugAdded");
+		ad.hidden = !added; if (added) { ad.textContent = `+${added}`; }
 		const tot = possFrames[0] + possFrames[1];
 		const mine = tot ? Math.round(100 * possFrames[0] / tot) : 50;
 		$("possLabel").textContent = leftIsYou ? `Possession ${mine}% : ${100 - mine}%` : `Possession ${100 - mine}% : ${mine}%`;
@@ -11248,11 +11266,21 @@
 		}
 	}
 
-	const replayTagEl = $("replayTag");
+	const replayTagEl = $("replayTag"), wipeEl = $("replayWipe");
+	// A band sweeps across the picture as a replay starts and as it ends (a skip too). It is pure CSS and
+	// clears itself; with reduced motion there is none.
+	let wipeT = 0;
+	function replayWipe () {
+		if (!wipeEl || reduceMotion || bulkSim) { return; }
+		wipeEl.hidden = false;
+		wipeEl.classList.remove("go"); void wipeEl.offsetWidth; wipeEl.classList.add("go");
+		clearTimeout(wipeT);
+		wipeT = setTimeout(() => { wipeEl.hidden = true; wipeEl.classList.remove("go"); }, 620);
+	}
 	function drawScene () {
 		// The REPLAY tag over the picture while one runs (and no GOAL banner over the replay).
 		const rp = (view3D() && replayOn()) || !!odr;
-		if (replayTagEl && replayTagEl.hidden === rp) { replayTagEl.hidden = !rp; if (rp) { banner.hidden = true; } }
+		if (replayTagEl && replayTagEl.hidden === rp) { replayTagEl.hidden = !rp; if (rp) { banner.hidden = true; } replayWipe(); }
 		if (view3D() && drawScene3D()) { return; }   // while three.js loads, the painted TV camera stands in
 		if ((camMode === "tv" || camMode === "3d") && !benchCam()) { drawSceneTV(); return; }
 		drawSceneTop();
@@ -15852,8 +15880,15 @@
 		return REPLAY_FR;
 	}
 	const replayOn = () => !!(replay && replay.len > 0 && state === "goal" && celeb && celeb.t >= REPLAY_AT && celeb.t < REPLAY_AT + REPLAY_FR && goalTimer > 70 && view3D());
-	// Where the clip is: a fractional frame, 0 at the start.
-	const replayPos = () => clamp((celeb.t - REPLAY_AT) * REPLAY_SPEED, 0, replay.len - 1.001);
+	// Where the clip is: a fractional frame, 0 at the start. The build-up runs a little quicker, then the
+	// last second or so (the shot and the ball going in) slows right down for the angle from behind the goal;
+	// the whole thing still fits the time the plain slow motion took.
+	const RP_FAST = 0.85, RP_SLOW = 0.45;
+	const rpTail = () => Math.min(60, Math.floor(replay.len * 0.4));
+	const replayPos = () => {
+		const u = celeb.t - REPLAY_AT, lead = replay.len - rpTail(), head = lead / RP_FAST;
+		return clamp(u < head ? u * RP_FAST : lead + (u - head) * RP_SLOW, 0, replay.len - 1.001);
+	};
 	// Put the recorded moment onto the players, the ball and the officials for drawing; returns
 	// the function that puts everything back.
 	function applyReplay (clip = replay, f = replayPos(), spd = REPLAY_SPEED) {
@@ -15898,6 +15933,14 @@
 		const sw = endsSwapped(), gx = sw ? FW - replay.goalX : replay.goalX, side = gx > FW / 2 ? 1 : -1;
 		const bx = sw ? FW - ball.x : ball.x, by = ball.y, bh = Math.max(0, ball.z || 0) * Z3;
 		out.kind = "replay" + replay.angle;
+		if (replayPos() >= replay.len - rpTail()) {
+			// The end of it, in slow motion, from low behind the net: the ball comes at the lens and into the goal.
+			out.kind = "replayGoal";
+			out.eye.set(gx + side * (NET + 16), 30, FH / 2 + (replay.shotY - FH / 2) * 0.25);
+			if (reduceMotion) { out.look.set(gx - side * 200, 10, FH / 2); } else { out.look.set(bx, 10 + bh * 0.6, by); }
+			out.fov = 38;
+			return out;
+		}
 		if (replay.angle === 0) {
 			out.eye.set(gx + side * (F_END3 + 70), 96, clamp(FH / 2 - (replay.shotY - FH / 2) * 0.35, FH * 0.25, FH * 0.75));
 		} else {
@@ -15916,6 +15959,7 @@
 	   at 45 and 90 (the clock holds while it is played), and a ticker along the bottom with the other
 	   league games, their goals going in as they happen and the finals after your match. */
 	let bcLineT = 0, bcBoardT = 0, subNo = [ 0, 0 ], stall = 0, addedDone = [ false, false ], tickPlan = null, tickKey = "", tickNew = new Map();
+	let addedN = 0;   // the minutes added on, shown by the clock while they are played
 	const tickerUp = () => ($("bcTicker").hidden ? 0 : 24);   // canvas hints sit above the ticker
 	function hideLineups () { clearTimeout(bcLineT); $("bcLineups").hidden = true; }
 	function showLineups () {
@@ -15958,7 +16002,7 @@
 	function startAdded (h) {
 		addedDone[h] = true;
 		const n = clamp(1 + Math.round(matchLog.filter(e => (h === 0 ? e.min <= 45 : e.min > 45)).length * 0.5), 1, 6);
-		stall = n * matchLen / 90;
+		stall = n * matchLen / 90; addedN = n;
 		board([ [ "Added time", "add", `+${n}` ] ], Math.max(4000, stall * 1000));
 		if (!bulkSim) { $("announce").textContent = `${n} minute${n === 1 ? "" : "s"} added on.`; }
 	}
@@ -17042,7 +17086,7 @@
 		if (l && [ ...lenSel.options ].some(o => o.value === l)) { lenSel.value = l; }
 		if (s === "0") { soundOn = false; soundBtn.textContent = "Sound off"; soundBtn.setAttribute("aria-pressed", "false"); }
 		if (store.get("ff-offside") === "0") { offsideRule = false; $("offsideBtn").textContent = "Offside off"; $("offsideBtn").setAttribute("aria-pressed", "false"); }
-		minimapOn = store.get("ff-map") === "1"; $("mapBtn").textContent = minimapOn ? "Minimap on" : "Minimap off"; $("mapBtn").setAttribute("aria-pressed", String(minimapOn));
+		minimapOn = store.get("ff-map") !== "0";   // the radar is on unless turned off $("mapBtn").textContent = minimapOn ? "Minimap on" : "Minimap off"; $("mapBtn").setAttribute("aria-pressed", String(minimapOn));
 		if (store.get("ff-hints") === "0") { hintsOn = false; $("hintsBtn").textContent = "Hints off"; $("hintsBtn").setAttribute("aria-pressed", "false"); }
 		if (store.get("ff-music") === "0") { musicOn = false; $("musicBtn").textContent = "Music off"; $("musicBtn").setAttribute("aria-pressed", "false"); }
 		{ const g = store.get("ff-gfx"); if (g && GFX3[g]) { setGfx(g); } else { setGfx("auto"); } }   // Auto until a level is picked
@@ -17120,7 +17164,7 @@
 			get restartWalk () { return restartWalk; }, get review () { return review; }, get cpuSubs () { return cpuSubs; }, get surge () { return surge; }, get pressI () { return press; }, formBonus, get lastRatings () { return lastRatings; }, get stretcher () { return stretcher; }, injureTest (t, serious) { const v = outfield(t).find(p => !p.injured); const o = outfield(1 - t)[0]; if (v && o) { tackling[1 - t] = "hard"; const r = Math.random; Math.random = () => 0.01; try { commitFoul(o, v, true); } finally { Math.random = r; } } return v; }, staOf, get offside () { return offside; }, get deadBall () { return deadBall; }, get tally () { return tally; }, get freezeKind () { return freezeKind; }, fkDist () { return fkDist(); }, simExtra () { return { tally, poss: possFrames.slice() }; }, get setPieceKind () { return setPiece ? setPiece.kind : null; }, get gfxLevel () { return gfxLevel; }, get gfxAuto () { return gfxAuto; }, gfxAutoTick, setGfx, get dynScale () { return DYN3.s; }, get dyn () { return DYN3; }, dynSet (v) { DYN3.s = v; DYN3.at = performance.now(); resize3D(); }, dynTick3D, get lightAsk () { return lightAsk; }, lightAskTest () { showLightAsk(); }, lightAskTick, get musicBar () { return music ? music.bar : -1; }, get audioState () { return audio ? audio.state : "none"; }, get replayOn () { return replayOn(); }, get replay () { return replay; }, get recFrames () { return rec.n; }, REPLAY_AT, REPLAY_FR, GOAL_CELEB, get lastCaption () { return lastCaption; }, get lastCommentary () { return lastCommentary; }, moment, commReset () { commAt = -1e9; commRecent = []; },
 			// Pose one player on a spare figure, n frames in a row, right now (no simulation step in between).
 			staffProbe (kind, o = {}) { const F3 = G3.fig; if (!F3) { return null; } const r = F3.rigs[F3.rigs.length - 1], m = { x: FW / 2, y: FH + 13, vx: 0, vy: 0, dir: 0, stride: 0, runAmt: o.run || 0, idlePh: o.ph || 0, role: "staff", team: 0, celebA: o.celebA || 0, kneel: o.kneel || 0 }; r.mir = 1; resetRig3D(r); pose3D(r, m, m.x, m.y, 0, 0, 0); if (kind === "bench") { benchPose3D(r, o.st || 0, o.ph || 0, 0, 0); } else { staffGesture3D(r, kind === "sprint" ? "" : kind, o.ph || 0, kind === "sprint", o.kneel || 0); } r.root.updateMatrixWorld(true); return r; },
-			poseProbe (p, n = 30, ballNear = 0) { const F3 = G3.fig; if (!F3) { return null; } const r = F3.rigs[F3.rigs.length - 1]; r.mir = 1; animLag = 0; for (let k = 0; k < n; k++) { resetRig3D(r); pose3D(r, p, p.x, p.y, p.dir, 0, ballNear, 0, 0); } r.root.updateMatrixWorld(true); return r; }, caption, get camMode () { return camMode; }, get view3D () { return view3D(); }, setCam, get crowdMood () { return crowdMood; }, get frameDt () { return frameDt; }, get crowdBed () { return crowd; }, get soundOn () { return soundOn; },
+			poseProbe (p, n = 30, ballNear = 0) { const F3 = G3.fig; if (!F3) { return null; } const r = F3.rigs[F3.rigs.length - 1]; r.mir = 1; animLag = 0; for (let k = 0; k < n; k++) { resetRig3D(r); pose3D(r, p, p.x, p.y, p.dir, 0, ballNear, 0, 0); } r.root.updateMatrixWorld(true); return r; }, caption, get camMode () { return camMode; }, get view3D () { return view3D(); }, setCam, startAdded, radarRect () { const r = canvas.getBoundingClientRect(), k = r.width / SW, w = RADAR_W, h = FH * w / FW, x0 = (SW - w) / 2, y0 = SH - h - 12 - tickerUp(); return { left: r.left + (x0 - 6) * k, top: r.top + (y0 - 6) * k, right: r.left + (x0 + w + 6) * k, bottom: r.top + (y0 + h + 6) * k, shown: radarShown() }; }, get crowdMood () { return crowdMood; }, get frameDt () { return frameDt; }, get crowdBed () { return crowd; }, get soundOn () { return soundOn; },
 			human, switchScore, outfield, dist, get cond () { return cond; }, clubSong, isDerby, celebrateTrophy, get fireworks () { return fireworks; }, goalSongTest (id) { const s = goalSong(id); playGoalSong(id); return s; }, chantTest (away) { ensureAudio(); chant(1, !!away); }, stepBallTest () { stepBall(); }, climateTest (n, nat) { return { weather: genForecast(n, nat), wind: genWind(n, nat), ko: genKickoff(n, nat) }; }, rematchTest () { clearLive(); state = "intro"; newMatch(); showIntro(); renderLeague(); },
 			get officials () { return officials3; }, get flagCall () { return flagCall; }, refKit, deltaE,
 			proj (x, y, z) { return G3.cam ? proj3D(x, y, z) : null; }, get viewScale () { return scale; },
