@@ -137,6 +137,7 @@ try {
 	const sold = await page.evaluate(buyer => {
 		const F = window.__ff, lg = F.league, q = lg.club.squad.find(p => p.name === "T. Okonkwo-Vale");
 		lg.round = 0;
+		q.listed = true;   // up for sale, so he won't refuse a smaller club (18e)
 		F.sellPlayer(q.name, 3, buyer);
 		const ins = (lg.cpuIn[buyer] || []).find(d => d.pl.name === "T. Okonkwo-Vale"), sq = F.cpuSquad(buyer, F.getStr(buyer));
 		return { gone: !lg.club.squad.some(p => p.name === "T. Okonkwo-Vale"), inCpu: !!ins, carried: ins && { id: ins.pl.id, shirt: ins.pl.shirt, lk: ins.pl.lk }, inSquad: sq.some(p => p.name === "T. Okonkwo-Vale") };

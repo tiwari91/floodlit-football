@@ -5983,6 +5983,7 @@
 			if (league) {
 				for (const b of league.bidsIn || []) { if (b.name === old) { b.name = out.name; } }
 				if (league.assistShort && Array.isArray(league.assistShort.names)) { league.assistShort.names = league.assistShort.names.map(n => (n === old ? out.name : n)); }
+				if (league.drama && Array.isArray(league.drama.issues)) { for (const i of league.drama.issues) { if (i && i.name === old) { i.name = out.name; } } }   // the dressing room (18e) knows him by name
 			}
 		}
 		for (const k of PLAYER_EDIT_KEYS) {
@@ -6288,7 +6289,7 @@
 		});
 		reset.addEventListener("click", () => { resetPlayer(lg, editor.where, editor.idx); afterEdit(); renderEditor(); });
 		row.append(save, reset);
-		body.append(form, tog, note("", e.custom ? `Ratings from ${RATING_MIN} to ${RATING_MAX}. Custom ratings change how your career plays.` : "Off: ratings stay as the game made them, so a career stays balanced."), rat, err, row);
+		body.append(form, tog, note("", e.custom ? `Ratings from ${RATING_MIN} to ${RATING_MAX}. Custom ratings change how your career plays. Players on the transfer list are held to 92 overall.` : "Off: ratings stay as the game made them, so a career stays balanced."), rat, err, row);
 	}
 	function renderFileTab (body) {
 		const lg = league, out = el("div", "ed-file");
