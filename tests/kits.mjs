@@ -55,6 +55,18 @@ try {
 	check("the opponent plays in the file's shirt and second colour", live.kit === live.opp && live.second === live.opp2 && live.cssOpp === live.opp, JSON.stringify(live));
 	check("the scoreboard chip is the opponent's own shirt", oppChip === rgb(live.opp), JSON.stringify({ oppChip, want: rgb(live.opp) }));
 
+	// The file's ground names: the pre-match card, the line-ups header, the kick-off welcome, fixtures and club cards.
+	const venue = await page.evaluate(fx => {
+		const F = window.__ff, host = fx.home ? F.YOU : F.TEAMS[fx.opp], away = F.league.members.find(id => id !== 0 && id !== fx.opp);
+		F.welcomeCall();
+		const up = [ ...document.querySelectorAll("#lgUpcoming .venue") ].map(e => e.textContent);
+		const cards = [ ...document.querySelectorAll("#clubGrid .club-card") ].map(c => c.textContent);
+		return { want: host.ground, ground: F.matchGround(), header: (document.querySelector("#bcLineups .bc-venue") || {}).textContent || "", said: F.lastCommentary && F.lastCommentary.text, kind: F.lastCommentary && F.lastCommentary.kind,
+			up, fileGrounds: F.league.members.filter(id => id !== 0).map(id => F.TEAMS[id].ground), cardHas: cards.some(t => t.includes(F.TEAMS[away].ground)), awayGround: F.TEAMS[away].ground };
+	}, fx);
+	check("the match is at the host's ground, named on the line-ups header and in the welcome", venue.ground === venue.want && venue.header.startsWith(venue.want) && venue.kind === "welcome" && venue.said.includes(venue.want), JSON.stringify(venue));
+	check("the file's grounds name the clubs' homes in fixtures and on the club cards", venue.fileGrounds.every(g => /^Test Ground \d+$/.test(g)) && venue.up.length >= 3 && venue.up.some(g => /^Test Ground/.test(g)) && venue.cardHas, JSON.stringify({ up: venue.up, cards: venue.cardHas }));
+
 	// Your club's colours (an edit, a file or a move abroad) are your kit too, and the UI follows them.
 	const mine = await page.evaluate(fx => {
 		const F = window.__ff, lg = F.league, t = F.clubTargets().find(x => x.kind === "club" && x.id === 0);

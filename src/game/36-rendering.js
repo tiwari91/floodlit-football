@@ -449,7 +449,7 @@
 				}
 			}
 			// The ground's name, picked out across the main stand.
-			const ground = (leagueMatch ? (leagueMatch.home ? YOU : TEAMS[leagueMatch.opp]).ground : YOU.ground).toUpperCase();
+			const ground = matchGround().toUpperCase();
 			gt.save && gt.save();
 			gt.globalAlpha = 1;   // a solid sign board on the stand, not lettering washed over the crowd
 			gt.fillStyle = "#0d1612";

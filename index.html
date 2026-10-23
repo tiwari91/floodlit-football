@@ -1336,6 +1336,9 @@
 	.assist-link { flex-basis: 100%; text-align: left; }
 	@keyframes assistFlash { 0% { box-shadow: 0 0 0 3px rgba(242, 181, 46, 0.9); } 100% { box-shadow: 0 0 0 3px rgba(242, 181, 46, 0); } }
 	.win.flash { animation: assistFlash 1.6s ease-out; }
+	/* The ground's name: on the kick-off line-ups and beside each upcoming fixture. */
+	.bc-venue { grid-column: 1 / -1; padding: 6px 12px 0; font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #c9d4cc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.lg-upcoming .venue, #lgUpcoming .venue { display: block; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 </style>
 
 <main class="wrap">
@@ -2980,6 +2983,10 @@
 		return { round: league.round, home: pair[0] === 0, opp: pair[0] === 0 ? pair[1] : pair[0] };
 	}
 
+	// Where a fixture is played: the home side's ground (an option file's own name, or the game's).
+	const hostOf = f => (f && !f.home && TEAMS[f.opp] ? TEAMS[f.opp] : YOU);
+	const matchGround = () => (hostOf(leagueMatch).ground || YOU.ground || "");
+
 	function poisson (l) {
 		const L = Math.exp(-l);
 		let k = 0, p = 1;
@@ -3282,8 +3289,10 @@
 		ol.replaceChildren();
 		for (let r = league.round; r < Math.min(league.fixtures.length, league.round + 5); r++) {
 			const pair = league.fixtures[r].find(([ a, b ]) => a === 0 || b === 0), home = pair[0] === 0, o = TEAMS[home ? pair[1] : pair[0]];
-			const li = el("li", r === league.round ? "now" : "");
-			li.append(el("b", "", String(r + 1)), el("span", home ? "ha h" : "ha a", home ? "H" : "A"), dotFor(o), el("span", "who", o.name + (derbyOf(0, home ? pair[1] : pair[0]) ? " (derby)" : "")), el("span", "stars", stars(Math.round(getStr(home ? pair[1] : pair[0])))));
+			const li = el("li", r === league.round ? "now" : ""), gr = (home ? YOU : o).ground || "";
+			const who = el("span", "who", o.name + (derbyOf(0, home ? pair[1] : pair[0]) ? " (derby)" : ""));
+			if (gr) { who.append(el("small", "venue", gr)); li.title = `${home ? "Home" : "Away"} at ${gr}`; }
+			li.append(el("b", "", String(r + 1)), el("span", home ? "ha h" : "ha a", home ? "H" : "A"), dotFor(o), who, el("span", "stars", stars(Math.round(getStr(home ? pair[1] : pair[0])))));
 			ol.append(li);
 		}
 	}
@@ -4255,7 +4264,7 @@
 			cardLines([
 				tired.length ? `Fitness: ⚠ ${tiredText(tired)} Tired players are slower and less sharp. Rest them: press "Rest tired players", or swap them yourself in the squad panel.` : "",
 				first ? "Welcome to Floodlit Football. You manage the club and play its matches. New to the controls? \"Learn the controls\" is a two-minute walk-through, then you're back here." : "",
-				`${o.name} · ${leagueMatch.home ? "at home" : "away"} at ${(leagueMatch.home ? YOU : o).ground} · rated ${stars(Math.round(getStr(leagueMatch.opp)))} · ${lv.name} difficulty`,
+				`${o.name} · ${leagueMatch.home ? "at home" : "away"} at ${matchGround()} · rated ${stars(Math.round(getStr(leagueMatch.opp)))} · ${lv.name} difficulty`,
 				o.manager ? `Their manager: ${o.manager}${NATIONS[o.managerNat] ? ` (${NATIONS[o.managerNat][0]})` : ""}.` : "",   // from an option file (18g, 18h)
 				derby ? "Derby day: the local rivals, and the loudest crowd of the season." : "",
 				k.watch ? `Watch: ${k.watch}.` : "",
@@ -11265,7 +11274,9 @@
 		}
 		if (state === "half") { toast("Second half: teams change ends", "#eef6ea"); }
 		if ((state === "intro" || state === "full" || state === "half") && mode !== "tutorial") { introSweep = { on: true }; }
+		const fresh = state === "intro" || state === "full";
 		state = "play";
+		if (fresh && typeof welcomeCall === "function") { welcomeCall(); }
 		pauseBtn.textContent = "Pause";
 		if (mode === "tutorial" && !tut) { tut = { step: 0 }; freeze = 0; setupTutStep(); }
 		canvas.focus?.();
@@ -12046,7 +12057,7 @@
 				}
 			}
 			// The ground's name, picked out across the main stand.
-			const ground = (leagueMatch ? (leagueMatch.home ? YOU : TEAMS[leagueMatch.opp]).ground : YOU.ground).toUpperCase();
+			const ground = matchGround().toUpperCase();
 			gt.save && gt.save();
 			gt.globalAlpha = 1;   // a solid sign board on the stand, not lettering washed over the crowd
 			gt.fillStyle = "#0d1612";
@@ -13845,6 +13856,7 @@
 		flare: [ "Tempers flare! {n} and {m} go nose to nose", "{n} isn't having that. He's straight in the face of {m}", "Handbags! {n} and {m} have to be pulled apart", "It's all kicking off. {n} squares up to {m}" ],
 		red2: [ "Second yellow for {n}, and he's off", "{n} walks: a second booking, and a red", "That's two yellows, so {n} has to go" ],
 		attack: [ "Here they come! {n} on the charge!", "{n} drives forward, this is dangerous!", "Oh, this looks promising! {n} into the final third!", "{n} running at them, the crowd on its feet!", "Space opening up for {n}! Can he make it count?", "Danger here! {n} bearing down!" ],
+		welcome: [ "Welcome to {g}, where {h} take on {a}", "Hello and welcome to {g}: {h} against {a}", "Good to be with you at {g}. {h} versus {a}, and we're under way", "And we're live from {g}, {h} and {a} ready to go" ],
 		offside: [ "Flag's up! {n} was offside", "Offside! {n} just a fraction too early", "The flag goes up against {n}!", "{n} strayed beyond the last man, and it's offside" ]
 	};
 	// The goal itself, called the moment it goes in (spoken; the caption shows it on screen).
@@ -13870,10 +13882,11 @@
 		lateEq: [ "Never, ever give up. What a lesson", "They've stolen a point from the jaws of defeat!" ],
 		hattrick: [ "Take a bow, son. Take a bow", "He'll sleep with that match ball tonight" ],
 		own: [ "Oh, you feel for him. Nightmare", "Nothing he could do, it just hit him" ],
+		welcome: [ "A cracking atmosphere here already", "Should be a good one, this", "The pitch looks in great nick, Rory" ],
 		flare: [ "Calm down, gents, there's a game going on", "The referee needs to get a grip of this" ]
 	};
 	// How excited the calls are, 0..1: the voices go up and quicken with it.
-	const EXCITE = { goal: 1, lateWin: 1, lateEq: 1, hattrick: 1, equaliser: 0.95, ahead: 0.9, comeback: 1, own: 0.7, woodwork: 0.85, bar: 0.85, near: 0.8, save: 0.75, rocket: 0.7, attack: 0.65, tackle: 0.5, red: 0.6, red2: 0.6, flare: 0.6, offside: 0.4 };
+	const EXCITE = { goal: 1, lateWin: 1, lateEq: 1, hattrick: 1, equaliser: 0.95, ahead: 0.9, comeback: 1, own: 0.7, woodwork: 0.85, bar: 0.85, near: 0.8, save: 0.75, rocket: 0.7, attack: 0.65, tackle: 0.5, red: 0.6, red2: 0.6, flare: 0.6, offside: 0.4, welcome: 0.3 };
 	const pickFresh = (pool, recent) => { const fresh = pool.filter(s => !recent.includes(s)); return fresh[Math.floor(Math.random() * fresh.length)] || pool[Math.floor(Math.random() * pool.length)]; };
 	let commAt = -1e9, commRecent = [], commTimer = 0, lastCommentary = null, lastColour = null, commKindAt = {}, colourTimer = 0, colourRecent = [], goalRecent = [];
 	const shortName = p => (p && (p.name || `No. ${p.num}`)) || "";
@@ -13934,6 +13947,14 @@
 		if (typeof speakLine === "function") { speakLine(text, "goal", 0); }
 		colourAfter("goal", t, commAt, 3600);
 		return text;
+	}
+	// Kick-off: a welcome to the ground (the home side's, an option file's name included).
+	function welcomeCall () {
+		if (mode !== "league" && mode !== "friendly") { return false; }
+		const g = matchGround();
+		if (!g) { return false; }
+		const h = homeSide === 0 ? YOU : opp, a = homeSide === 0 ? opp : YOU;
+		return commentary("welcome", { g, h: (h && h.name) || "", a: (a && a.name) || "" }, homeSide, true);
 	}
 	const hideCommentary = () => { const el = $("commLine"); if (el) { el.hidden = true; } clearTimeout(commTimer); };
 	function moment (kind, p, o = {}) {
@@ -15620,7 +15641,7 @@
 			const nc = document.createElement("canvas"); nc.width = 1024; nc.height = 64;
 			const ng = nc.getContext && nc.getContext("2d");
 			if (ng && ng.fillText) {
-				const name = (leagueMatch ? (leagueMatch.home ? YOU : TEAMS[leagueMatch.opp]).ground : YOU.ground).toUpperCase();
+				const name = matchGround().toUpperCase();
 				ng.fillStyle = "#0d1216"; ng.fillRect(0, 0, 1024, 64);
 				ng.font = "900 46px 'Big Shoulders Display', 'Arial Narrow', Arial, sans-serif"; ng.textAlign = "center"; ng.textBaseline = "middle";
 				ng.fillStyle = "#eef2ec"; ng.fillText(name, 512, 34);
@@ -19492,6 +19513,8 @@
 		if (bulkSim || mode === "tutorial" || mode === "corners") { return; }
 		const box = $("bcLineups");
 		box.replaceChildren();
+		const gr = mode === "league" || mode === "friendly" ? matchGround() : "";
+		if (gr) { box.append(el("div", "bc-venue", leagueMatch && leagueMatch.neutral ? `${gr} · neutral ground` : gr)); }
 		for (const t of [ 0, 1 ]) {
 			const col = el("div", "bc-col");
 			col.style.setProperty("--kit", (KITS[t] || KITS[0]).outfield);
@@ -20739,7 +20762,7 @@
 	// Offside, the two commentators and the chants.
 	if (window.__ff) { Object.assign(window.__ff, { kickTest (p, x, y, sp, restart) { if (restart) { deadBall = { kind: restart, taker: p }; } ball.owner = null; kick(p, x, y, sp); }, aerialTest (t) { lastTouch = t; return aerial(); }, chantLogTest () { return chantLog.slice(); }, CALLERS, COLOUR, GOAL_SHOUT, goalShout }); }
 	if (window.__ff) { Object.assign(window.__ff, { trophyCeremony, ceremonySeek, ceremonyInfo, endCeremony, queueTrophy, trophyDue, lastCeremony: () => lastCeremony }); }
-	if (window.__ff) { Object.assign(window.__ff, { setOpponent, yourKit }); }
+	if (window.__ff) { Object.assign(window.__ff, { setOpponent, yourKit, matchGround, welcomeCall }); }
 	if (window.__ff) { Object.assign(window.__ff, { ensureCont, contNight, contFixture, contSimAll, contQualify, contNext, ccTable, ccAgg, ccWinner, renderCont, CC_NIGHTS, currentFixture, simulateMine, restoreGuest, saveLeague, renderLeague }); }
 
 	const hot = window.claude && window.claude.hot;

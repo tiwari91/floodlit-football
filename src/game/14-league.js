@@ -112,6 +112,10 @@
 		return { round: league.round, home: pair[0] === 0, opp: pair[0] === 0 ? pair[1] : pair[0] };
 	}
 
+	// Where a fixture is played: the home side's ground (an option file's own name, or the game's).
+	const hostOf = f => (f && !f.home && TEAMS[f.opp] ? TEAMS[f.opp] : YOU);
+	const matchGround = () => (hostOf(leagueMatch).ground || YOU.ground || "");
+
 	function poisson (l) {
 		const L = Math.exp(-l);
 		let k = 0, p = 1;

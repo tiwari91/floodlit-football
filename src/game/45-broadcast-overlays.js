@@ -11,6 +11,8 @@
 		if (bulkSim || mode === "tutorial" || mode === "corners") { return; }
 		const box = $("bcLineups");
 		box.replaceChildren();
+		const gr = mode === "league" || mode === "friendly" ? matchGround() : "";
+		if (gr) { box.append(el("div", "bc-venue", leagueMatch && leagueMatch.neutral ? `${gr} · neutral ground` : gr)); }
 		for (const t of [ 0, 1 ]) {
 			const col = el("div", "bc-col");
 			col.style.setProperty("--kit", (KITS[t] || KITS[0]).outfield);

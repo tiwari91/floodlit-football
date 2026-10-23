@@ -792,7 +792,7 @@
 			const nc = document.createElement("canvas"); nc.width = 1024; nc.height = 64;
 			const ng = nc.getContext && nc.getContext("2d");
 			if (ng && ng.fillText) {
-				const name = (leagueMatch ? (leagueMatch.home ? YOU : TEAMS[leagueMatch.opp]).ground : YOU.ground).toUpperCase();
+				const name = matchGround().toUpperCase();
 				ng.fillStyle = "#0d1216"; ng.fillRect(0, 0, 1024, 64);
 				ng.font = "900 46px 'Big Shoulders Display', 'Arial Narrow', Arial, sans-serif"; ng.textAlign = "center"; ng.textBaseline = "middle";
 				ng.fillStyle = "#eef2ec"; ng.fillText(name, 512, 34);

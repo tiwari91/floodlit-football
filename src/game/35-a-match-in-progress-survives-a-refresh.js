@@ -86,7 +86,9 @@
 		}
 		if (state === "half") { toast("Second half: teams change ends", "#eef6ea"); }
 		if ((state === "intro" || state === "full" || state === "half") && mode !== "tutorial") { introSweep = { on: true }; }
+		const fresh = state === "intro" || state === "full";
 		state = "play";
+		if (fresh && typeof welcomeCall === "function") { welcomeCall(); }
 		pauseBtn.textContent = "Pause";
 		if (mode === "tutorial" && !tut) { tut = { step: 0 }; freeze = 0; setupTutStep(); }
 		canvas.focus?.();

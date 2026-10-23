@@ -140,8 +140,10 @@
 		ol.replaceChildren();
 		for (let r = league.round; r < Math.min(league.fixtures.length, league.round + 5); r++) {
 			const pair = league.fixtures[r].find(([ a, b ]) => a === 0 || b === 0), home = pair[0] === 0, o = TEAMS[home ? pair[1] : pair[0]];
-			const li = el("li", r === league.round ? "now" : "");
-			li.append(el("b", "", String(r + 1)), el("span", home ? "ha h" : "ha a", home ? "H" : "A"), dotFor(o), el("span", "who", o.name + (derbyOf(0, home ? pair[1] : pair[0]) ? " (derby)" : "")), el("span", "stars", stars(Math.round(getStr(home ? pair[1] : pair[0])))));
+			const li = el("li", r === league.round ? "now" : ""), gr = (home ? YOU : o).ground || "";
+			const who = el("span", "who", o.name + (derbyOf(0, home ? pair[1] : pair[0]) ? " (derby)" : ""));
+			if (gr) { who.append(el("small", "venue", gr)); li.title = `${home ? "Home" : "Away"} at ${gr}`; }
+			li.append(el("b", "", String(r + 1)), el("span", home ? "ha h" : "ha a", home ? "H" : "A"), dotFor(o), who, el("span", "stars", stars(Math.round(getStr(home ? pair[1] : pair[0])))));
 			ol.append(li);
 		}
 	}
