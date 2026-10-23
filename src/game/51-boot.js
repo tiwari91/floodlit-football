@@ -17,6 +17,8 @@
 		if (store.get("ff-offside") === "0") { offsideRule = false; $("offsideBtn").textContent = "Offside off"; $("offsideBtn").setAttribute("aria-pressed", "false"); }
 		minimapOn = store.get("ff-map") !== "0";   // the radar is on unless turned off $("mapBtn").textContent = minimapOn ? "Minimap on" : "Minimap off"; $("mapBtn").setAttribute("aria-pressed", String(minimapOn));
 		if (store.get("ff-hints") === "0") { hintsOn = false; $("hintsBtn").textContent = "Hints off"; $("hintsBtn").setAttribute("aria-pressed", "false"); }
+		if (typeof initMusicSettings === "function") { initMusicSettings(); }   // music volume and which track plays next
+		if (typeof initVoice === "function") { initVoice(); }   // the commentator's voice: off in the test mode
 		if (store.get("ff-music") === "0") { musicOn = false; $("musicBtn").textContent = "Music off"; $("musicBtn").setAttribute("aria-pressed", "false"); }
 		{ const g = store.get("ff-gfx"); if (g && GFX3[g]) { setGfx(g); } else { setGfx("auto"); } }   // Auto until a level is picked
 		if (store.get("ff-contrast") === "1") { highContrast = true; $("contrastBtn").textContent = "Kit contrast on"; $("contrastBtn").setAttribute("aria-pressed", "true"); }
@@ -119,7 +121,7 @@
 	}
 
 	// More test hooks, kept apart from the big list above.
-	if (window.__ff) { Object.assign(window.__ff, { renewWorth, renewPlan, assistContracts, reportText, rolloverClub, showContract, goalCall, COMM, cupNight, cupTie, cupPens, ensureCup, seasonAwards, youthIntake, promoteYouth, releaseYouth, renderExtras, CUP_NIGHTS, ensureDrama, dramaAfterMatch, resolveIssue, renewRefusal, signRefusal, sellRefusal, renderDrama, temperOf, signPlayer, sellPlayer, rejectBid, weeklyClub, flareUp, flareTick, commitFoulTest (r) { if (state !== "play") { return null; } freeze = 0; const off = outfield(1)[0], vic = outfield(0).sort((a, b) => dist(a, off) - dist(b, off))[0]; return flareUp(off, vic, true, "", { force: true, rnd: () => r }); } }); }
+	if (window.__ff) { Object.assign(window.__ff, { renewWorth, renewPlan, assistContracts, reportText, rolloverClub, showContract, goalCall, COMM, cupNight, cupTie, cupPens, ensureCup, seasonAwards, youthIntake, promoteYouth, releaseYouth, renderExtras, CUP_NIGHTS, ensureDrama, dramaAfterMatch, resolveIssue, renewRefusal, signRefusal, sellRefusal, renderDrama, temperOf, signPlayer, sellPlayer, rejectBid, weeklyClub, flareUp, flareTick, musicState () { return { tracks: TRACKS.map(x => x.name), vol: musicVol, level: musicLevel(), sel: !!$("musicVol"), next: trackNext, playing: music ? music.track : null }; }, setMusicVol, grooveBarTest (k) { ensureAudio(); const was = music; music = { g: audio.createGain() }; try { grooveBar(audio.currentTime + 0.05, 9, TRACKS[k]); return true; } finally { music.g.disconnect(); music = was; } }, voiceState () { return { on: voiceOn, available: voiceAvailable(), button: !!$("voiceBtn"), spoke: speakLine("Test line", "goal") }; }, commitFoulTest (r) { if (state !== "play") { return null; } freeze = 0; const off = outfield(1)[0], vic = outfield(0).sort((a, b) => dist(a, off) - dist(b, off))[0]; return flareUp(off, vic, true, "", { force: true, rnd: () => r }); } }); }
 
 	const hot = window.claude && window.claude.hot;
 	if (hot && typeof hot.snapshot === "function") {

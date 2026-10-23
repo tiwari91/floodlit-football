@@ -163,6 +163,13 @@ const red = await page.evaluate(() => {
 check("two hot-heads: a red for violent conduct and he's off", red.sent === 1 && red.gone === 1 && /violent conduct/.test(red.line), JSON.stringify(red));
 if (shot) { await page.evaluate(() => { const F = window.__ff, o = F.outfield(1)[2], v = F.outfield(0)[1]; F.flareUp(o, v, true, "", { force: true, noCards: true, rnd: () => 0.99 }); for (let k = 0; k < 30; k++) { F.flareTick(); } F.state === "play"; }); await page.waitForTimeout(500); await page.screenshot({ path: `${shot}/flare-up.png` }); }
 
+const voice = await page.evaluate(() => window.__ff.voiceState());
+check("the commentary voice stays off and silent in the test mode", voice.on === false && voice.spoke === false && voice.button === false, JSON.stringify(voice));
+
+const mus = await page.evaluate(() => { const F = window.__ff, a = F.musicState(); F.setMusicVol("quiet"); const b = F.musicState(), stored = localStorage.getItem("ff-music-vol"); F.setMusicVol("normal"); return { a, b, stored, g1: F.grooveBarTest(1), g2: F.grooveBarTest(2) }; });
+check("three menu tracks take turns, with a saved music volume setting", mus.a.tracks.length === 3 && mus.a.sel && mus.b.level < mus.a.level && mus.stored === "quiet", JSON.stringify(mus));
+check("the new tracks play a bar without errors", mus.g1 && mus.g2);
+
 check("no page errors", errs.length === 0, errs.slice(0, 3).join(" | "));
 await browser.close(); server.stop();
 process.exit(done() ? 1 : 0);

@@ -38,6 +38,7 @@
 		el.style.setProperty("--comm-kit", (KITS[t] || KITS[0]).outfield);
 		el.hidden = false; el.classList.remove("in"); void el.offsetWidth; el.classList.add("in");
 		commAt = now; lastCommentary = { kind, text, at: now };
+		if (typeof speakLine === "function") { speakLine(text, kind); }
 		clearTimeout(commTimer);
 		commTimer = setTimeout(() => { el.hidden = true; }, 4200);
 		return true;
@@ -75,6 +76,7 @@
 	}
 	function commTick () {
 		if (typeof flareTick === "function") { flareTick(); }
+		if (typeof voiceTick === "function") { voiceTick(); }
 		const log = typeof matchLog !== "undefined" && Array.isArray(matchLog) ? matchLog : null;
 		if (!log) { return; }
 		if (log.length < commSeen) { commSeen = 0; commWait = null; }   // a new match

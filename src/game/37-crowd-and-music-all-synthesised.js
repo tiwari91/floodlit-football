@@ -475,14 +475,84 @@
 		}
 		return (hallBuf = b);
 	}
+	// Two more menu tracks, in the style of a modern football game's soundtrack, and the three take
+	// turns: a new one each time the menus come back. Each is a loop of sixteen bars written as
+	// sixteenth-note patterns: a punchy kick, a clap or snare, hats, a pumping bass on the chord's
+	// root, a soft pad and a short hook that comes in after the four-bar intro. Still all synthesised,
+	// a handful of nodes a beat.
+	const TRACKS = [
+		{ name: "Floodlit anthem", bpm: BPM },
+		{ name: "Under the lights", bpm: 124, chords: [ [ 57, 60, 64 ], [ 53, 57, 60 ], [ 52, 55, 60 ], [ 55, 59, 62 ] ],
+			kick: "x...x...x...x...", snare: "....x.......x...", hat: "..x...x...x...x.", bass: "x.xxx.xxx.xxx.xx", wave: "sawtooth",
+			hook: [ [ 76, 0, 72, 0, 74, 0, 76, 0, 0, 0, 79, 0, 76, 0, 74, 0 ], [ 72, 0, 0, 0, 69, 0, 72, 0, 74, 0, 0, 0, 72, 0, 0, 0 ], [ 76, 0, 72, 0, 74, 0, 76, 0, 0, 0, 79, 0, 81, 0, 79, 0 ], [ 79, 0, 0, 0, 74, 0, 0, 0, 71, 0, 0, 0, 74, 0, 0, 0 ] ] },
+		{ name: "Matchday", bpm: 94, chords: [ [ 52, 55, 59, 62 ], [ 48, 52, 55, 59 ], [ 55, 59, 62, 66 ], [ 50, 54, 57, 60 ] ],
+			kick: "x.....x.x.....x.", snare: "....x.......x..x", hat: "x.xxx.x.x.xxx.x.", bass: "x.....x.x...x...", wave: "square",
+			hook: [ [ 71, 0, 0, 74, 0, 0, 76, 0, 79, 0, 76, 0, 74, 0, 0, 0 ], [ 72, 0, 0, 0, 71, 0, 67, 0, 0, 0, 0, 0, 0, 0, 0, 0 ], [ 71, 0, 0, 74, 0, 0, 76, 0, 79, 0, 81, 0, 79, 0, 0, 0 ], [ 78, 0, 0, 0, 76, 0, 74, 0, 0, 0, 0, 0, 0, 0, 0, 0 ] ] }
+	];
+	const VOLUMES = { quiet: [ "Quiet", 0.5 ], normal: [ "Normal", 1 ], loud: [ "Loud", 1.6 ] };
+	let musicVol = "normal", trackNext = 0;
+	const musicLevel = () => 0.055 * (VOLUMES[musicVol] || VOLUMES.normal)[1];
+	function setMusicVol (v, save = true) {
+		musicVol = VOLUMES[v] ? v : "normal";
+		if (save) { store.set("ff-music-vol", musicVol); }
+		const sel = $("musicVol");
+		if (sel) { sel.value = musicVol; }
+		if (music && audio) { music.g.gain.setTargetAtTime(musicLevel(), audio.currentTime, 0.3); }
+	}
+	function initMusicSettings () {
+		musicVol = VOLUMES[store.get("ff-music-vol")] ? store.get("ff-music-vol") : "normal";
+		trackNext = (Number(store.get("ff-track")) || 0) % TRACKS.length;
+		if ($("musicVol") || !$("musicBtn")) { return; }
+		const label = document.createElement("label"), sel = document.createElement("select");
+		label.className = "field"; label.htmlFor = "musicVol"; label.textContent = "Music volume ";
+		sel.id = "musicVol";
+		for (const [ k, [ name ] ] of Object.entries(VOLUMES)) { const o = document.createElement("option"); o.value = k; o.textContent = name; sel.append(o); }
+		sel.value = musicVol;
+		sel.addEventListener("change", () => setMusicVol(sel.value));
+		label.append(sel);
+		$("musicBtn").after(label);
+	}
+	function pad (t, notes, dur, gain) {   // a soft, slow pad: a triangle and a detuned sine per note
+		const g = audio.createGain(), f = audio.createBiquadFilter();
+		f.type = "lowpass"; f.frequency.value = 1400;
+		g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(gain, t + dur * 0.3); g.gain.setValueAtTime(gain, t + dur * 0.8); g.gain.linearRampToValueAtTime(0.0001, t + dur + 0.1);
+		f.connect(g).connect(music.g);
+		for (const n of notes) { for (const [ type, d ] of [ [ "triangle", -7 ], [ "sine", 7 ] ]) { const o = audio.createOscillator(); o.type = type; o.frequency.value = midiHz(n); o.detune.value = d; o.connect(f); o.start(t); o.stop(t + dur + 0.15); } }
+	}
+	function lead (t, n, dur, gain, type) {   // the hook: a bright pluck with a filter that closes
+		const o = audio.createOscillator(), g = audio.createGain(), f = audio.createBiquadFilter();
+		o.type = type; o.frequency.value = midiHz(n);
+		f.type = "lowpass"; f.Q.value = 3; f.frequency.setValueAtTime(3200, t); f.frequency.exponentialRampToValueAtTime(700, t + dur);
+		g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(gain, t + 0.008); g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.05);
+		o.connect(f).connect(g).connect(music.g); o.start(t); o.stop(t + dur + 0.08);
+	}
+	function grooveBar (t, i, tr) {
+		const beat = 60 / tr.bpm, s16 = beat / 4, bar = i % 16, ch = tr.chords[bar % 4], intro = bar < 4, full = bar >= 8;
+		for (let k = 0; k < 16; k++) {
+			const s = t + k * s16;
+			if (!intro && tr.kick[k] === "x") { drum(s, 130, 45, 0.28, 0.95); }
+			if (tr.snare[k] === "x") { hit(s, 0.14, intro ? 0.18 : 0.34, "bandpass", 1600, 1100, 0.9); if (!intro) { drum(s, 210, 160, 0.06, 0.2); } }
+			if (tr.hat[k] === "x") { hit(s, k % 4 === 2 ? 0.09 : 0.035, full ? 0.07 : 0.045, "highpass", 8000, 8000, 1); }
+			if (!intro && tr.bass[k] === "x") { pluck(s, ch[0] - 24, s16 * 1.7, 0.42, tr.wave === "square" ? "triangle" : "sawtooth"); }
+			const n = !intro && tr.hook[bar % 4][k];
+			if (n) { let len = 1; while (k + len < 16 && !tr.hook[bar % 4][k + len]) { len++; } lead(s, n, Math.min(len, 4) * s16, full ? 0.11 : 0.08, tr.wave); }
+		}
+		pad(t, ch, beat * 4, intro ? 0.05 : 0.035);
+		if (bar % 8 === 7) { for (let k = 0; k < 4; k++) { drum(t + 3 * beat + k * s16, 170 - k * 20, 70, 0.12, 0.5); } }
+		if (bar % 8 === 6) { swell(t + 2 * beat, 2 * beat, 0.07); }
+		if (bar % 8 === 0 && !intro) { hit(t, 1.4, 0.09, "highpass", 6000, 3000, 0.7); }
+	}
 	function updateMusic () {
 		if (!audio) { return; }
 		const want = soundOn && musicOn && (state === "intro" || state === "full" || state === "paused" || state === "half");
 		const t = audio.currentTime;
 		if (want && !music) {
-			music = { g: audio.createGain(), next: t + 0.1, bar: 0 };
+			// The next track in turn, faded in over a couple of seconds.
+			const k = trackNext % TRACKS.length, tr = TRACKS[k];
+			trackNext = (k + 1) % TRACKS.length; store.set("ff-track", String(trackNext));
+			music = { g: audio.createGain(), next: t + 0.1, bar: 0, track: k, barLen: 4 * 60 / tr.bpm };
 			music.g.gain.value = 0;
-			music.g.gain.setTargetAtTime(0.055, t, 0.6);
+			music.g.gain.setTargetAtTime(musicLevel(), t, 0.7);
 			music.g.connect(audio.destination);
 			// A hall around it: the dry mix plus a convolver with a two-and-a-half second decaying tail.
 			try {
@@ -494,12 +564,12 @@
 		}
 		if (!want && music) {
 			const g = music.g, wet = music.wet;
-			g.gain.setTargetAtTime(0, t, 0.25);
-			setTimeout(() => { try { g.disconnect(); if (wet) { wet.disconnect(); } } catch (e) { /* gone */ } }, 2500);
+			g.gain.setTargetAtTime(0, t, 0.45);   // faded out as the match comes in
+			setTimeout(() => { try { g.disconnect(); if (wet) { wet.disconnect(); } } catch (e) { /* gone */ } }, 3500);
 			music = null;
 			return;
 		}
-		if (music) { while (music.next < t + 0.6) { scheduleBar(music.next, music.bar++); music.next += BAR; } }
+		if (music) { while (music.next < t + 0.6) { if (music.track) { grooveBar(music.next, music.bar++, TRACKS[music.track]); } else { scheduleBar(music.next, music.bar++); } music.next += music.barLen; } }
 	}
 
 	// Rain you can hear: filtered noise, while a match is on and sound is on.
