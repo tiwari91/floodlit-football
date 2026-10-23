@@ -168,20 +168,25 @@
 		const S = KICK_SHAPE3[kind] || KICK_SHAPE3.drive, sc = 0.7 + 0.45 * pow;
 		const B = [ S.bh * sc, S.bk * (0.75 + 0.3 * pow), -0.55 ], Fh = S.ft[0] * (0.75 + 0.35 * pow);
 		const span = Math.max(1, n) + 1, down = Math.min(1.4, span * 0.45);   // frames for the downswing: the quickest part
-		if (k < -down) {   // the backswing
-			const t = clamp((k + span) / Math.max(0.3, span - down), 0, 1), e = smooth3(t);
+		if (k < -down) {   // the backswing: eased out of the run's own stride (no jerk at either end)
+			const t = clamp((k + span) / Math.max(0.3, span - down), 0, 1), e = t * t * t * (t * (6 * t - 15) + 10);
 			return { hip: B[0], knee: B[1], toe: B[2], w: 1 - e, bw: e, fw: 0 };
 		}
 		if (k < 0) {   // the downswing: the thigh comes through first, the knee whips straight last
 			const t = clamp((k + down) / down, 0, 1);
 			return { hip: lerp3(B[0], C[0], smooth3(t)), knee: lerp3(B[1], C[1], Math.pow(t, 2.2)), toe: lerp3(B[2], C[2], t), w: 0, bw: 1 - t, fw: 0 };
 		}
-		if (k < 4) {   // through the ball and up
-			const t = k / 4, e = 1 - (1 - t) * (1 - t);
+		// Through the ball and up: longer and higher on a harder kick, slowing into the top (ease-out), a
+		// moment held there, then down and back into his stride, the run taking the leg over by the end
+		// of the kick (frame 15) so nothing jumps when the swing hands back.
+		const thru = 3 + 2.5 * pow, hold = thru + 1.2;
+		if (k < thru) {
+			const t = k / thru, e = 1 - (1 - t) * (1 - t) * (1 - t);
 			return { hip: lerp3(C[0], Fh, e), knee: lerp3(C[1], S.ft[1], e), toe: lerp3(C[2], S.ft[2], e), w: 0, bw: 0, fw: e };
 		}
-		const t = clamp((k - 4) / 9, 0, 1), e = smooth3(t);   // and down, back into his stride
-		return { hip: lerp3(Fh, 0.1, e), knee: lerp3(S.ft[1], 0.5, e), toe: lerp3(S.ft[2], 0, e), w: smooth3(clamp((k - 6) / 7, 0, 1)), bw: 0, fw: 1 - e };
+		if (k < hold) { return { hip: Fh, knee: S.ft[1], toe: S.ft[2], w: 0, bw: 0, fw: 1 }; }
+		const t = clamp((k - hold) / (14 - hold), 0, 1), e = smooth3(t);
+		return { hip: lerp3(Fh, 0.1, e), knee: lerp3(S.ft[1], 0.5, e), toe: lerp3(S.ft[2], 0, e), w: smooth3(clamp((k - hold - 1) / (14.5 - hold - 1), 0, 1)), bw: 0, fw: 1 - e };
 	}
 	// The ball's drawn height (as sync3D draws it): a ball taken on the chest or thigh drops to his feet.
 	function ballDrawH3 () {
