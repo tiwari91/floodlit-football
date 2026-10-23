@@ -11,15 +11,19 @@
 	const DEFAULT_IDENT = TEAMS.map(identOf);
 	function rememberIdentity (lg) {
 		if (!lg) { return; }
+		const edits = typeof stripClubEdits === "function" && stripClubEdits();   // record the clubs without option-file edits (18g)
 		const clubs = {};
 		TEAMS.forEach((t, i) => { if (i !== 0 && JSON.stringify(identOf(t)) !== JSON.stringify(DEFAULT_IDENT[i])) { clubs[i] = identOf(t); } });
 		lg.ident = { you: identOf(YOU), clubs, country: lg.ident && lg.ident.country ? lg.ident.country : undefined };
+		if (edits) { reapplyClubEdits(lg); }
 	}
 	function applyIdentity (lg) {
 		TEAMS.forEach((t, i) => Object.assign(t, DEFAULT_IDENT[i]));
-		if (!lg || !lg.ident || typeof lg.ident !== "object") { return; }
-		if (lg.ident.you) { Object.assign(YOU, lg.ident.you); }
-		for (const [ i, id ] of Object.entries(lg.ident.clubs || {})) { if (TEAMS[i] && Number(i) !== 0) { Object.assign(TEAMS[i], id); } }
+		if (lg && lg.ident && typeof lg.ident === "object") {
+			if (lg.ident.you) { Object.assign(YOU, lg.ident.you); }
+			for (const [ i, id ] of Object.entries(lg.ident.clubs || {})) { if (TEAMS[i] && Number(i) !== 0) { Object.assign(TEAMS[i], id); } }
+		}
+		if (typeof applyEditsOnLoad === "function") { applyEditsOnLoad(lg); }   // option-file edits on top (18g)
 	}
 	function offerJobs (pos) {
 		const lg = league;
@@ -116,6 +120,7 @@
 	// A move abroad: a new identity in a new country, a fresh squad from that region, a new league,
 	// your career carried over.
 	function moveAbroad (offer) {
+		if (typeof stripClubEdits === "function") { stripClubEdits(); }   // the plain identities move; edits go back on after (18g)
 		const lg = league, m = MARKETS[offer.abroad], from = YOU.name, fmt = lg.fmt, country = NATIONS[offer.nat] ? NATIONS[offer.nat][0] : m.label;
 		const career = { ...(lg.career || { history: [] }), clubs: [ ...((lg.career && lg.career.clubs) || [ from ]), `${offer.name} (${country})` ] };
 		const palette = [ [ "#c8102e", "#ffffff" ], [ "#1d4fa0", "#ffffff" ], [ "#f2b52e", "#1f2a36" ], [ "#155e3a", "#ffffff" ], [ "#8fc3e6", "#1f2a36" ], [ "#5b2a86", "#ffffff" ], [ "#e0662f", "#1f2a36" ] ];
@@ -153,6 +158,7 @@
 	function takeJob (id) {
 		const lg = league, offer = lg && (lg.jobOffers || []).find(o => o.id === id);
 		if (!offer) { return false; }
+		if (typeof stripClubEdits === "function") { stripClubEdits(); }   // swap the plain identities; edits go back on after (18g)
 		const to = TEAMS[id], from = { ...YOU }, oldStr = yourStr();
 		// The two clubs trade identities: you wear theirs now; your old side keeps its name and your old squad's strength.
 		for (const k of [ "name", "short", "color", "color2", "ground", "surface" ]) { YOU[k] = to[k]; to[k] = from[k]; }

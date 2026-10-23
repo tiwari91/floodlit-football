@@ -75,6 +75,7 @@
 			].filter(Boolean).join(" ")
 		};
 		league.cpuIn = {};
+		if (typeof seasonEdits === "function") { seasonEdits(prev); }   // option-file edits carry on (18g)
 		windowEvents("Summer");
 		if (prev) {
 			sanitizeClub(club);
@@ -106,7 +107,7 @@
 
 	function currentFixture () {
 		if (!league || seasonDone()) { return null; }
-		if (typeof contFixture === "function") { const cf = contFixture(); if (cf) { return cf; } }   // a continental night comes first (18f)
+		if (typeof contFixture === "function") { const cf = contFixture(); if (cf) { return cf; } }   // a continental night comes first (18g)
 		const pair = league.fixtures[league.round].find(([ a, b ]) => a === 0 || b === 0);
 		return { round: league.round, home: pair[0] === 0, opp: pair[0] === 0 ? pair[1] : pair[0] };
 	}

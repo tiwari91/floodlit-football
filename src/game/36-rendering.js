@@ -829,16 +829,21 @@
 	// arms and a head with hair, all turned to face the way the player is going.
 	const SKIN = [ "#f1c9a5", "#e0ac86", "#c68a5e", "#9c6a44", "#6e4a30", "#4a3222" ];
 	const HAIR = [ "#1b1410", "#3b2616", "#6b4424", "#a0703a", "#d8b46a", "#2a2a2a" ];
+	// Fixed by name, so a player looks the same every match. hashStr is unsigned: shift with >>>,
+	// or half the squad gets a negative face index (a blank head) and no hair colour.
+	function lookFromName (name) {
+		const h = hashStr(name + "look");
+		// The broad style is fixed by the hash as before; a second draw splits it (crop or short,
+		// curly or a full afro, long or tied back), so nobody's look changes beyond recognition.
+		const base = [ "short", "short", "short", "curly", "long", "buzz", "shaved" ][(h >>> 5) % 7], alt = (h >>> 13) % 2;
+		const style = base === "short" && alt ? "crop" : base === "curly" && alt ? "afro" : base === "long" && alt ? "tied" : base;
+		return { skin: SKIN[h % SKIN.length], hair: HAIR[(h >>> 2) % HAIR.length], shaved: style === "shaved", style, face: (h >>> 9) % 16 };
+	}
 	function look (p) {
 		if (!p.look) {
-			// Fixed by name, so a player looks the same every match. hashStr is unsigned: shift with >>>,
-			// or half the squad gets a negative face index (a blank head) and no hair colour.
-			const h = hashStr((p.name || `${p.team}-${p.idx}-${p.num}`) + "look");
-			// The broad style is fixed by the hash as before; a second draw splits it (crop or short,
-			// curly or a full afro, long or tied back), so nobody's look changes beyond recognition.
-			const base = [ "short", "short", "short", "curly", "long", "buzz", "shaved" ][(h >>> 5) % 7], alt = (h >>> 13) % 2;
-			const style = base === "short" && alt ? "crop" : base === "curly" && alt ? "afro" : base === "long" && alt ? "tied" : base;
-			p.look = { skin: SKIN[h % SKIN.length], hair: HAIR[(h >>> 2) % HAIR.length], shaved: style === "shaved", style, face: (h >>> 9) % 16 };
+			p.look = lookFromName(p.name || `${p.team}-${p.idx}-${p.num}`);
+			// A look set in the editor (18g): skin, hair and style, frozen when he was renamed.
+			if (p.lookEd) { for (const k of [ "skin", "hair", "style", "face" ]) { if (p.lookEd[k] !== undefined) { p.look[k] = p.lookEd[k]; } } p.look.shaved = p.look.style === "shaved"; }
 		}
 		return p.look;
 	}

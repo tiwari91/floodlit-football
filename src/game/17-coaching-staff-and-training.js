@@ -703,6 +703,7 @@
 		const rnd = () => { h = (h * 48271) % 2147483647; return h / 2147483647; };
 		const base = cpuOvr(str);
 		const sq = POS_OF_SLOT.map((pos, i) => genPlayer(pos, base + Math.round((rnd() * 2 - 1) * 4) + (i === 9 || i === 2 ? 3 : 0), null, rnd));
+		if (typeof editCpuSquad === "function") { editCpuSquad(clubId, sq); }   // names edited by slot (18g)
 		// This season's signings, from the transfer windows, take their places.
 		const ins = league && league.cpuIn && league.cpuIn[clubId];
 		if (Array.isArray(ins)) { for (const d of ins) { if (d && d.pl && Number.isInteger(d.slot) && d.slot > 0 && d.slot < sq.length) { sq[d.slot] = { ...d.pl }; } } }

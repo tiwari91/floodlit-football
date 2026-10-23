@@ -1198,3 +1198,24 @@
 /* Simulate the rest, on the pitch itself once the computer has been playing for you a while. */
 .simchip { position: absolute; right: 12px; top: 92px; z-index: 6; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--amber); background: rgba(12, 18, 24, 0.82); color: var(--amber); font-weight: 600; font-size: 14px; cursor: pointer; }
 .simchip:hover, .simchip:focus-visible { background: rgba(12, 18, 24, 0.95); }
+
+/* Edit mode: rename clubs, kits and players; option files (18f). */
+.ed-help { margin: 0; color: var(--muted); font-size: 14px; }
+.ed-body { display: flex; flex-direction: column; gap: 12px; overflow-y: auto; overscroll-behavior: contain; min-height: 0; padding-right: 4px; }
+.ed-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); gap: 10px 16px; align-items: end; }
+.ed-field { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+.ed-field input, .ed-field select { font: inherit; font-size: 15px; text-transform: none; letter-spacing: 0; min-height: 34px; width: 100%; box-sizing: border-box; }
+.ed-field input[type="color"] { padding: 2px; }
+.ed-kit { display: block; height: 34px; border-radius: 6px; border: 1px solid var(--rule); }
+.ed-face { display: block; width: 34px; height: 34px; border-radius: 50%; border-top: 9px solid; box-sizing: border-box; }
+.ed-ratings input:disabled { opacity: 0.5; }
+.ed-toggle { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
+.ed-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.ed-note { margin: 0; color: var(--muted); font-size: 13px; }
+.ed-err { color: #ef6f79; font-weight: 600; min-height: 1em; }
+.ed-drop { border: 2px dashed var(--rule); border-radius: 8px; padding: 18px; text-align: center; color: var(--muted); }
+.ed-drop.over { border-color: var(--amber); color: var(--amber); }
+.ed-preview { display: flex; flex-direction: column; gap: 8px; }
+.ed-preview .ed-note:first-child { color: inherit; font-size: 15px; font-weight: 600; }
+.ed-file h3 { margin: 8px 0 0; font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--amber); }
+.ed-file { display: flex; flex-direction: column; gap: 10px; }

@@ -237,6 +237,7 @@
 			<button type="button" id="lgNew">New season</button>
 			<button type="button" id="lgExport" title="Save your season to a file you can keep or move to another device">Export league</button>
 			<button type="button" id="lgImport" title="Load a season from an exported file">Import league</button>
+			<button type="button" id="lgEdit" title="Rename clubs, kits and players, and share your edits as an option file">Edit names</button>
 			<input type="file" id="lgFile" accept=".json,application/json" hidden>
 		</div>
 		<div class="lg-grid">
@@ -392,6 +393,24 @@
 		<p class="fine">The dashed ring shows who your pass will reach, and it avoids teammates with a red shirt in the way. Your receiver runs onto the ball by itself, and the arrows take over once they have it. When you defend, the Auto switch setting decides who you control. <b>Assisted</b> (the default) switches you once when the ball is lost, to the defender who can get to it first (allowing for where it is going, and preferring players goal-side of the attacker), and then leaves you alone: while you hold the arrows or A, control stays with your man unless he is clearly out of the play (at most once a spell, with a message on screen), or the ball arrives at a teammate's feet while your man is well off it, when that teammate is yours at once. Let go of the arrows and the game moves you to a clearly better-placed defender, never more than twice a second and never straight back to the man you just left. <b>Manual only</b> never switches by itself (except at restarts, or if your man is sent off or subbed): S is the only way to change player. <b>Aggressive</b> switches as soon as another defender is better placed, whatever you are doing. A white pulse shows who you now control. The dashed ring with an S shows who S will switch you to; press S again to cycle to the next best, and control stays with your choice for two and a half seconds or until the ball changes hands. Your teammates cover and mark while you press: chase the ball with E, or hold A and your man closes the carrier down and jockeys him for you.</p>
 	</section>
 </main>
+
+<div class="sheet" id="editSheet" role="dialog" aria-modal="true" aria-labelledby="editTitle" hidden>
+	<div class="sheet-card">
+		<div class="sheet-head">
+			<h2 id="editTitle">Edit mode</h2>
+			<div class="tabs" id="editTabs" role="group" aria-label="What to edit">
+				<button type="button" data-tab="clubs" aria-pressed="true">Clubs</button>
+				<button type="button" data-tab="players" aria-pressed="false">Players</button>
+				<button type="button" data-tab="file" aria-pressed="false">Option file</button>
+			</div>
+			<button type="button" class="sheet-close" id="editClose" aria-label="Close">×</button>
+		</div>
+		<p class="ed-help">Floodlit ships with invented players. You can rename anything and share your edit file.</p>
+		<div class="ed-body" id="editBody"></div>
+		<input type="file" id="editFile" accept=".json,application/json" hidden>
+		<div class="actions"><button class="primary" id="editDone" type="button">Done</button></div>
+	</div>
+</div>
 
 <div class="sheet" id="howto" role="dialog" aria-modal="true" aria-labelledby="howtoTitle" hidden>
 	<div class="sheet-card">

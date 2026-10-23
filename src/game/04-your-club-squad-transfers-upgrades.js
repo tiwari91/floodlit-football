@@ -15,6 +15,8 @@
 	const money = m => (Math.abs(m) < 0.095 && m !== 0 ? `${m < 0 ? "-" : ""}£${Math.round(Math.abs(m) * 1000)}k` : `${m < 0 ? "-" : ""}£${Math.abs(m).toFixed(1)}m`);
 	const round1 = v => Math.round(v * 10) / 10;
 
+	// A stable id for each player, so edits can follow him (see 18g). Not from the seeded rnd: that would shift the computer's squads.
+	function newPid () { return `p${Date.now().toString(36).slice(-4)}${Math.random().toString(36).slice(2, 8)}`; }
 	const OVR_W = { gk: [ 0, 0, 0, 1 ], def: [ 0.25, 0.05, 0.2, 0.5 ], mid: [ 0.2, 0.2, 0.4, 0.2 ], fwd: [ 0.3, 0.35, 0.2, 0.15 ] };
 	function genPlayer (pos, ovr, name, rnd = Math.random) {
 		const j = () => Math.round((rnd() * 2 - 1) * 5), c = v => clamp(Math.round(v), 30, 96);
@@ -27,6 +29,7 @@
 			? { pac: 45 + j(), sho: 30 + j(), pas: 55 + j(), def: ovr + j() }
 			: { pac: ovr + b[0] + j(), sho: ovr + b[1] + j(), pas: ovr + b[2] + j(), def: ovr + b[3] + j() };
 		return ensurePlayer({
+			id: newPid(),
 			name: name || `${String.fromCharCode(65 + Math.floor(rnd() * 26))}. ${SURNAMES[Math.floor(rnd() * SURNAMES.length)]}`,
 			pos, pac: c(p.pac), sho: c(p.sho), pas: c(p.pas), def: c(p.def)
 		});

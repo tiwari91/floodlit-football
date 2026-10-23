@@ -22,6 +22,7 @@
 18d-the-cup-awards-and-the-academy.js
 18e-the-dressing-room.js
 18f-continental-cup.js
+18g-edit-mode.js
 19-audio.js
 20-kicking.js
 21-offside.js
