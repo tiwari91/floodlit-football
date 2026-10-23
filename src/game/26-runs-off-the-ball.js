@@ -420,9 +420,11 @@
 					return null;
 				}
 			}
-			const pressure = openness(p) < 55;
+			// A good dribbler is happy with a man close and sometimes takes him on instead of laying it off;
+			// a poor one moves it on sooner.
+			const dd = driD(p), pressure = openness(p) < 55 - 10 * dd, carry = dd > 0 && rel(p.team, p.x) > FW * 0.3 && Math.random() < 0.4 * dd;
 			// Possession sides move it on short and often; direct sides look forward.
-			if (pressure || Math.random() < (style[p.team] === "possession" ? 0.14 : 0.06)) {
+			if (!carry && (pressure || Math.random() < (style[p.team] === "possession" ? 0.14 : 0.06) * (1 - 0.4 * dd))) {
 				let best = null, bs = -Infinity;
 				for (const m of outfield(p.team)) {
 					if (m === p) { continue; }
@@ -447,7 +449,7 @@
 		let ty = isWide(p.y, 0.22) && rel(p.team, p.x) < FW * 0.86 ? p.y : FH / 2 + (p.y - FH / 2) * 0.5;
 		const opp = players.filter(q => q.team !== p.team);
 		const block = opp.find(q => dist(q, p) < 75 && (q.x - p.x) * (goal.x - p.x) > 0);
-		if (block) { ty = p.y + (p.y > block.y ? 110 : -110); }
+		if (block) { ty = p.y + (p.y > block.y ? 1 : -1) * 110 * (1 + 0.3 * driD(p)); }   // a dribbler goes round him sharper
 		return [ goal.x, clamp(ty, 30, FH - 30) ];
 	}
 

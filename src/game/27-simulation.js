@@ -12,7 +12,8 @@
 			// Waiting for a pass he doesn't stand stock still: small steps to set his feet.
 			const settle = receiver === p && spd < 0.5 && !ball.owner ? 1 : 0;
 			const moving = Math.max(clamp(spd / 0.4, 0, 1), settle * 0.6);
-			const hz = (0.95 + 0.5 * spd) / g.stride * (1 + 0.35 * p.shuf);
+			// Quick men turn their legs over faster; a dribbler takes short, quick steps on the ball.
+			const hz = (0.95 + 0.5 * spd) / g.stride * (1 + 0.35 * p.shuf) * (1 + (A(p, "pac") - 68) * 0.003 + (ball && ball.owner === p ? 0.08 * driD(p) : 0));
 			p.stride = (p.stride || 0) + Math.PI * 2 * hz / 60 * moving;
 			const target = Math.max(spd < 0.35 ? 0 : Math.min(1, spd / 2.6), settle * 0.22);
 			p.runAmt = (p.runAmt || 0) + (target - (p.runAmt || 0)) * 0.12;
@@ -71,7 +72,8 @@
 	function movePlayer (p, dvx, dvy, grip = cond.grip, accMax = ACC_AI, turn = 0.55) {
 		let ax = (dvx - p.vx) * grip, ay = (dvy - p.vy) * grip;
 		const faster = dvx * dvx + dvy * dvy > p.vx * p.vx + p.vy * p.vy;
-		const cap = accMax * (faster ? 1 : 1.7) * (cond.grip / 0.22) * (accMax < 1 ? build(p).agil : 1), a = Math.hypot(ax, ay);
+		// Quick men get going quicker too; on the ball a good dribbler is sharper off the mark.
+		const cap = accMax * (faster ? 1 : 1.7) * (cond.grip / 0.22) * (accMax < 1 ? build(p).agil * (1 + (A(p, "pac") - 68) * 0.005) * (ball && ball.owner === p ? 1 + 0.12 * driD(p) : 1) : 1), a = Math.hypot(ax, ay);
 		if (a > cap) { ax *= cap / a; ay *= cap / a; }
 		// At speed he can't swing round on the spot: the sideways push is limited, so a turn is a
 		// curve that tightens as he slows, and a hard change of direction means plant and cut.
@@ -79,7 +81,7 @@
 		if (v > 1 && accMax < 1) {
 			const ux = p.vx / v, uy = p.vy / v, along = ax * ux + ay * uy;
 			let side = -ax * uy + ay * ux;
-			const latCap = cap * clamp(1.9 / v, turn, 1);
+			const latCap = cap * clamp(1.9 / v, ball && ball.owner === p ? clamp(turn + 0.15 * driD(p), 0.35, 0.9) : turn, 1);   // turning with the ball: his dribbling
 			if (Math.abs(side) > latCap) { side = Math.sign(side) * latCap; }
 			ax = along * ux - side * uy; ay = along * uy + side * ux;
 			const want = Math.hypot(dvx, dvy);
@@ -103,7 +105,7 @@
 		if (on) {
 			// Slower legs (low pace, or tired from too many starts) tire a little sooner.
 			// Off the ball the tank lasts longer (about six seconds): a defender covers ground.
-			p.sprintFuel = Math.max(0, p.sprintFuel - SPRINT_DRAIN * (1 + Math.max(0, 70 - A(p, "pac")) * 0.01) * (ball && ball.owner === p ? 1 : 0.75));
+			p.sprintFuel = Math.max(0, p.sprintFuel - SPRINT_DRAIN * (1 + Math.max(0, 70 - A(p, "pac")) * 0.01) * (1 - 0.2 * phyD(p)) * (ball && ball.owner === p ? 1 : 0.75));
 		} else {
 			p.sprintFuel = Math.min(1, p.sprintFuel + SPRINT_FILL * (moving > 0.1 ? 1 : 1.6));
 		}
@@ -358,7 +360,7 @@
 				p.sprintAmt = (p.sprintAmt || 0) * 0.88;
 				if (Number.isFinite(p.sprintFuel)) { p.sprintFuel = Math.min(1, p.sprintFuel + SPRINT_FILL); p.sprintOut = p.sprintOut && p.sprintFuel < 0.25; }
 			}
-			const spdMul = (p.team === 1 ? diff.spd : 1) * (ball.owner === p ? 0.88 : 1) * (p.injured ? 0.8 : 1) * mood(p.team, 0.07) * paceMul(p) * cond.speed * (0.8 + 0.2 * staOf(p)) * (tr(p, "pace") ? 1.05 : 1);
+			const spdMul = (p.team === 1 ? diff.spd : 1) * (ball.owner === p ? 0.88 + 0.04 * driD(p) : 1) * (p.injured ? 0.8 : 1) * mood(p.team, 0.07) * paceMul(p) * cond.speed * (0.8 + 0.2 * staOf(p)) * (tr(p, "pace") ? 1.05 : 1);
 
 			// The man a pass is for runs onto it by himself, on either side; for yours the arrows take over on the first touch.
 			if ((p === receiver || p === ball.intended) && !ball.owner) {
@@ -622,8 +624,10 @@
 				const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
 				if (d > 0 && d < 26) {
 					const push = (26 - d) * 0.3, nx = dx / d, ny = dy / d;   // part of the overlap per frame: no ping-pong
-					a.x -= nx * push; a.y -= ny * push;
-					b.x += nx * push; b.y += ny * push;
+					// Shoulder to shoulder the stronger man gives less ground (both still move: no ping-pong).
+					const sh = a.team !== b.team ? clamp((phyD(b) - phyD(a)) * 0.35, -0.3, 0.3) : 0;
+					a.x -= nx * push * (1 + sh); a.y -= ny * push * (1 + sh);
+					b.x += nx * push * (1 - sh); b.y += ny * push * (1 - sh);
 					// A crowd must not shove anyone off the pitch or into a net.
 					a.x = clamp(a.x, 12, FW - 12); a.y = clamp(a.y, 12, FH - 12);
 					b.x = clamp(b.x, 12, FW - 12); b.y = clamp(b.y, 12, FH - 12);
@@ -645,7 +649,7 @@
 		let ahead = 18;
 		if (!held && v > 0.6) {
 			const sprint = clamp(o.sprintAmt || 0, 0, 1);
-			const reach = 18 + Math.min(16, v * 3.2) + sprint * 7 + (cond.wet ? 3 : 0) - (build(o).agil - 1) * 20;
+			const reach = 18 + Math.min(16, v * 3.2) + sprint * 7 + (cond.wet ? 3 : 0) - (build(o).agil - 1) * 20 - driD(o) * 5;   // close control: a good dribbler keeps it nearer
 			const ph = (((o.stride || 0) % Math.PI) + Math.PI) % Math.PI / Math.PI;   // 0 as a foot comes through, 1 just before the next
 			ahead = reach - (reach - 18) * ph * 0.75;
 			o.touchPh = ph;

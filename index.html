@@ -4325,6 +4325,7 @@
 				pl.age = styleAge(19 + Math.floor(Math.random() * 13), lg); fee = round1(valueOf(pl) * m.mult);
 			}
 			const keep = { name: pl.name, pos: pl.pos, pac: pl.pac, sho: pl.sho, pas: pl.pas, def: pl.def, age: pl.age, nat: pl.nat };
+			for (const k of [ "dri", "phy" ]) { if (Number.isFinite(pl[k])) { keep[k] = pl[k]; } }
 			if (typeof carryEdits === "function") { carryEdits(pl, keep); }   // an edited player keeps his edits (18g)
 			lg.cpuIn[buyer] = [ ...(lg.cpuIn[buyer] || []).filter(d => d.slot !== slot), { slot, pl: keep } ].slice(-4);
 			lg.clubStr[buyer] = clamp(lg.clubStr[buyer] + 0.12, 1, 5);
@@ -4411,7 +4412,7 @@
 			const cpu = p.team === 1 ? oppSquad[slots[p.idx]] : !club && youSquad ? youSquad[slots[p.idx]] : null;
 			p.sqi = slots[p.idx];
 			p.attr = p.team === 0 && club ? effective(club.squad[slots[p.idx]], FMT.roles[p.idx])
-				: cpu ? { pac: cpu.pac, sho: cpu.sho, pas: cpu.pas, def: cpu.def } : null;
+				: cpu ? ratingsOf(cpu) : null;
 			p.name = p.team === 0 && club ? club.squad[slots[p.idx]].name : cpu && p.team === 1 ? cpu.name : "";   // (your friendly side stays nameless)
 			const pl = p.team === 0 && club ? club.squad[slots[p.idx]] : cpu;
 			ensureTraitP(p, pl || (p.team === 0 && !club ? { name: `you${p.idx}`, pos: FMT.roles[p.idx] } : null));
@@ -4420,12 +4421,19 @@
 			if (typeof editMatchPlayer === "function") { editMatchPlayer(p, pl); }   // his own number, foot and look (18g)
 		});
 	}
-	const A = (p, k) => (p && p.attr ? p.attr[k] : 65);
+	const A = (p, k) => (p && p.attr && Number.isFinite(p.attr[k]) ? p.attr[k] : 65);
 	const tr = (p, k) => !!p && p.trait === k;
 	function ensureTraitP (p, pl) { p.trait = pl ? traitOf(pl) : ""; }
 	// Young legs last longer; a good fitness coach helps yours a little more.
 	const endureOf = pl => { const a = Number.isFinite(pl.age) ? pl.age : 26; const fc = league && league.club && [ ...league.club.squad, ...league.club.bench ].includes(pl) ? staffLvl(league.club, "fitness") * 0.025 : 0; return (a <= 23 ? 0.9 : a <= 29 ? 1 : a <= 32 ? 1.1 : 1.2) - fc; };
 	const paceMul = p => 1 + (A(p, "pac") - 65) * 0.008;
+	// Dribbling and physical at work, as -1 to 1 about a typical player (so a side of typical players plays
+	// as it always has): close control, beating a man and carrying it; shielding, duels, headers, stamina.
+	const DRI_C = 70, PHY_C = 76;
+	const driD = p => (p && p.attr && Number.isFinite(p.attr.dri) ? clamp((p.attr.dri - DRI_C) / 30, -1.2, 1.2) : 0);
+	const phyD = p => (p && p.attr && Number.isFinite(p.attr.phy) ? clamp((p.attr.phy - PHY_C) / 30, -1.2, 1.2) : 0);
+	// How hard he is to dispossess: a good dribbler slips the challenge, the stronger man holds it.
+	const holdMul = (o, q) => clamp(1 - 0.4 * driD(o) - 0.3 * (phyD(o) - phyD(q)), 0.45, 1.7);
 	const defMul = p => 1 + (A(p, "def") - 65) * 0.012;
 	// The man you are steering (not the autopilot): only he gets the helping hand with passes and a settling touch.
 	const steered = p => !!p && p.team === 0 && !autoPilot && players.indexOf(p) === ctrl;
@@ -8670,9 +8678,11 @@
 					return null;
 				}
 			}
-			const pressure = openness(p) < 55;
+			// A good dribbler is happy with a man close and sometimes takes him on instead of laying it off;
+			// a poor one moves it on sooner.
+			const dd = driD(p), pressure = openness(p) < 55 - 10 * dd, carry = dd > 0 && rel(p.team, p.x) > FW * 0.3 && Math.random() < 0.4 * dd;
 			// Possession sides move it on short and often; direct sides look forward.
-			if (pressure || Math.random() < (style[p.team] === "possession" ? 0.14 : 0.06)) {
+			if (!carry && (pressure || Math.random() < (style[p.team] === "possession" ? 0.14 : 0.06) * (1 - 0.4 * dd))) {
 				let best = null, bs = -Infinity;
 				for (const m of outfield(p.team)) {
 					if (m === p) { continue; }
@@ -8697,7 +8707,7 @@
 		let ty = isWide(p.y, 0.22) && rel(p.team, p.x) < FW * 0.86 ? p.y : FH / 2 + (p.y - FH / 2) * 0.5;
 		const opp = players.filter(q => q.team !== p.team);
 		const block = opp.find(q => dist(q, p) < 75 && (q.x - p.x) * (goal.x - p.x) > 0);
-		if (block) { ty = p.y + (p.y > block.y ? 110 : -110); }
+		if (block) { ty = p.y + (p.y > block.y ? 1 : -1) * 110 * (1 + 0.3 * driD(p)); }   // a dribbler goes round him sharper
 		return [ goal.x, clamp(ty, 30, FH - 30) ];
 	}
 
@@ -8715,7 +8725,8 @@
 			// Waiting for a pass he doesn't stand stock still: small steps to set his feet.
 			const settle = receiver === p && spd < 0.5 && !ball.owner ? 1 : 0;
 			const moving = Math.max(clamp(spd / 0.4, 0, 1), settle * 0.6);
-			const hz = (0.95 + 0.5 * spd) / g.stride * (1 + 0.35 * p.shuf);
+			// Quick men turn their legs over faster; a dribbler takes short, quick steps on the ball.
+			const hz = (0.95 + 0.5 * spd) / g.stride * (1 + 0.35 * p.shuf) * (1 + (A(p, "pac") - 68) * 0.003 + (ball && ball.owner === p ? 0.08 * driD(p) : 0));
 			p.stride = (p.stride || 0) + Math.PI * 2 * hz / 60 * moving;
 			const target = Math.max(spd < 0.35 ? 0 : Math.min(1, spd / 2.6), settle * 0.22);
 			p.runAmt = (p.runAmt || 0) + (target - (p.runAmt || 0)) * 0.12;
@@ -8774,7 +8785,8 @@
 	function movePlayer (p, dvx, dvy, grip = cond.grip, accMax = ACC_AI, turn = 0.55) {
 		let ax = (dvx - p.vx) * grip, ay = (dvy - p.vy) * grip;
 		const faster = dvx * dvx + dvy * dvy > p.vx * p.vx + p.vy * p.vy;
-		const cap = accMax * (faster ? 1 : 1.7) * (cond.grip / 0.22) * (accMax < 1 ? build(p).agil : 1), a = Math.hypot(ax, ay);
+		// Quick men get going quicker too; on the ball a good dribbler is sharper off the mark.
+		const cap = accMax * (faster ? 1 : 1.7) * (cond.grip / 0.22) * (accMax < 1 ? build(p).agil * (1 + (A(p, "pac") - 68) * 0.005) * (ball && ball.owner === p ? 1 + 0.12 * driD(p) : 1) : 1), a = Math.hypot(ax, ay);
 		if (a > cap) { ax *= cap / a; ay *= cap / a; }
 		// At speed he can't swing round on the spot: the sideways push is limited, so a turn is a
 		// curve that tightens as he slows, and a hard change of direction means plant and cut.
@@ -8782,7 +8794,7 @@
 		if (v > 1 && accMax < 1) {
 			const ux = p.vx / v, uy = p.vy / v, along = ax * ux + ay * uy;
 			let side = -ax * uy + ay * ux;
-			const latCap = cap * clamp(1.9 / v, turn, 1);
+			const latCap = cap * clamp(1.9 / v, ball && ball.owner === p ? clamp(turn + 0.15 * driD(p), 0.35, 0.9) : turn, 1);   // turning with the ball: his dribbling
 			if (Math.abs(side) > latCap) { side = Math.sign(side) * latCap; }
 			ax = along * ux - side * uy; ay = along * uy + side * ux;
 			const want = Math.hypot(dvx, dvy);
@@ -8806,7 +8818,7 @@
 		if (on) {
 			// Slower legs (low pace, or tired from too many starts) tire a little sooner.
 			// Off the ball the tank lasts longer (about six seconds): a defender covers ground.
-			p.sprintFuel = Math.max(0, p.sprintFuel - SPRINT_DRAIN * (1 + Math.max(0, 70 - A(p, "pac")) * 0.01) * (ball && ball.owner === p ? 1 : 0.75));
+			p.sprintFuel = Math.max(0, p.sprintFuel - SPRINT_DRAIN * (1 + Math.max(0, 70 - A(p, "pac")) * 0.01) * (1 - 0.2 * phyD(p)) * (ball && ball.owner === p ? 1 : 0.75));
 		} else {
 			p.sprintFuel = Math.min(1, p.sprintFuel + SPRINT_FILL * (moving > 0.1 ? 1 : 1.6));
 		}
@@ -9061,7 +9073,7 @@
 				p.sprintAmt = (p.sprintAmt || 0) * 0.88;
 				if (Number.isFinite(p.sprintFuel)) { p.sprintFuel = Math.min(1, p.sprintFuel + SPRINT_FILL); p.sprintOut = p.sprintOut && p.sprintFuel < 0.25; }
 			}
-			const spdMul = (p.team === 1 ? diff.spd : 1) * (ball.owner === p ? 0.88 : 1) * (p.injured ? 0.8 : 1) * mood(p.team, 0.07) * paceMul(p) * cond.speed * (0.8 + 0.2 * staOf(p)) * (tr(p, "pace") ? 1.05 : 1);
+			const spdMul = (p.team === 1 ? diff.spd : 1) * (ball.owner === p ? 0.88 + 0.04 * driD(p) : 1) * (p.injured ? 0.8 : 1) * mood(p.team, 0.07) * paceMul(p) * cond.speed * (0.8 + 0.2 * staOf(p)) * (tr(p, "pace") ? 1.05 : 1);
 
 			// The man a pass is for runs onto it by himself, on either side; for yours the arrows take over on the first touch.
 			if ((p === receiver || p === ball.intended) && !ball.owner) {
@@ -9325,8 +9337,10 @@
 				const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
 				if (d > 0 && d < 26) {
 					const push = (26 - d) * 0.3, nx = dx / d, ny = dy / d;   // part of the overlap per frame: no ping-pong
-					a.x -= nx * push; a.y -= ny * push;
-					b.x += nx * push; b.y += ny * push;
+					// Shoulder to shoulder the stronger man gives less ground (both still move: no ping-pong).
+					const sh = a.team !== b.team ? clamp((phyD(b) - phyD(a)) * 0.35, -0.3, 0.3) : 0;
+					a.x -= nx * push * (1 + sh); a.y -= ny * push * (1 + sh);
+					b.x += nx * push * (1 - sh); b.y += ny * push * (1 - sh);
 					// A crowd must not shove anyone off the pitch or into a net.
 					a.x = clamp(a.x, 12, FW - 12); a.y = clamp(a.y, 12, FH - 12);
 					b.x = clamp(b.x, 12, FW - 12); b.y = clamp(b.y, 12, FH - 12);
@@ -9348,7 +9362,7 @@
 		let ahead = 18;
 		if (!held && v > 0.6) {
 			const sprint = clamp(o.sprintAmt || 0, 0, 1);
-			const reach = 18 + Math.min(16, v * 3.2) + sprint * 7 + (cond.wet ? 3 : 0) - (build(o).agil - 1) * 20;
+			const reach = 18 + Math.min(16, v * 3.2) + sprint * 7 + (cond.wet ? 3 : 0) - (build(o).agil - 1) * 20 - driD(o) * 5;   // close control: a good dribbler keeps it nearer
 			const ph = (((o.stride || 0) % Math.PI) + Math.PI) % Math.PI / Math.PI;   // 0 as a foot comes through, 1 just before the next
 			ahead = reach - (reach - 18) * ph * 0.75;
 			o.touchPh = ph;
@@ -10077,7 +10091,7 @@
 	}
 	function cpuSub (p, kind, why) {
 		const was = p.name, np = genPlayer(kind, cpuOvr(clamp(Math.round(oppStrength), 1, 5)) - 2);
-		p.name = np.name; p.attr = { pac: np.pac, sho: np.sho, pas: np.pas, def: np.def };
+		p.name = np.name; p.attr = ratingsOf(np);
 		p.sta = 1; p.injured = false; p.yellow = 0; p.nudged = false;
 		if (typeof ensureTraitP === "function") { ensureTraitP(p, np); }
 		cpuSubs--;
@@ -10517,7 +10531,8 @@
 			if (tr(q, "winner")) { chance *= 1.4; }
 			if (tr(o, "target") && !sliding) { chance *= 0.7; }
 			if (dist(o, ball) > 27) { chance *= 1.5; }   // a heavy touch: the ball is a step from his feet
-			if (sliding) { chance = 0.3 * defMul(q) * (tr(q, "winner") ? 1.2 : 1); }
+			chance *= holdMul(o, q);   // his dribbling and strength against the tackler's
+			if (sliding) { chance = 0.3 * defMul(q) * (tr(q, "winner") ? 1.2 : 1) * clamp(1 - 0.2 * phyD(o) + 0.1 * phyD(q), 0.75, 1.25); }   // a strong man rides a slide
 			if (settling) { chance *= sliding ? 0.5 : 0.15; }
 			const won = Math.random() < chance;
 			// A slide that arrives and misses the ball takes the man instead, from behind most of all.
@@ -10657,7 +10672,7 @@
 		}
 		if (!a) { if (ball.z < 30 && ball.landT < 3) { tally.air.none++; } return false; }
 		// Attacking a ball is easier than defending it: the runner knows where he's going.
-		const air = (p, d) => (24 - d) * 0.5 + (Math.max(A(p, "def"), A(p, "sho")) - 65) * 0.08 + Math.random() * 6 + (p.team === lastTouch ? (shoot ? 3.5 : 1.5) : 0) + (tr(p, "target") ? 5 : 0);
+		const air = (p, d) => (24 - d) * 0.5 + (Math.max(A(p, "def"), A(p, "sho")) - 65) * 0.08 + phyD(p) * 4 + Math.random() * 6 + (p.team === lastTouch ? (shoot ? 3.5 : 1.5) : 0) + (tr(p, "target") ? 5 : 0);
 		let w = a, l = b && b.team !== a.team && db < 28 ? b : null;
 		if (l && air(l, db) > air(a, da)) { w = l; l = a; }
 		const isYou = w.team === 0 && players.indexOf(w) === ctrl;
@@ -10752,7 +10767,7 @@
 			const toGoal = Math.atan2(FH / 2 - p.y, attackX(p.team) - p.x), off = Math.atan2(Math.sin(toGoal - (p.dir || 0)), Math.cos(toGoal - (p.dir || 0)));
 			const bx = p.x + Math.cos(toGoal) * 45, by = p.y + Math.sin(toGoal) * 45;
 			const space = !players.some(q => q.team !== p.team && Math.hypot(q.x - bx, q.y - by) < 55);
-			p.recvK = recvKind({ z: ball.z || 0, spd: Math.hypot(ball.vx, ball.vy), pas: A(p, "pas"), seed: build(p).seed, play: tr(p, "playmaker"), back: Math.abs(off) > 2.1, space, human: p.team === 0, wet: cond.wet > 0 });
+			p.recvK = recvKind({ z: ball.z || 0, spd: Math.hypot(ball.vx, ball.vy), pas: A(p, "pas") + driD(p) * 12, seed: build(p).seed, play: tr(p, "playmaker"), back: Math.abs(off) > 2.1, space, human: p.team === 0, wet: cond.wet > 0 });
 			p.recvZ = ball.z || 0;
 			if (p.recvK === "turn") { p.turnTo = toGoal; p.turnT = 16; }
 			if (p.recvK === "heavy") { p.heavyT = 18; if (p.team === 0 && !bulkSim) { burst(p.x, p.y, "Heavy touch"); } }

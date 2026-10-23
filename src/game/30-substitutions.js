@@ -63,7 +63,7 @@
 	}
 	function cpuSub (p, kind, why) {
 		const was = p.name, np = genPlayer(kind, cpuOvr(clamp(Math.round(oppStrength), 1, 5)) - 2);
-		p.name = np.name; p.attr = { pac: np.pac, sho: np.sho, pas: np.pas, def: np.def };
+		p.name = np.name; p.attr = ratingsOf(np);
 		p.sta = 1; p.injured = false; p.yellow = 0; p.nudged = false;
 		if (typeof ensureTraitP === "function") { ensureTraitP(p, np); }
 		cpuSubs--;
@@ -503,7 +503,8 @@
 			if (tr(q, "winner")) { chance *= 1.4; }
 			if (tr(o, "target") && !sliding) { chance *= 0.7; }
 			if (dist(o, ball) > 27) { chance *= 1.5; }   // a heavy touch: the ball is a step from his feet
-			if (sliding) { chance = 0.3 * defMul(q) * (tr(q, "winner") ? 1.2 : 1); }
+			chance *= holdMul(o, q);   // his dribbling and strength against the tackler's
+			if (sliding) { chance = 0.3 * defMul(q) * (tr(q, "winner") ? 1.2 : 1) * clamp(1 - 0.2 * phyD(o) + 0.1 * phyD(q), 0.75, 1.25); }   // a strong man rides a slide
 			if (settling) { chance *= sliding ? 0.5 : 0.15; }
 			const won = Math.random() < chance;
 			// A slide that arrives and misses the ball takes the man instead, from behind most of all.
@@ -643,7 +644,7 @@
 		}
 		if (!a) { if (ball.z < 30 && ball.landT < 3) { tally.air.none++; } return false; }
 		// Attacking a ball is easier than defending it: the runner knows where he's going.
-		const air = (p, d) => (24 - d) * 0.5 + (Math.max(A(p, "def"), A(p, "sho")) - 65) * 0.08 + Math.random() * 6 + (p.team === lastTouch ? (shoot ? 3.5 : 1.5) : 0) + (tr(p, "target") ? 5 : 0);
+		const air = (p, d) => (24 - d) * 0.5 + (Math.max(A(p, "def"), A(p, "sho")) - 65) * 0.08 + phyD(p) * 4 + Math.random() * 6 + (p.team === lastTouch ? (shoot ? 3.5 : 1.5) : 0) + (tr(p, "target") ? 5 : 0);
 		let w = a, l = b && b.team !== a.team && db < 28 ? b : null;
 		if (l && air(l, db) > air(a, da)) { w = l; l = a; }
 		const isYou = w.team === 0 && players.indexOf(w) === ctrl;
@@ -738,7 +739,7 @@
 			const toGoal = Math.atan2(FH / 2 - p.y, attackX(p.team) - p.x), off = Math.atan2(Math.sin(toGoal - (p.dir || 0)), Math.cos(toGoal - (p.dir || 0)));
 			const bx = p.x + Math.cos(toGoal) * 45, by = p.y + Math.sin(toGoal) * 45;
 			const space = !players.some(q => q.team !== p.team && Math.hypot(q.x - bx, q.y - by) < 55);
-			p.recvK = recvKind({ z: ball.z || 0, spd: Math.hypot(ball.vx, ball.vy), pas: A(p, "pas"), seed: build(p).seed, play: tr(p, "playmaker"), back: Math.abs(off) > 2.1, space, human: p.team === 0, wet: cond.wet > 0 });
+			p.recvK = recvKind({ z: ball.z || 0, spd: Math.hypot(ball.vx, ball.vy), pas: A(p, "pas") + driD(p) * 12, seed: build(p).seed, play: tr(p, "playmaker"), back: Math.abs(off) > 2.1, space, human: p.team === 0, wet: cond.wet > 0 });
 			p.recvZ = ball.z || 0;
 			if (p.recvK === "turn") { p.turnTo = toGoal; p.turnT = 16; }
 			if (p.recvK === "heavy") { p.heavyT = 18; if (p.team === 0 && !bulkSim) { burst(p.x, p.y, "Heavy touch"); } }

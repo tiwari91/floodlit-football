@@ -26,6 +26,7 @@
 				pl.age = styleAge(19 + Math.floor(Math.random() * 13), lg); fee = round1(valueOf(pl) * m.mult);
 			}
 			const keep = { name: pl.name, pos: pl.pos, pac: pl.pac, sho: pl.sho, pas: pl.pas, def: pl.def, age: pl.age, nat: pl.nat };
+			for (const k of [ "dri", "phy" ]) { if (Number.isFinite(pl[k])) { keep[k] = pl[k]; } }
 			if (typeof carryEdits === "function") { carryEdits(pl, keep); }   // an edited player keeps his edits (18g)
 			lg.cpuIn[buyer] = [ ...(lg.cpuIn[buyer] || []).filter(d => d.slot !== slot), { slot, pl: keep } ].slice(-4);
 			lg.clubStr[buyer] = clamp(lg.clubStr[buyer] + 0.12, 1, 5);
@@ -112,7 +113,7 @@
 			const cpu = p.team === 1 ? oppSquad[slots[p.idx]] : !club && youSquad ? youSquad[slots[p.idx]] : null;
 			p.sqi = slots[p.idx];
 			p.attr = p.team === 0 && club ? effective(club.squad[slots[p.idx]], FMT.roles[p.idx])
-				: cpu ? { pac: cpu.pac, sho: cpu.sho, pas: cpu.pas, def: cpu.def } : null;
+				: cpu ? ratingsOf(cpu) : null;
 			p.name = p.team === 0 && club ? club.squad[slots[p.idx]].name : cpu && p.team === 1 ? cpu.name : "";   // (your friendly side stays nameless)
 			const pl = p.team === 0 && club ? club.squad[slots[p.idx]] : cpu;
 			ensureTraitP(p, pl || (p.team === 0 && !club ? { name: `you${p.idx}`, pos: FMT.roles[p.idx] } : null));
@@ -121,12 +122,19 @@
 			if (typeof editMatchPlayer === "function") { editMatchPlayer(p, pl); }   // his own number, foot and look (18g)
 		});
 	}
-	const A = (p, k) => (p && p.attr ? p.attr[k] : 65);
+	const A = (p, k) => (p && p.attr && Number.isFinite(p.attr[k]) ? p.attr[k] : 65);
 	const tr = (p, k) => !!p && p.trait === k;
 	function ensureTraitP (p, pl) { p.trait = pl ? traitOf(pl) : ""; }
 	// Young legs last longer; a good fitness coach helps yours a little more.
 	const endureOf = pl => { const a = Number.isFinite(pl.age) ? pl.age : 26; const fc = league && league.club && [ ...league.club.squad, ...league.club.bench ].includes(pl) ? staffLvl(league.club, "fitness") * 0.025 : 0; return (a <= 23 ? 0.9 : a <= 29 ? 1 : a <= 32 ? 1.1 : 1.2) - fc; };
 	const paceMul = p => 1 + (A(p, "pac") - 65) * 0.008;
+	// Dribbling and physical at work, as -1 to 1 about a typical player (so a side of typical players plays
+	// as it always has): close control, beating a man and carrying it; shielding, duels, headers, stamina.
+	const DRI_C = 70, PHY_C = 76;
+	const driD = p => (p && p.attr && Number.isFinite(p.attr.dri) ? clamp((p.attr.dri - DRI_C) / 30, -1.2, 1.2) : 0);
+	const phyD = p => (p && p.attr && Number.isFinite(p.attr.phy) ? clamp((p.attr.phy - PHY_C) / 30, -1.2, 1.2) : 0);
+	// How hard he is to dispossess: a good dribbler slips the challenge, the stronger man holds it.
+	const holdMul = (o, q) => clamp(1 - 0.4 * driD(o) - 0.3 * (phyD(o) - phyD(q)), 0.45, 1.7);
 	const defMul = p => 1 + (A(p, "def") - 65) * 0.012;
 	// The man you are steering (not the autopilot): only he gets the helping hand with passes and a settling touch.
 	const steered = p => !!p && p.team === 0 && !autoPilot && players.indexOf(p) === ctrl;
