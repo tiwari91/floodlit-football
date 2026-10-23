@@ -38,16 +38,18 @@
 		const home = lg.ident && lg.ident.country, out = [];
 		// Abroad, England takes your country's seats. A league file's clubs (18h) fill a country's seats first.
 		const engTop = CLUBS.slice().sort((a, b) => b.str - a.str);
+		// Never a guest with the name of a club already in your league (yours included, after a move with it).
+		const taken = new Set(TEAMS.map(t => String(t.name).toLowerCase())), free = c => c && !taken.has(c.name.toLowerCase());
 		for (const [ cn, k, top ] of CC_NATIONS) {
 			const nat = cn === home && FOREIGN[home] ? HOME_NAT : cn;
 			if (!k || nat === home || (!FOREIGN[nat] && nat !== HOME_NAT)) { continue; }
-			const fc = typeof fileCupClubs === "function" ? fileCupClubs(nat) : [];
-			const F = FOREIGN[nat], towns = F ? F[3].split(",") : [], h = hashStr(nat + "cc");
+			const fc = (typeof fileCupClubs === "function" ? fileCupClubs(nat) : []).filter(free);
+			const F = FOREIGN[nat], towns = F ? F[3].split(",") : [], h = hashStr(nat + "cc"), eng = engTop.filter(free);
 			for (let j = 0; j < k; j++) {
 				const str = round1(clamp(top - j * 0.45 + (Math.random() - 0.5) * 0.4, 1.5, 5)), f = fc[j];
 				let c;
 				if (F) { const town = towns[j], color = FOREIGN_SHIRTS[(j * 5 + h) % FOREIGN_SHIRTS.length]; c = { name: F[2][(j + h) % F[2].length].replace("{t}", town), short: town, color, color2: foreignSecond(color), ground: F[1].replace("{t}", town) }; }
-				else { const e = engTop[j]; c = { name: e.name, short: e.short, color: e.color, color2: e.color2, ground: e.ground }; }
+				else { const e = eng[j]; if (!e && !f) { continue; } c = e ? { name: e.name, short: e.short, color: e.color, color2: e.color2, ground: e.ground } : {}; }
 				if (f) { c = { name: f.name, short: f.short || (f.name.length <= 14 ? f.name : f.name.split(" ")[0].slice(0, 14)), color: f.color || c.color, color2: f.color2 || (f.color ? foreignSecond(f.color) : c.color2), ground: f.ground || c.ground, manager: f.manager, managerNat: f.managerNat }; }
 				out.push({ ...c, nat, str });
 			}

@@ -90,6 +90,9 @@ try {
 	const moved = await page.evaluate(() => { const F = window.__ff, before = F.league.club.squad.map(p => p.id).join(); const r = F.switchLeague("GER", { mode: "move" }); return { r, nat: F.leagueCountry(F.league), same: F.league.club.squad.map(p => p.id).join() === before, you: F.TEAMS[0].name, cq: F.league.club.contQual }; });
 	check("moving your club keeps the squad and its name, in the new league", moved.r.ok && moved.nat === "GER" && moved.same && /^Eng Club/.test(moved.you) && !moved.cq, JSON.stringify(moved));
 
+	const clash = await page.evaluate(() => { const F = window.__ff, lg = F.league, C = F.drawCont(lg, [ 0, ...lg.members.filter(i => i).slice(0, 3) ]), names = C.clubs.map(c => (c.id !== undefined ? F.TEAMS[c.id].name : c.name).toLowerCase()); return { n: C.clubs.length, dup: names.length - new Set(names).size, eng: C.clubs.filter(c => c.nat === "ENG").length }; });
+	check("abroad with a club from the file, the cup never draws a guest with your club's name", clash.n === 36 && clash.dup === 0 && clash.eng === 4, JSON.stringify(clash));
+
 	// A v1 file still works.
 	const v1 = await page.evaluate(() => {
 		const F = window.__ff, lg = F.league, base = F.clubTargets()[2].base;

@@ -25,7 +25,7 @@ const layout = await page.evaluate(() => {
 });
 check("settings cards: one label column and one controls column each, every row labelled", layout.n === 2 && layout.cols.every(c => c.labels === 1 && c.ctls === 1 && c.rows === c.ctlRows), JSON.stringify(layout.cols));
 check("settings cards: every button and select the same height, the two cards level and the same height", layout.heights.length === 1 && layout.tops[0] === layout.tops[1] && layout.hs[0] === layout.hs[1], JSON.stringify(layout));
-check("league header: the four buttons in one row, the same height", layout.head.n === 4 && layout.head.tops === 1 && layout.head.hs === 1, JSON.stringify(layout.head));
+check("league header: the five buttons in one row, the same height", layout.head.n === 5 && layout.head.tops === 1 && layout.head.hs === 1, JSON.stringify(layout.head));
 await page.evaluate(() => document.body.classList.remove("more"));
 
 // Every player has a temper, and the league a dressing room.

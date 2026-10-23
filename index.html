@@ -5698,16 +5698,18 @@
 		const home = lg.ident && lg.ident.country, out = [];
 		// Abroad, England takes your country's seats. A league file's clubs (18h) fill a country's seats first.
 		const engTop = CLUBS.slice().sort((a, b) => b.str - a.str);
+		// Never a guest with the name of a club already in your league (yours included, after a move with it).
+		const taken = new Set(TEAMS.map(t => String(t.name).toLowerCase())), free = c => c && !taken.has(c.name.toLowerCase());
 		for (const [ cn, k, top ] of CC_NATIONS) {
 			const nat = cn === home && FOREIGN[home] ? HOME_NAT : cn;
 			if (!k || nat === home || (!FOREIGN[nat] && nat !== HOME_NAT)) { continue; }
-			const fc = typeof fileCupClubs === "function" ? fileCupClubs(nat) : [];
-			const F = FOREIGN[nat], towns = F ? F[3].split(",") : [], h = hashStr(nat + "cc");
+			const fc = (typeof fileCupClubs === "function" ? fileCupClubs(nat) : []).filter(free);
+			const F = FOREIGN[nat], towns = F ? F[3].split(",") : [], h = hashStr(nat + "cc"), eng = engTop.filter(free);
 			for (let j = 0; j < k; j++) {
 				const str = round1(clamp(top - j * 0.45 + (Math.random() - 0.5) * 0.4, 1.5, 5)), f = fc[j];
 				let c;
 				if (F) { const town = towns[j], color = FOREIGN_SHIRTS[(j * 5 + h) % FOREIGN_SHIRTS.length]; c = { name: F[2][(j + h) % F[2].length].replace("{t}", town), short: town, color, color2: foreignSecond(color), ground: F[1].replace("{t}", town) }; }
-				else { const e = engTop[j]; c = { name: e.name, short: e.short, color: e.color, color2: e.color2, ground: e.ground }; }
+				else { const e = eng[j]; if (!e && !f) { continue; } c = e ? { name: e.name, short: e.short, color: e.color, color2: e.color2, ground: e.ground } : {}; }
 				if (f) { c = { name: f.name, short: f.short || (f.name.length <= 14 ? f.name : f.name.split(" ")[0].slice(0, 14)), color: f.color || c.color, color2: f.color2 || (f.color ? foreignSecond(f.color) : c.color2), ground: f.ground || c.ground, manager: f.manager, managerNat: f.managerNat }; }
 				out.push({ ...c, nat, str });
 			}
@@ -6083,7 +6085,7 @@
 	     league.edits.slots, laid over cpuSquad().
 	   - Ratings are only touched when "custom ratings" is on (league.edits.custom). */
 	// Version 2 adds whole leagues and the continental cup's clubs (18h); version 1 files still read.
-	const OPTION_KIND = "floodlit-option-file", OPTION_VERSION = 2, OPTION_MAX_BYTES = 3000000, OPTION_MAX_ENTRIES = 3000;
+	const OPTION_KIND = "floodlit-option-file", OPTION_VERSION = 2, OPTION_MAX_BYTES = 8000000, OPTION_MAX_ENTRIES = 3000;
 	const EDIT_LEN = { club: [ 2, 28 ], short: [ 2, 14 ], ground: [ 2, 32 ], player: [ 2, 24 ], manager: [ 2, 28 ] };
 	const AGE_MIN = 16, AGE_MAX = 40;
 	const HEX_COLOR = /^#[0-9a-f]{6}$/i;
@@ -6691,7 +6693,7 @@
 	   (18g): a slot's club is found by the plain name the game gives it in that country (DEFAULT_IDENT at
 	   home, foreignIdent in 18c), so it follows a club through a job swap. Edit mode's own edits win.
 	   The spec for tools that write these files is docs/option-file-schema.json. */
-	const LF_KEY = "ff-leaguefile", LF_SLOTS = TEAMS.length - 1, LF_PLAYERS = POS_OF_SLOT.length, LF_CUP_MAX = 8, LF_MAX_BYTES = 3000000;
+	const LF_KEY = "ff-leaguefile", LF_SLOTS = TEAMS.length - 1, LF_PLAYERS = POS_OF_SLOT.length, LF_CUP_MAX = 8;
 	const LEAGUE_NATS = [ HOME_NAT, ...Object.keys(FOREIGN) ];
 	const natLabel = n => (NATIONS[n] ? NATIONS[n][0] : n);
 	const leagueLabel = n => `${n === HOME_NAT ? "Premier Division" : FOREIGN[n][0]} (${natLabel(n)})`;

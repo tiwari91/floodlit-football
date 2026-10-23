@@ -2,7 +2,8 @@
  "$comment": "Floodlit option file, version 2. Machine-readable description for tools that write option files. tests/leaguefile.mjs checks the game's own constants against the slot, position, country and cup facts here, so this file stays true to the game.",
  "kind": "floodlit-option-file",
  "version": 2,
- "maxBytes": 3000000,
+ "maxBytes": 8000000,
+ "maxBytesNote": "The file's size in bytes (UTF-8, so accented letters take two). Write compact JSON (no indentation): a file with every league is about 2-3 MB compact.",
  "topLevelKeys": {
   "kind": "required, exactly \"floodlit-option-file\"",
   "version": "required, integer 1 or 2 (a file with leagues or cup must say 2)",
@@ -19,6 +20,7 @@
   "shape": { "clubs": "array of league clubs, at most 28, each with a distinct slot" },
   "slotCount": 28,
   "slots": "1 to 28. Slot 0 is the manager's own club and is never defined in a file. Slots 1-19 start in the top division (the division is always 20 clubs: yours plus 19); slots 20-28 start below it and come up through promotion. A 20-club league fits slots 1-20: when the user starts a career at one of slots 1-19, the club at slot 20 takes its place in the division.",
+  "emptySlots": "A slot the file leaves out keeps the club the game generates for it. The division always has 19 computer clubs, so a league of 18 real clubs leaves invented names in it: to complete the division fill slots 1-19, plus slot 20 for when the user takes over a file club, using clubs from the second tier (or recently relegated) for the extra places. Slots 21-28 are the rest of the tier below.",
   "divisionSize": 20,
   "firstSlotBelowDivision": 20,
   "startingStrengthBySlot": { "1": 3, "2": 2, "3": 4, "4": 5, "5": 3, "6": 1, "7": 2, "8": 5, "9": 4, "10": 4, "11": 4, "12": 3, "13": 3, "14": 3, "15": 3, "16": 3, "17": 2, "18": 2, "19": 2, "20": 2, "21": 2, "22": 2, "23": 1, "24": 2, "25": 2, "26": 2, "27": 1, "28": 2 },
@@ -127,7 +129,7 @@
    "Cup clubs use the same club and player fields as league clubs, without slot. Up to 8 per country are kept, but only as many as its seats are used. Countries without seats (and England while you manage in England) are accepted but unused."
   ]
  },
- "limits": { "maxBytes": 3000000, "leagueClubs": 28, "playersPerClub": 11, "cupClubsPerCountry": 8, "v1EntriesPerSection": 3000 },
+ "limits": { "maxBytes": 8000000, "leagueClubs": 28, "playersPerClub": 11, "cupClubsPerCountry": 8, "v1EntriesPerSection": 3000 },
  "storage": "League and cup data are kept in the browser (not in the saved season), so Export league does not carry them. Import the option file again on another device. Importing a file replaces the league and cup data only for the countries it has.",
  "example": {
   "kind": "floodlit-option-file",

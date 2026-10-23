@@ -13,7 +13,7 @@
 	     league.edits.slots, laid over cpuSquad().
 	   - Ratings are only touched when "custom ratings" is on (league.edits.custom). */
 	// Version 2 adds whole leagues and the continental cup's clubs (18h); version 1 files still read.
-	const OPTION_KIND = "floodlit-option-file", OPTION_VERSION = 2, OPTION_MAX_BYTES = 3000000, OPTION_MAX_ENTRIES = 3000;
+	const OPTION_KIND = "floodlit-option-file", OPTION_VERSION = 2, OPTION_MAX_BYTES = 8000000, OPTION_MAX_ENTRIES = 3000;
 	const EDIT_LEN = { club: [ 2, 28 ], short: [ 2, 14 ], ground: [ 2, 32 ], player: [ 2, 24 ], manager: [ 2, 28 ] };
 	const AGE_MIN = 16, AGE_MAX = 40;
 	const HEX_COLOR = /^#[0-9a-f]{6}$/i;

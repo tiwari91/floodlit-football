@@ -114,7 +114,7 @@ try {
 		return {
 			json: r("{ not json").error, kind: r('{"kind":"something-else"}').error, season: r(JSON.stringify({ app: "floodlit-football", v: 1, league: {} })).error,
 			newer: r('{"kind":"floodlit-option-file","version":9}').error, damaged: r('{"kind":"floodlit-option-file","version":1,"clubs":[1,2]}').error,
-			big: r(" ".repeat(3000001)).error, unknown: unk.sum, unknownLines: F.previewText(unk.sum), proto: ({}).name
+			big: r(" ".repeat(8000001)).error, unknown: unk.sum, unknownLines: F.previewText(unk.sum), proto: ({}).name
 		};
 	});
 	check("a file that isn't JSON is refused", /isn't valid JSON/.test(rej.json || ""), rej.json);

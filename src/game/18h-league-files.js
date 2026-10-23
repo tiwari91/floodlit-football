@@ -6,7 +6,7 @@
 	   (18g): a slot's club is found by the plain name the game gives it in that country (DEFAULT_IDENT at
 	   home, foreignIdent in 18c), so it follows a club through a job swap. Edit mode's own edits win.
 	   The spec for tools that write these files is docs/option-file-schema.json. */
-	const LF_KEY = "ff-leaguefile", LF_SLOTS = TEAMS.length - 1, LF_PLAYERS = POS_OF_SLOT.length, LF_CUP_MAX = 8, LF_MAX_BYTES = 3000000;
+	const LF_KEY = "ff-leaguefile", LF_SLOTS = TEAMS.length - 1, LF_PLAYERS = POS_OF_SLOT.length, LF_CUP_MAX = 8;
 	const LEAGUE_NATS = [ HOME_NAT, ...Object.keys(FOREIGN) ];
 	const natLabel = n => (NATIONS[n] ? NATIONS[n][0] : n);
 	const leagueLabel = n => `${n === HOME_NAT ? "Premier Division" : FOREIGN[n][0]} (${natLabel(n)})`;
