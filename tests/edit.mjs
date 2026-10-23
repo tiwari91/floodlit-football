@@ -108,6 +108,19 @@ try {
 	check("export then import brings every edit back", trip.back.club === "Port Wexham" && trip.back.player === "T. Okonkwo-Vale" && trip.back.shirt === 77 && trip.sum.clubs === 1 && trip.sum.players === 2, JSON.stringify({ back: trip.back, sum: trip.sum }));
 	check("the preview says what the file renames", /^This file renames 1 club and 2 players\.$/.test(trip.lines[0]), trip.lines[0]);
 
+	// Dribbling and physical: set with custom ratings, out to a file and back; left alone, never written.
+	const dp = await page.evaluate(() => {
+		const F = window.__ff, lg = F.league, q = lg.club.squad[6], d0 = F.driOf(q);
+		F.setCustomRatings(lg, true); F.editPlayer(lg, "you", 6, { dri: 93, phy: 41 });
+		const file = F.buildOptionFile(lg), text = JSON.stringify(file);
+		F.revertEdits(lg); const gone = [ q.dri, q.phy, F.driOf(q) === d0 ];
+		F.applyOptionFile(lg, F.readOptionFile(text, lg), "now", true);
+		const back = [ q.dri, q.phy ], others = !/"dri"|"phy"/.test(text.replace(/"dri":93,|"phy":41/g, ""));
+		F.revertEdits(lg); F.setCustomRatings(lg, false);
+		return { gone, back, others };
+	});
+	check("dribbling and physical round-trip through the option file; unset, none are written", dp.gone[0] === undefined && dp.gone[1] === undefined && dp.gone[2] && dp.back[0] === 93 && dp.back[1] === 41 && dp.others, JSON.stringify(dp));
+
 	// Malformed and foreign files are refused with a plain message; unknown entries are ignored.
 	const rej = await page.evaluate(() => {
 		const F = window.__ff, lg = F.league, r = t => F.readOptionFile(t, lg);
