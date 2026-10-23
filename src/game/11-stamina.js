@@ -10,10 +10,11 @@
 	function drainStamina () {
 		if (tut || shoot) { return; }
 		const mf = 1 / Math.max(60, matchLen * 60);
+		const tk = [ tacticDrain(0), tacticDrain(1) ];
 		for (const p of players) {
 			const sp = Math.hypot(p.vx, p.vy) / BASE_SPD, load = Math.min(2.2, sp * sp);
 			const rate = p.role === "gk" ? 0.06 : 0.1 + 0.55 * load - (sp < 0.35 ? 0.3 : 0) + (p.sprintAmt > 0.5 ? 0.25 : 0);
-			p.sta = clamp(staOf(p) - rate * (p.endure || 1) * mf * STA_K, 0.25, 1);
+			p.sta = clamp(staOf(p) - rate * (p.endure || 1) * mf * STA_K * (p.role === "gk" ? 1 : tk[p.team]), 0.25, 1);
 		}
 	}
 	let possFrames = [ 0, 0 ];

@@ -56,6 +56,7 @@
 		}
 		// The computer's line follows its press, and each club has its own way of tackling.
 		line[1] = press[1] === "high" ? "high" : press[1] === "low" ? "deep" : "normal";
+		cpuTacBase = null;
 		tackling[1] = leagueMatch ? [ "normal", "hard", "careful", "normal" ][leagueMatch.opp % 4] : [ "careful", "normal", "hard" ][Math.floor(Math.random() * 3)];
 		moodZone = 0;
 		matchLen = Number(lenSel.value);

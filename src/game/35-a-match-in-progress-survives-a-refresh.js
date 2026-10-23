@@ -9,7 +9,8 @@
 			v: 1, key: liveKey(), score, timeLeft, momentum, possFrames, stats, ostats: oppStats, best: bestStreak, ment: mentality[0], lastConceded, half: halfDone, at: Date.now(),
 			off: dismissed, cards: matchCards, hurt: matchInjuries, hurtInfo: matchInjInfo, subs: subLog, log: matchLog, goals: matchGoals,
 			marks: players.filter(p => p.yellow || p.injured).map(p => [ p.team, p.idx, p.yellow || 0, p.injured ? 1 : 0 ]),
-			sta: players.map(p => [ p.team, p.idx, Math.round(staOf(p) * 100) ]), cpuWin: subWin[1], youWin: subWin[0]
+			sta: players.map(p => [ p.team, p.idx, Math.round(staOf(p) * 100) ]), cpuWin: subWin[1], youWin: subWin[0],
+			tac: [ style, press, line, tackling ].map(a => a.slice()), tacBase: cpuTacBase
 		}));
 	}
 	const clearLive = () => store.del("ff-live");
@@ -25,6 +26,14 @@
 		if (v.ostats && typeof v.ostats === "object") { oppStats = { ...oppStats, ...v.ostats }; }
 		if (Array.isArray(v.best)) { bestStreak = v.best.slice(0, 2).map(n => Number(n) || 0); }
 		mentality[0] = clamp(Number(v.ment) || 0, -1, 2);
+		// Both sides' instructions as they stood (yours in the pickers too, the computer's mid-match changes).
+		if (Array.isArray(v.tac) && v.tac.length === 4) {
+			const ok = [ STYLES, PRESSES, LINES, TACKLING ], arr = [ style, press, line, tackling ];
+			v.tac.forEach((pair, k) => { if (Array.isArray(pair)) { pair.slice(0, 2).forEach((x, t) => { if (ok[k][x]) { arr[k][t] = x; } }); } });
+			if (styleSel) { styleSel.value = style[0]; } if (pressSel) { pressSel.value = press[0]; }
+			if ($("line")) { $("line").value = line[0]; } if ($("tackling")) { $("tackling").value = tackling[0]; }
+			if (v.tacBase && STYLES[v.tacBase.style] && PRESSES[v.tacBase.press]) { cpuTacBase = { style: v.tacBase.style, press: v.tacBase.press, line: LINES[v.tacBase.line] ? v.tacBase.line : "normal" }; }
+		}
 		lastConceded = v.lastConceded === 1 ? 1 : 0;
 		halfDone = !!v.half || timeLeft <= matchLen / 2;
 		const find = (t, i) => players.find(p => p.team === t && p.idx === i);
