@@ -7,6 +7,8 @@
 	let flareLog = null;   // the match log of the last flare-up: one a match
 	const FLARE_T = 170;
 	const FLARE_BASE = 0.38;   // per bad foul at average tempers: measured over 300 autopilot matches to give about one match in seven
+	// In the test mode they only happen when a check asks (forced, or flaresLive set), so no other check is upset by one.
+	let flaresLive = !/[?&]test\b/.test(location.search);
 	const flareStats = { fouls: 0, tackles: 0, chances: 0, flares: 0 };   // counted for the rate check in the tests
 	// The chance a bad foul boils over, from the two tempers (the man fouled's hot-headed teammate and the fouler).
 	// w: how bad it was (a bad foul 1, any other foul 0.5, a crunching tackle that won the ball 0.25).
@@ -22,6 +24,7 @@
 		const mate = mates.slice().sort((a, b) => temperOf(b) - temperOf(a))[0];
 		if (!mate) { return null; }
 		if (!o.force) { flareStats.chances++; }
+		if (!o.force && !flaresLive) { return null; }
 		if (!o.force && rnd() > flareChance(temperOf(mate), temperOf(off), flareWeight(behind, card, o.tackle))) { return null; }
 		if (!o.force) { flareStats.flares++; }
 		flareLog = matchLog;

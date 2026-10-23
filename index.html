@@ -9223,6 +9223,8 @@
 	let flareLog = null;   // the match log of the last flare-up: one a match
 	const FLARE_T = 170;
 	const FLARE_BASE = 0.38;   // per bad foul at average tempers: measured over 300 autopilot matches to give about one match in seven
+	// In the test mode they only happen when a check asks (forced, or flaresLive set), so no other check is upset by one.
+	let flaresLive = !/[?&]test\b/.test(location.search);
 	const flareStats = { fouls: 0, tackles: 0, chances: 0, flares: 0 };   // counted for the rate check in the tests
 	// The chance a bad foul boils over, from the two tempers (the man fouled's hot-headed teammate and the fouler).
 	// w: how bad it was (a bad foul 1, any other foul 0.5, a crunching tackle that won the ball 0.25).
@@ -9238,6 +9240,7 @@
 		const mate = mates.slice().sort((a, b) => temperOf(b) - temperOf(a))[0];
 		if (!mate) { return null; }
 		if (!o.force) { flareStats.chances++; }
+		if (!o.force && !flaresLive) { return null; }
 		if (!o.force && rnd() > flareChance(temperOf(mate), temperOf(off), flareWeight(behind, card, o.tackle))) { return null; }
 		if (!o.force) { flareStats.flares++; }
 		flareLog = matchLog;
@@ -19718,7 +19721,7 @@
 	}
 
 	// More test hooks, kept apart from the big list above.
-	if (window.__ff) { Object.assign(window.__ff, { renewWorth, renewPlan, assistContracts, reportText, rolloverClub, showContract, goalCall, COMM, cupNight, cupTie, cupPens, ensureCup, seasonAwards, youthIntake, promoteYouth, releaseYouth, renderExtras, CUP_NIGHTS, ensureDrama, dramaAfterMatch, resolveIssue, renewRefusal, signRefusal, sellRefusal, renderDrama, temperOf, signPlayer, sellPlayer, rejectBid, weeklyClub, flareUp, flareTick, flareStats, flareChance, halfTimeRow, resolveHalfTime, musicState () { return { tracks: TRACKS.map(x => x.name), vol: musicVol, level: musicLevel(), sel: !!$("musicVol"), next: trackNext, playing: music ? music.track : null }; }, setMusicVol, grooveBarTest (k) { ensureAudio(); const was = music; music = { g: audio.createGain() }; try { grooveBar(audio.currentTime + 0.05, 9, TRACKS[k]); return true; } finally { music.g.disconnect(); music = was; } }, voiceState () { return { on: voiceOn, available: voiceAvailable(), button: !!$("voiceBtn"), spoke: speakLine("Test line", "goal") }; }, commitFoulTest (r) { if (state !== "play") { return null; } freeze = 0; const off = outfield(1)[0], vic = outfield(0).sort((a, b) => dist(a, off) - dist(b, off))[0]; return flareUp(off, vic, true, "", { force: true, rnd: () => r }); } }); }
+	if (window.__ff) { Object.assign(window.__ff, { renewWorth, renewPlan, assistContracts, reportText, rolloverClub, showContract, goalCall, COMM, cupNight, cupTie, cupPens, ensureCup, seasonAwards, youthIntake, promoteYouth, releaseYouth, renderExtras, CUP_NIGHTS, ensureDrama, dramaAfterMatch, resolveIssue, renewRefusal, signRefusal, sellRefusal, renderDrama, temperOf, signPlayer, sellPlayer, rejectBid, weeklyClub, flareUp, flareTick, flareStats, flareChance, set flaresLive (v) { flaresLive = !!v; }, halfTimeRow, resolveHalfTime, musicState () { return { tracks: TRACKS.map(x => x.name), vol: musicVol, level: musicLevel(), sel: !!$("musicVol"), next: trackNext, playing: music ? music.track : null }; }, setMusicVol, grooveBarTest (k) { ensureAudio(); const was = music; music = { g: audio.createGain() }; try { grooveBar(audio.currentTime + 0.05, 9, TRACKS[k]); return true; } finally { music.g.disconnect(); music = was; } }, voiceState () { return { on: voiceOn, available: voiceAvailable(), button: !!$("voiceBtn"), spoke: speakLine("Test line", "goal") }; }, commitFoulTest (r) { if (state !== "play") { return null; } freeze = 0; const off = outfield(1)[0], vic = outfield(0).sort((a, b) => dist(a, off) - dist(b, off))[0]; return flareUp(off, vic, true, "", { force: true, rnd: () => r }); } }); }
 	if (window.__ff) { Object.assign(window.__ff, { trophyCeremony, ceremonySeek, ceremonyInfo, endCeremony, queueTrophy, trophyDue, lastCeremony: () => lastCeremony }); }
 	if (window.__ff) { Object.assign(window.__ff, { ensureCont, contNight, contFixture, contSimAll, contQualify, contNext, ccTable, ccAgg, ccWinner, renderCont, CC_NIGHTS, currentFixture, simulateMine, restoreGuest, saveLeague, renderLeague }); }
 

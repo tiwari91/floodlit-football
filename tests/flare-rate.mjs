@@ -10,7 +10,7 @@ await page.waitForFunction(() => window.__ff && window.__ff.league, null, { time
 const per = [];
 const t0 = Date.now();
 for (let m = 0; m < N; m++) {
-	await page.evaluate(() => document.getElementById("ovButton").click());
+	await page.evaluate(() => { window.__ff.flaresLive = true; document.getElementById("ovButton").click(); });
 	await page.waitForFunction(() => window.__ff.state === "play", null, { timeout: 60000 });
 	const r = await page.evaluate(() => {
 		const F = window.__ff, s0 = { ...F.flareStats };

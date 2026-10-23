@@ -153,7 +153,7 @@ const flare = await page.evaluate(() => {
 	return { line: r.line, booked: r.booked.length, sent: r.sent.length, facing: r.mate.flare > 0 && r.mate.flareWith === r.off, gathered, closer: F.dist(r.mate, r.off) <= Math.max(17, d0), log: F.matchLog.slice(-3).map(e => e.kind) };
 });
 check("a flare-up: they face off, others gather, both are booked, with a line on it", flare && flare.facing && flare.gathered >= 2 && flare.booked === 2 && /pull them apart/.test(flare.line) && flare.log.filter(k => k === "yellow").length === 2, JSON.stringify(flare));
-const once = await page.evaluate(() => { const F = window.__ff, o = F.outfield(1)[0], v = F.outfield(0)[0]; return F.flareUp(o, v, true, "Yellow card", { rnd: () => 0 }); });
+const once = await page.evaluate(() => { const F = window.__ff, o = F.outfield(1)[0], v = F.outfield(0)[0]; F.flaresLive = true; const r = F.flareUp(o, v, true, "Yellow card", { rnd: () => 0 }); F.flaresLive = false; return r; });
 check("only one flare-up a match", once === null);
 const red = await page.evaluate(() => {
 	const F = window.__ff, off = F.outfield(1)[1], mates = F.outfield(0); mates.forEach(p => { p.temper = 85; }); off.temper = 85;
