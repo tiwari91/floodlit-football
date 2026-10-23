@@ -253,3 +253,84 @@
 		else { box.append(el("p", "fine", "No problems in the squad right now.")); }
 		if (d.log.length) { const lg = el("ul", "drama-log"); for (const s of d.log.slice(-3).reverse()) { lg.append(el("li", "", s)); } box.append(lg); }
 	}
+
+	// ---------- the half-time row ----------
+	// Behind at the break, or a star taken off before it: now and then a man with a temper boils
+	// over in the dressing room. The half-time card shows it with the same four choices, and the
+	// choice changes his morale and how he plays the second half (and the rest of the side's, when
+	// you back yourself). Rare: tied to the score and his temper, and only in your league matches.
+	let htRow = null;
+	function halfTimeRow (o = {}) {
+		const old = $("htRow");
+		if (old) { old.remove(); }
+		htRow = null;
+		if (!league || !league.club || (!leagueMatch && !o.force) || tut) { return null; }
+		const rnd = o.rnd || Math.random, behind = score[1] - score[0], c = league.club;
+		const clubOf = name => [ ...c.squad, ...c.bench ].find(q => q.name === name);
+		const onPitch = team(0).filter(p => p.role !== "gk" && clubOf(p.name));
+		const star = wentOff.map(clubOf).find(pl => pl && roleOf(pl, c) === "key");
+		let who = null, text = "";
+		if (star && rnd() < 0.5 * temperOf(star) / 70) {
+			who = { pl: star, p: null };
+			text = `${star.name} kicked a water bottle across the dressing room. He's furious you took him off and wants to know why.`;
+		} else if (behind >= 1) {
+			const loud = onPitch.slice().sort((a, b) => temperOf(clubOf(b.name)) - temperOf(clubOf(a.name)))[0];
+			const pl = loud && clubOf(loud.name);
+			if (pl && rnd() < (behind >= 2 ? 0.45 : 0.15) * temperOf(pl) / 70) {
+				who = { pl, p: loud };
+				text = `${pl.name} has lost it in the dressing room at ${score[0]}-${score[1]} down. He's having a go at his teammates and at your tactics.`;
+			}
+		}
+		if (!who) { return null; }
+		htRow = { name: who.pl.name, p: who.p, text, done: false };
+		const box = el("div", "ht-row"); box.id = "htRow";
+		box.style.cssText = "margin:10px 0 6px;padding:8px 12px;font-size:0.92em;border-left:3px solid #e0533c;background:rgba(224,83,60,0.08);text-align:left";
+		const row = el("div", "drama-choices"); row.style.cssText = "display:flex;flex-wrap:wrap;gap:6px;margin-top:8px";
+		box.append(el("p", "", text));
+		for (const [ k, label ] of MANAGER_CHOICES) {
+			const b = el("button", "", label); b.type = "button"; b.dataset.choice = k; b.style.padding = "4px 9px";
+			b.addEventListener("click", () => resolveHalfTime(k));
+			row.append(b);
+		}
+		box.append(row);
+		const body = $("ovBody");   // under the card's text, above the quick settings, so the card never clips it
+		if (body) { body.after(box); }
+		const go = $("ovButton");
+		if (go) { go.addEventListener("click", () => { const b = $("htRow"); if (b) { b.remove(); } }, { once: true }); }   // gone with the second half
+		return htRow;
+	}
+	// Morale, dressing room, and his second half (added to each of his ratings for the rest of the match).
+	const HT_EFFECTS = { talk: [ 5, 1, 2 ], back: [ -5, 2, -1 ], fine: [ -10, 3, -2 ], drop: [ -12, 0, 0 ] };
+	function resolveHalfTime (choice) {
+		if (!htRow || htRow.done || !HT_EFFECTS[choice]) { return null; }
+		const d = ensureDrama(league), c = league.club, pl = [ ...c.squad, ...c.bench ].find(q => q.name === htRow.name), e = HT_EFFECTS[choice];
+		if (!pl) { return null; }
+		htRow.done = true;
+		const t = temperOf(pl), p = htRow.p && players.includes(htRow.p) && htRow.p.name === pl.name ? htRow.p : null;
+		let dm = e[0], df = e[2];
+		if (choice === "talk" && t < 40) { dm += 3; }
+		if (choice === "fine" && t >= 75) { dm -= 4; df -= 1; }
+		pl.morale = clamp(Math.round(pl.morale + dm), 5, 100);
+		d.room = clamp(Math.round(d.room + e[1]), 0, 100);
+		const lift = (q, n) => { if (q && q.attr && n) { for (const k of [ "pac", "sho", "pas", "def" ]) { if (Number.isFinite(q.attr[k])) { q.attr[k] = clamp(q.attr[k] + n, 20, 99); } } } };
+		lift(p, df);
+		if (choice === "back") { for (const q of team(0)) { if (q !== p) { lift(q, 1); } } }
+		if (choice === "fine") { c.budget = Math.round((c.budget + Math.max(0.001, wageOf(pl) / 52)) * 1000) / 1000; }
+		let off = "";
+		if (choice === "drop") {
+			const pool = typeof subPool === "function" ? subPool() : [];
+			const sub = p && subsLeft > 0 ? pool.filter(q => q.pos === pl.pos).sort((a, b) => ovrNow(b) - ovrNow(a))[0] || pool[0] : null;
+			if (sub) { makeSub(p, sub, true); off = ` ${sub.name} goes on in his place.`; } else { dropToBench(pl); off = " He's out of the side for the next game."; }
+		}
+		const note = {
+			talk: `You calmed ${pl.name} down. He goes out for the second half fired up (morale ${pl.morale}).`,
+			back: `You told ${pl.name} to sort himself out. He's sulking (morale ${pl.morale}), but the rest of the lads respond.`,
+			fine: `${pl.name} is fined a week's wages. He's not happy (morale ${pl.morale}) and it may show.`,
+			drop: `${pl.name} is hooked at half-time (morale ${pl.morale}).${off}`
+		}[choice];
+		dramaLog(note);
+		const box = $("htRow");
+		if (box) { box.querySelectorAll("button").forEach(b => { b.disabled = true; }); box.append(el("p", "fine", note)); }
+		if (typeof saveLeague === "function") { saveLeague(); }
+		return { note, morale: pl.morale, room: d.room, attr: p ? { ...p.attr } : null, onPitch: !!(p && players.includes(p) && p.name === pl.name) };
+	}

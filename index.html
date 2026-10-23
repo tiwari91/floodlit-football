@@ -5405,6 +5405,87 @@
 		else { box.append(el("p", "fine", "No problems in the squad right now.")); }
 		if (d.log.length) { const lg = el("ul", "drama-log"); for (const s of d.log.slice(-3).reverse()) { lg.append(el("li", "", s)); } box.append(lg); }
 	}
+
+	// ---------- the half-time row ----------
+	// Behind at the break, or a star taken off before it: now and then a man with a temper boils
+	// over in the dressing room. The half-time card shows it with the same four choices, and the
+	// choice changes his morale and how he plays the second half (and the rest of the side's, when
+	// you back yourself). Rare: tied to the score and his temper, and only in your league matches.
+	let htRow = null;
+	function halfTimeRow (o = {}) {
+		const old = $("htRow");
+		if (old) { old.remove(); }
+		htRow = null;
+		if (!league || !league.club || (!leagueMatch && !o.force) || tut) { return null; }
+		const rnd = o.rnd || Math.random, behind = score[1] - score[0], c = league.club;
+		const clubOf = name => [ ...c.squad, ...c.bench ].find(q => q.name === name);
+		const onPitch = team(0).filter(p => p.role !== "gk" && clubOf(p.name));
+		const star = wentOff.map(clubOf).find(pl => pl && roleOf(pl, c) === "key");
+		let who = null, text = "";
+		if (star && rnd() < 0.5 * temperOf(star) / 70) {
+			who = { pl: star, p: null };
+			text = `${star.name} kicked a water bottle across the dressing room. He's furious you took him off and wants to know why.`;
+		} else if (behind >= 1) {
+			const loud = onPitch.slice().sort((a, b) => temperOf(clubOf(b.name)) - temperOf(clubOf(a.name)))[0];
+			const pl = loud && clubOf(loud.name);
+			if (pl && rnd() < (behind >= 2 ? 0.45 : 0.15) * temperOf(pl) / 70) {
+				who = { pl, p: loud };
+				text = `${pl.name} has lost it in the dressing room at ${score[0]}-${score[1]} down. He's having a go at his teammates and at your tactics.`;
+			}
+		}
+		if (!who) { return null; }
+		htRow = { name: who.pl.name, p: who.p, text, done: false };
+		const box = el("div", "ht-row"); box.id = "htRow";
+		box.style.cssText = "margin:10px 0 6px;padding:8px 12px;font-size:0.92em;border-left:3px solid #e0533c;background:rgba(224,83,60,0.08);text-align:left";
+		const row = el("div", "drama-choices"); row.style.cssText = "display:flex;flex-wrap:wrap;gap:6px;margin-top:8px";
+		box.append(el("p", "", text));
+		for (const [ k, label ] of MANAGER_CHOICES) {
+			const b = el("button", "", label); b.type = "button"; b.dataset.choice = k; b.style.padding = "4px 9px";
+			b.addEventListener("click", () => resolveHalfTime(k));
+			row.append(b);
+		}
+		box.append(row);
+		const body = $("ovBody");   // under the card's text, above the quick settings, so the card never clips it
+		if (body) { body.after(box); }
+		const go = $("ovButton");
+		if (go) { go.addEventListener("click", () => { const b = $("htRow"); if (b) { b.remove(); } }, { once: true }); }   // gone with the second half
+		return htRow;
+	}
+	// Morale, dressing room, and his second half (added to each of his ratings for the rest of the match).
+	const HT_EFFECTS = { talk: [ 5, 1, 2 ], back: [ -5, 2, -1 ], fine: [ -10, 3, -2 ], drop: [ -12, 0, 0 ] };
+	function resolveHalfTime (choice) {
+		if (!htRow || htRow.done || !HT_EFFECTS[choice]) { return null; }
+		const d = ensureDrama(league), c = league.club, pl = [ ...c.squad, ...c.bench ].find(q => q.name === htRow.name), e = HT_EFFECTS[choice];
+		if (!pl) { return null; }
+		htRow.done = true;
+		const t = temperOf(pl), p = htRow.p && players.includes(htRow.p) && htRow.p.name === pl.name ? htRow.p : null;
+		let dm = e[0], df = e[2];
+		if (choice === "talk" && t < 40) { dm += 3; }
+		if (choice === "fine" && t >= 75) { dm -= 4; df -= 1; }
+		pl.morale = clamp(Math.round(pl.morale + dm), 5, 100);
+		d.room = clamp(Math.round(d.room + e[1]), 0, 100);
+		const lift = (q, n) => { if (q && q.attr && n) { for (const k of [ "pac", "sho", "pas", "def" ]) { if (Number.isFinite(q.attr[k])) { q.attr[k] = clamp(q.attr[k] + n, 20, 99); } } } };
+		lift(p, df);
+		if (choice === "back") { for (const q of team(0)) { if (q !== p) { lift(q, 1); } } }
+		if (choice === "fine") { c.budget = Math.round((c.budget + Math.max(0.001, wageOf(pl) / 52)) * 1000) / 1000; }
+		let off = "";
+		if (choice === "drop") {
+			const pool = typeof subPool === "function" ? subPool() : [];
+			const sub = p && subsLeft > 0 ? pool.filter(q => q.pos === pl.pos).sort((a, b) => ovrNow(b) - ovrNow(a))[0] || pool[0] : null;
+			if (sub) { makeSub(p, sub, true); off = ` ${sub.name} goes on in his place.`; } else { dropToBench(pl); off = " He's out of the side for the next game."; }
+		}
+		const note = {
+			talk: `You calmed ${pl.name} down. He goes out for the second half fired up (morale ${pl.morale}).`,
+			back: `You told ${pl.name} to sort himself out. He's sulking (morale ${pl.morale}), but the rest of the lads respond.`,
+			fine: `${pl.name} is fined a week's wages. He's not happy (morale ${pl.morale}) and it may show.`,
+			drop: `${pl.name} is hooked at half-time (morale ${pl.morale}).${off}`
+		}[choice];
+		dramaLog(note);
+		const box = $("htRow");
+		if (box) { box.querySelectorAll("button").forEach(b => { b.disabled = true; }); box.append(el("p", "fine", note)); }
+		if (typeof saveLeague === "function") { saveLeague(); }
+		return { note, morale: pl.morale, room: d.room, attr: p ? { ...p.attr } : null, onPitch: !!(p && players.includes(p) && p.name === pl.name) };
+	}
 	/* ---------- the Continental Champions Cup ----------
 	   The top four of the league qualify for next season's continental cup, with thirty-two clubs from
 	   the leagues abroad (named and coloured the way 18c names a country's clubs). One league phase:
@@ -9141,16 +9222,24 @@
 	   figures (face off and push in 3D, a red ring in 2D); p.flareGather draws teammates in. */
 	let flareLog = null;   // the match log of the last flare-up: one a match
 	const FLARE_T = 170;
+	const FLARE_BASE = 0.38;   // per bad foul at average tempers: measured over 300 autopilot matches to give about one match in seven
+	const flareStats = { fouls: 0, tackles: 0, chances: 0, flares: 0 };   // counted for the rate check in the tests
+	// The chance a bad foul boils over, from the two tempers (the man fouled's hot-headed teammate and the fouler).
+	// w: how bad it was (a bad foul 1, any other foul 0.5, a crunching tackle that won the ball 0.25).
+	const flareChance = (mateT, offT, w = 1) => FLARE_BASE * w * (mateT + offT) / 110;
+	const flareWeight = (behind, card, tackle) => (behind || card ? 1 : tackle ? 0.25 : 0.5);
 	function flareUp (off, vic, behind, card, o = {}) {
 		if (!off || !vic || bulkSim || tut || (typeof shoot !== "undefined" && shoot) || !players.includes(off)) { return null; }
-		if (!o.force && (flareLog === matchLog || !(behind || card))) { return null; }
+		if (!o.force) { if (o.tackle) { flareStats.tackles++; } else { flareStats.fouls++; } }
+		if (!o.force && flareLog === matchLog) { return null; }
 		const rnd = o.rnd || Math.random;
 		// The fouled side's nearest hot-head: the victim himself if he's on his feet, else the closest of the rest.
 		const mates = team(vic.team).filter(p => p !== off && p.role !== "gk" && players.includes(p)).sort((a, b) => dist(a, off) - dist(b, off)).slice(0, 3);
 		const mate = mates.slice().sort((a, b) => temperOf(b) - temperOf(a))[0];
 		if (!mate) { return null; }
-		const heat = (temperOf(mate) + temperOf(off)) / 110;
-		if (!o.force && rnd() > 0.06 * heat) { return null; }
+		if (!o.force) { flareStats.chances++; }
+		if (!o.force && rnd() > flareChance(temperOf(mate), temperOf(off), flareWeight(behind, card, o.tackle))) { return null; }
+		if (!o.force) { flareStats.flares++; }
 		flareLog = matchLog;
 		const pair = [ mate, off ];
 		for (const [ a, b ] of [ pair, pair.slice().reverse() ]) { a.flare = FLARE_T; a.flareWith = b; a.flareGather = null; }
@@ -9180,6 +9269,12 @@
 		$("announce").textContent = line;
 		for (const p of sent) { if (players.includes(p)) { sendOff(p); } }
 		return { mate, off, booked, sent, line };
+	}
+	// A crunching tackle that wins the ball clean can still start one: the man on the floor doesn't think it was clean.
+	function flareTackle (p) {
+		if (!p || state !== "play" || !players.includes(p)) { return null; }
+		const vic = team(1 - p.team).filter(q => q.role !== "gk").sort((a, b) => dist(a, p) - dist(b, p))[0];
+		return vic && dist(vic, p) < 60 ? flareUp(p, vic, false, "", { tackle: true }) : null;
 	}
 	// Each frame: the two face off and lean in; the others drift toward them. Called from the commentary tick.
 	function flareTick () {
@@ -10280,6 +10375,7 @@
 		showOverlay("Half time", `${leftIsYou ? "You" : opp.name} ${h}–${a} ${leftIsYou ? opp.name : "you"}. Change your tactic, formation or style now if you want to, then start the second half. The teams change ends, so you attack the other goal. ${opp.short === "CPU" ? "The CPU" : opp.name} kick off.`, "Start second half", matchStats(poss));
 		pauseBtn.textContent = "Pause";
 		if (!tut) { $("ovSubs").hidden = false; renderQuick(); }
+		if (typeof halfTimeRow === "function") { halfTimeRow(); }   // now and then, a row in the dressing room
 		kickoff(1);   // the other side kicks off the second half
 		saveLive();
 	}
@@ -12853,6 +12949,7 @@
 		if (kind === "near" || kind === "over" || kind === "woodwork") { p.headHands = 90; }
 		if (kind === "woodwork" || kind === "save") { gasp(kind === "save" && o.shooter ? o.shooter.team : p.team); }
 		if (kind === "save" && o.shooter === p) { p.headHands = 70; }
+		if (kind === "tackle" && typeof flareTackle === "function") { flareTackle(p); }
 		if (kind === "tackle") { p.fistPump = 50; crowdMood.excite = Math.min(1, crowdMood.excite + 0.2); if (p.team === homeSide) { crowdMood.home = Math.max(crowdMood.home, 0.6); } }
 		return said;
 	}
@@ -19621,7 +19718,7 @@
 	}
 
 	// More test hooks, kept apart from the big list above.
-	if (window.__ff) { Object.assign(window.__ff, { renewWorth, renewPlan, assistContracts, reportText, rolloverClub, showContract, goalCall, COMM, cupNight, cupTie, cupPens, ensureCup, seasonAwards, youthIntake, promoteYouth, releaseYouth, renderExtras, CUP_NIGHTS, ensureDrama, dramaAfterMatch, resolveIssue, renewRefusal, signRefusal, sellRefusal, renderDrama, temperOf, signPlayer, sellPlayer, rejectBid, weeklyClub, flareUp, flareTick, musicState () { return { tracks: TRACKS.map(x => x.name), vol: musicVol, level: musicLevel(), sel: !!$("musicVol"), next: trackNext, playing: music ? music.track : null }; }, setMusicVol, grooveBarTest (k) { ensureAudio(); const was = music; music = { g: audio.createGain() }; try { grooveBar(audio.currentTime + 0.05, 9, TRACKS[k]); return true; } finally { music.g.disconnect(); music = was; } }, voiceState () { return { on: voiceOn, available: voiceAvailable(), button: !!$("voiceBtn"), spoke: speakLine("Test line", "goal") }; }, commitFoulTest (r) { if (state !== "play") { return null; } freeze = 0; const off = outfield(1)[0], vic = outfield(0).sort((a, b) => dist(a, off) - dist(b, off))[0]; return flareUp(off, vic, true, "", { force: true, rnd: () => r }); } }); }
+	if (window.__ff) { Object.assign(window.__ff, { renewWorth, renewPlan, assistContracts, reportText, rolloverClub, showContract, goalCall, COMM, cupNight, cupTie, cupPens, ensureCup, seasonAwards, youthIntake, promoteYouth, releaseYouth, renderExtras, CUP_NIGHTS, ensureDrama, dramaAfterMatch, resolveIssue, renewRefusal, signRefusal, sellRefusal, renderDrama, temperOf, signPlayer, sellPlayer, rejectBid, weeklyClub, flareUp, flareTick, flareStats, flareChance, halfTimeRow, resolveHalfTime, musicState () { return { tracks: TRACKS.map(x => x.name), vol: musicVol, level: musicLevel(), sel: !!$("musicVol"), next: trackNext, playing: music ? music.track : null }; }, setMusicVol, grooveBarTest (k) { ensureAudio(); const was = music; music = { g: audio.createGain() }; try { grooveBar(audio.currentTime + 0.05, 9, TRACKS[k]); return true; } finally { music.g.disconnect(); music = was; } }, voiceState () { return { on: voiceOn, available: voiceAvailable(), button: !!$("voiceBtn"), spoke: speakLine("Test line", "goal") }; }, commitFoulTest (r) { if (state !== "play") { return null; } freeze = 0; const off = outfield(1)[0], vic = outfield(0).sort((a, b) => dist(a, off) - dist(b, off))[0]; return flareUp(off, vic, true, "", { force: true, rnd: () => r }); } }); }
 	if (window.__ff) { Object.assign(window.__ff, { trophyCeremony, ceremonySeek, ceremonyInfo, endCeremony, queueTrophy, trophyDue, lastCeremony: () => lastCeremony }); }
 	if (window.__ff) { Object.assign(window.__ff, { ensureCont, contNight, contFixture, contSimAll, contQualify, contNext, ccTable, ccAgg, ccWinner, renderCont, CC_NIGHTS, currentFixture, simulateMine, restoreGuest, saveLeague, renderLeague }); }
 

@@ -6,16 +6,24 @@
 	   figures (face off and push in 3D, a red ring in 2D); p.flareGather draws teammates in. */
 	let flareLog = null;   // the match log of the last flare-up: one a match
 	const FLARE_T = 170;
+	const FLARE_BASE = 0.38;   // per bad foul at average tempers: measured over 300 autopilot matches to give about one match in seven
+	const flareStats = { fouls: 0, tackles: 0, chances: 0, flares: 0 };   // counted for the rate check in the tests
+	// The chance a bad foul boils over, from the two tempers (the man fouled's hot-headed teammate and the fouler).
+	// w: how bad it was (a bad foul 1, any other foul 0.5, a crunching tackle that won the ball 0.25).
+	const flareChance = (mateT, offT, w = 1) => FLARE_BASE * w * (mateT + offT) / 110;
+	const flareWeight = (behind, card, tackle) => (behind || card ? 1 : tackle ? 0.25 : 0.5);
 	function flareUp (off, vic, behind, card, o = {}) {
 		if (!off || !vic || bulkSim || tut || (typeof shoot !== "undefined" && shoot) || !players.includes(off)) { return null; }
-		if (!o.force && (flareLog === matchLog || !(behind || card))) { return null; }
+		if (!o.force) { if (o.tackle) { flareStats.tackles++; } else { flareStats.fouls++; } }
+		if (!o.force && flareLog === matchLog) { return null; }
 		const rnd = o.rnd || Math.random;
 		// The fouled side's nearest hot-head: the victim himself if he's on his feet, else the closest of the rest.
 		const mates = team(vic.team).filter(p => p !== off && p.role !== "gk" && players.includes(p)).sort((a, b) => dist(a, off) - dist(b, off)).slice(0, 3);
 		const mate = mates.slice().sort((a, b) => temperOf(b) - temperOf(a))[0];
 		if (!mate) { return null; }
-		const heat = (temperOf(mate) + temperOf(off)) / 110;
-		if (!o.force && rnd() > 0.06 * heat) { return null; }
+		if (!o.force) { flareStats.chances++; }
+		if (!o.force && rnd() > flareChance(temperOf(mate), temperOf(off), flareWeight(behind, card, o.tackle))) { return null; }
+		if (!o.force) { flareStats.flares++; }
 		flareLog = matchLog;
 		const pair = [ mate, off ];
 		for (const [ a, b ] of [ pair, pair.slice().reverse() ]) { a.flare = FLARE_T; a.flareWith = b; a.flareGather = null; }
@@ -45,6 +53,12 @@
 		$("announce").textContent = line;
 		for (const p of sent) { if (players.includes(p)) { sendOff(p); } }
 		return { mate, off, booked, sent, line };
+	}
+	// A crunching tackle that wins the ball clean can still start one: the man on the floor doesn't think it was clean.
+	function flareTackle (p) {
+		if (!p || state !== "play" || !players.includes(p)) { return null; }
+		const vic = team(1 - p.team).filter(q => q.role !== "gk").sort((a, b) => dist(a, p) - dist(b, p))[0];
+		return vic && dist(vic, p) < 60 ? flareUp(p, vic, false, "", { tackle: true }) : null;
 	}
 	// Each frame: the two face off and lean in; the others drift toward them. Called from the commentary tick.
 	function flareTick () {

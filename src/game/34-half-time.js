@@ -36,6 +36,7 @@
 		showOverlay("Half time", `${leftIsYou ? "You" : opp.name} ${h}–${a} ${leftIsYou ? opp.name : "you"}. Change your tactic, formation or style now if you want to, then start the second half. The teams change ends, so you attack the other goal. ${opp.short === "CPU" ? "The CPU" : opp.name} kick off.`, "Start second half", matchStats(poss));
 		pauseBtn.textContent = "Pause";
 		if (!tut) { $("ovSubs").hidden = false; renderQuick(); }
+		if (typeof halfTimeRow === "function") { halfTimeRow(); }   // now and then, a row in the dressing room
 		kickoff(1);   // the other side kicks off the second half
 		saveLive();
 	}

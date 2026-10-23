@@ -163,6 +163,47 @@ const red = await page.evaluate(() => {
 check("two hot-heads: a red for violent conduct and he's off", red.sent === 1 && red.gone === 1 && /violent conduct/.test(red.line), JSON.stringify(red));
 if (shot) { await page.evaluate(() => { const F = window.__ff, o = F.outfield(1)[2], v = F.outfield(0)[1]; F.flareUp(o, v, true, "", { force: true, noCards: true, rnd: () => 0.99 }); for (let k = 0; k < 30; k++) { F.flareTick(); } F.state === "play"; }); await page.waitForTimeout(500); await page.screenshot({ path: `${shot}/flare-up.png` }); }
 
+// The flare-up rate, seeded: matches drawn with the fouls and crunching tackles per match measured on the
+// real engine (tests/flare-rate.mjs, 300 autopilot matches) and the real tempers of the league's squads.
+const rate = await page.evaluate(() => {
+	const F = window.__ff, lg = F.league;
+	let seed = 12345; const rnd = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296);
+	const pois = l => { let k = 0, p = Math.exp(-l), s = p; const u = rnd(); while (u > s && k < 20) { k++; p *= l / k; s += p; } return k; };
+	const tempers = [ ...lg.club.squad, ...lg.club.bench ].map(F.temperOf);
+	const T = () => tempers[Math.floor(rnd() * tempers.length)];
+	const M = 3000; let hit = 0;
+	for (let m = 0; m < M; m++) {
+		const events = [ ...Array(pois(0.12)).fill(1), ...Array(pois(0.23)).fill(0.5), ...Array(pois(0.58)).fill(0.25) ];
+		if (events.some(w => rnd() < F.flareChance(Math.max(T(), T()), T(), w))) { hit++; }
+	}
+	return { rate: hit / M, oneIn: Math.round(M / Math.max(1, hit) * 10) / 10 };
+});
+check("flare-ups happen in about one match in six to eight (seeded model of the measured fouls)", rate.rate >= 1 / 10 && rate.rate <= 1 / 5, JSON.stringify(rate));
+
+// The half-time row: behind at the break, a hot-head has a go; the choice changes his morale and his second half.
+const ht = await page.evaluate(() => {
+	const F = window.__ff, out = {};
+	F.score[0] = 1; F.score[1] = 1;
+	out.level = F.halfTimeRow({ force: true, rnd: () => 0 });
+	F.score[0] = 0; F.score[1] = 3;
+	out.calm = F.halfTimeRow({ force: true, rnd: () => 0.99 });
+	const row = F.halfTimeRow({ force: true, rnd: () => 0 });
+	out.text = row && row.text;
+	out.buttons = [ ...document.querySelectorAll("#htRow button") ].map(b => b.textContent);
+	const p = row && row.p, a0 = p && p.attr.sho, pl = [ ...F.league.club.squad, ...F.league.club.bench ].find(q => q.name === row.name), m0 = pl.morale;
+	const r = F.resolveHalfTime("talk");
+	out.talk = { morale: [ m0, r.morale ], sho: [ a0, r.attr && r.attr.sho ], again: F.resolveHalfTime("fine") };
+	F.halfTimeRow({ force: true, rnd: () => 0 });
+	const r2 = F.resolveHalfTime("drop");
+	out.drop = { onPitch: r2.onPitch, note: r2.note };
+	return out;
+});
+check("level at half-time, or a calm night: no row", ht.level === null && ht.calm === null, JSON.stringify(ht));
+check("three down at half-time: a row on the half-time card with the four choices", /down/.test(ht.text || "") && [ "Talk to him", "Back yourself", "Fine him", "Drop him" ].every(l => ht.buttons.includes(l)), JSON.stringify(ht));
+check("talking to him lifts his morale and his second half, and the choice is made once", ht.talk.morale[1] > ht.talk.morale[0] && ht.talk.sho[1] === Math.min(99, ht.talk.sho[0] + 2) && ht.talk.again === null, JSON.stringify(ht.talk));
+check("dropping him at half-time takes him off", ht.drop.onPitch === false && /hooked at half-time/.test(ht.drop.note), JSON.stringify(ht.drop));
+if (shot) { await page.evaluate(() => { const F = window.__ff; F.score[0] = 0; F.score[1] = 2; F.halfTime(); F.halfTimeRow({ force: true, rnd: () => 0 }); }); await page.waitForTimeout(400); await page.screenshot({ path: `${shot}/half-time-row.png` }); }
+
 const voice = await page.evaluate(() => window.__ff.voiceState());
 check("the commentary voice stays off and silent in the test mode", voice.on === false && voice.spoke === false && voice.button === false, JSON.stringify(voice));
 

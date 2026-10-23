@@ -51,6 +51,7 @@
 		if (kind === "near" || kind === "over" || kind === "woodwork") { p.headHands = 90; }
 		if (kind === "woodwork" || kind === "save") { gasp(kind === "save" && o.shooter ? o.shooter.team : p.team); }
 		if (kind === "save" && o.shooter === p) { p.headHands = 70; }
+		if (kind === "tackle" && typeof flareTackle === "function") { flareTackle(p); }
 		if (kind === "tackle") { p.fistPump = 50; crowdMood.excite = Math.min(1, crowdMood.excite + 0.2); if (p.team === homeSide) { crowdMood.home = Math.max(crowdMood.home, 0.6); } }
 		return said;
 	}
