@@ -1,7 +1,7 @@
 // Shared plumbing for the browser checks. Playwright and Chrome are not dependencies of the game:
 // point FF_PLAYWRIGHT_FROM at a package.json whose node_modules has playwright (default: a local
 // install next to the repo) and FF_CHROME at a Chrome binary (default: the Mac app path).
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import fs from "node:fs";
 import path from "node:path";
@@ -16,6 +16,8 @@ export const sleep = ms => new Promise(r => setTimeout(r, ms));
 export function serve (port) {
 	port += Number(process.env.FF_PORT_SHIFT || 0);   // a second checkout running its checks at the same time picks another port
 	const server = spawn("python3", [ "-m", "http.server", String(port), "--bind", "127.0.0.1", "--directory", root ], { stdio: "ignore" });
+	// Wait (up to 10 s) until the server answers, so the first page.goto never races its start-up.
+	spawnSync("python3", [ "-c", `import socket,time\nfor _ in range(200):\n    try:\n        socket.create_connection(("127.0.0.1", ${port}), 0.2).close(); break\n    except OSError: time.sleep(0.05)` ]);
 	return { url: `http://127.0.0.1:${port}/index.html?test`, stop: () => server.kill() };
 }
 export function launch () {
