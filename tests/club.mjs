@@ -186,7 +186,7 @@ const extras = await page.evaluate(() => {
 	const promoted = F.promoteYouth(kid.name), onBench = c.bench.some(p => p.name === kid.name);
 	const other = c.academy[0], released = F.releaseYouth(other.name);
 	F.renderExtras();
-	return { aw, fresh, n, kid: { age: kid.age, pot: kid.pot, role: kid.role }, promoted, onBench, released, left: c.academy.length, star: c.squad[2].name, scorer: c.squad[9].name, young: c.bench.find(p => p.age === 19) && c.bench.find(p => p.age === 19).name, card: document.getElementById("lgExtras").innerText };
+	return { aw, fresh, n, kid: { age: kid.age, pot: kid.pot, role: kid.role }, promoted, onBench, released, left: c.academy.length, star: c.squad[2].name, scorer: c.squad[9].name, young: c.bench.find(p => p.age === 19) && c.bench.find(p => p.age === 19).name, card: [ "lgExtras", "lgAcademy" ].map(id => document.getElementById(id).textContent).join(" ") };
 });
 check("season awards: player of the season, top scorer, young player and manager", extras.aw.player.name === extras.star && extras.aw.scorer.name === extras.scorer && /14 goals/.test(extras.aw.scorer.what) && extras.aw.young && extras.aw.manager && /Season \d+ awards/.test(extras.card), JSON.stringify(extras.aw));
 check("the academy: two or three prospects each summer with room to grow, promoted to the bench or released", extras.n >= 2 && extras.n <= 3 && extras.kid.age <= 17 && extras.kid.pot >= 64 && extras.promoted && extras.onBench && extras.released && extras.left === extras.n - 2 && /Academy/.test(extras.card), JSON.stringify(extras));
@@ -198,7 +198,7 @@ const swap = await page.evaluate(() => {
 	const kid = c.academy[0], budget = c.budget;
 	const asked = F.promoteYouth(kid.name);
 	F.renderExtras();
-	const card = document.getElementById("lgExtras").innerText;
+	const card = [ "lgExtras", "lgAcademy" ].map(id => document.getElementById(id).textContent).join(" ");
 	const done = F.promoteYouth(kid.name, true);
 	return { asked, prompt: /The bench is full \(7\/7\)/.test(card), done, onBench: c.bench.some(p => p.name === kid.name), size: c.bench.length, paid: c.budget <= budget, note: F.lastDeal };
 });
@@ -207,7 +207,7 @@ check("with the bench full, Promote offers a swap and a yes releases the weakest
 const oldSave = await (async () => {
 	await page.evaluate(() => { const raw = JSON.parse(localStorage.getItem("ff-league")); delete raw.cup; delete raw.awards; delete raw.club.academy; raw.round = 15; raw.results = raw.results.slice(0, 15); localStorage.setItem("ff-league", JSON.stringify(raw)); });
 	await page.reload(); await page.waitForFunction(() => window.__ff && window.__ff.league && window.__ff.league.club, null, { timeout: 60000 });
-	return page.evaluate(() => { const F = window.__ff; F.renderLeagueTest(); return { cup: F.league.cup && (F.league.cup.none ? "none" : "cup"), card: (document.getElementById("lgExtras") || {}).innerText || "" }; });
+	return page.evaluate(() => { const F = window.__ff; F.renderLeagueTest(); return { cup: F.league.cup && (F.league.cup.none ? "none" : "cup"), card: [ "lgExtras", "lgAcademy" ].map(id => (document.getElementById(id) || {}).textContent || "").join(" ") }; });
 })();
 const oldNote = await (async () => {
 	await page.evaluate(() => { const raw = JSON.parse(localStorage.getItem("ff-league")); raw.assistNote = "Assistant (your call, reserve spent): O. Osei signed on to 3 seasons; no money yet for new deals for U. Ruiz (£0.0m is kept for wages)."; delete raw.assistReport; localStorage.setItem("ff-league", JSON.stringify(raw)); localStorage.setItem("ff-assist", "contracts"); });
