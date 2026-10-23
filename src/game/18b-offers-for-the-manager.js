@@ -160,13 +160,13 @@
 		const lg = league, offer = lg && (lg.jobOffers || []).find(o => o.id === id);
 		if (!offer) { return false; }
 		if (typeof stripClubEdits === "function") { stripClubEdits(); }   // swap the plain identities; edits go back on after (18g)
-		const to = TEAMS[id], from = { ...YOU }, oldStr = yourStr();
+		const to = TEAMS[id], from = { ...YOU }, oldStr = yourStr(), theirs = cpuSquad(id, offer.str);   // their eleven, found by their own name (a league file's players, 18h)
 		// The two clubs trade identities: you wear theirs now; your old side keeps its name and your old squad's strength.
 		for (const k of [ "name", "short", "color", "color2", "ground", "surface" ]) { YOU[k] = to[k]; to[k] = from[k]; }
 		lg.clubStr[id] = oldStr;
 		rememberIdentity(lg);
 		const c = inheritSetup(newClub(), lg.club, offer.str), base = cpuOvr(offer.str);
-		c.squad = cpuSquad(id, offer.str);
+		c.squad = theirs;
 		c.bench = BENCH_POS.map((pos, i) => genPlayer(pos, base - 5 + (i % 3)));
 		c.budget = offer.budget; c.autoRotate = lg.club.autoRotate; c.market = genMarket(); c.scoutLeft = 2;
 		c.log = [ `You took the ${YOU.name} job, from ${from.name} (budget ${money(offer.budget)})` ];

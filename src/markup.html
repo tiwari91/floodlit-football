@@ -2,7 +2,7 @@
 <main class="wrap">
 	<header class="top">
 		<h1>Floodlit <span id="fmtName">Eleven</span></h1>
-		<p class="sub">Football under the lights, eleven-a-side or five-a-side. You run the yellow team against seven computer-run clubs. Over a touchline it's a throw-in; over the goal line, a corner or a goal kick.</p>
+		<p class="sub">Football under the lights, eleven-a-side or five-a-side. You manage one club in a twenty-club league (yellow, until you take another job); the computer runs the other nineteen. Over a touchline it's a throw-in; over the goal line, a corner or a goal kick.</p>
 		<div class="modes" role="group" aria-label="Game mode">
 			<button type="button" id="modeLeague" aria-pressed="true">League</button>
 			<button type="button" id="modeFriendly" aria-pressed="false">Friendly</button>
@@ -254,6 +254,7 @@
 			<button type="button" id="lgExport" title="Save your season to a file you can keep or move to another device">Export league</button>
 			<button type="button" id="lgImport" title="Load a season from an exported file">Import league</button>
 			<button type="button" id="lgEdit" title="Rename clubs, kits and players, and share your edits as an option file">Edit names</button>
+			<button type="button" id="lgLeagues" title="Start a career in another country, or take your club there">Play in another league</button>
 			</div>
 			<input type="file" id="lgFile" accept=".json,application/json" hidden>
 		</div>
@@ -419,6 +420,7 @@
 				<button type="button" data-tab="clubs" aria-pressed="true">Clubs</button>
 				<button type="button" data-tab="players" aria-pressed="false">Players</button>
 				<button type="button" data-tab="file" aria-pressed="false">Option file</button>
+				<button type="button" data-tab="leagues" aria-pressed="false">Leagues</button>
 			</div>
 			<button type="button" class="sheet-close" id="editClose" aria-label="Close">×</button>
 		</div>

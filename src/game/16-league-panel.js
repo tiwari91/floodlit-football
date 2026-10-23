@@ -107,6 +107,7 @@
 			if (clubsView === "div") { name.append(el("span", "cc-pos", ordinal(posOf.get(id)))); }
 			card.append(name);
 			const l1 = el("div", "cc-line"); l1.append(el("span", "stars", stars(Math.round(str))), document.createTextNode(` · ${t.ground} (${SURFACES[t.surface].label.toLowerCase()})`)); card.append(l1);
+			if (t.manager) { card.append(el("div", "cc-line", `Manager ${t.manager}${NATIONS[t.managerNat] ? ` (${NATIONS[t.managerNat][0]})` : ""}`)); }   // from an option file (18g, 18h)
 			card.append(el("div", "cc-line", `Plays ${STYLES[st].toLowerCase()} football, ${PRESSES[pr].toLowerCase()}`));
 			if (clubNat(id) !== leagueNat()) { card.append(el("div", "cc-line", `${styleLine(clubNat(id))} (${NATIONS[clubNat(id)][0]})`)); }   // a guest from abroad plays its own country's game
 			card.append(el("div", "cc-line", `Danger man ${fw.name} (SHO ${fw.sho}) · Rock ${df.name} (DEF ${df.def})`));

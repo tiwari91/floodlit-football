@@ -103,7 +103,7 @@ try {
 		return { file, bytes: text.length, n, reverted, sum: read.sum, lines: F.previewText(read.sum), back: { club: F.TEAMS[1].name, player: lg.club.squad[9].name, shirt: lg.club.squad[9].shirt }, origClub, origPlayer };
 	}, [ orig.club, orig.player ]);
 	check("revert puts the default names back", trip.reverted.club === orig.club && trip.reverted.player === orig.player && trip.reverted.shirt === undefined && trip.reverted.stored === null, JSON.stringify(trip.reverted));
-	check("the option file is small and versioned", trip.file.kind === "floodlit-option-file" && trip.file.version === 1 && trip.bytes < 2000, `${trip.bytes} bytes`);
+	check("the option file is small and versioned", trip.file.kind === "floodlit-option-file" && trip.file.version === 2 && trip.bytes < 2000, `${trip.bytes} bytes`);
 	check("export then import brings every edit back", trip.back.club === "Port Wexham" && trip.back.player === "T. Okonkwo-Vale" && trip.back.shirt === 77 && trip.sum.clubs === 1 && trip.sum.players === 2, JSON.stringify({ back: trip.back, sum: trip.sum }));
 	check("the preview says what the file renames", /^This file renames 1 club and 2 players\.$/.test(trip.lines[0]), trip.lines[0]);
 
@@ -114,7 +114,7 @@ try {
 		return {
 			json: r("{ not json").error, kind: r('{"kind":"something-else"}').error, season: r(JSON.stringify({ app: "floodlit-football", v: 1, league: {} })).error,
 			newer: r('{"kind":"floodlit-option-file","version":9}').error, damaged: r('{"kind":"floodlit-option-file","version":1,"clubs":[1,2]}').error,
-			big: r(" ".repeat(500001)).error, unknown: unk.sum, unknownLines: F.previewText(unk.sum), proto: ({}).name
+			big: r(" ".repeat(3000001)).error, unknown: unk.sum, unknownLines: F.previewText(unk.sum), proto: ({}).name
 		};
 	});
 	check("a file that isn't JSON is refused", /isn't valid JSON/.test(rej.json || ""), rej.json);

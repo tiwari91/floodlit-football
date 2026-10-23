@@ -637,6 +637,7 @@
 				tired.length ? `Fitness: ⚠ ${tiredText(tired)} Tired players are slower and less sharp. Rest them: press "Rest tired players", or swap them yourself in the squad panel.` : "",
 				first ? "Welcome to Floodlit Football. You manage the club and play its matches. New to the controls? \"Learn the controls\" is a two-minute walk-through, then you're back here." : "",
 				`${o.name} · ${leagueMatch.home ? "at home" : "away"} at ${(leagueMatch.home ? YOU : o).ground} · rated ${stars(Math.round(getStr(leagueMatch.opp)))} · ${lv.name} difficulty`,
+				o.manager ? `Their manager: ${o.manager}${NATIONS[o.managerNat] ? ` (${NATIONS[o.managerNat][0]})` : ""}.` : "",   // from an option file (18g, 18h)
 				derby ? "Derby day: the local rivals, and the loudest crowd of the season." : "",
 				k.watch ? `Watch: ${k.watch}.` : "",
 				k.how ? `They play: ${k.how}.` : "",

@@ -1263,7 +1263,7 @@
 <main class="wrap">
 	<header class="top">
 		<h1>Floodlit <span id="fmtName">Eleven</span></h1>
-		<p class="sub">Football under the lights, eleven-a-side or five-a-side. You run the yellow team against seven computer-run clubs. Over a touchline it's a throw-in; over the goal line, a corner or a goal kick.</p>
+		<p class="sub">Football under the lights, eleven-a-side or five-a-side. You manage one club in a twenty-club league (yellow, until you take another job); the computer runs the other nineteen. Over a touchline it's a throw-in; over the goal line, a corner or a goal kick.</p>
 		<div class="modes" role="group" aria-label="Game mode">
 			<button type="button" id="modeLeague" aria-pressed="true">League</button>
 			<button type="button" id="modeFriendly" aria-pressed="false">Friendly</button>
@@ -1515,6 +1515,7 @@
 			<button type="button" id="lgExport" title="Save your season to a file you can keep or move to another device">Export league</button>
 			<button type="button" id="lgImport" title="Load a season from an exported file">Import league</button>
 			<button type="button" id="lgEdit" title="Rename clubs, kits and players, and share your edits as an option file">Edit names</button>
+			<button type="button" id="lgLeagues" title="Start a career in another country, or take your club there">Play in another league</button>
 			</div>
 			<input type="file" id="lgFile" accept=".json,application/json" hidden>
 		</div>
@@ -1680,6 +1681,7 @@
 				<button type="button" data-tab="clubs" aria-pressed="true">Clubs</button>
 				<button type="button" data-tab="players" aria-pressed="false">Players</button>
 				<button type="button" data-tab="file" aria-pressed="false">Option file</button>
+				<button type="button" data-tab="leagues" aria-pressed="false">Leagues</button>
 			</div>
 			<button type="button" class="sheet-close" id="editClose" aria-label="Close">×</button>
 		</div>
@@ -3084,6 +3086,7 @@
 			if (clubsView === "div") { name.append(el("span", "cc-pos", ordinal(posOf.get(id)))); }
 			card.append(name);
 			const l1 = el("div", "cc-line"); l1.append(el("span", "stars", stars(Math.round(str))), document.createTextNode(` · ${t.ground} (${SURFACES[t.surface].label.toLowerCase()})`)); card.append(l1);
+			if (t.manager) { card.append(el("div", "cc-line", `Manager ${t.manager}${NATIONS[t.managerNat] ? ` (${NATIONS[t.managerNat][0]})` : ""}`)); }   // from an option file (18g, 18h)
 			card.append(el("div", "cc-line", `Plays ${STYLES[st].toLowerCase()} football, ${PRESSES[pr].toLowerCase()}`));
 			if (clubNat(id) !== leagueNat()) { card.append(el("div", "cc-line", `${styleLine(clubNat(id))} (${NATIONS[clubNat(id)][0]})`)); }   // a guest from abroad plays its own country's game
 			card.append(el("div", "cc-line", `Danger man ${fw.name} (SHO ${fw.sho}) · Rock ${df.name} (DEF ${df.def})`));
@@ -4091,6 +4094,7 @@
 				tired.length ? `Fitness: ⚠ ${tiredText(tired)} Tired players are slower and less sharp. Rest them: press "Rest tired players", or swap them yourself in the squad panel.` : "",
 				first ? "Welcome to Floodlit Football. You manage the club and play its matches. New to the controls? \"Learn the controls\" is a two-minute walk-through, then you're back here." : "",
 				`${o.name} · ${leagueMatch.home ? "at home" : "away"} at ${(leagueMatch.home ? YOU : o).ground} · rated ${stars(Math.round(getStr(leagueMatch.opp)))} · ${lv.name} difficulty`,
+				o.manager ? `Their manager: ${o.manager}${NATIONS[o.managerNat] ? ` (${NATIONS[o.managerNat][0]})` : ""}.` : "",   // from an option file (18g, 18h)
 				derby ? "Derby day: the local rivals, and the loudest crowd of the season." : "",
 				k.watch ? `Watch: ${k.watch}.` : "",
 				k.how ? `They play: ${k.how}.` : "",
@@ -4918,13 +4922,13 @@
 		const lg = league, offer = lg && (lg.jobOffers || []).find(o => o.id === id);
 		if (!offer) { return false; }
 		if (typeof stripClubEdits === "function") { stripClubEdits(); }   // swap the plain identities; edits go back on after (18g)
-		const to = TEAMS[id], from = { ...YOU }, oldStr = yourStr();
+		const to = TEAMS[id], from = { ...YOU }, oldStr = yourStr(), theirs = cpuSquad(id, offer.str);   // their eleven, found by their own name (a league file's players, 18h)
 		// The two clubs trade identities: you wear theirs now; your old side keeps its name and your old squad's strength.
 		for (const k of [ "name", "short", "color", "color2", "ground", "surface" ]) { YOU[k] = to[k]; to[k] = from[k]; }
 		lg.clubStr[id] = oldStr;
 		rememberIdentity(lg);
 		const c = inheritSetup(newClub(), lg.club, offer.str), base = cpuOvr(offer.str);
-		c.squad = cpuSquad(id, offer.str);
+		c.squad = theirs;
 		c.bench = BENCH_POS.map((pos, i) => genPlayer(pos, base - 5 + (i % 3)));
 		c.budget = offer.budget; c.autoRotate = lg.club.autoRotate; c.market = genMarket(); c.scoutLeft = 2;
 		c.log = [ `You took the ${YOU.name} job, from ${from.name} (budget ${money(offer.budget)})` ];
@@ -5029,12 +5033,13 @@
 	};
 	const FOREIGN_SHIRTS = [ "#c8102e", "#1d4fa0", "#f2b52e", "#155e3a", "#8fc3e6", "#5b2a86", "#e0662f", "#15171a", "#eef2f0", "#2fb8b0", "#7a1f3d", "#c2185b", "#0b6e6e", "#9b6ee8", "#a33c1d", "#123a7a", "#d9d9d9", "#4f8fde", "#de4f5a", "#2b2b52", "#8a2432", "#e45a91", "#b9c2c9", "#1f7a8c", "#4b4b4b", "#8b4db8", "#2a5caa", "#f4f4f4" ];
 	const foreignSecond = c => (lum(c) > 0.55 ? "#1f2a36" : "#ffffff");
-	// Every other club in the division (and those waiting below it) renamed for `nat`; yours keeps its name.
-	function applyForeignLeague (nat) {
+	// The plain identities `nat` gives slots 1.. (index 0 unused): the same every time for the same country
+	// and your club's name, so a league file (18h) finds each slot's club by its generated name.
+	function foreignIdent (nat, youName) {
 		const F = FOREIGN[nat];
-		if (!F) { return false; }
+		if (!F) { return null; }
 		const [ , groundPat, pats, townList ] = F, towns = townList.split(","), h = hashStr(nat);
-		const used = new Set([ YOU.name ]);
+		const used = new Set([ youName ]), out = [ null ];
 		for (let i = 1; i < TEAMS.length; i++) {
 			// The first fourteen clubs a town each; the rest are a town's second club (its derby rival).
 			const k = i - 1, town = towns[k % towns.length], pat = pats[(k < towns.length ? k + h : k + h + 3) % pats.length];
@@ -5043,8 +5048,15 @@
 			used.add(name);
 			const short = k < towns.length ? town : (name.length <= 14 ? name : town);
 			const color = FOREIGN_SHIRTS[(k * 7 + h) % FOREIGN_SHIRTS.length], color2 = foreignSecond(color);
-			Object.assign(TEAMS[i], { name, short, color, color2, text: textFor(color), ink: lum(color) > 0.55 ? "#1b2420" : "#ffffff", ground: groundPat.replace("{t}", town), surface: [ "grass", "grass", "turf", "mud" ][(k + h) % 4] });
+			out.push({ name, short, color, color2, text: textFor(color), ink: lum(color) > 0.55 ? "#1b2420" : "#ffffff", ground: groundPat.replace("{t}", town), surface: [ "grass", "grass", "turf", "mud" ][(k + h) % 4] });
 		}
+		return out;
+	}
+	// Every other club in the division (and those waiting below it) renamed for `nat`; yours keeps its name.
+	function applyForeignLeague (nat) {
+		const ids = foreignIdent(nat, YOU.name);
+		if (!ids) { return false; }
+		for (let i = 1; i < TEAMS.length; i++) { Object.assign(TEAMS[i], ids[i]); }
 		return true;
 	}
 	const divisionName = () => {
@@ -5684,12 +5696,20 @@
 	// The thirty-two from abroad: each country's clubs, named as 18c names them, the best first.
 	function ccForeign (lg, n) {
 		const home = lg.ident && lg.ident.country, out = [];
-		for (const [ nat, k, top ] of CC_NATIONS) {
-			if (!k || nat === home || !FOREIGN[nat]) { continue; }
-			const [ , groundPat, pats, townList ] = FOREIGN[nat], towns = townList.split(","), h = hashStr(nat + "cc");
+		// Abroad, England takes your country's seats. A league file's clubs (18h) fill a country's seats first.
+		const engTop = CLUBS.slice().sort((a, b) => b.str - a.str);
+		for (const [ cn, k, top ] of CC_NATIONS) {
+			const nat = cn === home && FOREIGN[home] ? HOME_NAT : cn;
+			if (!k || nat === home || (!FOREIGN[nat] && nat !== HOME_NAT)) { continue; }
+			const fc = typeof fileCupClubs === "function" ? fileCupClubs(nat) : [];
+			const F = FOREIGN[nat], towns = F ? F[3].split(",") : [], h = hashStr(nat + "cc");
 			for (let j = 0; j < k; j++) {
-				const town = towns[j], name = pats[(j + h) % pats.length].replace("{t}", town), color = FOREIGN_SHIRTS[(j * 5 + h) % FOREIGN_SHIRTS.length];
-				out.push({ name, short: town, color, color2: foreignSecond(color), ground: groundPat.replace("{t}", town), nat, str: round1(clamp(top - j * 0.45 + (Math.random() - 0.5) * 0.4, 1.5, 5)) });
+				const str = round1(clamp(top - j * 0.45 + (Math.random() - 0.5) * 0.4, 1.5, 5)), f = fc[j];
+				let c;
+				if (F) { const town = towns[j], color = FOREIGN_SHIRTS[(j * 5 + h) % FOREIGN_SHIRTS.length]; c = { name: F[2][(j + h) % F[2].length].replace("{t}", town), short: town, color, color2: foreignSecond(color), ground: F[1].replace("{t}", town) }; }
+				else { const e = engTop[j]; c = { name: e.name, short: e.short, color: e.color, color2: e.color2, ground: e.ground }; }
+				if (f) { c = { name: f.name, short: f.short || (f.name.length <= 14 ? f.name : f.name.split(" ")[0].slice(0, 14)), color: f.color || c.color, color2: f.color2 || (f.color ? foreignSecond(f.color) : c.color2), ground: f.ground || c.ground, manager: f.manager, managerNat: f.managerNat }; }
+				out.push({ ...c, nat, str });
 			}
 		}
 		// A country left out (yours) makes room for the next in line.
@@ -5919,7 +5939,7 @@
 		for (let i = TEAMS.length - 1; i > 0; i--) { if (!lg.members.includes(i)) { return i; } }
 		return -1;
 	}
-	const GUEST_KEYS = [ "name", "short", "color", "color2", "text", "ink", "ground", "surface", "pattern" ];
+	const GUEST_KEYS = [ "name", "short", "color", "color2", "text", "ink", "ground", "surface", "pattern", "manager", "managerNat" ];
 	function applyGuest (lg, c) {
 		if (lg.contGuest && lg.contGuest.key === c.name && TEAMS[lg.contGuest.slot] && TEAMS[lg.contGuest.slot].name === c.name) { return lg.contGuest.slot; }
 		restoreGuest(lg);
@@ -5928,7 +5948,7 @@
 		const T = TEAMS[slot], orig = {};
 		for (const k of GUEST_KEYS) { orig[k] = T[k]; }
 		lg.contGuest = { slot, key: c.name, nat: c.nat, orig, str: lg.clubStr ? lg.clubStr[slot] : T.str };   // nat: it plays its country's game (05a)
-		Object.assign(T, { name: c.name, short: c.short || c.name, color: c.color, color2: c.color2, text: textFor(c.color), ink: lum(c.color) > 0.55 ? "#1b2420" : "#ffffff", ground: c.ground, surface: "grass", pattern: undefined });
+		Object.assign(T, { name: c.name, short: c.short || c.name, color: c.color, color2: c.color2, text: textFor(c.color), ink: lum(c.color) > 0.55 ? "#1b2420" : "#ffffff", ground: c.ground, surface: "grass", pattern: undefined, manager: c.manager, managerNat: c.managerNat });
 		if (lg.clubStr) { lg.clubStr[slot] = c.str; }
 		return slot;
 	}
@@ -6062,16 +6082,18 @@
 	   - The computer's players are rebuilt each season, so their edits are by club and squad slot:
 	     league.edits.slots, laid over cpuSquad().
 	   - Ratings are only touched when "custom ratings" is on (league.edits.custom). */
-	const OPTION_KIND = "floodlit-option-file", OPTION_VERSION = 1, OPTION_MAX_BYTES = 400000, OPTION_MAX_ENTRIES = 3000;
-	const EDIT_LEN = { club: [ 2, 28 ], short: [ 2, 14 ], ground: [ 2, 32 ], player: [ 2, 24 ] };
+	// Version 2 adds whole leagues and the continental cup's clubs (18h); version 1 files still read.
+	const OPTION_KIND = "floodlit-option-file", OPTION_VERSION = 2, OPTION_MAX_BYTES = 3000000, OPTION_MAX_ENTRIES = 3000;
+	const EDIT_LEN = { club: [ 2, 28 ], short: [ 2, 14 ], ground: [ 2, 32 ], player: [ 2, 24 ], manager: [ 2, 28 ] };
+	const AGE_MIN = 16, AGE_MAX = 40;
 	const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 	const LOOK_STYLES = [ "short", "crop", "curly", "afro", "long", "tied", "buzz", "shaved" ];
 	const SKIN_TONES = [ "#f1c9a5", "#e0ac86", "#c68a5e", "#9c6a44", "#6e4a30", "#4a3222" ];   // the same as SKIN and HAIR in 36
 	const HAIR_SHADES = [ "#1b1410", "#3b2616", "#6b4424", "#a0703a", "#d8b46a", "#2a2a2a" ];
 	const HAIR_NAMES = [ "Black", "Dark brown", "Brown", "Light brown", "Blond", "Dark grey" ];
 	const RATING_KEYS = [ "pac", "sho", "pas", "def" ], RATING_MIN = 30, RATING_MAX = 96;
-	const CLUB_EDIT_KEYS = [ "name", "short", "color", "color2", "ground" ], CLUB_SET_KEYS = [ ...CLUB_EDIT_KEYS, "text", "ink" ];
-	const PLAYER_EDIT_KEYS = [ "name", "nat", "shirt", "foot", "pos", "lk", ...RATING_KEYS ];
+	const CLUB_EDIT_KEYS = [ "name", "short", "color", "color2", "ground", "manager", "managerNat" ], CLUB_SET_KEYS = [ ...CLUB_EDIT_KEYS, "text", "ink" ];
+	const PLAYER_EDIT_KEYS = [ "name", "nat", "shirt", "foot", "pos", "lk", "age", "trait", ...RATING_KEYS ];
 	const BAD_KEYS = new Set([ "__proto__", "constructor", "prototype" ]);
 	const own = (o, k) => !!o && typeof o === "object" && Object.prototype.hasOwnProperty.call(o, k);
 	const plainObj = v => !!v && typeof v === "object" && !Array.isArray(v);
@@ -6093,7 +6115,7 @@
 	function checkText (v, kind, label) {
 		const t = cleanText(v), [ lo, hi ] = EDIT_LEN[kind];
 		if (t.length < lo || t.length > hi) { return { error: `${label} must be ${lo} to ${hi} characters.` }; }
-		if (kind === "player" && !/^[\p{L}\p{M}][\p{L}\p{M} .'’-]*$/u.test(t)) { return { error: `${label} can only use letters, spaces, full stops, apostrophes and hyphens.` }; }
+		if ((kind === "player" || kind === "manager") && !/^[\p{L}\p{M}][\p{L}\p{M} .'’-]*$/u.test(t)) { return { error: `${label} can only use letters, spaces, full stops, apostrophes and hyphens.` }; }
 		return { value: t };
 	}
 	const checkColor = v => (typeof v === "string" && HEX_COLOR.test(v) ? v.toLowerCase() : null);
@@ -6105,7 +6127,8 @@
 		for (const k of marketOnly ? [ "name" ] : CLUB_EDIT_KEYS) {
 			if (!own(src, k)) { continue; }
 			if (k === "color" || k === "color2") { const c = checkColor(src[k]); if (c) { out[k] = c; } else { bad.push(`${k === "color" ? "Shirt" : "Second"} colour must look like #1d4fa0.`); } continue; }
-			const r = checkText(src[k], k === "name" ? "club" : k, k === "name" ? "Club name" : k === "short" ? "Short name" : "Ground name");
+			if (k === "managerNat") { if (typeof src[k] === "string" && own(NATIONS, src[k])) { out[k] = src[k]; } else { bad.push("Unknown nationality for the manager."); } continue; }
+			const r = checkText(src[k], k === "name" ? "club" : k, k === "name" ? "Club name" : k === "short" ? "Short name" : k === "manager" ? "Manager's name" : "Ground name");
 			if (r.error) { bad.push(r.error); } else { out[k] = r.value; }
 		}
 		if (out.color && out.color2 && deltaE(out.color, out.color2) < 12) { bad.push("Pick a second colour that stands apart from the shirt."); delete out.color2; }
@@ -6129,6 +6152,8 @@
 		if (own(src, "foot")) { if (src.foot === "left" || src.foot === "right") { out.foot = src.foot; } else { bad.push("Foot must be left or right."); } }
 		if (own(src, "pos")) { if (typeof src.pos === "string" && own(POS_LABEL, src.pos)) { out.pos = src.pos; } else { bad.push("Unknown position."); } }
 		if (own(src, "lk")) { const lk = checkLook(src.lk); if (lk) { out.lk = lk; } else { bad.push("Unknown look."); } }
+		if (own(src, "age")) { const n = checkInt(src.age, AGE_MIN, AGE_MAX); if (n !== null) { out.age = n; } else { bad.push(`Age must be ${AGE_MIN} to ${AGE_MAX}.`); } }
+		if (own(src, "trait")) { if (src.trait === "" || (typeof src.trait === "string" && own(TRAITS, src.trait))) { out.trait = src.trait; } else { bad.push("Unknown trait."); } }
 		for (const k of RATING_KEYS) {
 			if (!own(src, k)) { continue; }
 			if (!ratingsOn) { continue; }   // ratings only with custom ratings on
@@ -6184,11 +6209,11 @@
 	// Lay the league's club edits over the identities. fresh: the identities were just reset (applyIdentity).
 	function reapplyClubEdits (lg, fresh) {
 		if (fresh) { clubOverlay = new Map(); for (const [ r, m ] of Object.entries(MARKETS)) { m.clubs = MARKET_BASE[r].slice(); } } else { stripClubEdits(); }
-		const e = editsOf(lg);
+		const e = editsOf(lg), fc = fileOverlay(lg).clubs;   // a league file's clubs (18h) under the save's own edits
 		for (const t of TEAMS) {
-			if (!own(e.clubs, t.name)) { continue; }
+			if (!own(e.clubs, t.name) && !own(fc, t.name)) { continue; }
 			const base = pick(t, CLUB_SET_KEYS);
-			Object.assign(t, e.clubs[t.name]);
+			Object.assign(t, own(fc, t.name) ? fc[t.name] : {}, own(e.clubs, t.name) ? e.clubs[t.name] : {});
 			if (t.color !== base.color) { t.text = textFor(t.color); t.ink = lum(t.color) > 0.55 ? "#1b2420" : "#ffffff"; }
 			clubOverlay.set(t, { base, applied: pick(t, CLUB_SET_KEYS) });
 		}
@@ -6223,10 +6248,16 @@
 	function editCpuSquad (clubId, sq) {
 		const t = TEAMS[clubId];
 		if (!league || !t || !league.edits) { return sq; }
-		const e = league.edits, key = baseName(t);
+		const e = league.edits, key = baseName(t), fs = fileOverlay(league).slots;
 		for (let i = 0; i < sq.length; i++) {
 			const k = `${key}#${i}`;
-			if (!own(e.slots, k) || !sq[i]) { continue; }
+			if (!sq[i]) { continue; }
+			if (own(fs, k)) {
+				const fp = fs[k];
+				for (const f of PLAYER_EDIT_KEYS) { if (own(fp, f)) { sq[i][f] = f === "lk" ? { ...fp.lk } : fp[f]; } }
+				if (fp.name && !own(fp, "trait")) { sq[i].trait = traitFor(sq[i]); }   // his own trait, from his own name
+			}   // a league file's player (18h): its ratings were kept only if wanted
+			if (!own(e.slots, k)) { continue; }
 			const ed = e.slots[k];
 			for (const f of PLAYER_EDIT_KEYS) { if (own(ed, f) && (!RATING_KEYS.includes(f) || e.custom)) { sq[i][f] = f === "lk" ? { ...ed.lk } : ed[f]; } }
 		}
@@ -6347,6 +6378,8 @@
 		let n = 0;
 		for (const pl of allOwn(lg.club)) { if (revertPlayer(pl)) { n++; } }
 		store.del("ff-edits");
+		clearLeagueFile();
+		reapplyClubEdits(lg, false);
 		return n;
 	}
 
@@ -6379,13 +6412,15 @@
 			if (own(v, k) && !plainObj(v[k])) { return { error: `The option file is damaged: "${k}" should be a list of named entries.` }; }
 			if (own(v, k) && Object.keys(v[k]).length > OPTION_MAX_ENTRIES) { return { error: `The option file has too many ${k}.` }; }
 		}
+		for (const k of [ "leagues", "cup" ]) { if (own(v, k) && !plainObj(v[k])) { return { error: `The option file is damaged: "${k}" should be a list of countries.` }; } }
 		const file = { edits: { clubs: {}, markets: {}, slots: {}, custom: v.customRatings === true }, players: {} };
 		const sum = { clubs: 0, players: 0, ratings: 0, unknown: 0, bad: 0, extra: 0 };
+		file.lf = readLeagueSections(v, sum);   // whole leagues and the cup's clubs (18h)
 		const knownClubs = new Set([ ...DEFAULT_IDENT.map(d => d.name), ...TEAMS.map(baseName) ]);
 		const knownMarkets = new Set(Object.values(MARKET_BASE).flat());
 		const ids = new Map(allOwn(lg && lg.club).map(pl => [ pl.id, pl ]));
 		const keysOf = o => Object.keys(o || {}).filter(k => { if (BAD_KEYS.has(k) || k.length > 64) { sum.bad++; return false; } return true; });
-		sum.extra = Object.keys(v).filter(k => ![ "kind", "version", "note", "customRatings", "clubs", "markets", "slots", "players" ].includes(k)).length;
+		sum.extra = Object.keys(v).filter(k => ![ "kind", "version", "note", "customRatings", "clubs", "markets", "slots", "players", "leagues", "cup" ].includes(k)).length;
 		for (const k of keysOf(v.clubs)) {
 			if (!knownClubs.has(k)) { sum.unknown++; continue; }
 			const { out, bad } = checkClubFields(v.clubs[k], false);
@@ -6424,7 +6459,12 @@
 	function previewText (sum) {
 		const n = (k, one, many) => `${k} ${k === 1 ? one : many}`;
 		const lines = [ sum.clubs || sum.players ? `This file renames ${n(sum.clubs, "club", "clubs")} and ${n(sum.players, "player", "players")}.` : "This file has nothing that matches this save." ];
+		const per = leagueSummary(sum);
+		if (per) { lines.push(`${per}.`); }
+		const here = leagueCountry(league), away = (sum.countries || []).map(c => c.nat).filter(c => c !== here);
+		if (away.length) { lines.push(`You play in ${natLabel(here)}, so ${away.map(natLabel).join(", ")} ${away.length === 1 ? "shows" : "show"} when you play there (the Leagues tab: Play in another league) and in the continental cup.`); }
 		const skip = [];
+		if (sum.unknownNats && sum.unknownNats.length) { skip.push(`countries the game has no league for (${sum.unknownNats.slice(0, 6).join(", ")})`); }
 		if (sum.unknown) { skip.push(`${n(sum.unknown, "entry", "entries")} for clubs or players not in this save`); }
 		if (sum.bad) { skip.push(`${n(sum.bad, "value", "values")} that didn't pass the checks`); }
 		if (sum.extra) { skip.push(`${n(sum.extra, "section", "sections")} Floodlit doesn't use`); }
@@ -6443,10 +6483,14 @@
 		const ids = new Map(allOwn(lg.club).map(pl => [ pl.id, pl ]));
 		for (const [ id, o ] of Object.entries(file.players || {})) { const pl = ids.get(id); if (pl) { setPlayerFields(pl, noRatings(o)); } }
 	}
+	// Leagues and cup clubs (18h) are kept in this browser and apply at once; the rest now or next season.
+	// Returns false when the browser would not keep the league data.
 	function applyOptionFile (lg, read, when, ratings) {
-		if (when === "next") { lg.editsNext = { edits: read.file.edits, players: read.file.players, ratings: !!ratings }; return; }
+		const kept = read.file.lf && !lfEmpty(read.file.lf) ? mergeLeagueFile(read.file.lf, !!ratings) : true;
+		if (when === "next") { lg.editsNext = { edits: read.file.edits, players: read.file.players, ratings: !!ratings }; reapplyClubEdits(lg, false); return kept; }
 		mergeOptionFile(lg, read.file, !!ratings);
 		reapplyClubEdits(lg, false);
+		return kept;
 	}
 	function afterEdit () {
 		if (!league) { return; }
@@ -6476,7 +6520,7 @@
 		const body = $("editBody");
 		body.textContent = "";
 		for (const b of $("editTabs").querySelectorAll("button")) { b.setAttribute("aria-pressed", String(b.dataset.tab === editor.tab)); }
-		if (editor.tab === "clubs") { renderClubEditor(body); } else if (editor.tab === "players") { renderPlayerEditor(body); } else { renderFileTab(body); }
+		if (editor.tab === "clubs") { renderClubEditor(body); } else if (editor.tab === "players") { renderPlayerEditor(body); } else if (editor.tab === "leagues") { renderLeagueTab(body); } else { renderFileTab(body); }
 	}
 	function renderClubEditor (body) {
 		const targets = clubTargets(), cur = targets[clamp(editor.club, 0, targets.length - 1)] || targets[0];
@@ -6497,9 +6541,11 @@
 		const c1 = input("color", t.color, { id: "edClubColor" }), c2 = input("color", t.color2 || "#ffffff", { id: "edClubColor2" }), ground = input("text", t.ground || "", { id: "edClubGround", maxLength: EDIT_LEN.ground[1] });
 		const swatch = el("span", "ed-kit"), paint = () => { swatch.style.background = `linear-gradient(90deg, ${c1.value} 0 60%, ${c2.value} 60% 100%)`; };
 		c1.addEventListener("input", paint); c2.addEventListener("input", paint); paint();
+		const mgr = input("text", t.manager || "", { id: "edClubManager", maxLength: EDIT_LEN.manager[1], placeholder: "optional" });
 		form.append(field("Name", name), field("Short name", short), field("Shirt colour", c1), field("Second colour", c2), swatch, field("Ground", ground));
+		if (cur.id !== 0) { form.append(field("Manager", mgr)); }
 		if (clubOverlay.has(t)) { form.append(note("", `Default name: ${clubOverlay.get(t).base.name}`)); }
-		body.append(form, err, clubButtons(cur, () => ({ name: name.value, short: short.value, color: c1.value, color2: c2.value, ground: ground.value }), err));
+		body.append(form, err, clubButtons(cur, () => ({ name: name.value, short: short.value, color: c1.value, color2: c2.value, ground: ground.value, ...(cur.id !== 0 && mgr.value.trim() ? { manager: mgr.value } : {}) }), err));
 	}
 	function clubButtons (cur, read, err) {
 		const row = el("div", "ed-row"), save = el("button", "primary", "Save club"), reset = el("button", "", "Back to default");
@@ -6577,7 +6623,7 @@
 		drop.addEventListener("dragleave", () => drop.classList.remove("over"));
 		drop.addEventListener("drop", ev => { ev.preventDefault(); drop.classList.remove("over"); const f = ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0]; if (f) { readOptionFileFrom(f); } });
 		const row = el("div", "ed-row"); row.append(exp, pickBtn);
-		out.append(note("", "An option file holds your club names, kits and player edits. It never holds a saved season."), row, drop);
+		out.append(note("", "An option file holds club names, kits and players, for this league or any other and the continental cup. It never holds a saved season. Leagues from a file are kept in this browser, not in your season."), row, drop);
 		const pv = el("div", "ed-preview"); pv.id = "edPreview";
 		if (editor.read && editor.read.error) { pv.append(note("ed-err", editor.read.error)); }
 		else if (editor.read) {
@@ -6586,7 +6632,13 @@
 			if (editor.read.sum.ratings) { pv.append(rl); }
 			const now = el("button", "primary", "Apply to this save"), next = el("button", "", "Apply from next season"), cancel = el("button", "", "Cancel");
 			now.type = next.type = cancel.type = "button"; now.id = "edApplyNow"; next.id = "edApplyNext";
-			const go = when => { applyOptionFile(lg, editor.read, when, rat.checked); editor.read = null; afterEdit(); renderEditor(); toast(when === "next" ? "Edits will apply next season" : "Option file applied", "#7fd49b"); };
+			const go = when => {
+				const kept = applyOptionFile(lg, editor.read, when, rat.checked), away = (editor.read.sum.countries || []).some(c => c.nat !== leagueCountry(lg));
+				editor.read = null; afterEdit();
+				if (away) { editor.tab = "leagues"; }   // the file's leagues are elsewhere: show the way there
+				renderEditor();
+				toast(!kept ? "Applied, but this browser is too full to keep the leagues after closing" : when === "next" ? "Edits will apply next season" : "Option file applied", kept ? "#7fd49b" : "#f2b52e");
+			};
 			now.addEventListener("click", () => go("now")); next.addEventListener("click", () => go("next"));
 			cancel.addEventListener("click", () => { editor.read = null; renderEditor(); });
 			const r2 = el("div", "ed-row"); r2.append(now, next, cancel); pv.append(r2);
@@ -6630,6 +6682,239 @@
 	$("editSheet").addEventListener("keydown", e => { e.stopPropagation(); if (e.code === "Escape") { closeEditor(); } });
 	if (/[?&]test\b/.test(location.search)) {
 		queueMicrotask(() => { if (window.__ff) { Object.assign(window.__ff, { openEditor, closeEditor, afterEdit, editClub, editPlayer, resetPlayer, resetClub, revertEdits, buildOptionFile, readOptionFile, applyOptionFile, setCustomRatings, squadFor, cpuSquad, sellPlayer, clubTargets, rememberIdentity, applyIdentity, editsOf, getStr, newSeason, previewText }); } });
+	}
+	/* ---------- league files: whole leagues and the continental cup from an option file ----------
+	   A version 2 option file can name the clubs (and their eleven players) of any league the game has,
+	   by country code and club slot, and the guests of the continental cup by country. That data is kept
+	   in this browser under its own key, not in the season, so it never bloats a save and Revert stays
+	   exact. It is laid over the clubs through the same name-keyed overlay as edit mode's own renames
+	   (18g): a slot's club is found by the plain name the game gives it in that country (DEFAULT_IDENT at
+	   home, foreignIdent in 18c), so it follows a club through a job swap. Edit mode's own edits win.
+	   The spec for tools that write these files is docs/option-file-schema.json. */
+	const LF_KEY = "ff-leaguefile", LF_SLOTS = TEAMS.length - 1, LF_PLAYERS = POS_OF_SLOT.length, LF_CUP_MAX = 8, LF_MAX_BYTES = 3000000;
+	const LEAGUE_NATS = [ HOME_NAT, ...Object.keys(FOREIGN) ];
+	const natLabel = n => (NATIONS[n] ? NATIONS[n][0] : n);
+	const leagueLabel = n => `${n === HOME_NAT ? "Premier Division" : FOREIGN[n][0]} (${natLabel(n)})`;
+	const leagueCountry = lg => (lg && lg.ident && FOREIGN[lg.ident.country] ? lg.ident.country : HOME_NAT);
+	let lfData = null, lfOver = null;   // the stored file (file shape), and the overlay built from it for one country
+
+	// One club from a file, checked: its fields, its slot (league clubs), and up to eleven players.
+	function checkFileClub (src, withSlot, sum) {
+		if (!plainObj(src)) { sum.bad++; return null; }
+		const { out, bad } = checkClubFields(src, false);
+		if (bad.length) { sum.bad++; }
+		if (!out.name) { sum.bad++; return null; }
+		if (withSlot) { const s = checkInt(src.slot, 1, LF_SLOTS); if (s === null) { sum.bad++; return null; } out.slot = s; }
+		if (!own(src, "players")) { return out; }
+		if (!Array.isArray(src.players)) { sum.bad++; return out; }
+		const names = new Set(), slots = new Set();
+		out.players = [];
+		src.players.slice(0, 40).forEach((p, i) => {
+			if (!plainObj(p)) { sum.bad++; return; }
+			const sl = own(p, "slot") ? checkInt(p.slot, 0, LF_PLAYERS - 1) : (i < LF_PLAYERS ? i : null);
+			if (sl === null || slots.has(sl)) { sum.bad++; return; }
+			const { out: po, bad: pb } = checkPlayerFields(p, true);
+			if (pb.length) { sum.bad++; }
+			if (!po.name || names.has(po.name.toLowerCase())) { sum.bad++; return; }
+			if (RATING_KEYS.some(k => own(po, k))) { sum.ratings++; }
+			names.add(po.name.toLowerCase()); slots.add(sl);
+			out.players.push({ slot: sl, ...po });
+		});
+		return out;
+	}
+	// The leagues and cup sections of a parsed file, checked. sum gets the counts the preview shows.
+	function readLeagueSections (v, sum) {
+		const lf = { leagues: {}, cup: {} };
+		sum.countries = []; sum.cupClubs = 0; sum.unknownNats = [];
+		const natKeys = o => Object.keys(o).filter(k => { if (BAD_KEYS.has(k) || k.length > 8) { sum.bad++; return false; } if (!LEAGUE_NATS.includes(k)) { sum.unknownNats.push(k); return false; } return true; });
+		if (plainObj(v.leagues)) {
+			for (const nat of natKeys(v.leagues)) {
+				const L = v.leagues[nat];
+				if (!plainObj(L) || !Array.isArray(L.clubs)) { sum.bad++; continue; }
+				const clubs = [], names = new Set(), slots = new Set();
+				for (const c of L.clubs.slice(0, 60)) {
+					const o = checkFileClub(c, true, sum);
+					if (!o) { continue; }
+					if (slots.has(o.slot) || names.has(o.name.toLowerCase())) { sum.bad++; continue; }
+					slots.add(o.slot); names.add(o.name.toLowerCase()); clubs.push(o);
+				}
+				if (!clubs.length) { continue; }
+				lf.leagues[nat] = { clubs };
+				sum.countries.push({ nat, clubs: clubs.length, players: clubs.reduce((t, c) => t + (c.players ? c.players.length : 0), 0) });
+			}
+		}
+		if (plainObj(v.cup)) {
+			for (const nat of natKeys(v.cup)) {
+				if (!Array.isArray(v.cup[nat])) { sum.bad++; continue; }
+				const clubs = [], names = new Set();
+				for (const c of v.cup[nat].slice(0, LF_CUP_MAX)) {
+					const o = checkFileClub(c, false, sum);
+					if (!o || names.has(o.name.toLowerCase())) { if (o) { sum.bad++; } continue; }
+					names.add(o.name.toLowerCase()); clubs.push(o);
+				}
+				if (clubs.length) { lf.cup[nat] = clubs; sum.cupClubs += clubs.length; sum.players += clubs.reduce((t, c) => t + (c.players ? c.players.length : 0), 0); }
+			}
+		}
+		sum.clubs += sum.countries.reduce((t, c) => t + c.clubs, 0) + sum.cupClubs;
+		sum.players += sum.countries.reduce((t, c) => t + c.players, 0);
+		return lf;
+	}
+	const lfEmpty = lf => !lf || (!Object.keys(lf.leagues).length && !Object.keys(lf.cup).length);
+	function leagueFile () {
+		if (lfData) { return lfData; }
+		let raw = null;
+		try { raw = JSON.parse(store.get(LF_KEY) || "null"); } catch (err) { raw = null; }
+		lfData = plainObj(raw) ? readLeagueSections(raw, { bad: 0, ratings: 0, clubs: 0, players: 0 }) : { leagues: {}, cup: {} };
+		return lfData;
+	}
+	// Keep it in this browser; false when storage refused it (it still works until the page closes).
+	function storeLeagueFile (lf) {
+		lfData = lf; lfOver = null;
+		if (lfEmpty(lf)) { store.del(LF_KEY); return true; }
+		const text = JSON.stringify(lf);
+		store.set(LF_KEY, text);
+		return store.get(LF_KEY) === text;
+	}
+	// A read file's leagues and cup go in, country by country (a country in the file replaces what was kept for it).
+	function mergeLeagueFile (add, ratings) {
+		const cur = leagueFile(), lf = { leagues: { ...cur.leagues }, cup: { ...cur.cup } };
+		const strip = c => ({ ...c, players: c.players ? c.players.map(p => { const q = { ...p }; if (!ratings) { for (const k of RATING_KEYS) { delete q[k]; } } return q; }) : undefined });
+		for (const [ nat, L ] of Object.entries(add.leagues)) { lf.leagues[nat] = { clubs: L.clubs.map(strip) }; }
+		for (const [ nat, cl ] of Object.entries(add.cup)) { lf.cup[nat] = cl.map(strip); }
+		return storeLeagueFile(lf);
+	}
+	const clearLeagueFile = () => storeLeagueFile({ leagues: {}, cup: {} });
+	// Each slot's plain name in a country (index 0, your club, unused).
+	const slotNames = nat => (nat === HOME_NAT ? DEFAULT_IDENT.map(d => d.name) : (foreignIdent(nat, "") || []).map(d => (d ? d.name : "")));
+	const clubFields = c => { const o = {}; for (const k of CLUB_EDIT_KEYS) { if (c[k] !== undefined) { o[k] = c[k]; } } if (o.color && !o.color2) { o.color2 = foreignSecond(o.color); } return o; };
+	// What the file lays over this league: clubs by plain name, and players by "<name>#<squad slot>" (the
+	// league's clubs by their plain names; every other club in the file, cup guests too, by its own name).
+	function fileOverlay (lg) {
+		const nat = leagueCountry(lg);
+		if (lfOver && lfOver.nat === nat) { return lfOver; }
+		const lf = leagueFile(), clubs = {}, slots = {};
+		const addPlayers = (key, c) => { for (const p of c.players || []) { const q = { ...p }; delete q.slot; slots[`${key}#${p.slot}`] = q; } };
+		for (const [ n, L ] of Object.entries(lf.leagues)) {
+			const names = n === nat ? slotNames(n) : null;
+			for (const c of L.clubs) {
+				if (names) { const base = names[c.slot]; if (base) { clubs[base] = clubFields(c); addPlayers(base, c); } } else { addPlayers(c.name, c); }
+			}
+		}
+		for (const cl of Object.values(lf.cup)) { for (const c of cl) { addPlayers(c.name, c); } }
+		lfOver = { nat, clubs, slots };
+		return lfOver;
+	}
+	// The clubs a country sends to the continental cup from the file, best first: its cup list, then its league's clubs by slot strength.
+	function fileCupClubs (nat) {
+		const lf = leagueFile(), out = [], seen = new Set();
+		const inLeague = lf.leagues[nat] ? lf.leagues[nat].clubs.slice().sort((a, b) => (CLUBS[b.slot - 1] ? CLUBS[b.slot - 1].str : 0) - (CLUBS[a.slot - 1] ? CLUBS[a.slot - 1].str : 0) || a.slot - b.slot) : [];
+		for (const c of [ ...(lf.cup[nat] || []), ...inLeague ]) { if (!seen.has(c.name.toLowerCase())) { seen.add(c.name.toLowerCase()); out.push(c); } }
+		return out;
+	}
+	// One line per country for the preview: "England 20 clubs / 209 players".
+	function leagueSummary (sum) {
+		const parts = (sum.countries || []).map(c => `${natLabel(c.nat)} ${c.clubs} ${c.clubs === 1 ? "club" : "clubs"} / ${c.players} ${c.players === 1 ? "player" : "players"}`);
+		if (sum.cupClubs) { parts.push(`Continental cup ${sum.cupClubs} ${sum.cupClubs === 1 ? "club" : "clubs"}`); }
+		return parts.join("; ");
+	}
+
+	/* --- playing in another league ---
+	   There is one season per browser, so a new league replaces it: the season is downloaded first (bring
+	   it back any time with Import league), then either your club moves (squad, budget, staff and career
+	   come too) or a new career starts, at your own club or at any club of that league. */
+	const LEAGUE_HINT = "Your season is downloaded first, unless you untick it. Import league brings it back.";
+	function switchLeague (nat, opts = {}) {
+		const lg = league;
+		if (!lg || !lg.club) { return { error: "Start a season first." }; }
+		if (!LEAGUE_NATS.includes(nat)) { return { error: "That league isn't in the game." }; }
+		if (typeof liveMatch === "function" && liveMatch()) { return { error: "Finish or abandon the match first." }; }
+		const move = opts.mode === "move", pickSlot = !move && Number.isInteger(opts.club) && opts.club >= 1 && opts.club <= LF_SLOTS ? opts.club : 0;
+		if (opts.backup) { exportLeague(); }
+		if (lg.contGuest) { restoreGuest(lg); }   // a cup guest must not be baked into the identities
+		const shown = identOf(YOU);   // your club as it looks now, a file's or your own renames included
+		stripClubEdits();
+		if (move) { Object.assign(YOU, shown); }   // it keeps that look abroad, where no overlay knows it
+		const fmt = lg.fmt, from = YOU.name;
+		let c;
+		if (move) {
+			c = lg.club;
+			delete c.contQual; delete c.contCoef;   // old slot ids and the old cup's records mean nothing in the new league
+			c.log = [ `You took ${YOU.name} to the ${leagueLabel(nat)}`, ...(Array.isArray(c.log) ? c.log : []) ].slice(0, 40);
+		} else {
+			Object.assign(YOU, DEFAULT_IDENT[0]);
+			c = newClub();
+		}
+		TEAMS.forEach((t, i) => { if (i !== 0) { Object.assign(t, DEFAULT_IDENT[i]); } });
+		if (nat !== HOME_NAT) { applyForeignLeague(nat); }
+		league = null;
+		newSeason(fmt, c);
+		if (move && lg.career) { league.career = { ...lg.career, clubs: [ ...((lg.career && lg.career.clubs) || [ from ]), `${from} (${natLabel(nat)})` ] }; }
+		rememberIdentity(league);
+		league.ident.country = nat === HOME_NAT ? undefined : nat;
+		reapplyClubEdits(league, false);
+		if (pickSlot) {
+			// You take that club's place (its eleven from the file), and your own club takes its seat; a club
+			// from below the division moves up into the place so a full league file stays whole.
+			const str = getStr(pickSlot), base = cpuOvr(str), sq = cpuSquad(pickSlot, str);
+			stripClubEdits();
+			const swap = (a, b) => { for (const k of IDENT_KEYS) { const v = a[k]; a[k] = b[k]; b[k] = v; } };
+			swap(YOU, TEAMS[pickSlot]);
+			if (pickSlot < DIVISION && TEAMS[DIVISION]) { swap(TEAMS[pickSlot], TEAMS[DIVISION]); const s = league.clubStr; [ s[pickSlot], s[DIVISION] ] = [ s[DIVISION], s[pickSlot] ]; }
+			league.club.squad = sq.map(p => ({ ...p }));
+			league.club.bench = BENCH_POS.map((pos, i) => genPlayer(pos, base - 5 + (i % 3)));
+			league.club.budget = round1(1 + str * 0.9);
+			ensureIds(league.club);
+			rememberIdentity(league);
+			reapplyClubEdits(league, false);
+		}
+		forecastLeague(league);
+		league.news = `${league.news || ""} ${move ? `${YOU.name} now play in the ${leagueLabel(nat)}.` : `A new career: you manage ${YOU.name} in the ${leagueLabel(nat)}.`}`.trim();
+		lastDeal = move ? `${YOU.name} moved to the ${leagueLabel(nat)}.` : `New career: ${YOU.name}, ${leagueLabel(nat)}.`;
+		mirrorEdits(league);
+		saveLeague();
+		state = "intro"; banner.hidden = true; newMatch(); showIntro(); renderLeague();
+		return { ok: true };
+	}
+	// The Leagues tab of the editor: pick a country, a club, and go.
+	const switcher = { nat: null, mode: "new", club: 0, backup: true, arm: 0 };
+	function renderLeagueTab (body) {
+		const lg = league, here = leagueCountry(lg), lf = leagueFile();
+		if (!switcher.nat || !LEAGUE_NATS.includes(switcher.nat)) { switcher.nat = Object.keys(lf.leagues).find(n => n !== here) || (here === HOME_NAT ? "ESP" : HOME_NAT); }
+		const nat = switcher.nat;
+		body.append(note("", `You manage ${YOU.name} in the ${leagueLabel(here)}. Play in another league to start there, with the clubs from your option file where it has them.`));
+		const count = n => (lf.leagues[n] ? ` · your file: ${lf.leagues[n].clubs.length} clubs` : "");
+		const nsel = select(LEAGUE_NATS.map(n => [ n, `${leagueLabel(n)}${n === here ? " · you are here" : ""}${count(n)}` ]), nat); nsel.id = "lsNat";
+		nsel.addEventListener("change", () => { switcher.nat = nsel.value; switcher.club = 0; switcher.arm = 0; renderEditor(); });
+		const msel = select([ [ "new", "Start a new career there" ], [ "move", `Move ${YOU.name} there (squad, budget and career come too)` ] ], switcher.mode); msel.id = "lsMode";
+		msel.addEventListener("change", () => { switcher.mode = msel.value; switcher.arm = 0; renderEditor(); });
+		body.append(field("League", nsel), field("How", msel));
+		if (switcher.mode === "new") {
+			const names = slotNames(nat), byslot = {};
+			for (const c of lf.leagues[nat] ? lf.leagues[nat].clubs : []) { byslot[c.slot] = c.name; }
+			const opts = [ [ 0, `${DEFAULT_IDENT[0].name} (a club of your own)` ] ];
+			for (let i = 1; i <= LF_SLOTS; i++) { opts.push([ i, `${byslot[i] || names[i]}${i >= DIVISION ? " (below the division)" : ""}` ]); }
+			const csel = select(opts, switcher.club); csel.id = "lsClub";
+			csel.addEventListener("change", () => { switcher.club = Number(csel.value); switcher.arm = 0; });
+			body.append(field("Your club", csel));
+		}
+		const bk = input("checkbox", "", { id: "lsBackup", checked: switcher.backup });
+		bk.addEventListener("change", () => { switcher.backup = bk.checked; });
+		const bl = el("label", "ed-toggle"); bl.append(bk, el("span", "", "Download this season first (a backup)"));
+		const armed = Date.now() - switcher.arm < 6000;
+		const go = el("button", "primary", armed ? "Press again: this replaces the season here" : "Play in another league"); go.type = "button"; go.id = "lsGo";
+		const err = note("ed-err", "");
+		go.addEventListener("click", () => {
+			if (Date.now() - switcher.arm >= 6000) { switcher.arm = Date.now(); renderEditor(); return; }
+			switcher.arm = 0;
+			const r = switchLeague(switcher.nat, { mode: switcher.mode, club: switcher.club, backup: switcher.backup });
+			if (r.error) { err.textContent = r.error; return; }
+			closeEditor(); toast(`Welcome to the ${leagueLabel(switcher.nat)}`, "#7fd49b");
+		});
+		body.append(bl, note("", LEAGUE_HINT), go, err);
+	}
+	$("lgLeagues").addEventListener("click", e => { e.currentTarget.blur(); openEditor("leagues"); });
+	if (/[?&]test\b/.test(location.search)) {
+		queueMicrotask(() => { if (window.__ff) { Object.assign(window.__ff, { switchLeague, leagueFile, fileOverlay, fileCupClubs, leagueCountry, slotNames, clearLeagueFile, drawCont, ensureCont, LEAGUE_NATS, POS_OF_SLOT, BENCH_POS, CC_NATIONS, CLUB_STRS: CLUBS.map(c => c.str), RIVALS, NATIONS, TRAIT_KEYS: Object.keys(TRAITS), LOOKS: { skin: SKIN_TONES, hair: HAIR_SHADES, style: LOOK_STYLES } }); } });
 	}
 	/* ---------- audio ----------
 	   Everything is synthesised in WebAudio: the ball off a boot, the referee's whistle, and a

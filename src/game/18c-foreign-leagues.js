@@ -42,12 +42,13 @@
 	};
 	const FOREIGN_SHIRTS = [ "#c8102e", "#1d4fa0", "#f2b52e", "#155e3a", "#8fc3e6", "#5b2a86", "#e0662f", "#15171a", "#eef2f0", "#2fb8b0", "#7a1f3d", "#c2185b", "#0b6e6e", "#9b6ee8", "#a33c1d", "#123a7a", "#d9d9d9", "#4f8fde", "#de4f5a", "#2b2b52", "#8a2432", "#e45a91", "#b9c2c9", "#1f7a8c", "#4b4b4b", "#8b4db8", "#2a5caa", "#f4f4f4" ];
 	const foreignSecond = c => (lum(c) > 0.55 ? "#1f2a36" : "#ffffff");
-	// Every other club in the division (and those waiting below it) renamed for `nat`; yours keeps its name.
-	function applyForeignLeague (nat) {
+	// The plain identities `nat` gives slots 1.. (index 0 unused): the same every time for the same country
+	// and your club's name, so a league file (18h) finds each slot's club by its generated name.
+	function foreignIdent (nat, youName) {
 		const F = FOREIGN[nat];
-		if (!F) { return false; }
+		if (!F) { return null; }
 		const [ , groundPat, pats, townList ] = F, towns = townList.split(","), h = hashStr(nat);
-		const used = new Set([ YOU.name ]);
+		const used = new Set([ youName ]), out = [ null ];
 		for (let i = 1; i < TEAMS.length; i++) {
 			// The first fourteen clubs a town each; the rest are a town's second club (its derby rival).
 			const k = i - 1, town = towns[k % towns.length], pat = pats[(k < towns.length ? k + h : k + h + 3) % pats.length];
@@ -56,8 +57,15 @@
 			used.add(name);
 			const short = k < towns.length ? town : (name.length <= 14 ? name : town);
 			const color = FOREIGN_SHIRTS[(k * 7 + h) % FOREIGN_SHIRTS.length], color2 = foreignSecond(color);
-			Object.assign(TEAMS[i], { name, short, color, color2, text: textFor(color), ink: lum(color) > 0.55 ? "#1b2420" : "#ffffff", ground: groundPat.replace("{t}", town), surface: [ "grass", "grass", "turf", "mud" ][(k + h) % 4] });
+			out.push({ name, short, color, color2, text: textFor(color), ink: lum(color) > 0.55 ? "#1b2420" : "#ffffff", ground: groundPat.replace("{t}", town), surface: [ "grass", "grass", "turf", "mud" ][(k + h) % 4] });
 		}
+		return out;
+	}
+	// Every other club in the division (and those waiting below it) renamed for `nat`; yours keeps its name.
+	function applyForeignLeague (nat) {
+		const ids = foreignIdent(nat, YOU.name);
+		if (!ids) { return false; }
+		for (let i = 1; i < TEAMS.length; i++) { Object.assign(TEAMS[i], ids[i]); }
 		return true;
 	}
 	const divisionName = () => {

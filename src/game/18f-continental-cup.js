@@ -36,12 +36,20 @@
 	// The thirty-two from abroad: each country's clubs, named as 18c names them, the best first.
 	function ccForeign (lg, n) {
 		const home = lg.ident && lg.ident.country, out = [];
-		for (const [ nat, k, top ] of CC_NATIONS) {
-			if (!k || nat === home || !FOREIGN[nat]) { continue; }
-			const [ , groundPat, pats, townList ] = FOREIGN[nat], towns = townList.split(","), h = hashStr(nat + "cc");
+		// Abroad, England takes your country's seats. A league file's clubs (18h) fill a country's seats first.
+		const engTop = CLUBS.slice().sort((a, b) => b.str - a.str);
+		for (const [ cn, k, top ] of CC_NATIONS) {
+			const nat = cn === home && FOREIGN[home] ? HOME_NAT : cn;
+			if (!k || nat === home || (!FOREIGN[nat] && nat !== HOME_NAT)) { continue; }
+			const fc = typeof fileCupClubs === "function" ? fileCupClubs(nat) : [];
+			const F = FOREIGN[nat], towns = F ? F[3].split(",") : [], h = hashStr(nat + "cc");
 			for (let j = 0; j < k; j++) {
-				const town = towns[j], name = pats[(j + h) % pats.length].replace("{t}", town), color = FOREIGN_SHIRTS[(j * 5 + h) % FOREIGN_SHIRTS.length];
-				out.push({ name, short: town, color, color2: foreignSecond(color), ground: groundPat.replace("{t}", town), nat, str: round1(clamp(top - j * 0.45 + (Math.random() - 0.5) * 0.4, 1.5, 5)) });
+				const str = round1(clamp(top - j * 0.45 + (Math.random() - 0.5) * 0.4, 1.5, 5)), f = fc[j];
+				let c;
+				if (F) { const town = towns[j], color = FOREIGN_SHIRTS[(j * 5 + h) % FOREIGN_SHIRTS.length]; c = { name: F[2][(j + h) % F[2].length].replace("{t}", town), short: town, color, color2: foreignSecond(color), ground: F[1].replace("{t}", town) }; }
+				else { const e = engTop[j]; c = { name: e.name, short: e.short, color: e.color, color2: e.color2, ground: e.ground }; }
+				if (f) { c = { name: f.name, short: f.short || (f.name.length <= 14 ? f.name : f.name.split(" ")[0].slice(0, 14)), color: f.color || c.color, color2: f.color2 || (f.color ? foreignSecond(f.color) : c.color2), ground: f.ground || c.ground, manager: f.manager, managerNat: f.managerNat }; }
+				out.push({ ...c, nat, str });
 			}
 		}
 		// A country left out (yours) makes room for the next in line.
@@ -271,7 +279,7 @@
 		for (let i = TEAMS.length - 1; i > 0; i--) { if (!lg.members.includes(i)) { return i; } }
 		return -1;
 	}
-	const GUEST_KEYS = [ "name", "short", "color", "color2", "text", "ink", "ground", "surface", "pattern" ];
+	const GUEST_KEYS = [ "name", "short", "color", "color2", "text", "ink", "ground", "surface", "pattern", "manager", "managerNat" ];
 	function applyGuest (lg, c) {
 		if (lg.contGuest && lg.contGuest.key === c.name && TEAMS[lg.contGuest.slot] && TEAMS[lg.contGuest.slot].name === c.name) { return lg.contGuest.slot; }
 		restoreGuest(lg);
@@ -280,7 +288,7 @@
 		const T = TEAMS[slot], orig = {};
 		for (const k of GUEST_KEYS) { orig[k] = T[k]; }
 		lg.contGuest = { slot, key: c.name, nat: c.nat, orig, str: lg.clubStr ? lg.clubStr[slot] : T.str };   // nat: it plays its country's game (05a)
-		Object.assign(T, { name: c.name, short: c.short || c.name, color: c.color, color2: c.color2, text: textFor(c.color), ink: lum(c.color) > 0.55 ? "#1b2420" : "#ffffff", ground: c.ground, surface: "grass", pattern: undefined });
+		Object.assign(T, { name: c.name, short: c.short || c.name, color: c.color, color2: c.color2, text: textFor(c.color), ink: lum(c.color) > 0.55 ? "#1b2420" : "#ffffff", ground: c.ground, surface: "grass", pattern: undefined, manager: c.manager, managerNat: c.managerNat });
 		if (lg.clubStr) { lg.clubStr[slot] = c.str; }
 		return slot;
 	}
