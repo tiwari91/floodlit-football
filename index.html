@@ -885,7 +885,9 @@
 	.lg-extras li { padding: 3px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
 	.lg-extras li.mine { font-weight: 600; }
 	.lg-extras .academy li { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-	.lg-extras .academy .who { flex: 1 1 auto; }
+	.lg-extras .academy .who { flex: 1 1 12em; }
+	.lg-extras .academy .acts { display: inline-flex; gap: 6px; margin-left: auto; }
+	.lg-extras .academy .ask { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; color: var(--amber); padding: 4px 0 2px; }
 	.lg-extras .academy button { padding: 2px 8px; font-size: 12px; }
 	.lg-extras .awards b { color: #f2b52e; font-weight: 600; }
 	.market .bids { grid-row: span 3; display: grid; gap: 4px; justify-items: stretch; }
@@ -5051,13 +5053,32 @@
 		if (league) { league.news = `${league.news || ""}${fresh.length ? ` Through from the academy: ${fresh.join(", ")}.` : ""}${left.length ? ` Left the academy: ${left.join(", ")}.` : ""}`.trim(); }
 		return fresh;
 	}
-	function promoteYouth (name) {
+	// The bench man who makes way when the bench is full: the weakest in the youngster's position, else
+	// the weakest outfield man (the backup keeper stays unless a keeper is coming up).
+	function promoteSwapFor (pl) {
+		const bench = league.club.bench;
+		const same = bench.filter(q => q.pos === pl.pos);
+		const pool = same.length ? same : bench.filter(q => q.pos !== "gk" || pl.pos === "gk");
+		return pool.length ? pool.reduce((a, q) => (ovrOf(q) < ovrOf(a) ? q : a)) : null;
+	}
+	const releaseCost = pl => Math.round(wageOf(pl) * pl.contract * 0.5 * 1000) / 1000;
+	let promoteAsk = null;   // the youngster whose swap is waiting for a yes
+	function promoteYouth (name, swap = false) {
 		const c = league.club, acad = ensureAcademy(c), i = acad.findIndex(pl => pl.name === name);
 		if (i < 0) { return false; }
-		if (c.bench.length >= BENCH) { lastDeal = `The bench is full: release or sell someone before you promote ${name}.`; afterClubChange(); return false; }
+		let out = null;
+		if (c.bench.length >= BENCH) {
+			out = promoteSwapFor(acad[i]);
+			if (!swap || !out) { promoteAsk = out ? name : null; if (!out) { lastDeal = `The bench is full: release or sell someone before you promote ${name}.`; } afterClubChange(); return false; }
+			const pay = releaseCost(out);
+			c.bench.splice(c.bench.indexOf(out), 1);
+			c.budget = Math.round((c.budget - pay) * 1000) / 1000;
+			out = `${out.name} (contract paid off, ${money(pay)})`;
+		}
+		promoteAsk = null;
 		const [ pl ] = acad.splice(i, 1);
 		c.bench.push(pl);
-		lastDeal = `${pl.name} promoted from the academy to the first-team squad.`;
+		lastDeal = `${pl.name} promoted from the academy to the first-team squad${out ? `, in place of ${out}` : ""}.`;
 		c.log = [ ...(c.log || []), lastDeal ].slice(-10);
 		afterClubChange();
 		return true;
@@ -5109,9 +5130,21 @@
 		for (const pl of acad) {
 			const li = el("li");
 			li.append(el("span", "pos", POS_LABEL[pl.pos]), el("span", "who", `${pl.name}, ${pl.age} · OVR ${ovrOf(pl)} · potential ${Math.round(pl.pot)}`));
-			const pr = el("button", "", "Promote"); pr.type = "button"; pr.disabled = league.club.bench.length >= BENCH; pr.title = pr.disabled ? "The bench is full" : "Move him to the first-team bench"; pr.addEventListener("click", () => promoteYouth(pl.name));
+			const full = league.club.bench.length >= BENCH, out = full ? promoteSwapFor(pl) : null;
+			const pr = el("button", "", full ? "Promote…" : "Promote"); pr.type = "button"; pr.disabled = full && !out;
+			pr.title = !full ? "Move him to the first-team bench" : out ? `The bench is full: he would take ${out.name}'s place` : "The bench is full";
+			pr.addEventListener("click", () => promoteYouth(pl.name));
 			const rl = el("button", "", "Release"); rl.type = "button"; rl.addEventListener("click", () => releaseYouth(pl.name));
-			li.append(pr, rl);
+			const acts = el("span", "acts"); acts.append(pr, rl);
+			li.append(acts);
+			if (promoteAsk === pl.name && out) {
+				const ask = el("div", "ask");
+				ask.append(el("span", "", `The bench is full (${league.club.bench.length}/${BENCH}). Promote ${pl.name} in place of ${out.name} (${POS_LABEL[out.pos]}, OVR ${ovrOf(out)}, ${out.age})? His contract is paid off: ${money(releaseCost(out))}.`));
+				const yes = el("button", "primary", `Promote, release ${out.name}`); yes.type = "button"; yes.addEventListener("click", () => promoteYouth(pl.name, true));
+				const no = el("button", "", "Cancel"); no.type = "button"; no.addEventListener("click", () => { promoteAsk = null; afterClubChange(); });
+				ask.append(yes, no);
+				li.append(ask);
+			}
 			ul.append(li);
 		}
 		ac.append(ul);

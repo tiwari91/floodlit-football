@@ -190,6 +190,19 @@ const extras = await page.evaluate(() => {
 });
 check("season awards: player of the season, top scorer, young player and manager", extras.aw.player.name === extras.star && extras.aw.scorer.name === extras.scorer && /14 goals/.test(extras.aw.scorer.what) && extras.aw.young && extras.aw.manager && /Season \d+ awards/.test(extras.card), JSON.stringify(extras.aw));
 check("the academy: two or three prospects each summer with room to grow, promoted to the bench or released", extras.n >= 2 && extras.n <= 3 && extras.kid.age <= 17 && extras.kid.pot >= 64 && extras.promoted && extras.onBench && extras.released && extras.left === extras.n - 2 && /Academy/.test(extras.card), JSON.stringify(extras));
+// A full bench: Promote asks to swap the weakest bench man in that position, and a yes does it.
+const swap = await page.evaluate(() => {
+	const F = window.__ff, c = F.league.club;
+	while (c.bench.length < 7) { c.bench.push({ ...c.bench[0], name: `Filler ${c.bench.length}` }); }
+	if (!(c.academy || []).length) { F.youthIntake(c); }
+	const kid = c.academy[0], budget = c.budget;
+	const asked = F.promoteYouth(kid.name);
+	F.renderExtras();
+	const card = document.getElementById("lgExtras").innerText;
+	const done = F.promoteYouth(kid.name, true);
+	return { asked, prompt: /The bench is full \(7\/7\)/.test(card), done, onBench: c.bench.some(p => p.name === kid.name), size: c.bench.length, paid: c.budget <= budget, note: F.lastDeal };
+});
+check("with the bench full, Promote offers a swap and a yes releases the weakest bench man in his place", swap.asked === false && swap.prompt && swap.done && swap.onBench && swap.size === 7 && swap.paid && /in place of/.test(swap.note), JSON.stringify(swap));
 // An old save with no cup, awards or academy loads cleanly mid-season.
 const oldSave = await (async () => {
 	await page.evaluate(() => { const raw = JSON.parse(localStorage.getItem("ff-league")); delete raw.cup; delete raw.awards; delete raw.club.academy; raw.round = 15; raw.results = raw.results.slice(0, 15); localStorage.setItem("ff-league", JSON.stringify(raw)); });

@@ -864,7 +864,9 @@
 	.lg-extras li { padding: 3px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
 	.lg-extras li.mine { font-weight: 600; }
 	.lg-extras .academy li { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-	.lg-extras .academy .who { flex: 1 1 auto; }
+	.lg-extras .academy .who { flex: 1 1 12em; }
+	.lg-extras .academy .acts { display: inline-flex; gap: 6px; margin-left: auto; }
+	.lg-extras .academy .ask { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; color: var(--amber); padding: 4px 0 2px; }
 	.lg-extras .academy button { padding: 2px 8px; font-size: 12px; }
 	.lg-extras .awards b { color: #f2b52e; font-weight: 600; }
 	.market .bids { grid-row: span 3; display: grid; gap: 4px; justify-items: stretch; }
