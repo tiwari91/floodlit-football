@@ -1,13 +1,17 @@
 # National teams and international jobs: design note
 
-Status: not built yet. This note is the plan, so the work can be picked up in its own session.
+Status: Phase A built (section 1 and a read-only Nations card on the Cups tab: `src/game/18j-national-teams.js`,
+`tests/intl.mjs`). Phases B (section 2, the job) and C (section 3 onward, breaks and fixtures) are not built yet.
+This note is the plan, so the work can be picked up in its own session.
 Generic data only: country codes and names from `NATIONS` (05). There are no real people, and
 national managers' names are generated the same way club staff names are.
 
 ## 1. National teams from the save
 
 - A squad is picked from every player in the save whose `nat` is the country: your club, every
-  CPU squad (`cpuSquad(id, getStr(id))`), the transfer markets and the continental-cup guests.
+  CPU squad (`cpuSquad(id, getStr(id))`) and your transfer shortlist (`club.market`). As built: the
+  continental-cup guests are left out, because a guest's eleven is generated in the borrowed slot on
+  the night (`cpuSquad(slot)`), so those players are not stable members of the save.
 - Selection: the best 11 for the format by `ovrOf`, filled by position the way `slotsFor(fmt)`
   fills a club (gk, def, mid, fwd), with a bench of 5 from the next best. If a country is short in
   a position, the gap is filled with `genPlayer(pos, …, { nat })` at that country's average rating
@@ -18,8 +22,12 @@ national managers' names are generated the same way club staff names are.
   a small generic table per region, run through `foreignSecond`; the ground is "National Stadium".
   An option file may later add a `nations` section (`color`, `color2`, `ground`) in the same
   checked way as clubs (18g `checkClubFields`). Nothing real is put in the repo.
-- Cache: built once a season (`lg.intl.squads[nat]`, player ids only), and rebuilt after the
-  summer rollover and the January window, so transfers and retirements show up.
+- Cache: built once per half-season and rebuilt after the summer rollover and the January window,
+  so transfers and retirements show up. As built: the cache is in memory only (keyed by season, half,
+  format, your roster and shortlist), not `lg.intl.squads`. Computer clubs' players get a fresh `id`
+  every time `cpuSquad` runs, so stored ids would not find them again; their elevens are rebuilt from
+  their seeds instead. If Phase B needs a stored call-up list, store `{ club, slot }` references.
+- Fillers for a country with nobody in the save start from overall 64 (so 60 after the drop).
 
 ## 2. International jobs alongside the club job
 
