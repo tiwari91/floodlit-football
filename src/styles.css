@@ -880,6 +880,13 @@
 	.lg-extras .academy .acts { display: inline-flex; gap: 6px; margin-left: auto; }
 	.lg-extras .academy .ask { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; color: var(--amber); padding: 4px 0 2px; }
 	.lg-extras .academy button { padding: 2px 8px; font-size: 12px; }
+	.lg-extras .nat-list summary { cursor: pointer; overflow-wrap: anywhere; }
+	.lg-extras .nat-list summary .detail { font-size: 12px; color: var(--muted); }
+	.lg-extras .nat-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; border: 2px solid; margin-right: 6px; vertical-align: -1px; }
+	.lg-extras ol.nat-xi { list-style: none; margin: 4px 0 6px; padding: 0 0 0 16px; font-size: 12px; }
+	.lg-extras ol.nat-xi li { display: flex; gap: 6px; padding: 2px 0; }
+	.lg-extras ol.nat-xi .pos { flex: 0 0 3em; color: var(--muted); font-size: 11px; font-weight: 700; }
+	.lg-extras ol.nat-xi .who { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 	.lg-extras .awards b { color: #f2b52e; font-weight: 600; }
 	.market .bids { grid-row: span 3; display: grid; gap: 4px; justify-items: stretch; }
 	.market .bids button { grid-row: auto; padding: 3px 8px; font-size: 12px; }
