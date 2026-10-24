@@ -27,6 +27,9 @@ national managers' names are generated the same way club staff names are.
   format, your roster and shortlist), not `lg.intl.squads`. Computer clubs' players get a fresh `id`
   every time `cpuSquad` runs, so stored ids would not find them again; their elevens are rebuilt from
   their seeds instead. If Phase B needs a stored call-up list, store `{ club, slot }` references.
+  Known limit: the key does not see edit-mode changes to computer players or in-season rating
+  changes, so the Nations card can lag until January or next season. Phase B should call
+  `nationSquads` fresh (or clear `intlCache`) before a call-up if that matters.
 - Fillers for a country with nobody in the save start from overall 64 (so 60 after the drop).
 
 ## 2. International jobs alongside the club job

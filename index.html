@@ -6726,10 +6726,23 @@
 	// Returns false when the browser would not keep the league data.
 	function applyOptionFile (lg, read, when, ratings) {
 		const kept = read.file.lf && !lfEmpty(read.file.lf) ? mergeLeagueFile(read.file.lf, !!ratings) : true;
-		if (when === "next") { lg.editsNext = { edits: read.file.edits, players: read.file.players, ratings: !!ratings }; reapplyClubEdits(lg, false); return kept; }
+		if (when === "next") { lg.editsNext = { edits: read.file.edits, players: read.file.players, ratings: !!ratings }; reapplyClubEdits(lg, false); dropMaskedSignings(lg); return kept; }
 		mergeOptionFile(lg, read.file, !!ratings);
 		reapplyClubEdits(lg, false);
+		dropMaskedSignings(lg);
 		return kept;
+	}
+	// A computer club's signing from before the import sits on top of its squad slot (cpuSquad, 17): where
+	// the file now names that slot's player, the file's player takes the slot back. Later signings still replace.
+	function dropMaskedSignings (lg) {
+		if (!lg || !lg.cpuIn || typeof lg.cpuIn !== "object") { return; }
+		const fs = fileOverlay(lg).slots, es = (lg.edits && lg.edits.slots) || {};
+		for (const id of Object.keys(lg.cpuIn)) {
+			const t = TEAMS[id], ins = lg.cpuIn[id];
+			if (!t || !Array.isArray(ins)) { continue; }
+			const key = baseName(t), named = d => { const k = `${key}#${d && d.slot}`; return !!((own(fs, k) && fs[k].name) || (own(es, k) && es[k].name)); };
+			lg.cpuIn[id] = ins.filter(d => !named(d));
+		}
 	}
 	function afterEdit () {
 		if (!league) { return; }

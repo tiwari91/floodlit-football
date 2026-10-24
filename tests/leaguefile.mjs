@@ -58,6 +58,15 @@ try {
 	}, JSON.stringify(v2));
 	check("applying it while abroad shows the file's clubs in that league", applied.kept && applied.stored && applied.names.every(n => /^Esp Club/.test(n)), JSON.stringify(applied.names.slice(0, 3)));
 	check("their squads are the file's eleven, with age, trait, ratings and the manager", /^[A-Z]/.test(applied.p0) && applied.p9.trait === "poacher" && applied.p9.age === 29 && applied.p9.sho === 69 && applied.p9.dri === 88 && applied.p9.phy === 61 && /\w/.test(applied.mgr || ""), JSON.stringify({ p9: applied.p9.name, mgr: applied.mgr }));
+	// A computer club's signing from before the import must not hide the file's player in that slot.
+	const masked = await page.evaluate(t => {
+		const F = window.__ff, lg = F.league, before = F.cpuSquad(1, F.getStr(1))[2].name;
+		lg.cpuIn = { 1: [ { slot: 2, pl: { name: "Z. Generated", pos: "def", pac: 60, sho: 40, pas: 55, def: 70, age: 25 } } ] };
+		const stale = F.cpuSquad(1, F.getStr(1))[2].name;
+		F.applyOptionFile(lg, F.readOptionFile(t, lg), "now", true);
+		return { before, stale, after: F.cpuSquad(1, F.getStr(1))[2].name, left: (lg.cpuIn[1] || []).length };
+	}, JSON.stringify(v2));
+	check("an import gives a slot back from an older computer signing to the file's player", masked.stale === "Z. Generated" && masked.after === masked.before && masked.left === 0, JSON.stringify(masked));
 	const dp = await page.evaluate(() => { const F = window.__ff, f = JSON.parse(localStorage.getItem("ff-leaguefile") || "{}"), p = (((f.leagues || {}).ESP || {}).clubs || [])[0]; const q = p && p.players.find(x => x.slot === 9), r = p && p.players.find(x => x.slot === 8); return { q: q && [ q.dri, q.phy ], r: r && [ "dri" in r, "phy" in r ], sq: F.cpuSquad(1, F.getStr(1)).map(x => [ F.driOf(x), F.phyOf(x) ]).flat() }; });
 	check("dribbling and physical round-trip through the stored file; left out, they stay derived", JSON.stringify(dp.q) === "[88,61]" && JSON.stringify(dp.r) === "[false,false]" && dp.sq.every(v => v >= 30 && v <= 96), JSON.stringify(dp));
 	const panel = await page.evaluate(() => { window.__ff.renderLeagueTest(); return document.getElementById("clubGrid").textContent; });
