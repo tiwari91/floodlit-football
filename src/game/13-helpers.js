@@ -6,6 +6,12 @@
 	const team = t => players.filter(p => p.team === t);
 	const human = () => players[ctrl];
 	const outfield = t => players.filter(p => p.team === t && p.role !== "gk");
+	// Anonymous play counts for GoatCounter (no cookies); only on the live site, never in tests or local copies.
+	const track = (path, title) => {
+		try {
+			if (location.hostname === "tiwari91.github.io" && window.goatcounter && window.goatcounter.count) { window.goatcounter.count({ path, title: title || path, event: true }); }
+		} catch (e) { /* analytics never breaks the game */ }
+	};
 
 	const YOU_HOME_KIT = { outfield: "#f2b52e", second: "#1f2a36", gk: "#7ec8e3", ink: "#1d1604", pattern: "plain" };
 	// Your kit is your club's own colours (an edit, an option file or a move abroad can change them);

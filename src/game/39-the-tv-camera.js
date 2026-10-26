@@ -596,7 +596,7 @@
 		if (m === "3d" && !webglOK) { m = wideScreen ? "tv" : "top"; }
 		if (!CAM_LABEL[m]) { m = "top"; }
 		camMode = m;
-		if (chosen) { store.set(CAM_KEY, m); }
+		if (chosen) { store.set(CAM_KEY, m); track(`camera-${m}`); }
 		const b = $("camBtn");
 		b.textContent = CAM_LABEL[m];
 		b.title = webglOK ? "Switch camera (C): overhead, TV or 3D close" : "Switch camera (C): overhead or TV";

@@ -2,6 +2,7 @@
 	function newMatch () {
 		leagueMatch = mode === "league" ? currentFixture() : null;
 		applyFormat(mode === "league" && league ? league.fmt : fmtSel.value);
+		track(`match-start-${mode}`, `${mode} ${FMT.label}`);
 		setOpponent(leagueMatch ? TEAMS[leagueMatch.opp] : FRIENDLY, !leagueMatch || leagueMatch.home);
 		homeSide = !leagueMatch || leagueMatch.home ? 0 : 1;
 		cond = leagueMatch

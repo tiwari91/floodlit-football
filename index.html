@@ -13,6 +13,7 @@
 <meta name="theme-color" content="#0d1612">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230f1d16'/%3E%3Cpath d='M9 8l12 10M55 8L43 18' stroke='%23f2b52e' stroke-width='5' stroke-linecap='round'/%3E%3Ccircle cx='32' cy='38' r='19' fill='%23ffffff'/%3E%3Cpath d='M32 29l8.5 6.2-3.2 10H26.7l-3.2-10z' fill='%2316201b'/%3E%3Cpath d='M32 19v10M40.5 35.2l9.3-3.1M37.3 45.2l5.4 8.2M26.7 45.2l-5.4 8.2M23.5 35.2l-9.3-3.1' stroke='%2316201b' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E">
 <style>body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>
+<script data-goatcounter="https://stiw.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
 </head>
 <body>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -2843,6 +2844,12 @@
 	const team = t => players.filter(p => p.team === t);
 	const human = () => players[ctrl];
 	const outfield = t => players.filter(p => p.team === t && p.role !== "gk");
+	// Anonymous play counts for GoatCounter (no cookies); only on the live site, never in tests or local copies.
+	const track = (path, title) => {
+		try {
+			if (location.hostname === "tiwari91.github.io" && window.goatcounter && window.goatcounter.count) { window.goatcounter.count({ path, title: title || path, event: true }); }
+		} catch (e) { /* analytics never breaks the game */ }
+	};
 
 	const YOU_HOME_KIT = { outfield: "#f2b52e", second: "#1f2a36", gk: "#7ec8e3", ink: "#1d1604", pattern: "plain" };
 	// Your kit is your club's own colours (an edit, an option file or a move abroad can change them);
@@ -6725,6 +6732,7 @@
 	// Leagues and cup clubs (18h) are kept in this browser and apply at once; the rest now or next season.
 	// Returns false when the browser would not keep the league data.
 	function applyOptionFile (lg, read, when, ratings) {
+		track("option-file-import");
 		const kept = read.file.lf && !lfEmpty(read.file.lf) ? mergeLeagueFile(read.file.lf, !!ratings) : true;
 		if (when === "next") { lg.editsNext = { edits: read.file.edits, players: read.file.players, ratings: !!ratings }; reapplyClubEdits(lg, false); dropMaskedSignings(lg); return kept; }
 		mergeOptionFile(lg, read.file, !!ratings);
@@ -11106,6 +11114,7 @@
 	function newMatch () {
 		leagueMatch = mode === "league" ? currentFixture() : null;
 		applyFormat(mode === "league" && league ? league.fmt : fmtSel.value);
+		track(`match-start-${mode}`, `${mode} ${FMT.label}`);
 		setOpponent(leagueMatch ? TEAMS[leagueMatch.opp] : FRIENDLY, !leagueMatch || leagueMatch.home);
 		homeSide = !leagueMatch || leagueMatch.home ? 0 : 1;
 		cond = leagueMatch
@@ -11197,6 +11206,7 @@
 	   (three pairs at most, then honours even). No clock, no offside, nothing saved. */
 	let shoot = null;
 	function startShootout () {
+		track("corner-shootout");
 		shoot = { n: 0, total: 10, att: 0, live: false, next: 0, at: 0, log: [], extra: 0 };
 		freeze = 0;
 		state = "play";
@@ -11570,6 +11580,7 @@
 		updateNextNote();
 		$("announce").textContent = `Full time. ${line}`;
 		const wasSim = simulated;
+		track(wasSim ? "match-simulated" : "match-finished", leagueMatch ? "league match" : "friendly");
 		simulated = false;
 		showOverlay(wasSim ? (leagueMatch ? "Simulated result" : "Simulated friendly") : "Full time", `${line} ${nudge}`, btn,
 			wasSim ? null : matchStats(Math.round(100 * possFrames[0] / Math.max(1, possFrames[0] + possFrames[1]))));
@@ -15071,7 +15082,7 @@
 		if (m === "3d" && !webglOK) { m = wideScreen ? "tv" : "top"; }
 		if (!CAM_LABEL[m]) { m = "top"; }
 		camMode = m;
-		if (chosen) { store.set(CAM_KEY, m); }
+		if (chosen) { store.set(CAM_KEY, m); track(`camera-${m}`); }
 		const b = $("camBtn");
 		b.textContent = CAM_LABEL[m];
 		b.title = webglOK ? "Switch camera (C): overhead, TV or 3D close" : "Switch camera (C): overhead or TV";
@@ -20797,7 +20808,8 @@
 				<li><i style="border-color:#f2b52e;border-width:3px"></i>Amber arc round your player: shot power while you hold Shoot (also the bar at the bottom)</li>
 				<li><i style="border-color:rgba(255,255,255,0.4);border-width:3px"></i>Grey arc: tackle recharging</li>
 				<li><i style="border-color:#de4f5a;border-radius:2px;height:4px;border-width:2px 0 0"></i>Red dashed line: the offside line while you have the ball; OFF marks anyone beyond it</li>
-			</ul></section>`
+			</ul></section>`,
+			`<section><h3>Privacy</h3><p>This page counts visits and plays anonymously with GoatCounter: no cookies, no personal data. Your saves stay in your browser.</p></section>`
 		].join("");
 		for (const [ id, s ] of [ [ "howKeys", "keys" ], [ "howTouch", "touch" ], [ "howPad", "pad" ] ]) { $(id).setAttribute("aria-pressed", String(howScheme === s)); }
 	}

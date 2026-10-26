@@ -5,6 +5,7 @@
 	   (three pairs at most, then honours even). No clock, no offside, nothing saved. */
 	let shoot = null;
 	function startShootout () {
+		track("corner-shootout");
 		shoot = { n: 0, total: 10, att: 0, live: false, next: 0, at: 0, log: [], extra: 0 };
 		freeze = 0;
 		state = "play";

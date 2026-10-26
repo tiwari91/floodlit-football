@@ -417,6 +417,7 @@
 	// Leagues and cup clubs (18h) are kept in this browser and apply at once; the rest now or next season.
 	// Returns false when the browser would not keep the league data.
 	function applyOptionFile (lg, read, when, ratings) {
+		track("option-file-import");
 		const kept = read.file.lf && !lfEmpty(read.file.lf) ? mergeLeagueFile(read.file.lf, !!ratings) : true;
 		if (when === "next") { lg.editsNext = { edits: read.file.edits, players: read.file.players, ratings: !!ratings }; reapplyClubEdits(lg, false); dropMaskedSignings(lg); return kept; }
 		mergeOptionFile(lg, read.file, !!ratings);
