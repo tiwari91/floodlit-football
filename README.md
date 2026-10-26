@@ -148,6 +148,10 @@ portrait and landscape layouts, the settings drawer and the 60-a-second frame ca
 `tests/move.mjs` dribbling, planting, sprinting, challenges and the 3D renderer, and `tests/club.mjs` the assistant manager's contracts, bids and signings. `tests/edit.mjs` covers edit mode and option files. Screenshots land
 in `tests/out/`.
 
+## Privacy
+
+The live site counts visits and a few play events (match starts and finishes, camera choice) anonymously with [GoatCounter](https://www.goatcounter.com): no cookies, no personal data. Your saves stay in your browser. Local copies and tests send nothing.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).

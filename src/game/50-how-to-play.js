@@ -57,7 +57,8 @@
 				<li><i style="border-color:#f2b52e;border-width:3px"></i>Amber arc round your player: shot power while you hold Shoot (also the bar at the bottom)</li>
 				<li><i style="border-color:rgba(255,255,255,0.4);border-width:3px"></i>Grey arc: tackle recharging</li>
 				<li><i style="border-color:#de4f5a;border-radius:2px;height:4px;border-width:2px 0 0"></i>Red dashed line: the offside line while you have the ball; OFF marks anyone beyond it</li>
-			</ul></section>`
+			</ul></section>`,
+			`<section><h3>Privacy</h3><p>This page counts visits and plays anonymously with GoatCounter: no cookies, no personal data. Your saves stay in your browser.</p></section>`
 		].join("");
 		for (const [ id, s ] of [ [ "howKeys", "keys" ], [ "howTouch", "touch" ], [ "howPad", "pad" ] ]) { $(id).setAttribute("aria-pressed", String(howScheme === s)); }
 	}
