@@ -176,3 +176,22 @@ Replaces the eight-team knockout. Generic names only ("World Championship"), no 
   The trophy for winning it is queued as "World Championship".
 - Tests: `tests/worldcup.mjs` (sizes, groups, pairing, calendar clash, the cups card, an old save);
   `tests/intl.mjs` follows the new format.
+
+## 8. The European Nations Cup (alternate even seasons)
+
+Generic name ("European Nations Cup"), no real competition names.
+
+- **The cycle.** The even seasons alternate: the World Championship in seasons 2, 6, 10 ... and the European
+  Nations Cup in seasons 4, 8, 12 ... (`intlTourOf`). The season before each is its qualifying season, so
+  odd seasons 1, 5, 9 qualify for the World Championship and 3, 7, 11 for the European Nations Cup.
+  `C.tour` (`"wc"` or `"eu"`) records it on the competition; a competition without it (an old save) is the
+  World Championship.
+- **Europe only.** Countries carry a region tag in `NATIONS`; the European pool is the `home` and `europe`
+  regions (16 countries). Qualifying draws only those, four groups of four, one round-robin (three nights
+  of the five); `intlFinalsSize(16)` is 8, so the top two of each group go to the finals. The finals are two
+  groups of four on the same break calendar (matchdays 1 and 2 after matchday 9, 3 after 20) and then the
+  semi-finals and the final after matchday 30.
+- **Non-European jobs have no Euro.** A national job in another region plays no European qualifying or
+  finals: no fixtures, no missed tournament counted against you (the FA does not sack you for it), and the
+  Cups card and Overview say so. The job carries on into the next World Championship cycle.
+- Tests: `tests/euro.mjs` (six seasons of the cycle, the pool, a non-European job, a European fixture).

@@ -7486,7 +7486,13 @@
 	   continental cup's guest seat (18f). */
 	const INTL_BREAKS = [ 9, 20, 30 ];
 	const INTL_KO = { r16: "Round of 16", qf: "Quarter-final", sf: "Semi-final", f: "Final" };
-	const INTL_TOURNEY = "World Championship";
+	// Two tournaments take turns in the even seasons: the World Championship (every country) in seasons 2, 6, 10 ... and the
+	// European Nations Cup (the "home" and "europe" regions only) in seasons 4, 8, 12 ... Each is qualified for the season before.
+	const INTL_TOURS = { wc: "World Championship", eu: "European Nations Cup" };
+	const intlTourOf = season => { const yr = season % 2 ? season + 1 : season; return Math.floor(yr / 2) % 2 ? "wc" : "eu"; };
+	const tn = C => INTL_TOURS[(C && C.tour) || "wc"];
+	const inEurope = nat => NATIONS[nat] && (NATIONS[nat][1] === "europe" || NATIONS[nat][1] === "home");
+	const intlPoolNats = (key, lg) => nationSquads(lg).map(s => s.nat).filter(n => key === "wc" || inEurope(n));
 	// The finals: the biggest of 16, 8 or 4 that at most half the countries fill; groups of four, the top two go through.
 	const intlFinalsSize = n => (n >= 32 ? 16 : n >= 16 ? 8 : 4);
 	// The finals' nights: group matchdays 1 and 2 at the first break, 3 and the quarter-finals at the second, the rest at the last.
@@ -7501,7 +7507,7 @@
 	const intlNone = season => ({ v: 1, season, none: true });
 	// The qualifying draw: pots by strength, one from each pot into each group.
 	function drawQualifiers (lg) {
-		const list = nationSquads(lg).map(s => s.nat), N = list.length, G = Math.max(1, Math.floor(N / (N >= 20 ? 5 : 4)));
+		const tour = intlTourOf(lg.season), list = intlPoolNats(tour, lg), N = list.length, G = Math.max(1, Math.floor(N / (N >= 20 ? 5 : 4)));
 		const groups = Array.from({ length: G }, () => []);
 		for (let k = 0; k < N; k += G) {
 			const pot = shuffle(list.slice(k, k + G)), order = shuffle(groups.map((g, i) => i)).sort((a, b) => groups[a].length - groups[b].length);
@@ -7512,19 +7518,19 @@
 			const rr = roundRobin(grp.length % 2 ? [ ...grp, null ] : grp.slice());
 			rr.slice(0, INTL_GROUP_NIGHTS.length).forEach((pairs, n) => { for (const [ h, a ] of pairs) { if (h && a) { games.push({ h, a, n, grp: gi }); } } });
 		});
-		return { v: 1, season: lg.season, kind: "q", groups, games, nights: INTL_GROUP_NIGHTS.map((r, k) => ({ r, md: k + 1 })), night: 0, done: false, qualified: [], qn: intlFinalsSize(N) };
+		return { v: 1, season: lg.season, kind: "q", groups, games, nights: INTL_GROUP_NIGHTS.map((r, k) => ({ r, md: k + 1 })), night: 0, done: false, qualified: [], qn: intlFinalsSize(N), tour };
 	}
 	// The finals: last season's qualifiers if there were any (an old save: the strongest), seeded by strength into
 	// pots of one per group, groups of four; the top two of each go on, winners against another group's runners-up.
 	function drawTournament (lg, I) {
-		const str = nat => intlStr(nat, lg), T = intlFinalsSize(nationSquads(lg).length);
-		let teams = I && I.next && I.next.season === lg.season && [ 4, 8, 16 ].includes(I.next.nats.length) ? I.next.nats.slice() : nationSquads(lg).slice(0, T).map(s => s.nat);
+		const str = nat => intlStr(nat, lg), tour = intlTourOf(lg.season), pool = intlPoolNats(tour, lg), T = intlFinalsSize(pool.length);
+		let teams = I && I.next && I.next.season === lg.season && [ 4, 8, 16 ].includes(I.next.nats.length) ? I.next.nats.slice() : pool.slice(0, T);
 		teams = teams.sort((a, b) => str(b) - str(a));
 		const G = teams.length / 4, groups = Array.from({ length: G }, () => []);
 		for (let k = 0; k < 4; k++) { shuffle(teams.slice(k * G, k * G + G)).forEach((nat, j) => groups[j].push(nat)); }
 		const games = [];
 		groups.forEach((grp, gi) => roundRobin(grp.slice()).forEach((pairs, n) => { for (const [ h, a ] of pairs) { games.push({ h, a, n, grp: gi, neutral: true }); } }));
-		return { v: 1, season: lg.season, kind: "t", teams, groups, games, nights: intlFinalsNights(teams.length), night: 0, done: false, winner: null };
+		return { v: 1, season: lg.season, kind: "t", tour, teams, groups, games, nights: intlFinalsNights(teams.length), night: 0, done: false, winner: null };
 	}
 	const drawIntl = (lg, I) => (lg.season % 2 ? drawQualifiers(lg) : drawTournament(lg, I));
 	// lg.intl: versioned and optional. An older save gets no national job and no breaks until next season.
@@ -7561,8 +7567,8 @@
 		ensureIntl(lg);
 		lg.intl.comp = drawIntl(lg, lg.intl);
 		const C = lg.intl.comp, me = lg.intl.nat;
-		if (C.kind === "q") { lg.news = `${lg.news || ""} International qualifiers this season: breaks after matchdays 9, 20 and 30.${me ? ` ${natName(me)} are in Group ${groupLetter(C.groups.findIndex(g => g.includes(me)))}.` : ""}`.trim(); }
-		else { lg.news = `${lg.news || ""} The ${INTL_TOURNEY} is played over the breaks after matchdays 9, 20 and 30: ${C.teams.length} countries in groups of four, then knockouts. ${C.teams.map(natName).join(", ")}.${me ? (C.teams.includes(me) ? ` ${natName(me)} are in it.` : ` ${natName(me)} didn't qualify.`) : ""}`.trim(); }
+		if (C.kind === "q") { lg.news = `${lg.news || ""} Qualifiers for the ${INTL_TOURS[C.tour]} this season: breaks after matchdays 9, 20 and 30.${me ? ` ${natName(me)} are in Group ${groupLetter(C.groups.findIndex(g => g.includes(me)))}.` : ""}`.trim(); }
+		else { lg.news = `${lg.news || ""} The ${tn(C)} is played over the breaks after matchdays 9, 20 and 30: ${C.teams.length} countries in groups of four, then knockouts. ${C.teams.map(natName).join(", ")}.${me ? (C.teams.includes(me) ? ` ${natName(me)} are in it.` : ` ${natName(me)} didn't qualify.`) : ""}`.trim(); }
 	}
 	// A game played out from the two squads' strength; a knockout tie level after ninety minutes goes to extra time, then penalties.
 	function intlPlay (g, lg = league) {
@@ -7615,8 +7621,9 @@
 			if (k !== C.nights.length - 1) { return; }
 			C.qualified = intlQualified(C); C.done = true;
 			I.next = { season: C.season + 1, nats: C.qualified.slice() };
-			news.push(`International qualifying is over: ${C.qualified.map(natName).join(", ")} go to next season's ${INTL_TOURNEY}.`);
-			if (me) {
+			news.push(`International qualifying is over: ${C.qualified.map(natName).join(", ")} go to next season's ${tn(C)}.`);
+			if (me && C.tour === "eu" && !inEurope(me)) { news.push(`${natName(me)} are not a European side: there is no ${tn(C)} for them.`); }
+			else if (me) {
 				if (C.qualified.includes(me)) { I.missed = 0; news.push(`${natName(me)} are through.`); }
 				else {
 					I.missed = (I.missed || 0) + 1;
@@ -7634,16 +7641,16 @@
 				for (const [ h, a ] of ties) { C.games.push({ h, a, n: k + 1, stage: nextStage, neutral: true }); }
 				if (me) {
 					const mg = C.groups.findIndex(g => g.includes(me)), pos = mg < 0 ? 0 : tabs[mg].findIndex(r => r.nat === me) + 1;
-					if (pos) { news.push(pos <= 2 ? `${natName(me)} finished ${ordinal(pos)} in Group ${groupLetter(mg)} and go through to the ${INTL_KO[nextStage].toLowerCase()}s.` : `${natName(me)} finished ${ordinal(pos)} in Group ${groupLetter(mg)} and are out of the ${INTL_TOURNEY}.`); }
+					if (pos) { news.push(pos <= 2 ? `${natName(me)} finished ${ordinal(pos)} in Group ${groupLetter(mg)} and go through to the ${INTL_KO[nextStage].toLowerCase()}s.` : `${natName(me)} finished ${ordinal(pos)} in Group ${groupLetter(mg)} and are out of the ${tn(C)}.`); }
 				}
-				news.push(`${INTL_TOURNEY} groups are over: ${[ ...W, ...R ].map(natName).join(", ")} go through.`);
+				news.push(`${tn(C)} groups are over: ${[ ...W, ...R ].map(natName).join(", ")} go through.`);
 			} else if (stage === "f") {
 				C.winner = wins[0]; C.done = true;
-				news.push(`${INTL_TOURNEY} final: ${intlScore(games[0])}. ${natName(C.winner)} are the winners.`);
-				if (me && C.winner === me) { news.push(`You've won the ${INTL_TOURNEY} with ${natName(me)}!`); if (typeof queueTrophy === "function") { queueTrophy(INTL_TOURNEY); } }
+				news.push(`${tn(C)} final: ${intlScore(games[0])}. ${natName(C.winner)} are the winners.`);
+				if (me && C.winner === me) { news.push(`You've won the ${tn(C)} with ${natName(me)}!`); if (typeof queueTrophy === "function") { queueTrophy(tn(C)); } }
 			} else {
 				for (let j = 0; j + 1 < wins.length; j += 2) { C.games.push({ h: wins[j], a: wins[j + 1], n: k + 1, stage: nextStage, neutral: true }); }
-				if (me && games.some(g => g.h === me || g.a === me)) { news.push(wins.includes(me) ? `${natName(me)} are into the ${INTL_KO[nextStage].toLowerCase()}${nextStage === "sf" ? "s" : ""}.` : `${natName(me)} are out of the ${INTL_TOURNEY}.`); }
+				if (me && games.some(g => g.h === me || g.a === me)) { news.push(wins.includes(me) ? `${natName(me)} are into the ${INTL_KO[nextStage].toLowerCase()}${nextStage === "sf" ? "s" : ""}.` : `${natName(me)} are out of the ${tn(C)}.`); }
 			}
 		}
 		if (news.length) { lg.news = `${lg.news || ""} ${news.join(" ")}`.trim(); }
@@ -7661,7 +7668,7 @@
 			intlAdvance(lg, C, k);
 		}
 	}
-	const intlLabel = (C, g) => (C.kind === "q" ? `International · Qualifier, Group ${groupLetter(g.grp)}` : g.stage ? `International · ${INTL_KO[g.stage]}` : `International · ${INTL_TOURNEY}, Group ${groupLetter(g.grp)}`);
+	const intlLabel = (C, g) => (C.kind === "q" ? `International · Qualifier, Group ${groupLetter(g.grp)}` : g.stage ? `International · ${INTL_KO[g.stage]}` : `International · ${tn(C)}, Group ${groupLetter(g.grp)}`);
 	// Your next game as a fixture (see currentFixture, 14): the other country borrows the guest seat.
 	function intlFixture () {
 		const lg = league, C = intlComp(lg), gi = intlMine(lg, C);
@@ -7842,17 +7849,18 @@
 		const C = intlComp(lg), I = lg.intl, me = I.nat;
 		if (!C || C.none) { return "No internationals this season: the breaks start again next season."; }
 		if (C.done) {
-			if (C.kind === "q") { return `Qualifying over: ${C.qualified.map(natName).join(", ")} go to next season's ${INTL_TOURNEY}.${me ? (C.qualified.includes(me) ? ` ${natName(me)} are through.` : ` ${natName(me)} missed out.`) : ""}`; }
-			return `${natName(C.winner)} won the ${INTL_TOURNEY}.${me && C.winner === me ? " That's your side!" : ""}`;
+			if (C.kind === "q") { return `Qualifying over: ${C.qualified.map(natName).join(", ")} go to next season's ${tn(C)}.${me ? (C.qualified.includes(me) ? ` ${natName(me)} are through.` : ` ${natName(me)} missed out.`) : ""}`; }
+			return `${natName(C.winner)} won the ${tn(C)}.${me && C.winner === me ? " That's your side!" : ""}`;
 		}
+		if (me && C.kind === "q" && C.tour === "eu" && !inEurope(me)) { return `No ${tn(C)} for ${natName(me)} this season: it is for European countries. The breaks pass without a game for you.`; }
 		const night = C.nights[C.night], gi = me ? C.games.findIndex(g => g.n === C.night && g.hg === undefined && (g.h === me || g.a === me)) : -1;
 		const now = night.r <= lg.round, when = now ? "International break now" : `International break after matchday ${night.r}`;
 		if (gi >= 0) {
 			const g = C.games[gi], opp = g.h === me ? g.a : g.h;
-			return `${when}: ${C.kind === "q" ? `qualifier v ${natName(opp)} (Group ${groupLetter(g.grp)}), ${g.neutral ? "neutral ground" : g.h === me ? "at home" : "away"}` : `${g.stage ? INTL_KO[g.stage].toLowerCase() : `${INTL_TOURNEY} group ${groupLetter(g.grp)}`} v ${natName(opp)}, neutral ground`}.`;
+			return `${when}: ${C.kind === "q" ? `qualifier v ${natName(opp)} (Group ${groupLetter(g.grp)}), ${g.neutral ? "neutral ground" : g.h === me ? "at home" : "away"}` : `${g.stage ? INTL_KO[g.stage].toLowerCase() : `${tn(C)} group ${groupLetter(g.grp)}`} v ${natName(opp)}, neutral ground`}.`;
 		}
 		const out = me && C.kind === "t" && !C.games.some(g => g.n >= C.night && (g.h === me || g.a === me)) ? ` ${natName(me)} ${C.teams.includes(me) ? "are out" : "aren't in it"}.` : "";
-		return `${when}: ${C.kind === "q" ? `qualifiers, group matchday ${night.md}` : `the ${INTL_TOURNEY}, ${night.stage === "g" ? `group matchday ${night.md}` : `${INTL_KO[night.stage].toLowerCase()}${night.stage === "f" ? "" : "s"}`}`}.${out}`;
+		return `${when}: ${C.kind === "q" ? `qualifiers, group matchday ${night.md}` : `the ${tn(C)}, ${night.stage === "g" ? `group matchday ${night.md}` : `${INTL_KO[night.stage].toLowerCase()}${night.stage === "f" ? "" : "s"}`}`}.${out}`;
 	}
 	function renderIntl (box) {
 		const lg = league, C = intlComp(lg);
@@ -7877,7 +7885,7 @@
 				});
 				grid.append(t);
 			}
-			d.append(grid, el("p", "detail", `Group winners, then the best runners-up and thirds (on points a game), fill the ${C.qn || 8} places in next season's ${INTL_TOURNEY}.`));
+			d.append(grid, el("p", "detail", `Group winners, then the best runners-up and thirds (on points a game), fill the ${C.qn || 8} places in next season's ${tn(C)}.`));
 			card.append(d);
 			const lastN = C.night - 1, played = C.games.filter(g => g.hg !== undefined && (g.n === lastN || (me && (g.h === me || g.a === me))));
 			if (played.length) {
@@ -7889,7 +7897,7 @@
 			}
 		} else if (!C.none) {
 			const d = el("details"); d.open = true;
-			d.append(el("summary", "", INTL_TOURNEY));
+			d.append(el("summary", "", tn(C)));
 			if (C.groups) {
 				const mg = me ? C.groups.findIndex(g => g.includes(me)) : -1, grid = el("div", "intl-groups");
 				for (const gi of C.groups.map((g, i) => i).sort((a, b) => (b === mg) - (a === mg))) {
