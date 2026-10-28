@@ -1,7 +1,8 @@
 # National teams and international jobs: design note
 
-Status: Phase A built (section 1 and a read-only Nations card on the Cups tab: `src/game/18j-national-teams.js`,
-`tests/intl.mjs`). Phases B (section 2, the job) and C (section 3 onward, breaks and fixtures) are not built yet.
+Status: Phases A, B and C built (sections 1 to 4: `src/game/18j-national-teams.js`, hooks in 07, 14, 17, 18, 18b,
+18d, 18e, 18f, 18g, 21, 30, 31, 35 and 42, tests in `tests/intl.mjs`). As-built notes and the calls made where this
+plan was ambiguous or did not fit the code are in section 6.
 This note is the plan, so the work can be picked up in its own session.
 Generic data only: country codes and names from `NATIONS` (05). There are no real people, and
 national managers' names are generated the same way club staff names are.
@@ -85,3 +86,62 @@ national managers' names are generated the same way club staff names are.
 3. The job: offers, accept or decline, resign.
 4. Playing your national side's match through the guest path.
 5. UI polish: Overview line, Squad tab card, Help text.
+
+## 6. As built (Phases B and C)
+
+Calls made where the plan above did not fit the code, smallest change each time:
+
+- **The second break is after matchday 20, not 21.** `CC_NIGHTS` has the continental knockout play-off's
+  first leg after matchday 21, so 21 would put a continental night and a break on the same evening. 20 is
+  clear of both lists (and of the January window at 19). Breaks: 9, 20, 30.
+- **Qualifying is one round-robin over five nights**, two at each of the first two breaks and one at the
+  last. Groups of 5 or 6 need five rounds for a single round-robin (a group of five has a bye each night);
+  a double round-robin would need ten nights, more than three breaks hold. All countries take part (those
+  short of players are filled with uncapped players, as in section 1). With 32 countries that is six
+  groups, 6, 6, 5, 5, 5, 5.
+- **Best runners-up are ranked on points a game** (then goal difference and goals a game), since the
+  groups differ in size. Six winners plus the two best runners-up make the eight.
+- **The tournament's eight** are last season's qualifiers (`lg.intl.next`). With none stored (an old save,
+  or a career that moved abroad and restarted its season count) the eight strongest squads play.
+  Seeded by strength 1v8, 4v5, 2v7, 3v6, all at neutral grounds.
+- **State.** `lg.intl = { v: 1, nat, offers, record, season, missed, rest, next, comp }`. `comp` is the
+  season's competition (groups, games, nights; or the bracket). `league.v` is unchanged; `lg.intl` is
+  checked on load by `ensureIntl` (07 `ensureClub`), and anything that doesn't check out is dropped: a bad
+  country code loses the job, a damaged competition becomes "no breaks this season".
+- **"Your nationality"** for the offer weighting is the home country (`HOME_NAT`): there is no
+  manager nationality in the save, and every career starts at home.
+- **Reputation** for the offer is `yourStr()` plus a little for a top-four finish (less for the bottom
+  three), for winning the League Cup or the continental cup, and for seasons managed, capped at 1..5.
+  An offer comes after about 60% of seasons in the top half, 30% otherwise.
+- **"A club in another country"** is read as any move abroad (`moveAbroad`, a change of league country).
+  Pressing Move abroad while you hold a national job puts an FA card in the offers list: take the club
+  job (the national job ends) or stay (the club offer is turned down). A move agreed with your agent in
+  January has already been chosen, so it ends the national job without asking.
+- **Your side's identity.** The guest seat only covers the opponent, so for your national kit, name and
+  ground `YOU` is swapped in `newMatch` (never in `currentFixture`, which the panels call all the time)
+  and restored at the start of every `newMatch`, when the result is recorded, and before
+  `rememberIdentity`. `YOU.short` stays "You". The swap is in memory only: a reload rebuilds `YOU` from
+  the save and swaps again if the international is still next.
+- **`matchSquad()`** is read where match code used `league.club`: `applySquad` (18), the formation
+  change (21), the substitutes (30), the late auto-substitution (17) and the captain (42). The opponent's
+  eleven is that country's picked eleven, not the guest seat's generated one. `simulateMine` uses the
+  national side's strength.
+- **No club bookkeeping on international duty.** An international doesn't advance the league round,
+  tick injuries or bans, pay wages, change morale or form, or count goals, appearances or cards for your
+  club. Your own club's players who play lose fitness as a league start would cost them (by object, not
+  by name, so a namesake elsewhere is never charged). Your own injured or banned players are not called up.
+  Your club's upgrades and staff don't apply to the national side. The half-time team talk is skipped.
+- **Squad picking** is Auto-pick (the best available) with "Leave out" and "Recall" for your own
+  club's players (`lg.intl.rest`); Auto-pick clears the list. Other clubs' players can't be left out.
+- **National managers' names** (shown on the matchday card for the other country) come from the staff
+  first names (17) and player surnames (04), hashed from the country code.
+- **Option file `nations`**: `{ "ITA": { "color", "color2", "ground" } }`, checked with the same colour
+  and text rules as a club (18g `checkNationFields`); unknown codes and bad values are skipped and counted
+  in the preview. Kept in the save's edits, exported with them, and in `docs/option-file-schema.json`.
+
+Known limits:
+
+- The match report after an international can name the guest seat's own club in the stats header, as
+  the continental cup's does, because the guest is restored when the result is recorded.
+- Edit-mode changes to computer players are not seen by the national squads until the cache rebuilds
+  (section 1's limit still applies).
