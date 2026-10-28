@@ -193,6 +193,21 @@
 		return card;
 	}
 
+	// The Any club search: name, position, minimum rating, club and maximum price; Search applies them.
+	function searchForm () {
+		const mk = (label, node) => { const l = el("label", "mk-f", label + " "); l.append(node); return l; };
+		const name = el("input"); name.type = "search"; name.placeholder = "Any name"; name.value = mkQ.name; name.setAttribute("aria-label", "Player name"); name.id = "mkqName";
+		const pos = el("select"); pos.id = "mkqPos"; for (const [ v, t ] of [ [ "", "Any" ], ...Object.entries(POS_LABEL) ]) { const o = el("option", "", t); o.value = v; pos.append(o); } pos.value = mkQ.pos;
+		const min = el("input"); min.type = "number"; min.min = "0"; min.max = "99"; min.value = mkQ.min || ""; min.placeholder = "0"; min.id = "mkqMin";
+		const club = el("select"); club.id = "mkqClub"; { const o = el("option", "", "Any club"); o.value = ""; club.append(o); for (const id of league.members) { if (id !== 0 && TEAMS[id]) { const x = el("option", "", TEAMS[id].name); x.value = String(id); club.append(x); } } } club.value = String(mkQ.club);
+		const max = el("input"); max.type = "number"; max.min = "0"; max.step = "0.1"; max.value = mkQ.max || ""; max.placeholder = "No limit"; max.id = "mkqMax";
+		const go = el("button", "", "Search"); go.type = "button"; go.id = "mkqGo";
+		const apply = () => { mkQ.name = name.value; mkQ.pos = pos.value; mkQ.min = Number(min.value) || 0; mkQ.club = club.value; mkQ.max = Number(max.value) || 0; renderClub(); };
+		go.addEventListener("click", apply);
+		for (const x of [ name, min, max ]) { x.addEventListener("keydown", e => { if (e.key === "Enter") { apply(); } }); }
+		for (const x of [ pos, club ]) { x.addEventListener("change", apply); }
+		return [ mk("Name", name), mk("Position", pos), mk("Min rating", min), mk("Club", club), mk("Max price (M)", max), go ];
+	}
 	function renderClub () {
 		const c = league.club;
 		const open = windowOpen(), five = league.fmt !== "11", used = slotsFor(league.fmt), capt = clubCaptain(c);
@@ -300,7 +315,7 @@
 		const tabs = $("mkTabs");
 		tabs.replaceChildren();
 		tabs.hidden = !open;
-		for (const [ key, m ] of [ [ "foryou", { label: "For you" } ], [ "all", { label: "All" } ], ...Object.entries(MARKETS) ]) {
+		for (const [ key, m ] of [ [ "foryou", { label: "For you" } ], [ "all", { label: "All" } ], ...Object.entries(MARKETS), [ "search", { label: "Any club" } ] ]) {
 			const b = el("button", "", m.label); b.type = "button"; b.setAttribute("aria-pressed", String(mkTab === key));
 			b.addEventListener("click", () => { mkTab = key; renderClub(); });
 			tabs.append(b);
@@ -318,7 +333,27 @@
 			sc.disabled = !(c.scoutLeft > 0) || !assistShortlist(c).some(x => x.est); sc.addEventListener("click", () => scoutShortlist());
 			acts.append(buy, sc);
 		}
-		const entries = shortlist ? shortlist.map(x => [ c.market[x.i], x.i, x ]) : c.market.map((pl, i) => [ pl, i, null ]).filter(([ pl ]) => mkTab === "all" || (pl.region || "home") === mkTab);
+		if (open && mkTab === "search") {
+			acts.append(...searchForm());
+			const res = searchAnyClub(mkQ), canBuy = open && c.budget >= 0;
+			res.slice(0, SEARCH_SHOW).forEach(r => {
+				const pl = r.pl, held = r.held, ok = !held || held.bids === undefined || held.bids >= 0, li = el("li");
+				const tgt = signingTarget(pl.pos), out = tgt.out;
+				li.append(el("span", "pos", POS_LABEL[pl.pos]), el("span", "who", `${pl.name} · ${pl.age} · ${pl.nat}`));
+				const btns = el("span", "bids"), low = round1(r.ask * 0.8);
+				const b = el("button", "", `Bid ${money(r.ask)}`); b.type = "button"; b.disabled = !canBuy || !ok || c.budget + 1e-9 < r.ask;
+				b.addEventListener("click", () => bidAnyClub(r, false));
+				const b2 = el("button", "", `Offer ${money(low)}`); b2.type = "button"; b2.disabled = !canBuy || !ok || c.budget + 1e-9 < low; b2.title = "A cheeky bid: they may accept, or turn it down and raise the price";
+				b2.addEventListener("click", () => bidAnyClub(r, true));
+				btns.append(b, b2); li.append(btns);
+				li.append(el("span", "ratings", `OVR ${ovrOf(pl)} · PAC ${pl.pac} SHO ${pl.sho} PAS ${pl.pas} DEF ${pl.def}`));
+				li.append(el("span", "swap", `${TEAMS[r.id].name}${ok ? "" : " · talks broken off"}`));
+				li.append(el("span", "swap", out ? `Replaces ${out.name} (${ovrNow(out)}), sold for ${money(round1(priceOf(out) * 0.5))}` : "Joins your bench"));
+				mk.append(li);
+			});
+			const li = el("li"); li.append(el("span", "swap", res.length ? `${res.length} player${res.length === 1 ? "" : "s"} found${res.length > SEARCH_SHOW ? `: showing the best ${SEARCH_SHOW}, narrow the search to see the rest` : ""}.` : "Nobody matches: loosen the filters.")); mk.append(li);
+		}
+		const entries = mkTab === "search" ? [] : shortlist ? shortlist.map(x => [ c.market[x.i], x.i, x ]) : c.market.map((pl, i) => [ pl, i, null ]).filter(([ pl ]) => mkTab === "all" || (pl.region || "home") === mkTab);
 		entries.forEach(([ pl, i, pick ]) => {
 			ensurePlayer(pl);
 			const ask = askOf(pl), tgt = signingTarget(pl.pos), out = tgt.out, rr = ratingRange(pl), ok = permitOk(pl), talks = pl.bids >= 0 || pl.bids === undefined;
@@ -341,7 +376,7 @@
 			if (pick) { li.append(el("span", "swap gain", `+${pick.gain} on ${pick.weak.name} (${pick.weakOvr})${pick.est ? " by the estimate: scout him to be sure" : ""}`)); }
 			mk.append(li);
 		});
-		if (open && !entries.length) { const li = el("li"); li.append(el("span", "swap", shortlist ? "Nobody on the list would improve the eleven right now: try the other tabs, or wait for the next window." : "Nobody left on the list this window.")); mk.append(li); }
+		if (open && mkTab !== "search" && !entries.length) { const li = el("li"); li.append(el("span", "swap", shortlist ? "Nobody on the list would improve the eleven right now: try the other tabs, or wait for the next window." : "Nobody left on the list this window.")); mk.append(li); }
 
 		renderCoaching();
 		renderBids();

@@ -1386,6 +1386,8 @@
 		.mc-toggle { top: 40px; padding: 3px 8px; font-size: 11px; }
 		.mc { top: 68px; right: 6px; width: min(240px, 64%); max-height: calc(100% - 84px); font-size: 12px; }
 	}
+	.mk-f { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; }
+	.mk-f input { width: 90px; }
 </style>
 
 <main class="wrap">
@@ -3400,6 +3402,21 @@
 		return card;
 	}
 
+	// The Any club search: name, position, minimum rating, club and maximum price; Search applies them.
+	function searchForm () {
+		const mk = (label, node) => { const l = el("label", "mk-f", label + " "); l.append(node); return l; };
+		const name = el("input"); name.type = "search"; name.placeholder = "Any name"; name.value = mkQ.name; name.setAttribute("aria-label", "Player name"); name.id = "mkqName";
+		const pos = el("select"); pos.id = "mkqPos"; for (const [ v, t ] of [ [ "", "Any" ], ...Object.entries(POS_LABEL) ]) { const o = el("option", "", t); o.value = v; pos.append(o); } pos.value = mkQ.pos;
+		const min = el("input"); min.type = "number"; min.min = "0"; min.max = "99"; min.value = mkQ.min || ""; min.placeholder = "0"; min.id = "mkqMin";
+		const club = el("select"); club.id = "mkqClub"; { const o = el("option", "", "Any club"); o.value = ""; club.append(o); for (const id of league.members) { if (id !== 0 && TEAMS[id]) { const x = el("option", "", TEAMS[id].name); x.value = String(id); club.append(x); } } } club.value = String(mkQ.club);
+		const max = el("input"); max.type = "number"; max.min = "0"; max.step = "0.1"; max.value = mkQ.max || ""; max.placeholder = "No limit"; max.id = "mkqMax";
+		const go = el("button", "", "Search"); go.type = "button"; go.id = "mkqGo";
+		const apply = () => { mkQ.name = name.value; mkQ.pos = pos.value; mkQ.min = Number(min.value) || 0; mkQ.club = club.value; mkQ.max = Number(max.value) || 0; renderClub(); };
+		go.addEventListener("click", apply);
+		for (const x of [ name, min, max ]) { x.addEventListener("keydown", e => { if (e.key === "Enter") { apply(); } }); }
+		for (const x of [ pos, club ]) { x.addEventListener("change", apply); }
+		return [ mk("Name", name), mk("Position", pos), mk("Min rating", min), mk("Club", club), mk("Max price (M)", max), go ];
+	}
 	function renderClub () {
 		const c = league.club;
 		const open = windowOpen(), five = league.fmt !== "11", used = slotsFor(league.fmt), capt = clubCaptain(c);
@@ -3507,7 +3524,7 @@
 		const tabs = $("mkTabs");
 		tabs.replaceChildren();
 		tabs.hidden = !open;
-		for (const [ key, m ] of [ [ "foryou", { label: "For you" } ], [ "all", { label: "All" } ], ...Object.entries(MARKETS) ]) {
+		for (const [ key, m ] of [ [ "foryou", { label: "For you" } ], [ "all", { label: "All" } ], ...Object.entries(MARKETS), [ "search", { label: "Any club" } ] ]) {
 			const b = el("button", "", m.label); b.type = "button"; b.setAttribute("aria-pressed", String(mkTab === key));
 			b.addEventListener("click", () => { mkTab = key; renderClub(); });
 			tabs.append(b);
@@ -3525,7 +3542,27 @@
 			sc.disabled = !(c.scoutLeft > 0) || !assistShortlist(c).some(x => x.est); sc.addEventListener("click", () => scoutShortlist());
 			acts.append(buy, sc);
 		}
-		const entries = shortlist ? shortlist.map(x => [ c.market[x.i], x.i, x ]) : c.market.map((pl, i) => [ pl, i, null ]).filter(([ pl ]) => mkTab === "all" || (pl.region || "home") === mkTab);
+		if (open && mkTab === "search") {
+			acts.append(...searchForm());
+			const res = searchAnyClub(mkQ), canBuy = open && c.budget >= 0;
+			res.slice(0, SEARCH_SHOW).forEach(r => {
+				const pl = r.pl, held = r.held, ok = !held || held.bids === undefined || held.bids >= 0, li = el("li");
+				const tgt = signingTarget(pl.pos), out = tgt.out;
+				li.append(el("span", "pos", POS_LABEL[pl.pos]), el("span", "who", `${pl.name} · ${pl.age} · ${pl.nat}`));
+				const btns = el("span", "bids"), low = round1(r.ask * 0.8);
+				const b = el("button", "", `Bid ${money(r.ask)}`); b.type = "button"; b.disabled = !canBuy || !ok || c.budget + 1e-9 < r.ask;
+				b.addEventListener("click", () => bidAnyClub(r, false));
+				const b2 = el("button", "", `Offer ${money(low)}`); b2.type = "button"; b2.disabled = !canBuy || !ok || c.budget + 1e-9 < low; b2.title = "A cheeky bid: they may accept, or turn it down and raise the price";
+				b2.addEventListener("click", () => bidAnyClub(r, true));
+				btns.append(b, b2); li.append(btns);
+				li.append(el("span", "ratings", `OVR ${ovrOf(pl)} · PAC ${pl.pac} SHO ${pl.sho} PAS ${pl.pas} DEF ${pl.def}`));
+				li.append(el("span", "swap", `${TEAMS[r.id].name}${ok ? "" : " · talks broken off"}`));
+				li.append(el("span", "swap", out ? `Replaces ${out.name} (${ovrNow(out)}), sold for ${money(round1(priceOf(out) * 0.5))}` : "Joins your bench"));
+				mk.append(li);
+			});
+			const li = el("li"); li.append(el("span", "swap", res.length ? `${res.length} player${res.length === 1 ? "" : "s"} found${res.length > SEARCH_SHOW ? `: showing the best ${SEARCH_SHOW}, narrow the search to see the rest` : ""}.` : "Nobody matches: loosen the filters.")); mk.append(li);
+		}
+		const entries = mkTab === "search" ? [] : shortlist ? shortlist.map(x => [ c.market[x.i], x.i, x ]) : c.market.map((pl, i) => [ pl, i, null ]).filter(([ pl ]) => mkTab === "all" || (pl.region || "home") === mkTab);
 		entries.forEach(([ pl, i, pick ]) => {
 			ensurePlayer(pl);
 			const ask = askOf(pl), tgt = signingTarget(pl.pos), out = tgt.out, rr = ratingRange(pl), ok = permitOk(pl), talks = pl.bids >= 0 || pl.bids === undefined;
@@ -3548,7 +3585,7 @@
 			if (pick) { li.append(el("span", "swap gain", `+${pick.gain} on ${pick.weak.name} (${pick.weakOvr})${pick.est ? " by the estimate: scout him to be sure" : ""}`)); }
 			mk.append(li);
 		});
-		if (open && !entries.length) { const li = el("li"); li.append(el("span", "swap", shortlist ? "Nobody on the list would improve the eleven right now: try the other tabs, or wait for the next window." : "Nobody left on the list this window.")); mk.append(li); }
+		if (open && mkTab !== "search" && !entries.length) { const li = el("li"); li.append(el("span", "swap", shortlist ? "Nobody on the list would improve the eleven right now: try the other tabs, or wait for the next window." : "Nobody left on the list this window.")); mk.append(li); }
 
 		renderCoaching();
 		renderBids();
@@ -4000,6 +4037,40 @@
 		}
 		signPlayer(i, offer);
 	}
+	// Buy from any club: the transfers screen can search every computer club's eleven. A player found there
+	// joins your market list (priced a fifth over his value, from his club) so the same bid, cheeky offer
+	// and refusal rules apply; when you sign him his club replaces him from its own pool.
+	const mkQ = { name: "", pos: "", min: 0, club: "", max: 0 };
+	const SEARCH_SHOW = 25;
+	function searchAnyClub (q) {
+		const out = [], name = (q.name || "").trim().toLowerCase();
+		for (const id of league.members) {
+			if (id === 0 || !TEAMS[id] || (q.club !== "" && String(id) !== String(q.club))) { continue; }
+			cpuSquad(id, getStr(id)).forEach((pl, slot) => {
+				if (!pl || (name && !pl.name.toLowerCase().includes(name)) || (q.pos && pl.pos !== q.pos) || ovrOf(pl) < (q.min || 0)) { return; }
+				const held = league.club.market.find(m => m.name === pl.name && m.cpuClub === id), ask = held ? askOf(held) : round1(priceOf(pl) * 1.2);
+				if (q.max > 0 && ask > q.max + 1e-9) { return; }
+				out.push({ id, slot, pl, ask, held });
+			});
+		}
+		return out.sort((a, b) => ovrOf(b.pl) - ovrOf(a.pl) || a.ask - b.ask);
+	}
+	function bidAnyClub (r, low) {
+		const c = league.club;
+		if (!windowOpen()) { return; }
+		let i = c.market.findIndex(m => m.name === r.pl.name && m.cpuClub === r.id);
+		if (i < 0) { c.market.push({ ...r.pl, from: TEAMS[r.id].name, ask: r.ask, cpuClub: r.id, cpuSlot: r.slot }); i = c.market.length - 1; }
+		bidFor(i, low);
+	}
+	// His club fills the gap with a younger man of a similar level, and keeps him all season.
+	function backfillCpu (id, slot) {
+		const lg = league, old = cpuSquad(id, getStr(id))[slot], nat = clubNat(id);
+		const pl = genPlayer(old.pos, clamp(ovrOf(old) - 3, 50, 92), null, Math.random, { lg: nat }), keep = { name: pl.name, pos: pl.pos, pac: pl.pac, sho: pl.sho, pas: pl.pas, def: pl.def, age: pl.age, nat: pl.nat };
+		for (const k of [ "dri", "phy" ]) { if (Number.isFinite(pl[k])) { keep[k] = pl[k]; } }
+		lg.cpuIn = lg.cpuIn || {};
+		lg.cpuIn[id] = [ ...(lg.cpuIn[id] || []).filter(d => d.slot !== slot), { slot, pl: keep, fixed: true } ];
+	}
+	const capIn = list => [ ...list.filter(d => d.fixed), ...list.filter(d => !d.fixed).slice(-4) ];
 	function scoutPlayer (i) {
 		const c = league.club, pl = c.market[i];
 		if (!pl || pl.scouted || !(c.scoutLeft > 0)) { return; }
@@ -4017,13 +4088,16 @@
 	function signPlayer (i, offer) {
 		const c = league.club, pl = c.market[i];
 		if (!pl || !windowOpen()) { return; }
+		const cpuFrom = Number.isInteger(pl.cpuClub) ? { id: pl.cpuClub, slot: pl.cpuSlot } : null;
+		if (cpuFrom && (cpuSquad(cpuFrom.id, getStr(cpuFrom.id))[cpuFrom.slot] || {}).name !== pl.name) { c.market.splice(i, 1); lastDeal = `${pl.name} is no longer at ${TEAMS[cpuFrom.id].name}.`; afterClubChange(); return; }
 		const price = Number.isFinite(offer) ? offer : askOf(pl);
 		if (c.budget + 1e-9 < price || c.budget < 0) { return; }
 		const no = typeof signRefusal === "function" ? signRefusal(pl, c, price) : null;
 		if (no) { lastDeal = no.why; addIssue("signing", pl, no.why, { offer: no.offer }); afterClubChange(); return; }
 		const m = MARKETS[pl.region];
 		pl.adapt = m ? Math.max(0, m.adapt - staffLvl(c, "scout") * 0.5) : 0;
-		delete pl.ask; delete pl.bids; delete pl.from; delete pl.scouted;
+		delete pl.ask; delete pl.bids; delete pl.from; delete pl.scouted; delete pl.cpuClub; delete pl.cpuSlot;
+		if (cpuFrom) { backfillCpu(cpuFrom.id, cpuFrom.slot); }
 		const tgt = signingTarget(pl.pos), out = tgt.out, fee = out ? round1(priceOf(out) * 0.5) : 0;
 		c.budget = round1(c.budget - price + fee);
 		c[tgt.list][tgt.i] = pl;
@@ -4393,7 +4467,7 @@
 		if (typeof editCpuSquad === "function") { editCpuSquad(clubId, sq); }   // names edited by slot (18g)
 		// This season's signings, from the transfer windows, take their places.
 		const ins = league && league.cpuIn && league.cpuIn[clubId];
-		if (Array.isArray(ins)) { for (const d of ins) { if (d && d.pl && Number.isInteger(d.slot) && d.slot > 0 && d.slot < sq.length) { sq[d.slot] = { ...d.pl }; } } }
+		if (Array.isArray(ins)) { for (const d of ins) { if (d && d.pl && Number.isInteger(d.slot) && (d.slot > 0 || d.fixed) && d.slot < sq.length) { sq[d.slot] = { ...d.pl }; } } }
 		return sq;
 	}
 	/* ---------- the other clubs do business too ----------
@@ -4426,7 +4500,7 @@
 			const keep = { name: pl.name, pos: pl.pos, pac: pl.pac, sho: pl.sho, pas: pl.pas, def: pl.def, age: pl.age, nat: pl.nat };
 			for (const k of [ "dri", "phy" ]) { if (Number.isFinite(pl[k])) { keep[k] = pl[k]; } }
 			if (typeof carryEdits === "function") { carryEdits(pl, keep); }   // an edited player keeps his edits (18g)
-			lg.cpuIn[buyer] = [ ...(lg.cpuIn[buyer] || []).filter(d => d.slot !== slot), { slot, pl: keep } ].slice(-4);
+			lg.cpuIn[buyer] = [ ...(lg.cpuIn[buyer] || []).filter(d => d.slot !== slot), { slot, pl: keep } ]; lg.cpuIn[buyer] = capIn(lg.cpuIn[buyer]);
 			lg.clubStr[buyer] = clamp(lg.clubStr[buyer] + 0.12, 1, 5);
 			news.push(`${TEAMS[buyer].short || TEAMS[buyer].name} sign ${pl.name} (${pl.nat}, ${ovrOf(pl)}) from ${from} for ${money(fee)}`);
 		}
@@ -4453,7 +4527,7 @@
 		if (inSq >= 0) { c.squad.splice(inSq, 1); } else { c.bench.splice(inB, 1); }
 		c.budget = round1(c.budget + fee);
 		league.bidsIn = (league.bidsIn || []).filter(b => b.name !== name);
-		if (Number.isInteger(club)) { const slot = POS_OF_SLOT.indexOf(pl.pos) > 0 ? POS_OF_SLOT.indexOf(pl.pos) + Math.floor(Math.random() * 2) : 1; league.cpuIn = league.cpuIn || {}; league.cpuIn[club] = [ ...(league.cpuIn[club] || []), { slot: clamp(slot, 1, 10), pl: (typeof carryEdits === "function" ? carryEdits : (_, k) => k)(pl, { name: pl.name, pos: pl.pos, pac: pl.pac, sho: pl.sho, pas: pl.pas, def: pl.def, age: pl.age, nat: pl.nat }) } ].slice(-4); league.clubStr[club] = clamp(league.clubStr[club] + 0.1, 1, 5); }
+		if (Number.isInteger(club)) { const slot = POS_OF_SLOT.indexOf(pl.pos) > 0 ? POS_OF_SLOT.indexOf(pl.pos) + Math.floor(Math.random() * 2) : 1; league.cpuIn = league.cpuIn || {}; league.cpuIn[club] = [ ...(league.cpuIn[club] || []), { slot: clamp(slot, 1, 10), pl: (typeof carryEdits === "function" ? carryEdits : (_, k) => k)(pl, { name: pl.name, pos: pl.pos, pac: pl.pac, sho: pl.sho, pas: pl.pas, def: pl.def, age: pl.age, nat: pl.nat }) } ]; league.cpuIn[club] = capIn(league.cpuIn[club]); league.clubStr[club] = clamp(league.clubStr[club] + 0.1, 1, 5); }
 		refillSquad(c);
 		openPl = null;
 		lastDeal = `${pl.name} sold${Number.isInteger(club) ? ` to ${TEAMS[club].name}` : ""} for ${money(fee)}.`;
