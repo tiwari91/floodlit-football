@@ -7703,6 +7703,7 @@
 		I.record = Array.isArray(I.record) ? I.record.filter(r => plainObj(r) && natOk(r.nat) && natOk(r.opp) && Number.isInteger(r.gf) && Number.isInteger(r.ga)).slice(-30) : [];
 		I.missed = Number.isInteger(I.missed) ? clamp(I.missed, 0, 2) : 0;
 		I.rest = Array.isArray(I.rest) ? I.rest.filter(n => typeof n === "string").slice(0, 30) : [];
+		I.sel = Array.isArray(I.sel) ? I.sel.filter(n => typeof n === "string").slice(0, INTL_CALLUP) : [];   // the call-up: up to 23 names; empty = auto-pick
 		if (!(plainObj(I.next) && Number.isInteger(I.next.season) && Array.isArray(I.next.nats) && I.next.nats.every(natOk))) { I.next = null; }
 		if (I.ask !== undefined && typeof I.ask !== "string") { delete I.ask; }
 		I.season = lg.season;
@@ -7713,7 +7714,7 @@
 	// A new season: the job, the record and the qualifiers carry over; the offers lapse; a new draw.
 	function intlNewSeason (prev) {
 		const lg = league, P = prev && plainObj(prev.intl) && prev.intl.v === 1 ? prev.intl : null;
-		lg.intl = { v: 1, nat: P && natOk(P.nat) ? P.nat : null, offers: [], record: P && Array.isArray(P.record) ? P.record.slice(-30) : [], season: lg.season, only: !!(P && P.only === true), missed: P && Number.isInteger(P.missed) ? P.missed : 0, rest: [], next: P && P.next ? P.next : null, comp: intlNone(lg.season) };
+		lg.intl = { v: 1, nat: P && natOk(P.nat) ? P.nat : null, offers: [], record: P && Array.isArray(P.record) ? P.record.slice(-30) : [], season: lg.season, only: !!(P && P.only === true), missed: P && Number.isInteger(P.missed) ? P.missed : 0, rest: [], sel: P && Array.isArray(P.sel) ? P.sel.slice() : [], next: P && P.next ? P.next : null, comp: intlNone(lg.season) };
 		ensureIntl(lg);
 		lg.intl.comp = drawIntl(lg, lg.intl);
 		const C = lg.intl.comp, me = lg.intl.nat;
@@ -7843,8 +7844,31 @@
 	function intlCallUp (lg = league) {
 		const I = ensureIntl(lg);
 		if (!I || !I.nat) { return null; }
-		const rest = new Set(I.rest), pool = intlPool(lg).filter(e => !((e.own || I.only) && (e.pl.inj > 0 || e.pl.ban > 0 || rest.has(e.pl.name))));
+		const rest = new Set(I.rest), sel = new Set(I.sel), pool = intlPool(lg).filter(e => !((e.own || I.only) && (e.pl.inj > 0 || e.pl.ban > 0 || rest.has(e.pl.name))) && (!sel.size || e.pl.nat !== I.nat || sel.has(e.pl.name)));
 		return pickNation(I.nat, pool, lg);
+	}
+	// The call-up of 23: who of your nationality could go (best first), the auto-pick, and who is in.
+	const INTL_CALLUP = 23;
+	function intlEligible (lg = league) {
+		const I = ensureIntl(lg), seen = new Set();
+		return !I || !I.nat ? [] : intlPool(lg).filter(e => e.pl.nat === I.nat && !seen.has(e.pl.name) && seen.add(e.pl.name)).sort((a, b) => ovrOf(b.pl) - ovrOf(a.pl));
+	}
+	function intlAutoNames (lg = league) {
+		const I = ensureIntl(lg), all = intlEligible(lg), ok = e => !((e.own || I.only) && (e.pl.inj > 0 || e.pl.ban > 0)), healthy = all.filter(ok);
+		const base = pickNation(I.nat, healthy, lg), names = [ ...base.xi, ...base.bench ].filter(e => !e.gen).map(e => e.pl.name);
+		for (const e of healthy) { if (names.length >= INTL_CALLUP) { break; } if (!names.includes(e.pl.name)) { names.push(e.pl.name); } }
+		return names.slice(0, INTL_CALLUP);
+	}
+	const intlCalled = (lg = league) => { const I = ensureIntl(lg); return I && I.sel.length ? I.sel.slice() : I && I.nat ? intlAutoNames(lg) : []; };
+	function intlSelToggle (name) {
+		const I = ensureIntl(league);
+		if (!I || !I.nat) { return false; }
+		const cur = intlCalled(league);
+		if (cur.includes(name)) { I.sel = cur.filter(n => n !== name); }
+		else if (cur.length >= INTL_CALLUP) { toast(`Your squad is full: ${INTL_CALLUP} called up`, "#f2b52e"); return false; }
+		else { I.sel = [ ...cur, name ]; }
+		saveLeague(); renderIntlSquad();
+		return true;
 	}
 	const matchSquad = () => (intlSide ? intlSide.club : league && league.club);
 	function intlBegin (lm) {
@@ -7920,7 +7944,7 @@
 		const I = lg && lg.intl;
 		if (!I || !I.nat) { return; }
 		const was = I.nat;
-		I.nat = null; I.missed = 0; I.rest = []; delete I.ask;
+		I.nat = null; I.missed = 0; I.rest = []; I.sel = []; delete I.ask;
 		if (why === "club") { I.only = false; }   // a club job is next: the country job is over and so is any time without a club
 		if (lg.contGuest && lg.contGuest.intl) { restoreGuest(lg); }
 		if (why === "resigned") { lg.news = `${lg.news || ""} You resigned as ${natName(was)} manager.`.trim(); }
@@ -7932,7 +7956,7 @@
 		const lg = league, I = ensureIntl(lg), o = I && I.offers.find(x => x.nat === nat);
 		if (!o || I.nat) { return false; }
 		const club = clubName();
-		I.nat = nat; I.only = true; I.offers = []; I.missed = 0; I.rest = [];
+		I.nat = nat; I.only = true; I.offers = []; I.missed = 0; I.rest = []; I.sel = [];
 		lg.career = { ...(lg.career || { history: [] }), clubs: [ ...((lg.career && lg.career.clubs) || [ club ]), `${natName(nat)} (national team)` ] };
 		lg.news = `${lg.news || ""} You left ${club} to manage ${natName(nat)} full-time. ${club} have a new manager.`.trim();
 		lastDeal = `You left ${club} and are the new ${natName(nat)} manager. The league carries on without you; you play the internationals.`;
@@ -8143,7 +8167,7 @@
 		I.rest = I.rest.includes(name) ? I.rest.filter(n => n !== name) : [ ...I.rest, name ];
 		saveLeague(); renderIntlSquad();
 	}
-	function intlAutoPick () { const I = ensureIntl(league); if (!I) { return; } I.rest = []; saveLeague(); renderIntlSquad(); }
+	function intlAutoPick () { const I = ensureIntl(league); if (!I) { return; } I.rest = []; I.sel = []; saveLeague(); renderIntlSquad(); }
 	function renderIntlSquad () {
 		const box = $("intlSquad");
 		if (!box) { return; }
@@ -8151,23 +8175,30 @@
 		const I = league && league.club ? ensureIntl(league) : null;
 		box.hidden = !(I && I.nat);
 		if (box.hidden) { return; }
-		const side = intlCallUp(league), auto = !I.rest.length;
+		const side = intlCallUp(league), auto = !I.sel.length && !I.rest.length;
 		const head = el("div", "sq-head");
 		head.append(el("h4", "", `International · ${natName(I.nat)}`), el("span", "lg-meta", `${stars(Math.round(side.str))} · OVR ${Math.round(side.ovr)}`));
-		const ap = el("button", "", "Auto-pick best XI"); ap.type = "button"; ap.id = "intlAuto"; ap.setAttribute("aria-pressed", String(auto)); ap.addEventListener("click", intlAutoPick);
+		const ap = el("button", "", "Auto-pick 23"); ap.type = "button"; ap.id = "intlAuto"; ap.setAttribute("aria-pressed", String(auto)); ap.addEventListener("click", intlAutoPick);
 		head.append(ap);
-		box.append(head, el("p", "win-note", `${intlNext(league)} ${auto ? "Auto-pick: the best eleven in the save by position." : "Your picks: the players you left out are below."} ${I.only ? "" : "Your club's players who play lose fitness for the next league match, as a start would cost them."}`));
+		box.append(head, el("p", "win-note", `${intlNext(league)} ${auto ? "Auto-pick: the best 23 of your nationality." : "Your own call-up."} Only the ${INTL_CALLUP} called up can play. ${I.only ? "" : "Your club's players who play lose fitness for the next league match, as a start would cost them."}`));
 		const ol = el("ol", "nat-xi"), row = (e, on) => {
 			const r = el("li", e.own ? "mine" : "");
 			r.append(el("span", "pos", POS_LABEL[e.pl.pos]), el("span", "who", `${e.pl.name} · ${ovrOf(e.pl)} · ${e.club}${e.own ? ` · fit ${Math.round(fitOf(e.pl))}%` : ""}`));
-			if (e.own || I.only) { const b = el("button", "", on ? "Leave out" : "Recall"); b.type = "button"; b.addEventListener("click", () => intlRestToggle(e.pl.name)); r.append(b); }
 			return r;
 		};
 		for (const i of slotsFor(league.fmt)) { if (side.xi[i]) { ol.append(row(side.xi[i], true)); } }
 		box.append(ol);
 		if (side.bench.length) { box.append(el("span", "eyebrow", "Bench")); const b = el("ol", "nat-xi"); for (const e of side.bench) { b.append(row(e, true)); } box.append(b); }
-		const out = I.only ? intlPool(league).filter(e => e.pl.nat === I.nat && I.rest.includes(e.pl.name)) : [ ...league.club.squad, ...league.club.bench ].filter(pl => I.rest.includes(pl.name)).map(pl => ({ pl, own: true, club: clubName() }));
-		if (out.length) { box.append(el("span", "eyebrow", "Left out")); const b = el("ol", "nat-xi"); for (const e of out) { b.append(row(e, false)); } box.append(b); }
+		const called = new Set(intlCalled(league)), sh = el("div", "intl-sel"), tbl = el("ol", "nat-xi intl-selist");
+		sh.append(el("span", "eyebrow", `Squad selection · ${called.size} of ${INTL_CALLUP} called up`));
+		for (const e of intlEligible(league)) {
+			const pl = e.pl, avg = pl.rn > 0 ? (pl.rsum / pl.rn).toFixed(1) : "-", hurt = pl.inj > 0 || pl.ban > 0, on = called.has(pl.name);
+			const r = el("li", on ? "called" : "");
+			r.append(el("span", "pos", POS_LABEL[pl.pos]), el("span", "who", `${pl.name} · ${ovrOf(pl)} · ${e.club} · form ${avg} · fit ${Math.round(fitOf(pl))}%${hurt ? (pl.inj > 0 ? " · injured" : " · banned") : ""}`));
+			const b = el("button", "", on ? "Drop" : "Call up"); b.type = "button"; b.addEventListener("click", () => intlSelToggle(pl.name)); r.append(b);
+			tbl.append(r);
+		}
+		sh.append(tbl); box.append(sh);
 	}
 	/* Country only (lg.intl.only): no club. The league season still runs; your old club is played by the computer
 	   (its matches are simulated for you), and this runs them up to your next international. */
@@ -8196,7 +8227,7 @@
 		for (const id of [ "sqBox", "transfersBox", "assistCard", "coachPanel", "clubUpgrades", "lgAcademy" ]) { const b = $(id); if (b) { b.hidden = on; } }
 		for (const id of [ "sqNoClub", "transfersNoClub", "clubNoClub" ]) { const b = $(id); if (b) { b.hidden = !on; b.textContent = note; } }
 	}
-	queueMicrotask(() => { if (window.__ff) { Object.assign(window.__ff, { intlOnlyAdvance, intlFreeOffers, intlNoClub, intlLegacy, intlLegacyChoose, renderIntlOnly, nationSquads, nationSquad, nationIdent, strOfOvr, intlPool, pickNation, renderNations, NATIONS, INTL_BREAKS, ensureIntl, intlComp, intlNight, intlFixture, intlOffers, acceptIntl, declineIntl, resignIntl, intlChoose, intlCallUp, intlGroupTable, intlQualified, intlManager, intlNext, intlNewSeason, renderIntlSquad, intlRestToggle, intlAutoPick, nameTables: { FIRST, SURNAMES }, intlRep, renderOffers, newMatchTest () { clearLive(); state = "intro"; newMatch(); renderLeague(); }, readyTest () { clearLive(); state = "intro"; banner.hidden = true; newMatch(); showIntro(); renderLeague(); } }); Object.defineProperties(window.__ff, { intlSide: { get: () => intlSide, configurable: true }, leagueMatch: { get: () => leagueMatch, configurable: true } }); } });
+	queueMicrotask(() => { if (window.__ff) { Object.assign(window.__ff, { intlOnlyAdvance, intlFreeOffers, intlNoClub, intlLegacy, intlLegacyChoose, renderIntlOnly, nationSquads, nationSquad, nationIdent, strOfOvr, intlPool, pickNation, renderNations, NATIONS, INTL_BREAKS, ensureIntl, intlComp, intlNight, intlFixture, intlOffers, acceptIntl, declineIntl, resignIntl, intlChoose, intlCallUp, intlGroupTable, intlQualified, intlManager, intlNext, intlNewSeason, renderIntlSquad, intlRestToggle, intlAutoPick, intlSelToggle, intlCalled, intlEligible, nameTables: { FIRST, SURNAMES }, intlRep, renderOffers, newMatchTest () { clearLive(); state = "intro"; newMatch(); renderLeague(); }, readyTest () { clearLive(); state = "intro"; banner.hidden = true; newMatch(); showIntro(); renderLeague(); } }); Object.defineProperties(window.__ff, { intlSide: { get: () => intlSide, configurable: true }, leagueMatch: { get: () => leagueMatch, configurable: true } }); } });
 	/* ---------- audio ----------
 	   Everything is synthesised in WebAudio: the ball off a boot, the referee's whistle, and a
 	   crowd built from layered noise and detuned voices that breathes with the match. */

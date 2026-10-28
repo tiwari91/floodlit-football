@@ -131,7 +131,7 @@ const sqc = await page.evaluate(() => {
 	const F = window.__ff; for (const p of [ ...F.league.club.squad, ...F.league.club.bench ]) { if (p.name === "Capped Forward") { p.inj = 0; p.ban = 0; } } F.renderLeague();
 	const box = document.getElementById("intlSquad"), names = () => [ ...box.querySelectorAll("ol.nat-xi li .who") ].map(e => e.textContent);
 	const auto = box.querySelector("#intlAuto").getAttribute("aria-pressed"), had = names().some(t => t.startsWith("Capped Forward"));
-	const btn = [ ...box.querySelectorAll("li button") ].find(b => b.closest("li").textContent.includes("Capped Forward"));
+	const btn = [ ...box.querySelectorAll(".intl-selist li button") ].find(b => b.closest("li").textContent.includes("Capped Forward"));
 	btn.click();
 	const left = !F.intlCallUp(F.league).xi.some(e => e.pl.name === "Capped Forward"), auto2 = box.querySelector("#intlAuto").getAttribute("aria-pressed");
 	box.querySelector("#intlAuto").click();
@@ -293,9 +293,9 @@ for (const k of [ "transfers", "club", "squad" ]) {
 check("Transfers, Club and Squad show the no-club note instead of club tools (the Squad tab keeps the national squad)", Object.values(tabs).every(x => x.note && x.hid && x.intl), JSON.stringify(tabs));
 const own = await page.evaluate(() => {
 	const F = window.__ff, lg = F.league, pl = F.intlCallUp(lg).xi[3].pl, nm = pl.name, cnt = () => F.intlCallUp(lg).xi.filter(e => e.pl.name === nm).length, before = cnt(), box = document.getElementById("intlSquad");
-	const li = [ ...box.querySelectorAll("li") ].find(x => x.textContent.includes(nm)), btn = li && li.querySelector("button");
+	const li = [ ...box.querySelectorAll(".intl-selist li") ].find(x => x.textContent.includes(nm)), btn = li && li.querySelector("button");
 	btn && btn.click();
-	return { btn: !!btn, nm, rest: lg.intl.rest.slice(), left: cnt() < before, inj: pl.inj };
+	return { btn: !!btn, nm, left: cnt() < before, inj: pl.inj };
 });
 check("any player of your nationality can be left out of the national squad", own.btn && own.left, JSON.stringify(own));
 const sim = await page.evaluate(() => {
@@ -304,6 +304,21 @@ const sim = await page.evaluate(() => {
 	return { done: F.league.round >= F.league.fixtures.length, rec: F.league.intl.record.length, nat: F.league.intl.nat, only: F.league.intl.only, same: F.league.season === season };
 });
 check("simulate whole season works in country mode: the league ends and your internationals were played", sim.done && sim.rec >= 1 && sim.nat === only.nat && sim.only && sim.same, JSON.stringify(sim));
+// Squad selection: a call-up of 23 with position, rating, club, form and fitness; only those called up can play.
+await showTab(page, "squad");
+const cu = await page.evaluate(() => {
+	const F = window.__ff, box = document.getElementById("intlSquad"), I = F.league.intl;
+	document.getElementById("intlAuto").click();
+	const rows = () => [ ...box.querySelectorAll(".intl-selist li") ];
+	const head = box.querySelector(".intl-sel .eyebrow").textContent, first = rows()[0].textContent, n0 = F.intlCalled(F.league).length;
+	const playing = () => new Set([ ...F.intlCallUp(F.league).xi, ...F.intlCallUp(F.league).bench ].map(e => e.pl.name));
+	const victim = F.intlCalled(F.league).find(n => F.intlCallUp(F.league).xi.some(e => e.pl.name === n && !e.gen));
+	rows().find(r => r.textContent.includes(victim)).querySelector("button").click();
+	const out = !playing().has(victim), n1 = F.intlCalled(F.league).length, sel = I.sel.length;
+	rows().find(r => r.textContent.includes(victim)).querySelector("button").click();
+	return { head, first, n0, victim, out, n1, sel, back: F.intlCalled(F.league).includes(victim), total: rows().length };
+});
+check("Squad selection lists the eligible players with position, rating, club, form and fitness; the manager drops and calls up, max 23, and a player dropped cannot play", /called up/.test(cu.head) && /form/.test(cu.first) && /fit \d+%/.test(cu.first) && cu.n0 <= 23 && cu.n0 >= 11 && cu.out && cu.n1 === cu.n0 - 1 && cu.back, JSON.stringify(cu));
 // The bar's button is the one next step on every tab, and never starts a club match.
 await page.evaluate(() => { window.__ff.simSeasonAllTest(); });
 const tabBtn = {};
