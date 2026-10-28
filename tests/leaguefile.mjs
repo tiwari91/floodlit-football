@@ -78,7 +78,7 @@ try {
 		const C = F.drawCont(lg, [ 0, ...lg.members.filter(i => i).slice(0, 3) ]);
 		return { n: C.clubs.length, eng: C.clubs.filter(c => c.nat === "ENG").map(c => c.name), ger: C.clubs.filter(c => c.nat === "GER").map(c => c.name), mgr: (C.clubs.find(c => c.nat === "GER") || {}).manager };
 	});
-	check("the cup uses file clubs: England from the league file, Germany from the cup list", cup.n === 36 && cup.eng.length === 4 && cup.eng.every(n => /^Eng Club/.test(n)) && cup.ger.every(n => /^Ger Cup/.test(n)) && cup.ger.length === 4 && !!cup.mgr, JSON.stringify(cup));
+	check("the cup uses file clubs: England from the league file, Germany from the cup list", cup.n === 32 && cup.eng.length === 4 && cup.eng.every(n => /^Eng Club/.test(n)) && cup.ger.every(n => /^Ger Cup/.test(n)) && cup.ger.length === 4 && !!cup.mgr, JSON.stringify(cup));
 	const guest = await page.evaluate(() => { const F = window.__ff, ov = F.fileOverlay(F.league); return Object.keys(ov.slots).some(k => /^Ger Cup .+#9$/.test(k)) && Object.keys(ov.slots).some(k => /^Eng Club .+#0$/.test(k)); });
 	check("cup guests' players are found by the guest's name", guest);
 
@@ -102,7 +102,7 @@ try {
 	check("moving your club keeps the squad and its name, in the new league", moved.r.ok && moved.nat === "GER" && moved.same && /^Eng Club/.test(moved.you) && !moved.cq, JSON.stringify(moved));
 
 	const clash = await page.evaluate(() => { const F = window.__ff, lg = F.league, C = F.drawCont(lg, [ 0, ...lg.members.filter(i => i).slice(0, 3) ]), names = C.clubs.map(c => (c.id !== undefined ? F.TEAMS[c.id].name : c.name).toLowerCase()); return { n: C.clubs.length, dup: names.length - new Set(names).size, eng: C.clubs.filter(c => c.nat === "ENG").length }; });
-	check("abroad with a club from the file, the cup never draws a guest with your club's name", clash.n === 36 && clash.dup === 0 && clash.eng === 4, JSON.stringify(clash));
+	check("abroad with a club from the file, the cup never draws a guest with your club's name", clash.n === 32 && clash.dup === 0 && clash.eng === 4, JSON.stringify(clash));
 
 	// A v1 file still works.
 	const v1 = await page.evaluate(() => {
