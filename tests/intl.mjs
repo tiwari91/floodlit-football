@@ -291,6 +291,56 @@ for (const k of [ "transfers", "club", "squad" ]) {
 	tabs[k] = await page.evaluate(k => { const n = document.getElementById({ transfers: "transfersNoClub", club: "clubNoClub", squad: "sqNoClub" }[k]); const box = document.getElementById({ transfers: "transfersBox", club: "assistCard", squad: "sqBox" }[k]); return { note: !n.hidden && new RegExp(`You manage ${window.__onlyName}\\. No club duties`).test(n.textContent), hid: box.hidden, intl: k !== "squad" || !document.getElementById("intlSquad").hidden }; }, k);
 }
 check("Transfers, Club and Squad show the no-club note instead of club tools (the Squad tab keeps the national squad)", Object.values(tabs).every(x => x.note && x.hid && x.intl), JSON.stringify(tabs));
+// Pick the XI yourself: move a bench player into the eleven; formation, style and press for the national side; Subs use the national bench.
+await showTab(page, "squad");
+const pk = await page.evaluate(() => {
+	const F = window.__ff, box = document.getElementById("intlSquad");
+	F.newMatchTest();
+	const lists = () => [ ...box.querySelectorAll("ol.nat-xi") ].filter(o => !o.classList.contains("intl-selist")), xiRows = () => [ ...lists()[0].querySelectorAll("li") ], bRows = () => [ ...lists()[1].querySelectorAll("li") ];
+	const who = li => li.querySelector(".who").textContent.split(" · ")[0];
+	const benchName = who(bRows()[0]), outName = who(xiRows()[3]);
+	bRows()[0].querySelector("button.swap").click();
+	xiRows()[3].querySelector("button.swap").click();
+	window.__bn = benchName;
+	const xi = F.intlCallUp(F.league).xi.map(e => e.pl.name), bench = F.intlCallUp(F.league).bench.map(e => e.pl.name);
+	return { benchName, outName, inXi: xi.includes(benchName), outOnBench: bench.includes(outName), stored: F.league.intl.xi.length, hasLeaveOut: !![ ...box.querySelectorAll("ol.nat-xi li button") ].find(b => b.textContent === "Leave out") };
+});
+check("the manager can move a bench player into the starting eleven (and the benched man goes to the bench); Leave out is still there", pk.inXi && pk.outOnBench && pk.stored >= 11 && pk.hasLeaveOut, JSON.stringify(pk));
+const pk2 = await page.evaluate(() => {
+	const F = window.__ff; F.newMatchTest();
+	const sq = F.intlSide.club.squad.map(p => p.name);
+	return { intl: !!(F.leagueMatch && F.leagueMatch.intl), starts: sq.includes(window.__bn || ""), sq };
+});
+const pk3 = await page.evaluate(() => { const F = window.__ff, n = F.league.intl.xi; return { first11: F.intlSide.club.squad.map(p => p.name).slice(0, 11).join() === n.slice(0, 11).join() || F.intlSide.club.squad.length >= 11, intl: !!(F.leagueMatch && F.leagueMatch.intl) }; });
+check("the player you moved into the XI starts the international", pk2.intl && pk2.starts && pk.inXi, JSON.stringify({ pk2: pk2.intl, pk3 }));
+const tc = await page.evaluate(() => {
+	const F = window.__ff, box = document.getElementById("intlSquad"); F.renderIntlSquad();
+	const before = { style: document.getElementById("style").value, press: document.getElementById("press").value };
+	const st = document.getElementById("intlStyle"), nstyle = [ ...st.options ].map(o => o.value).find(v => v !== before.style);
+	st.value = nstyle; st.dispatchEvent(new Event("change"));
+	const pr = document.getElementById("intlPress"), npress = [ ...pr.options ].map(o => o.value).find(v => v !== before.press);
+	pr.value = npress; pr.dispatchEvent(new Event("change"));
+	const shp = [ ...document.querySelectorAll("#intlShape button") ].find(b => b.getAttribute("aria-pressed") === "false"); shp.click();
+	const key = F.league.intl.tac.shape, other = document.getElementById("shape").value;
+	F.newMatchTest();
+	const during = { style: document.getElementById("style").value, press: document.getElementById("press").value, shape: document.getElementById("shape").value };
+	F.newMatchTest ? 0 : 0;
+	return { before, nstyle, npress, key, during, stored: F.league.intl.tac };
+});
+const tc2 = await page.evaluate(() => { const F = window.__ff; F.intlSide; return { style: document.getElementById("style").value }; });
+check("the national side has its own formation, style and press, applied in the international", tc.during.style === tc.nstyle && tc.during.press === tc.npress && tc.during.shape === tc.key && tc.stored.style === tc.nstyle, JSON.stringify({ tc, tc2 }));
+const sb = await page.evaluate(async () => {
+	const F = window.__ff; F.readyTest();
+	document.getElementById("ovButton").click();
+	await new Promise(r => setTimeout(r, 300));
+	document.getElementById("pauseBtn").click();
+	await new Promise(r => setTimeout(r, 200));
+	document.getElementById("subsBtn").click();
+	await new Promise(r => setTimeout(r, 200));
+	const panel = document.getElementById("subPanel").textContent, bench = F.intlSide.club.bench.map(p => p.name), clubSq = [ ...F.league.club.squad, ...F.league.club.bench ].map(p => p.name).filter(n => !F.intlSide.club.squad.some(p => p.name === n) && !bench.includes(n));
+	return { shown: !document.getElementById("subPanel").hidden, hasBench: bench.some(n => panel.includes(n)), hasClub: clubSq.some(n => panel.includes(n)) };
+});
+check("in-match Subs in an international use the national bench, not the old club's", sb.shown && sb.hasBench && !sb.hasClub, JSON.stringify(sb));
 const own = await page.evaluate(() => {
 	const F = window.__ff, lg = F.league, pl = F.intlCallUp(lg).xi[3].pl, nm = pl.name, cnt = () => F.intlCallUp(lg).xi.filter(e => e.pl.name === nm).length, before = cnt(), box = document.getElementById("intlSquad");
 	const li = [ ...box.querySelectorAll(".intl-selist li") ].find(x => x.textContent.includes(nm)), btn = li && li.querySelector("button");

@@ -7709,6 +7709,8 @@
 		I.missed = Number.isInteger(I.missed) ? clamp(I.missed, 0, 2) : 0;
 		I.rest = Array.isArray(I.rest) ? I.rest.filter(n => typeof n === "string").slice(0, 30) : [];
 		if (typeof I.capt !== "string") { delete I.capt; }
+		I.xi = Array.isArray(I.xi) ? I.xi.filter(n => typeof n === "string").slice(0, 40) : [];   // your own order: the starting eleven, then the bench
+		I.tac = plainObj(I.tac) ? { shape: typeof I.tac.shape === "string" ? I.tac.shape : undefined, style: STYLES[I.tac.style] ? I.tac.style : undefined, press: PRESSES[I.tac.press] ? I.tac.press : undefined } : {};
 		if (I.conf !== undefined && !Number.isInteger(I.conf)) { delete I.conf; }
 		if (!Number.isInteger(I.frDone)) { delete I.frDone; }
 		if (!(plainObj(I.fr) && Number.isInteger(I.fr.round) && natOk(I.fr.nat))) { I.fr = null; }
@@ -7723,7 +7725,7 @@
 	// A new season: the job, the record and the qualifiers carry over; the offers lapse; a new draw.
 	function intlNewSeason (prev) {
 		const lg = league, P = prev && plainObj(prev.intl) && prev.intl.v === 1 ? prev.intl : null;
-		lg.intl = { v: 1, nat: P && natOk(P.nat) ? P.nat : null, offers: [], record: P && Array.isArray(P.record) ? P.record.slice(-30) : [], season: lg.season, only: !!(P && P.only === true), missed: P && Number.isInteger(P.missed) ? P.missed : 0, rest: [], sel: P && Array.isArray(P.sel) ? P.sel.slice() : [], capt: P && typeof P.capt === "string" ? P.capt : undefined, conf: P && Number.isInteger(P.conf) ? P.conf : undefined, next: P && P.next ? P.next : null, comp: intlNone(lg.season) };
+		lg.intl = { v: 1, nat: P && natOk(P.nat) ? P.nat : null, offers: [], record: P && Array.isArray(P.record) ? P.record.slice(-30) : [], season: lg.season, only: !!(P && P.only === true), missed: P && Number.isInteger(P.missed) ? P.missed : 0, rest: [], sel: P && Array.isArray(P.sel) ? P.sel.slice() : [], tac: P && P.tac ? P.tac : {}, capt: P && typeof P.capt === "string" ? P.capt : undefined, conf: P && Number.isInteger(P.conf) ? P.conf : undefined, next: P && P.next ? P.next : null, comp: intlNone(lg.season) };
 		ensureIntl(lg);
 		lg.intl.comp = drawIntl(lg, lg.intl);
 		if (lg.intl.nat) { intlObjective(lg); }
@@ -7878,7 +7880,49 @@
 		const I = ensureIntl(lg);
 		if (!I || !I.nat) { return null; }
 		const rest = new Set(I.rest), sel = new Set(I.sel), pool = intlPool(lg).filter(e => !((e.own || I.only) && (e.pl.inj > 0 || e.pl.ban > 0 || rest.has(e.pl.name))) && (!sel.size || e.pl.nat !== I.nat || sel.has(e.pl.name)));
-		return pickNation(I.nat, pool, lg);
+		const side = pickNation(I.nat, pool, lg);
+		if (I.xi.length >= 11) {   // your own order, if every name is still available
+			const all = [ ...side.xi, ...side.bench ], by = new Map(all.map(e => [ e.pl.name, e ]));
+			const used = new Set(), ord = I.xi.map(n => by.get(n)).map(e => (e && !used.has(e) ? (used.add(e), e) : null));
+			if (ord.filter(Boolean).length >= 11 - 3) {   // a name that is gone (dropped, hurt) is replaced by the best spare of that position
+				const spare = all.filter(e => !used.has(e));
+				ord.forEach((e, k) => { if (!e) { const j = spare.findIndex(x => k >= 11 || x.pl.pos === POS_OF_SLOT[k]), at = j >= 0 ? j : 0; ord[k] = spare.splice(at, 1)[0] || null; } });
+				const got = ord.filter(Boolean);
+				side.xi = got.slice(0, 11); side.bench = [ ...got.slice(11), ...spare ].slice(0, INTL_BENCH);
+				const on = slotsFor(lg.fmt).map(i => side.xi[i]).filter(Boolean), ovr = on.reduce((t, e) => t + ovrOf(e.pl), 0) / on.length;
+				side.ovr = round1(ovr); side.str = strOfOvr(ovr);
+			}
+		}
+		return side;
+	}
+	// Swap two players of the squad's order (XI slots then bench) by name: the XI-and-bench interaction of the club Squad tab.
+	function intlSwap (a, b) {
+		const I = ensureIntl(league);
+		if (!I || !I.nat || a === b) { return false; }
+		const side = intlCallUp(league), ord = [ ...side.xi, ...side.bench ].map(e => e.pl.name), i = ord.indexOf(a), j = ord.indexOf(b);
+		if (i < 0 || j < 0) { return false; }
+		[ ord[i], ord[j] ] = [ ord[j], ord[i] ];
+		I.xi = ord; saveLeague(); renderIntlSquad();
+		return true;
+	}
+	// The national side's tactics, kept apart from the club's: swapped into the controls for an international and back after.
+	let intlTacBack = null;
+	function intlTacApply (lg) {
+		const I = lg.intl, t = I && I.tac || {};
+		intlTacBack = { style: styleSel.value, press: pressSel.value, shape: shapePref[lg.fmt], fmt: lg.fmt };
+		if (t.style) { styleSel.value = t.style; }
+		if (t.press) { pressSel.value = t.press; }
+		if (t.shape && SHAPES[lg.fmt] && SHAPES[lg.fmt][t.shape]) { shapePref[lg.fmt] = t.shape; if ([ ...shapeSel.options ].some(o => o.value === t.shape)) { shapeSel.value = t.shape; } }
+	}
+	function intlTacRestore () {
+		const b = intlTacBack; if (!b) { return; }
+		intlTacBack = null;
+		styleSel.value = b.style; pressSel.value = b.press; shapePref[b.fmt] = b.shape;
+		if ([ ...shapeSel.options ].some(o => o.value === b.shape)) { shapeSel.value = b.shape; }
+	}
+	function intlTacSet (k, v) {
+		const I = ensureIntl(league); if (!I || !I.nat) { return; }
+		I.tac[k] = v; saveLeague(); renderIntlSquad();
 	}
 	// The call-up of 23: who of your nationality could go (best first), the auto-pick, and who is in.
 	const INTL_CALLUP = 23;
@@ -7906,8 +7950,10 @@
 	const matchSquad = () => (intlSide ? intlSide.club : league && league.club);
 	function intlBegin (lm) {
 		intlRestoreYou();
+		intlTacRestore();
 		intlSide = null;
 		if (!lm || !lm.intl || !league || !league.intl || !league.intl.nat) { return; }
+		intlTacApply(league);
 		const side = intlCallUp(league), id = nationIdent(league.intl.nat), opp = nationSquad(lm.intl.nat, league);
 		if (!side || !id) { return; }
 		intlYou = {};
@@ -7989,7 +8035,7 @@
 		const I = lg && lg.intl;
 		if (!I || !I.nat) { return; }
 		const was = I.nat;
-		I.nat = null; I.missed = 0; I.rest = []; I.sel = []; delete I.capt; delete I.obj; delete I.conf; delete I.ask;
+		I.nat = null; I.missed = 0; I.rest = []; I.sel = []; I.xi = []; I.tac = {}; delete I.capt; delete I.obj; delete I.conf; delete I.ask;
 		if (why === "club") { I.only = false; }   // a club job is next: the country job is over and so is any time without a club
 		if (lg.contGuest && lg.contGuest.intl) { restoreGuest(lg); }
 		if (why === "resigned") { lg.news = `${lg.news || ""} You resigned as ${natName(was)} manager.`.trim(); }
@@ -8001,7 +8047,7 @@
 		const lg = league, I = ensureIntl(lg), o = I && I.offers.find(x => x.nat === nat);
 		if (!o || I.nat) { return false; }
 		const club = clubName();
-		I.nat = nat; I.only = true; I.offers = []; I.missed = 0; I.rest = []; I.sel = []; delete I.capt; delete I.obj; delete I.conf;
+		I.nat = nat; I.only = true; I.offers = []; I.missed = 0; I.rest = []; I.sel = []; I.xi = []; I.tac = {}; delete I.capt; delete I.obj; delete I.conf;
 		lg.career = { ...(lg.career || { history: [] }), clubs: [ ...((lg.career && lg.career.clubs) || [ club ]), `${natName(nat)} (national team)` ] };
 		lg.news = `${lg.news || ""} You left ${club} to manage ${natName(nat)} full-time. ${club} have a new manager.`.trim();
 		lastDeal = `You left ${club} and are the new ${natName(nat)} manager. The league carries on without you; you play the internationals.`;
@@ -8256,8 +8302,14 @@
 		I.rest = I.rest.includes(name) ? I.rest.filter(n => n !== name) : [ ...I.rest, name ];
 		saveLeague(); renderIntlSquad();
 	}
-	function intlAutoPick () { const I = ensureIntl(league); if (!I) { return; } I.rest = []; I.sel = []; delete I.capt; delete I.obj; delete I.conf; saveLeague(); renderIntlSquad(); }
+	function intlAutoPick () { const I = ensureIntl(league); if (!I) { return; } I.rest = []; I.sel = []; I.xi = []; saveLeague(); renderIntlSquad(); }
 	function renderIntlSquad () {
+		const own = !intlTacBack && league && league.intl && league.intl.nat;   // not while an international has the controls
+		if (own) { intlTacApply(league); }
+		try { renderIntlSquadIn(); } finally { if (own) { intlTacRestore(); } }
+	}
+	let intlPicked = null;
+	function renderIntlSquadIn () {
 		const box = $("intlSquad");
 		if (!box) { return; }
 		box.replaceChildren();
@@ -8275,14 +8327,15 @@
 		pre.setAttribute("role", "group"); pre.setAttribute("aria-label", "Formation"); pre.id = "intlShape";
 		for (const k of LU_PRESETS[league.fmt] || Object.keys(SHAPES[league.fmt] || {})) {
 			const b = el("button", "", SHAPES[league.fmt][k].label.split(" ")[0]); b.type = "button"; b.setAttribute("aria-pressed", String(k === cur));
-			b.addEventListener("click", () => setLineupShape(league.fmt, k)); pre.append(b);
+			b.addEventListener("click", () => intlTacSet("shape", k)); pre.append(b);
 		}
 		const cs = el("select"); cs.id = "intlCapt"; cs.setAttribute("aria-label", "Captain");
 		const ao = el("option", "", "Captain: best form"); ao.value = ""; cs.append(ao);
 		for (const e of [ ...side.xi, ...side.bench ].filter(e => !e.gen && e.pl.pos !== "gk")) { const o = el("option", "", `Captain: ${e.pl.name}`); o.value = e.pl.name; cs.append(o); }
 		cs.value = I.capt && [ ...cs.options ].some(o => o.value === I.capt) ? I.capt : "";
 		cs.addEventListener("change", () => { if (cs.value) { I.capt = cs.value; } else { delete I.capt; } saveLeague(); });
-		ctl.append(pre, cs); box.append(ctl);
+		const tsel = (id, label, map, key, dflt) => { const x = el("select"); x.id = id; x.setAttribute("aria-label", label); for (const [ v, t ] of Object.entries(map)) { const o = el("option", "", `${label}: ${t}`); o.value = v; x.append(o); } x.value = (I.tac && I.tac[key]) || dflt; x.addEventListener("change", () => intlTacSet(key, x.value)); return x; };
+		ctl.append(pre, tsel("intlStyle", "Style", STYLES, "style", styleSel.value), tsel("intlPress", "Press", PRESSES, "press", pressSel.value), cs); box.append(ctl);
 		const fr = intlFriendly(league);
 		if (fr) {   // a break with no competitive game: one friendly, a random country unless you pick one
 			const fc = el("div", "intl-friendly"); fc.id = "intlFriendly";
@@ -8295,7 +8348,13 @@
 		}
 		const ol = el("ol", "nat-xi"), row = (e, on) => {
 			const r = el("li", e.own ? "mine" : "");
+			const pk = intlPicked === e.pl.name;
 			r.append(el("span", "pos", POS_LABEL[e.pl.pos]), el("span", "who", `${e.pl.name} · ${ovrOf(e.pl)} · ${e.club}${e.own ? ` · fit ${Math.round(fitOf(e.pl))}%` : ""}`));
+			if (pk) { r.classList.add("picked"); }
+			const mv = el("button", "swap", pk ? "Cancel" : intlPicked ? "Swap here" : "Move"); mv.type = "button";
+			mv.addEventListener("click", () => { if (!intlPicked || pk) { intlPicked = pk ? null : e.pl.name; renderIntlSquad(); } else { const a = intlPicked; intlPicked = null; intlSwap(a, e.pl.name); } });
+			r.append(mv);
+			if (!e.gen) { const lo = el("button", "", "Leave out"); lo.type = "button"; lo.addEventListener("click", () => { intlPicked = null; intlSelToggle(e.pl.name); }); r.append(lo); }
 			return r;
 		};
 		for (const i of slotsFor(league.fmt)) { if (side.xi[i]) { ol.append(row(side.xi[i], true)); } }
@@ -8339,7 +8398,7 @@
 		for (const id of [ "sqBox", "transfersBox", "assistCard", "coachPanel", "clubUpgrades", "lgAcademy" ]) { const b = $(id); if (b) { b.hidden = on; } }
 		for (const id of [ "sqNoClub", "transfersNoClub", "clubNoClub" ]) { const b = $(id); if (b) { b.hidden = !on; b.textContent = note; } }
 	}
-	queueMicrotask(() => { if (window.__ff) { Object.assign(window.__ff, { intlOnlyAdvance, intlFreeOffers, intlNoClub, intlLegacy, intlLegacyChoose, renderIntlOnly, nationSquads, nationSquad, nationIdent, strOfOvr, intlPool, pickNation, renderNations, NATIONS, INTL_BREAKS, ensureIntl, intlComp, intlNight, intlFixture, intlOffers, acceptIntl, declineIntl, resignIntl, intlChoose, intlCallUp, intlGroupTable, intlQualified, intlManager, intlNext, intlNewSeason, renderIntlSquad, intlRestToggle, intlFriendly, intlObjective, intlConf, intlMood, intlAutoPick, intlSelToggle, intlCalled, intlEligible, nameTables: { FIRST, SURNAMES }, intlRep, renderOffers, newMatchTest () { clearLive(); state = "intro"; newMatch(); renderLeague(); }, readyTest () { clearLive(); state = "intro"; banner.hidden = true; newMatch(); showIntro(); renderLeague(); } }); Object.defineProperties(window.__ff, { intlSide: { get: () => intlSide, configurable: true }, leagueMatch: { get: () => leagueMatch, configurable: true } }); } });
+	queueMicrotask(() => { if (window.__ff) { Object.assign(window.__ff, { intlOnlyAdvance, intlFreeOffers, intlNoClub, intlLegacy, intlLegacyChoose, renderIntlOnly, nationSquads, nationSquad, nationIdent, strOfOvr, intlPool, pickNation, renderNations, NATIONS, INTL_BREAKS, ensureIntl, intlComp, intlNight, intlFixture, intlOffers, acceptIntl, declineIntl, resignIntl, intlChoose, intlCallUp, intlGroupTable, intlQualified, intlManager, intlNext, intlNewSeason, renderIntlSquad, intlRestToggle, intlSwap, intlTacSet, intlFriendly, intlObjective, intlConf, intlMood, intlAutoPick, intlSelToggle, intlCalled, intlEligible, nameTables: { FIRST, SURNAMES }, intlRep, renderOffers, newMatchTest () { clearLive(); state = "intro"; newMatch(); renderLeague(); }, readyTest () { clearLive(); state = "intro"; banner.hidden = true; newMatch(); showIntro(); renderLeague(); } }); Object.defineProperties(window.__ff, { intlSide: { get: () => intlSide, configurable: true }, leagueMatch: { get: () => leagueMatch, configurable: true } }); } });
 	/* ---------- audio ----------
 	   Everything is synthesised in WebAudio: the ball off a boot, the referee's whistle, and a
 	   crowd built from layered noise and detuned voices that breathes with the match. */
