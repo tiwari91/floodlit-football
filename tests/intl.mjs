@@ -331,6 +331,30 @@ const fc = await page.evaluate(() => {
 	return { n: btns.length, lab, now: after && after.textContent, capt: I.capt, want: pick.value };
 });
 check("the national side has a formation choice (the club shapes) and a captain pick, both stored", fc.n >= 2 && fc.now === fc.lab && fc.capt === fc.want, JSON.stringify(fc));
+// Friendlies: a break with no competitive game for your country offers one, against a random or chosen nation.
+await showTab(page, "squad");
+const fr1 = await page.evaluate(() => {
+	const F = window.__ff, lg = F.league, I = lg.intl;
+	I.comp = { none: true, season: lg.season }; delete I.frDone; I.fr = null; lg.round = 5; F.renderLeague();
+	const box = document.getElementById("intlFriendly"), sel = document.getElementById("intlFrOpp");
+	if (!box) { return { box: false }; }
+	const other = [ ...sel.options ].map(o => o.value).find(v => v !== sel.value);
+	sel.value = other; sel.dispatchEvent(new Event("change"));
+	return { box: true, head: box.textContent.slice(0, 40), picked: I.fr && I.fr.nat === other, other };
+});
+check("a break with no competitive game shows a friendly card on the Squad tab, with a choice of opponent", fr1.box && /after matchday 9/.test(fr1.head) && fr1.picked, JSON.stringify(fr1));
+const fr2 = await page.evaluate(() => {
+	const F = window.__ff, lg = F.league, I = lg.intl, opp = I.fr.nat, f = F.intlFixture(), rounds = lg.round;
+	lg.round = 9; for (let i = 0; i < 9; i++) { lg.results[i] = lg.results[i] || []; }
+	const fx = F.intlFixture();
+	return { early: f, fx: !!fx && fx.intl.fr === true && fx.intl.nat === opp && /Friendly/.test(fx.label), opp, rounds };
+});
+check("at that break the next fixture is the friendly against the chosen nation (and not before it)", fr2.early === null && fr2.fx, JSON.stringify(fr2));
+await page.evaluate(() => { const F = window.__ff; F.newMatchTest(); });
+await page.evaluate(() => document.getElementById("simBtn").click());
+await page.waitForTimeout(800);
+const fr3 = await page.evaluate(() => { const F = window.__ff, lg = F.league, I = lg.intl, last = I.record[I.record.length - 1]; return { what: last && last.what, done: I.frDone, round: lg.round, again: F.intlFixture(), note: /Friendly/.test(I.lastNote || "") }; });
+check("a friendly is recorded, moves no league round, and is not offered again", fr3.what === "Friendly" && fr3.done === 9 && fr3.round === 9 && fr3.again === null && fr3.note, JSON.stringify(fr3));
 // The bar's button is the one next step on every tab, and never starts a club match.
 await page.evaluate(() => { window.__ff.simSeasonAllTest(); });
 const tabBtn = {};

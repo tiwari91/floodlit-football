@@ -7704,6 +7704,8 @@
 		I.missed = Number.isInteger(I.missed) ? clamp(I.missed, 0, 2) : 0;
 		I.rest = Array.isArray(I.rest) ? I.rest.filter(n => typeof n === "string").slice(0, 30) : [];
 		if (typeof I.capt !== "string") { delete I.capt; }
+		if (!Number.isInteger(I.frDone)) { delete I.frDone; }
+		if (!(plainObj(I.fr) && Number.isInteger(I.fr.round) && natOk(I.fr.nat))) { I.fr = null; }
 		I.sel = Array.isArray(I.sel) ? I.sel.filter(n => typeof n === "string").slice(0, INTL_CALLUP) : [];   // the call-up: up to 23 names; empty = auto-pick
 		if (!(plainObj(I.next) && Number.isInteger(I.next.season) && Array.isArray(I.next.nats) && I.next.nats.every(natOk))) { I.next = null; }
 		if (I.ask !== undefined && typeof I.ask !== "string") { delete I.ask; }
@@ -7821,10 +7823,33 @@
 		}
 	}
 	const intlLabel = (C, g) => (C.kind === "q" ? `International · Qualifier, Group ${groupLetter(g.grp)}` : g.stage ? `International · ${INTL_KO[g.stage]}` : `International · ${tn(C)}, Group ${groupLetter(g.grp)}`);
+	/* Friendlies: a break (after matchday 9, 20 or 30) where your country has no competitive game gets one friendly,
+	   against a random country unless you pick another on the Squad tab, or skip it. Country only. */
+	function intlFriendly (lg = league) {
+		const I = ensureIntl(lg), C = I && I.comp;
+		if (!I || !I.nat || !I.only || !C) { return null; }
+		const r = INTL_BREAKS.find(b => b >= lg.round && b !== I.frDone && b < lg.fixtures.length);
+		if (r === undefined) { return null; }
+		if (!C.none && !C.done && C.nights[C.night] && C.nights[C.night].r < r) { return null; }   // an earlier night is still open: the picture isn't clear yet
+		if (!C.none && C.games.some(g => C.nights[g.n] && C.nights[g.n].r === r && (g.h === I.nat || g.a === I.nat))) { return null; }
+		if (!(plainObj(I.fr) && I.fr.round === r && natOk(I.fr.nat) && I.fr.nat !== I.nat)) {
+			const all = Object.keys(NATIONS).filter(n => n !== I.nat);
+			I.fr = { round: r, nat: all[hashStr(`${I.nat}|${lg.season}|${r}`) % all.length] };
+		}
+		return { round: r, nat: I.fr.nat, due: lg.round === r };
+	}
 	// Your next game as a fixture (see currentFixture, 14): the other country borrows the guest seat.
 	function intlFixture () {
 		const lg = league, C = intlComp(lg), gi = intlMine(lg, C);
-		if (gi < 0) { if (lg && lg.contGuest && lg.contGuest.intl) { restoreGuest(lg); } return null; }
+		if (gi < 0) {
+			const fr = intlFriendly(lg);   // a break with no competitive game for you: the friendly (below)
+			if (fr && fr.due) {
+				const s = nationSquad(fr.nat, lg), slot = s ? applyGuest(lg, { ...s.ident, str: s.str, manager: intlManager(fr.nat), managerNat: fr.nat }) : -1;
+				if (slot >= 0) { lg.contGuest.intl = true; return { round: lg.round, home: true, opp: slot, intl: { fr: true, season: lg.season, nat: fr.nat }, label: "International · Friendly", neutral: false }; }
+			}
+			if (lg && lg.contGuest && lg.contGuest.intl) { restoreGuest(lg); }
+			return null;
+		}
 		const g = C.games[gi], me = lg.intl.nat, other = g.h === me ? g.a : g.h, s = nationSquad(other, lg);
 		const slot = applyGuest(lg, { ...s.ident, str: s.str, manager: intlManager(other), managerNat: other });
 		if (slot < 0) { return null; }
@@ -7890,20 +7915,31 @@
 		};
 	}
 	// Your result: the game, your own players' legs for the next league match, then the rest of the night.
+	function intlTire (lg, I) {   // your club's players who played lose fitness for the next league match, as if they had started one
+		if (!intlSide) { return; }
+		const played = new Set([ ...team(0).map(p => p.name), ...wentOff ]), sl = slotsFor(lg.fmt);
+		const on = [ ...sl.map(i => intlSide.club.squad[i]), ...intlSide.club.bench.filter(pl => cameOn.includes(pl.name)) ].filter(pl => pl && intlSide.own.has(pl) && (played.has(pl.name) || !team(0).length));
+		for (const pl of on) { const st = matchSta[pl.name]; pl.fit = clamp(fitOf(pl) - (Number.isFinite(st) ? 4 + (1 - st) * 20 : 10), 40, 100); }
+		I.tired = on.map(pl => pl.name);
+	}
 	function recordIntlResult (lm, h, a) {
 		const lg = league, C = intlComp(lg), I = lg.intl;
+		if (lm.intl.fr) {   // a friendly: on the record, nothing else moves
+			if (!I.nat) { intlBegin(null); return ""; }
+			const me = I.nat, opp = lm.intl.nat, note = `Friendly: ${natName(me)} ${h}–${a} ${natName(opp)}.`;
+			intlTire(lg, I); matchSta = {};
+			I.record = [ ...I.record, { season: lg.season, nat: me, opp, gf: h, ga: a, what: "Friendly" } ].slice(-30);
+			I.fr = null; I.frDone = lm.round;
+			I.lastNote = note; lg.news = `${lg.news || ""} ${note}`.trim();
+			restoreGuest(lg); intlBegin(null);
+			return note;
+		}
 		const g = C && !C.none && C.season === lm.intl.season ? C.games[lm.intl.gi] : null;
 		if (!g || g.hg !== undefined || !I.nat) { intlBegin(null); return ""; }
 		const me = I.nat;
 		[ g.hg, g.ag ] = g.h === me ? [ h, a ] : [ a, h ];
 		if (g.stage) { intlDecide(g, lg); }
-		// Your club's players who played lose fitness for the next league match, as if they had started one.
-		if (intlSide) {
-			const played = new Set([ ...team(0).map(p => p.name), ...wentOff ]), sl = slotsFor(lg.fmt);
-			const on = [ ...sl.map(i => intlSide.club.squad[i]), ...intlSide.club.bench.filter(pl => cameOn.includes(pl.name)) ].filter(pl => pl && intlSide.own.has(pl) && (played.has(pl.name) || !team(0).length));
-			for (const pl of on) { const st = matchSta[pl.name]; pl.fit = clamp(fitOf(pl) - (Number.isFinite(st) ? 4 + (1 - st) * 20 : 10), 40, 100); }
-			I.tired = on.map(pl => pl.name);
-		}
+		intlTire(lg, I);
 		matchSta = {};
 		const opp = g.h === me ? g.a : g.h, my = g.h === me ? [ g.hg, g.ag ] : [ g.ag, g.hg ];
 		I.record = [ ...I.record, { season: C.season, nat: me, opp, gf: my[0], ga: my[1], what: intlWhat(C, g) } ].slice(-30);
@@ -8195,6 +8231,16 @@
 		cs.value = I.capt && [ ...cs.options ].some(o => o.value === I.capt) ? I.capt : "";
 		cs.addEventListener("change", () => { if (cs.value) { I.capt = cs.value; } else { delete I.capt; } saveLeague(); });
 		ctl.append(pre, cs); box.append(ctl);
+		const fr = intlFriendly(league);
+		if (fr) {   // a break with no competitive game: one friendly, a random country unless you pick one
+			const fc = el("div", "intl-friendly"); fc.id = "intlFriendly";
+			const fs = el("select"); fs.id = "intlFrOpp"; fs.setAttribute("aria-label", "Friendly opponent");
+			for (const n of Object.keys(NATIONS).filter(n => n !== I.nat).sort((x, y) => natName(x).localeCompare(natName(y)))) { const o = el("option", "", natName(n)); o.value = n; fs.append(o); }
+			fs.value = fr.nat; fs.addEventListener("change", () => { I.fr = { round: fr.round, nat: fs.value }; saveLeague(); });
+			const sk = el("button", "", "Skip friendly"); sk.type = "button"; sk.id = "intlFrSkip"; sk.addEventListener("click", () => { I.frDone = fr.round; I.fr = null; saveLeague(); renderIntlSquad(); });
+			fc.append(el("span", "eyebrow", `Friendly after matchday ${fr.round}`), el("span", "detail", "No competitive game that break: try your players against "), fs, sk);
+			box.append(fc);
+		}
 		const ol = el("ol", "nat-xi"), row = (e, on) => {
 			const r = el("li", e.own ? "mine" : "");
 			r.append(el("span", "pos", POS_LABEL[e.pl.pos]), el("span", "who", `${e.pl.name} · ${ovrOf(e.pl)} · ${e.club}${e.own ? ` · fit ${Math.round(fitOf(e.pl))}%` : ""}`));
@@ -8241,7 +8287,7 @@
 		for (const id of [ "sqBox", "transfersBox", "assistCard", "coachPanel", "clubUpgrades", "lgAcademy" ]) { const b = $(id); if (b) { b.hidden = on; } }
 		for (const id of [ "sqNoClub", "transfersNoClub", "clubNoClub" ]) { const b = $(id); if (b) { b.hidden = !on; b.textContent = note; } }
 	}
-	queueMicrotask(() => { if (window.__ff) { Object.assign(window.__ff, { intlOnlyAdvance, intlFreeOffers, intlNoClub, intlLegacy, intlLegacyChoose, renderIntlOnly, nationSquads, nationSquad, nationIdent, strOfOvr, intlPool, pickNation, renderNations, NATIONS, INTL_BREAKS, ensureIntl, intlComp, intlNight, intlFixture, intlOffers, acceptIntl, declineIntl, resignIntl, intlChoose, intlCallUp, intlGroupTable, intlQualified, intlManager, intlNext, intlNewSeason, renderIntlSquad, intlRestToggle, intlAutoPick, intlSelToggle, intlCalled, intlEligible, nameTables: { FIRST, SURNAMES }, intlRep, renderOffers, newMatchTest () { clearLive(); state = "intro"; newMatch(); renderLeague(); }, readyTest () { clearLive(); state = "intro"; banner.hidden = true; newMatch(); showIntro(); renderLeague(); } }); Object.defineProperties(window.__ff, { intlSide: { get: () => intlSide, configurable: true }, leagueMatch: { get: () => leagueMatch, configurable: true } }); } });
+	queueMicrotask(() => { if (window.__ff) { Object.assign(window.__ff, { intlOnlyAdvance, intlFreeOffers, intlNoClub, intlLegacy, intlLegacyChoose, renderIntlOnly, nationSquads, nationSquad, nationIdent, strOfOvr, intlPool, pickNation, renderNations, NATIONS, INTL_BREAKS, ensureIntl, intlComp, intlNight, intlFixture, intlOffers, acceptIntl, declineIntl, resignIntl, intlChoose, intlCallUp, intlGroupTable, intlQualified, intlManager, intlNext, intlNewSeason, renderIntlSquad, intlRestToggle, intlFriendly, intlAutoPick, intlSelToggle, intlCalled, intlEligible, nameTables: { FIRST, SURNAMES }, intlRep, renderOffers, newMatchTest () { clearLive(); state = "intro"; newMatch(); renderLeague(); }, readyTest () { clearLive(); state = "intro"; banner.hidden = true; newMatch(); showIntro(); renderLeague(); } }); Object.defineProperties(window.__ff, { intlSide: { get: () => intlSide, configurable: true }, leagueMatch: { get: () => leagueMatch, configurable: true } }); } });
 	/* ---------- audio ----------
 	   Everything is synthesised in WebAudio: the ball off a boot, the referee's whistle, and a
 	   crowd built from layered noise and detuned voices that breathes with the match. */
