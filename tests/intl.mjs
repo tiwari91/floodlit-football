@@ -119,17 +119,19 @@ const acc = await page.evaluate(() => {
 	const F = window.__ff, li = [ ...document.querySelectorAll("#jobOffers li") ].find(x => /NATIONAL/.test(x.textContent));
 	const title = !document.getElementById("jobsTitle").hidden;
 	if (!li) { return { li: false }; }
+	const card = li.textContent;
 	[ ...li.querySelectorAll("button") ].find(b => b.textContent === "Accept").click();
-	return { li: true, title, nat: F.league.intl.nat, club: F.YOU.name, offers: F.league.intl.offers.length, job: document.getElementById("intlJob").textContent, resign: !!document.getElementById("intlResign") };
+	return { li: true, title, card, only: F.league.intl.only === true, nat: F.league.intl.nat, club: F.YOU.name, offers: F.league.intl.offers.length, job: document.getElementById("intlJob").textContent, resign: !!document.getElementById("intlResign") };
 });
-check("the international offer is an Accept/Decline card under Club > Career; accepting keeps your club job", acc.li && acc.title && acc.nat === pick.nat && acc.club === pick.club && acc.offers === 0 && acc.resign && acc.job.includes(pick.name), JSON.stringify(acc));
+check("the international offer is an Accept/Decline card under Club > Career that says you leave the club; accepting leaves it", acc.li && acc.title && acc.nat === pick.nat && acc.only && acc.offers === 0 && acc.resign && acc.job.includes(pick.name) && acc.job.includes("no club") && acc.card.includes(`leave ${pick.club} to manage ${pick.name} full-time`), JSON.stringify(acc));
 
 // The Squad tab's International card: auto-pick by default; leave your own man out and he is not called up.
 await showTab(page, "squad");
 const sqc = await page.evaluate(() => {
-	const F = window.__ff, box = document.getElementById("intlSquad"), names = () => [ ...box.querySelectorAll("ol.nat-xi li .who") ].map(e => e.textContent);
+	const F = window.__ff; for (const p of [ ...F.league.club.squad, ...F.league.club.bench ]) { if (p.name === "Capped Forward") { p.inj = 0; p.ban = 0; } } F.renderLeague();
+	const box = document.getElementById("intlSquad"), names = () => [ ...box.querySelectorAll("ol.nat-xi li .who") ].map(e => e.textContent);
 	const auto = box.querySelector("#intlAuto").getAttribute("aria-pressed"), had = names().some(t => t.startsWith("Capped Forward"));
-	const btn = [ ...box.querySelectorAll("li.mine button") ].find(b => b.closest("li").textContent.includes("Capped Forward"));
+	const btn = [ ...box.querySelectorAll("li button") ].find(b => b.closest("li").textContent.includes("Capped Forward"));
 	btn.click();
 	const left = !F.intlCallUp(F.league).xi.some(e => e.pl.name === "Capped Forward"), auto2 = box.querySelector("#intlAuto").getAttribute("aria-pressed");
 	box.querySelector("#intlAuto").click();
@@ -142,7 +144,7 @@ check("the Squad tab has an International card: best XI by default, your own pla
 const play = await page.evaluate(() => {
 	const F = window.__ff, lg = F.league, C = F.intlComp(lg), nat = lg.intl.nat, natName = F.NATIONS[nat][0];
 	const clubName = F.YOU.name, clubColor = F.YOU.color, nationNames = new Set(Object.values(F.NATIONS).map(n => n[0]));
-	lg.round = 20; F.intlNight();
+	lg.round = 20; for (let i = 0; i < lg.round; i++) { lg.results[i] = lg.results[i] || []; } F.intlNight();
 	const out = { games: [] };
 	const fx = F.currentFixture();
 	out.first = { intl: !!fx.intl, label: fx.label, opp: F.TEAMS[fx.opp].name, oppNat: fx.intl && F.NATIONS[fx.intl.nat][0] };
@@ -166,9 +168,9 @@ const play = await page.evaluate(() => {
 });
 check("at the second break your qualifier comes before the league, labelled, against the other country in the guest seat", play.first.intl && /^International · Qualifier, Group [A-F]$/.test(play.first.label) && play.first.opp === play.first.oppNat, JSON.stringify(play.first));
 check("the international is played in your national kit and name, with your national squad (your own capped man in it)", play.games.length === 2 && play.games.every(g => g.intl && g.you === play.natName && g.kit && g.xi) && play.games[0].capped, JSON.stringify(play.games));
-check("after the break the league resumes: same matchday, your club's name back, no country left in the clubs list", !play.after.intl && play.after.round === 20 && play.after.lgRound === 20 && play.after.you === play.clubName && play.leftover.length === 0, JSON.stringify({ after: play.after, leftover: play.leftover }));
+check("after the break the league resumes: same matchday, your club's name back, no country left in the clubs list", !play.after.intl && play.after.round === 20 && play.after.lgRound === 20 && play.leftover.length === 0, JSON.stringify({ after: play.after, leftover: play.leftover }));
 check("your group table counts your games, and your record keeps them", play.mineP === 4 && play.record === 2, JSON.stringify(play));
-check("your own club's player who played for his country is tired for the next league match", play.fit[1] < play.fit[0], JSON.stringify(play.fit));
+check("with no club, an international costs nobody's fitness", play.fit[1] === play.fit[0], JSON.stringify(play.fit));
 
 // The FA's choice: a club abroad while you manage a country.
 await showTab(page, "club");
@@ -178,13 +180,13 @@ const fa = await page.evaluate(() => {
 	F.renderLeague();
 	const li = [ ...document.querySelectorAll("#jobOffers li") ].find(x => /Puerto Test/.test(x.textContent));
 	[ ...li.querySelectorAll("button") ].find(b => b.textContent === "Move abroad").click();
-	const ask = [ ...document.querySelectorAll("#jobOffers li") ].find(x => /FA ask you to choose/.test(x.textContent));
+	const ask = [ ...document.querySelectorAll("#jobOffers li") ].find(x => /can't manage a club and a country/.test(x.textContent));
 	const stay = ask && [ ...ask.querySelectorAll("button") ].find(b => /^Stay with/.test(b.textContent));
 	const still = F.YOU.name;
 	if (stay) { stay.click(); }
 	return { ask: !!ask, still, nat: lg.intl.nat, offers: lg.jobOffers.length, you: F.YOU.name };
 });
-check("taking a club job abroad while you manage a country: the FA asks you to choose; staying turns the club down", fa.ask && fa.nat === pick.nat && fa.offers === 0 && fa.you === pick.club, JSON.stringify(fa));
+check("taking a club job abroad while you manage a country: the FA asks you to choose; staying turns the club down", fa.ask && fa.nat === pick.nat && fa.offers === 0, JSON.stringify(fa));
 
 // Saves: the job survives export and import; an old save without it loads with no job and no breaks; a damaged one is cleaned.
 const sv = await page.evaluate(() => {
@@ -205,7 +207,7 @@ check("an old save loads with no national job and no breaks until next season; a
 // The last break and the end of qualifying: sixteen go through (the six group winners first), and the job carries into an even season's tournament.
 const q = await page.evaluate(() => {
 	const F = window.__ff, lg = F.league, C = F.intlComp(lg);
-	lg.round = 30; F.intlNight();
+	lg.round = 30; for (let i = 0; i < lg.round; i++) { lg.results[i] = lg.results[i] || []; } F.intlNight();
 	let guard = 0;
 	while (F.currentFixture() && F.currentFixture().intl && guard++ < 3) { F.newMatchTest(); F.simulateMineTest(); }
 	const winners = C.groups.map((g, i) => F.intlGroupTable(C, i)[0].nat);
@@ -222,7 +224,7 @@ check("the national job and record carry into the next season, an even one: the 
 // The tournament plays out to a winner (your games through the match flow if you are in it), one round a night.
 const t = await page.evaluate(() => {
 	const F = window.__ff, lg = F.league, T = F.intlComp(lg);
-	lg.round = 30; F.intlNight();
+	lg.round = 30; for (let i = 0; i < lg.round; i++) { lg.results[i] = lg.results[i] || []; } F.intlNight();
 	let guard = 0;
 	while (F.currentFixture() && F.currentFixture().intl && guard++ < 12) { F.newMatchTest(); F.simulateMineTest(); }
 	F.renderLeague();
@@ -247,11 +249,12 @@ await page.evaluate(() => { const F = window.__ff; F.readyTest(); });
 const sack = await page.evaluate(() => {
 	const F = window.__ff;
 	F.league.round = F.league.fixtures.length; F.nextSeasonTest();
-	const lg = F.league, C = F.intlComp(lg), nat = lg.intl.nat;
+	const lg = F.league, C = F.intlComp(lg); if (!lg.intl.nat || (C.tour === "eu" && !F.NATIONS[lg.intl.nat][1].match(/home|europe/))) { lg.intl.nat = "NED"; }
+	const nat = lg.intl.nat;
 	if (C.kind !== "q") { return { kind: C.kind }; }
 	lg.intl.missed = 1;
 	for (const g of C.games) { if (g.hg === undefined) { [ g.hg, g.ag ] = g.h === nat ? [ 0, 3 ] : g.a === nat ? [ 3, 0 ] : [ 1, 1 ]; } }
-	C.night = C.nights.length - 1; lg.round = 30; F.intlNight();
+	C.night = C.nights.length - 1; lg.round = 30; for (let i = 0; i < lg.round; i++) { lg.results[i] = lg.results[i] || []; } F.intlNight();
 	return { kind: C.kind, done: C.done, out: !C.qualified.includes(nat), nat: lg.intl.nat, news: /let you go/.test(lg.news) };
 });
 check("two missed tournaments in a row and the FA lets you go", sack.kind === "q" && sack.done && sack.out && sack.nat === null && sack.news, JSON.stringify(sack));
@@ -263,9 +266,73 @@ const rs = await page.evaluate(() => {
 	lg.intl.offers = [ { nat: "NED", str: 3, season: lg.season } ]; F.acceptIntl("NED"); F.renderLeague();
 	const b = document.getElementById("intlResign"), had = lg.intl.nat;
 	if (b) { b.click(); }
-	return { had, nat: lg.intl.nat, gone: document.getElementById("intlJob").hidden };
+	return { had, nat: lg.intl.nat, between: /between jobs/.test(document.getElementById("intlJob").textContent), offers: lg.jobOffers.length };
 });
-check("you can resign the national job from the Club tab", rs.had === "NED" && rs.nat === null && rs.gone, JSON.stringify(rs));
+check("you can resign the national job from the Club tab; with no club you are told to pick one of the offers", rs.had === "NED" && rs.nat === null && rs.between && rs.offers > 0, JSON.stringify(rs));
+
+
+// Country only: no club. Fresh season, accept a job, and look at what the player sees.
+const only = await page.evaluate(() => {
+	const F = window.__ff; F.league.jobOffers = []; F.league.intl.only = false; F.league.intl.nat = null;
+	F.league.round = F.league.fixtures.length; F.nextSeasonTest();
+	const lg = F.league, club = F.YOU.name, C = F.intlComp(lg); window.__onlyNat = C.kind === "t" ? C.teams[0] : C.groups[0][0]; window.__onlyName = F.NATIONS[window.__onlyNat][0];
+	lg.intl.offers = [ { nat: window.__onlyNat, str: 3, season: lg.season } ]; F.renderLeague();
+	const card = [ ...document.querySelectorAll("#jobOffers li") ].find(x => /NATIONAL/.test(x.textContent));
+	const said = card ? card.textContent : "";
+	[ ...card.querySelectorAll("button") ].find(b => b.textContent === "Accept").click();
+	const fx = F.leagueMatch, I = lg.intl;
+	return { club, name: window.__onlyName, said, only: I.only, nat: I.nat, intl: !!(fx && fx.intl), round: lg.round, played: lg.results.filter(r => r && r.length).length, news: /full-time/.test(lg.news), career: lg.career.clubs.join("|"), ov: document.querySelector("#lgNext").textContent };
+});
+check("accepting a national job: the card says you leave the club, and you are unattached from it", only.said.includes(`leave ${only.club} to manage ${only.name} full-time`) && only.only && only.nat === only.nat && /national team/.test(only.career) && only.news, JSON.stringify(only));
+check("in country-only mode the next fixture is the international and the league matchdays before it were simulated; the Overview shows the country and the competition", only.intl && only.round >= 9 && only.played >= 9 && /Italy|International break|qualifier/i.test(only.ov), JSON.stringify(only));
+const tabs = {};
+for (const k of [ "transfers", "club", "squad" ]) {
+	await showTab(page, k);
+	tabs[k] = await page.evaluate(k => { const n = document.getElementById({ transfers: "transfersNoClub", club: "clubNoClub", squad: "sqNoClub" }[k]); const box = document.getElementById({ transfers: "transfersBox", club: "assistCard", squad: "sqBox" }[k]); return { note: !n.hidden && new RegExp(`You manage ${window.__onlyName}\\. No club duties`).test(n.textContent), hid: box.hidden, intl: k !== "squad" || !document.getElementById("intlSquad").hidden }; }, k);
+}
+check("Transfers, Club and Squad show the no-club note instead of club tools (the Squad tab keeps the national squad)", Object.values(tabs).every(x => x.note && x.hid && x.intl), JSON.stringify(tabs));
+const own = await page.evaluate(() => {
+	const F = window.__ff, lg = F.league, pl = F.intlCallUp(lg).xi[3].pl, nm = pl.name, cnt = () => F.intlCallUp(lg).xi.filter(e => e.pl.name === nm).length, before = cnt(), box = document.getElementById("intlSquad");
+	const li = [ ...box.querySelectorAll("li") ].find(x => x.textContent.includes(nm)), btn = li && li.querySelector("button");
+	btn && btn.click();
+	return { btn: !!btn, nm, rest: lg.intl.rest.slice(), left: cnt() < before, inj: pl.inj };
+});
+check("any player of your nationality can be left out of the national squad", own.btn && own.left, JSON.stringify(own));
+const sim = await page.evaluate(() => {
+	const F = window.__ff, lg = F.league, season = lg.season;
+	F.simSeasonAllTest();
+	return { done: F.league.round >= F.league.fixtures.length, rec: F.league.intl.record.length, nat: F.league.intl.nat, only: F.league.intl.only, same: F.league.season === season };
+});
+check("simulate whole season works in country mode: the league ends and your internationals were played", sim.done && sim.rec >= 1 && sim.nat === only.nat && sim.only && sim.same, JSON.stringify(sim));
+const roll = await page.evaluate(() => {
+	const F = window.__ff; F.nextSeasonTest();
+	const lg = F.league;
+	return { season: lg.season, nat: lg.intl.nat, only: lg.intl.only, round: lg.round, intl: !!(F.leagueMatch && F.leagueMatch.intl), comp: !F.intlComp(lg).none };
+});
+check("season rollover keeps the country job, draws the next competition and runs to the first international", roll.nat === only.nat && roll.only && roll.comp && (roll.intl || roll.round >= 9), JSON.stringify(roll));
+const take = await page.evaluate(() => {
+	const F = window.__ff, lg = F.league, id = lg.members.find(i => i !== 0);
+	lg.jobOffers = [ { id, kind: "home", str: 3, budget: 4, below: false, season: lg.season } ]; F.renderLeague();
+	const li = [ ...document.querySelectorAll("#jobOffers li") ].find(x => /JOB/.test(x.querySelector(".pos").textContent));
+	[ ...li.querySelectorAll("button") ].find(b => b.textContent === "Take the job").click();
+	const ask = [ ...document.querySelectorAll("#jobOffers li") ].find(x => /can't manage a club and a country/.test(x.textContent)), still = lg.intl.nat;
+	[ ...ask.querySelectorAll("button") ].find(b => b.textContent === "Take the club job").click();
+	F.renderLeague();
+	return { still, nat: lg.intl.nat, only: lg.intl.only, club: F.YOU.name === F.TEAMS[id].name, tabs: !document.getElementById("sqBox").hidden && document.getElementById("sqNoClub").hidden };
+});
+check("taking a club offer while you manage a country asks once, then ends the national job and puts you back in club mode", take.still === only.nat && take.nat === null && !take.only && take.tabs, JSON.stringify(take));
+const leg = await page.evaluate(() => {
+	const F = window.__ff, out = {};
+	for (const keepCountry of [ false, true ]) {
+		const lg = F.league; lg.jobOffers = []; lg.intl.nat = "NED"; lg.intl.only = false;
+		F.ensureClub(lg); F.renderLeague();
+		const card = [ ...document.querySelectorAll("#jobOffers li") ].find(x => /can't manage both/.test(x.textContent)), seen = !!card;
+		document.getElementById(keepCountry ? "intlKeepCountry" : "intlKeepClub").click();
+		out[keepCountry ? "country" : "club"] = { seen, nat: F.league.intl.nat, only: F.league.intl.only, cardGone: ![ ...document.querySelectorAll("#jobOffers li") ].some(x => /can't manage both/.test(x.textContent)) };
+	}
+	return out;
+});
+check("an old save holding both jobs shows the choice card; keeping the club ends the national job, keeping the country leaves the club", leg.club.seen && leg.club.nat === null && !leg.club.only && leg.club.cardGone && leg.country.seen && leg.country.nat === "NED" && leg.country.only && leg.country.cardGone, JSON.stringify(leg));
 
 // No real names: every national manager's name comes from the game's own name tables.
 const mg = await page.evaluate(() => {

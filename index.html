@@ -1542,7 +1542,8 @@
 				</div>
 			</div>
 			<div class="hub-panel" role="tabpanel" id="panel-squad" aria-labelledby="tab-squad" tabindex="0" hidden>
-				<div class="sq">
+				<p class="win-note no-club" id="sqNoClub" hidden></p>
+				<div class="sq" id="sqBox">
 				<div class="sq-head"><h4>Your squad</h4><span class="lg-meta" id="sqMeta"></span><button type="button" id="autoPick">Auto-pick best XI</button><button type="button" id="autoRot" aria-pressed="false">Auto-rotate off</button></div>
 				<p class="win-note">Drag a player onto another position or to and from the bench, or tap one and then another to swap them. Starters lose fitness each match and rested players recover, so rotate before legs go.</p>
 				<div class="lineup" id="lineup" aria-label="Line-up"></div>
@@ -1586,7 +1587,8 @@
 				<div class="lg-extras" id="lgExtras"></div>
 			</div>
 			<div class="hub-panel" role="tabpanel" id="panel-transfers" aria-labelledby="tab-transfers" tabindex="0" hidden>
-				<div class="win">
+				<p class="win-note no-club" id="transfersNoClub" hidden></p>
+				<div class="win" id="transfersBox">
 				<div class="sq-head"><h4 id="winTitle">Transfer window</h4><span class="budget" id="winBudget"></span></div>
 				<p class="win-note" id="winNote"></p>
 				<div class="tabs mk-tabs" id="mkTabs" role="group" aria-label="Which market"></div>
@@ -1649,10 +1651,13 @@
 				<ul class="market" id="agentOffers"></ul>
 				<p class="win-note" id="careerLine"></p>
 				<p class="win-note intl-job" id="intlJob" hidden></p>
+				<div id="clubUpgrades">
 				<h4 class="up-title">Club upgrades</h4>
 				<ul class="upgrades" id="winUpgrades"></ul>
 				</div>
+				</div>
 				<div class="win lg-academy-box" id="lgAcademy"></div>
+				<p class="win-note no-club" id="clubNoClub" hidden></p>
 				</div>
 			</div>
 		</section>
@@ -1826,7 +1831,7 @@
 				<p class="fine"><b>Crowd and music.</b> The crowd swells as the ball nears a goal, the home end sings with a drum beating under it, goals get a roar (or a groan from the home fans), and hard saves get an "ooh". After a long quiet spell, or with the home side cruising, the 3D crowd starts a Mexican wave that runs round the bowl. The menus play a stadium anthem: strings, a horn carrying the tune with a choir under it, bass, timpani and snare, in a hall; turn it off with Music.</p>
 				<p class="fine"><b>Goals.</b> The scorer wheels away to the corner, slides on his knees in front of the fans and is mobbed by his teammates while the other side trudges back and their keeper fetches the ball out of the net, which bulges and swings where the ball hit it. A caption names the scorer and the minute, and the score bug flashes. In the 3D view the celebration then gives way to an instant replay of the build-up in slow motion, from high behind the goal or low beside it, before the camera goes back to the scorer and cuts wide for the restart. The match clock is stopped throughout. Any key, button or tap skips the celebration and the replay. Cards and substitutions get captions too.</p>
 				<p class="fine"><b>Weather and grounds.</b> Every club has a home ground: grass, muddy or artificial turf. Mud slows the ball and the players and kills the bounce. Turf is quick and true. Rain holds the ball up (heavy rain and mud most of all), costs players grip on the turn, sends passes a little astray and makes shots harder for keepers to hold, so they spill more. Wind pushes the ball while it is in the air: long balls, crosses, corners and lofted shots carry with it and hang against it; the arrow and speed at the top left of the pitch show which way it blows. League fixtures kick off in the afternoon or at night under the floodlights, with the stands dark around a lit pitch. In the league, matchdays 10 to 26 are the rainy season, windier and mostly at night, and the forecast is shown in advance (☾ night, ☀ afternoon, ≈ windy); the kick-off card gives the time, the rain and which way the wind blows for you. In a friendly, pick the weather (including Windy, and Fog, which only thickens the air: the far side fades but the ball plays as on a dry night) and ground yourself.</p>
-				<p class="fine"><b>National teams.</b> Every country's squad is picked from the players in your save (the Cups tab lists them). There are three international breaks a season, after league matchdays 9, 20 and 30. In odd seasons the countries play qualifying groups of five or six; the group winners and the two best runners-up go to the next season's tournament, eight countries playing quarter-finals, semi-finals and a final at the last break. A good season can bring an offer to manage a country as well as your club (Club tab, Career): accept it and its games become your fixtures at the breaks, played in its kit with its squad. The International card on the Squad tab picks the best eleven by default; leave out your own club's players if you want them fresh, since those who play lose fitness for the next league match. You can resign from the Club tab; two missed tournaments in a row and the FA lets you go, and taking a club job in another country means choosing between the two.</p>
+				<p class="fine"><b>National teams.</b> Every country's squad is picked from the players in your save (the Cups tab lists them). There are three international breaks a season, after league matchdays 9, 20 and 30. In odd seasons the countries play qualifying groups of five or six; the group winners and the two best runners-up go to the next season's tournament, eight countries playing quarter-finals, semi-finals and a final at the last break. A good season can bring an offer to manage a country (Club tab, Career). You manage a country or a club, never both: accepting means you leave your club, which gets a new manager, and you manage the country full-time. The league season still runs and its matches are simulated for you; you play the internationals at the breaks, in the country's kit with its squad. While you manage a country the Squad tab shows its call-up card (auto-pick, leave out or recall any player of your nationality), and Transfers, club staff, academy and upgrades are not available. Club offers still arrive; taking one asks once and ends the national job. You can resign from the Club tab; two missed tournaments in a row and the FA lets you go. An old save that holds both jobs asks you to pick one.</p>
 				<p class="fine"><b>Your season, backed up.</b> Your league saves in this browser. Export league saves it to a file; Import league loads a file back (press twice to confirm, since it replaces the season you have). Use it to keep a backup or carry your season to another browser or device.</p>
 				<p class="fine"><b>Assistant.</b> In the Club tab (the first card, "Assistant manager"; Settings has a shortcut under Your team), the Assistant setting hands the club's paperwork to your assistant manager. Contracts: between matches he goes through everyone in the last year of his deal, the most important first (rating, age, how much he plays and who else can play there). Young key men get three more seasons, men past 31 and the fringe one, older squad men take a pay cut, and a squad man of 33 or more, or one the squad doesn't need, is let go on a free. He keeps £0.4m back for wages. When the money runs short, a key man who would otherwise walk signs with no signing-on fee and a bigger rise instead; with Transfers on too and a window open he sells a squad player to pay for the rest, otherwise he suggests one. His report says who renewed, for how long and at what wage, who hasn't signed yet, when their deals end and why, and what you can do: spend the wage money, sell, or offer the deal yourself from the squad list. Transfers: when a window is open he answers bids (cashing in only well over a player's value, or on anyone past 31 at a fair price, never the only keeper), and signs at most two players a window where a known quantity, scouted or from home, is a clear step up on your weakest starter in that position. Everything he does appears in the notes on the League panel. Off by default.</p>
 				<p class="fine"><b>The transfer window.</b> The market opens on the For you tab: a shortlist of the players who would improve your eleven, each with the gain over the starter he would replace (an estimate until he is scouted). "Sign the best for me" lets the assistant buy up to two known step-ups at the asking price, keeping money for wages; "Scout the shortlist" spends the window's reports on it, best first. The line above the tabs says where the eleven is thinnest. The other tabs show every market as before.</p>
@@ -3270,16 +3275,17 @@
 			const champ = TEAMS[rows[0].id];
 			next.append(el("span", "eyebrow", `Season ${league.season} champions`));
 			const name = el("div", "opp"); name.append(dotFor(champ), el("span", "", champ.name)); next.append(name);
-			next.append(el("span", "detail", rows[0].id === 0
+			if (league.intl && league.intl.only) { next.append(el("span", "detail", `You were not managing a club. ${league.intl.nat ? intlNext(league) : ""} Start a new season from the pitch.`)); } else next.append(el("span", "detail", rows[0].id === 0
 				? `That's you, with ${me.pts} point${me.pts === 1 ? "" : "s"}. Start a new season from the pitch.`
 				: `You finished ${ordinal(myPos)} with ${me.pts} point${me.pts === 1 ? "" : "s"}. Start a new season from the pitch.`));
 		} else {
 			const f = currentFixture(), o = TEAMS[f.opp];
 			next.append(el("span", "eyebrow", `Next · ${f.label || `Matchday ${f.round + 1}`} · ${f.neutral ? "Neutral ground" : f.home ? "Home" : "Away"}${derbyOf(0, f.opp) ? " · Derby" : ""}`));
 			const name = el("div", "opp"); name.append(dotFor(o), el("span", "", o.name)); next.append(name);
-			const det = el("span", "detail");
-			det.append(el("span", "stars", stars(getStr(f.opp))), document.createTextNode(` rating. You are ${ordinal(myPos)} on ${me.pts} point${me.pts === 1 ? "" : "s"}.`));
+			const det = el("span", "detail"), only = !!(league.intl && league.intl.only);
+			det.append(el("span", "stars", stars(getStr(f.opp))), document.createTextNode(only ? ` rating. ${intlNext(league)}` : ` rating. You are ${ordinal(myPos)} on ${me.pts} point${me.pts === 1 ? "" : "s"}.`));
 			next.append(det);
+			if (!only) {
 			const host = f.home ? YOU : o;
 			const wn = league.wind[f.round];
 			const cc = typeof ensureCont === "function" ? ensureCont(league) : null, path = cc && cc.none ? ccPath(league) : "";
@@ -3287,6 +3293,7 @@
 			next.append(el("span", "detail", `${host.ground} · ${SURFACES[host.surface].label} · ${league.ko[f.round] === "day" ? "Afternoon" : "Night"} kick-off, ${koLabel(league.ko[f.round])} · Forecast: ${WEATHER[league.weather[f.round]].label.toLowerCase()}, ${wn.s >= 6 ? `${windWord(wn.s)} of ${wn.s} km/h` : "still air"}`));
 			const tired = tiredStarters();
 			if (tired.length) { next.append(el("span", "detail tiredwarn", `⚠ ${tiredText(tired)}`)); }
+			}
 		}
 
 		const list = $("lgRound");
@@ -5270,9 +5277,9 @@
 	function takeOffer (key) {
 		const o = (league && league.jobOffers || []).find(x => offerKey(x) === key);
 		if (!o) { return false; }
-		// A club in another country while you manage a national side: the FA asks you to choose (18j).
+		// A club job while you manage a country: you can't do both, so one confirm, and the national job ends (18j).
 		// A move agreed in January has already been chosen: it ends the national job.
-		if (o.abroad && league.intl && league.intl.nat) {
+		if (league.intl && league.intl.nat) {
 			if (!o.agreed && typeof intlAsk === "function") { return intlAsk(key); }
 			if (typeof intlEndJob === "function") { intlEndJob(league, "club"); }
 		}
@@ -5300,6 +5307,7 @@
 		c.log = [ `You took the ${YOU.name} job, from ${from.name} (budget ${money(offer.budget)})` ];
 		if (typeof ensureCoaching === "function") { ensureCoaching(c, lg); }
 		lg.club = c;
+		if (lg.intl) { lg.intl.only = false; }   // back in club mode (18j)
 		if (lg.cpuIn) { delete lg.cpuIn[id]; }
 		lg.bidsIn = []; lg.jobOffers = [];
 		lg.career = { ...(lg.career || {}), clubs: [ ...((lg.career && lg.career.clubs) || [ from.name ]), YOU.name ] };
@@ -5656,6 +5664,7 @@
 		if (typeof renderIntl === "function") { renderIntl(box); }   // the international breaks (18j)
 		if (typeof renderNations === "function") { renderNations(box); }   // national squads (18j)
 		if (typeof renderIntlSquad === "function") { renderIntlSquad(); }   // and your national squad, on the Squad tab
+		if (typeof renderIntlOnly === "function") { renderIntlOnly(); }   // no club: the club tabs say so
 		const aw = league.awards;
 		if (aw && aw.season === league.season) {
 			const a = el("div", "lg-awards");
@@ -7547,7 +7556,8 @@
 	// Everyone in the save who could be picked, with where he plays.
 	function intlPool (lg) {
 		const out = [], add = (pl, club, own) => { if (pl && NATIONS[pl.nat]) { out.push({ pl, club, own }); } };
-		for (const p of [ ...(lg.club.squad || []), ...(lg.club.bench || []) ]) { add(p, YOU.name, true); }
+		const mine = !(lg.intl && lg.intl.only);   // country only: your old club's players are anyone else's (the club has a CPU manager)
+		for (const p of [ ...(lg.club.squad || []), ...(lg.club.bench || []) ]) { add(p, YOU.name, mine); }
 		const guest = lg.contGuest ? lg.contGuest.slot : -1;
 		for (let i = 1; i < TEAMS.length; i++) {
 			if (i === guest) { continue; }   // a cup guest's eleven is made up on the night; not one of the save's players
@@ -7688,6 +7698,7 @@
 		let I = lg.intl;
 		if (!plainObj(I) || I.v !== 1) { I = lg.intl = { v: 1, nat: null, offers: [], record: [], season: lg.season, missed: 0, rest: [], next: null, comp: intlNone(lg.season) }; }
 		if (!natOk(I.nat)) { I.nat = null; }
+		I.only = I.only === true;   // true: no club, the country is the whole job (or neither, after resigning)
 		I.offers = Array.isArray(I.offers) ? I.offers.filter(o => plainObj(o) && natOk(o.nat) && o.season === lg.season).slice(0, 1) : [];
 		I.record = Array.isArray(I.record) ? I.record.filter(r => plainObj(r) && natOk(r.nat) && natOk(r.opp) && Number.isInteger(r.gf) && Number.isInteger(r.ga)).slice(-30) : [];
 		I.missed = Number.isInteger(I.missed) ? clamp(I.missed, 0, 2) : 0;
@@ -7702,7 +7713,7 @@
 	// A new season: the job, the record and the qualifiers carry over; the offers lapse; a new draw.
 	function intlNewSeason (prev) {
 		const lg = league, P = prev && plainObj(prev.intl) && prev.intl.v === 1 ? prev.intl : null;
-		lg.intl = { v: 1, nat: P && natOk(P.nat) ? P.nat : null, offers: [], record: P && Array.isArray(P.record) ? P.record.slice(-30) : [], season: lg.season, missed: P && Number.isInteger(P.missed) ? P.missed : 0, rest: [], next: P && P.next ? P.next : null, comp: intlNone(lg.season) };
+		lg.intl = { v: 1, nat: P && natOk(P.nat) ? P.nat : null, offers: [], record: P && Array.isArray(P.record) ? P.record.slice(-30) : [], season: lg.season, only: !!(P && P.only === true), missed: P && Number.isInteger(P.missed) ? P.missed : 0, rest: [], next: P && P.next ? P.next : null, comp: intlNone(lg.season) };
 		ensureIntl(lg);
 		lg.intl.comp = drawIntl(lg, lg.intl);
 		const C = lg.intl.comp, me = lg.intl.nat;
@@ -7832,7 +7843,7 @@
 	function intlCallUp (lg = league) {
 		const I = ensureIntl(lg);
 		if (!I || !I.nat) { return null; }
-		const rest = new Set(I.rest), pool = intlPool(lg).filter(e => !(e.own && (e.pl.inj > 0 || e.pl.ban > 0 || rest.has(e.pl.name))));
+		const rest = new Set(I.rest), pool = intlPool(lg).filter(e => !((e.own || I.only) && (e.pl.inj > 0 || e.pl.ban > 0 || rest.has(e.pl.name))));
 		return pickNation(I.nat, pool, lg);
 	}
 	const matchSquad = () => (intlSide ? intlSide.club : league && league.club);
@@ -7910,18 +7921,24 @@
 		if (!I || !I.nat) { return; }
 		const was = I.nat;
 		I.nat = null; I.missed = 0; I.rest = []; delete I.ask;
+		if (why === "club") { I.only = false; }   // a club job is next: the country job is over and so is any time without a club
 		if (lg.contGuest && lg.contGuest.intl) { restoreGuest(lg); }
 		if (why === "resigned") { lg.news = `${lg.news || ""} You resigned as ${natName(was)} manager.`.trim(); }
 		else if (why === "club") { lg.news = `${lg.news || ""} You left the ${natName(was)} job for a club abroad.`.trim(); }
 		if (lg === league) { intlNight(); }   // anything of theirs that was waiting is played out
+		if (lg === league && why === "sacked") { intlFreeOffers(lg); }
 	}
 	function acceptIntl (nat) {
 		const lg = league, I = ensureIntl(lg), o = I && I.offers.find(x => x.nat === nat);
 		if (!o || I.nat) { return false; }
-		I.nat = nat; I.offers = []; I.missed = 0; I.rest = [];
-		lg.news = `${lg.news || ""} You are the new manager of ${natName(nat)}, alongside the ${YOU.name} job.`.trim();
-		lastDeal = `You are the new ${natName(nat)} manager. Your club job goes on as before; the internationals come at the breaks.`;
+		const club = clubName();
+		I.nat = nat; I.only = true; I.offers = []; I.missed = 0; I.rest = [];
+		lg.career = { ...(lg.career || { history: [] }), clubs: [ ...((lg.career && lg.career.clubs) || [ club ]), `${natName(nat)} (national team)` ] };
+		lg.news = `${lg.news || ""} You left ${club} to manage ${natName(nat)} full-time. ${club} have a new manager.`.trim();
+		lastDeal = `You left ${club} and are the new ${natName(nat)} manager. The league carries on without you; you play the internationals.`;
 		afterClubChange();
+		newMatch();   // the club's matchdays are played for you, up to the next international
+		renderLeague();
 		return true;
 	}
 	function declineIntl (nat) {
@@ -7931,7 +7948,44 @@
 		lastDeal = `You turned ${natName(nat)} down.`;
 		afterClubChange();
 	}
-	function resignIntl () { if (!league || !league.intl || !league.intl.nat) { return false; } intlEndJob(league, "resigned"); lastDeal = "You resigned from the national job."; afterClubChange(); return true; }
+	// No club and no country: the club offers come straight away (the career history isn't doubled).
+	function intlFreeOffers (lg) {
+		if (!lg.intl || !lg.intl.only || lg.intl.nat || (lg.jobOffers || []).length) { return false; }
+		const hist = lg.career && Array.isArray(lg.career.history) ? lg.career.history.slice() : null;
+		offerJobs();
+		if (hist) { lg.career.history = hist; }
+		lg.intl.offers = [];
+		return true;
+	}
+	function resignIntl () {
+		const lg = league;
+		if (!lg || !lg.intl || !lg.intl.nat) { return false; }
+		const noClub = lg.intl.only;
+		intlEndJob(lg, "resigned");
+		lastDeal = "You resigned from the national job.";
+		if (noClub && intlFreeOffers(lg)) { lastDeal = "You resigned from the national job. Pick a club from the offers in Club, Career."; }
+		afterClubChange();
+		return true;
+	}
+	// An old save that holds a club and a country: the one-time choice (renderIntlOffers shows the card).
+	const intlLegacy = (lg = league) => !!(lg && lg.intl && lg.intl.nat && !lg.intl.only);
+	function intlLegacyChoose (keepCountry) {
+		const lg = league, I = lg && lg.intl;
+		if (!intlLegacy(lg)) { return; }
+		if (keepCountry) {
+			I.only = true; const club = clubName();
+			lg.career = { ...(lg.career || { history: [] }), clubs: [ ...((lg.career && lg.career.clubs) || [ club ]), `${natName(I.nat)} (national team)` ] };
+			lg.news = `${lg.news || ""} You left ${club} to manage ${natName(I.nat)} full-time. ${club} have a new manager.`.trim();
+			lastDeal = `You keep ${natName(I.nat)} and left ${club}.`;
+		} else {
+			const was = natName(I.nat);
+			intlEndJob(lg, "choice");
+			lastDeal = `You keep ${clubName()}; the ${was} job is over.`;
+		}
+		afterClubChange();
+		newMatch();
+		renderLeague();
+	}
 	// A club job in another country: the FA asks you to choose (see takeOffer, 18b).
 	function intlAsk (key) { const I = ensureIntl(league); if (!I || !I.nat) { return false; } I.ask = key; afterClubChange(); return true; }
 	function intlChoose (keepCountry) {
@@ -7949,33 +8003,50 @@
 		let n = 0;
 		for (const o of I.offers) {
 			const li = el("li");
-			li.append(el("span", "pos", "NATIONAL"), el("span", "who", `${natName(o.nat)} want you as manager: strength ${"★".repeat(Math.round(o.str))}, alongside your club job`));
+			li.append(el("span", "pos", "NATIONAL"), el("span", "who", `${natName(o.nat)} want you as manager: strength ${"★".repeat(Math.round(o.str))}. You'll leave ${clubName()} to manage ${natName(o.nat)} full-time`));
 			const btns = el("span", "bids");
 			const a = el("button", "", "Accept"); a.type = "button"; a.addEventListener("click", () => acceptIntl(o.nat));
 			const r = el("button", "", "Decline"); r.type = "button"; r.addEventListener("click", () => declineIntl(o.nat));
 			btns.append(a, r); li.append(btns);
-			li.append(el("span", "ratings", `International offer. You keep ${YOU.name}; you pick ${natName(o.nat)}'s squad and play their games at the international breaks. Two missed tournaments in a row and the FA will let you go.`));
+			li.append(el("span", "ratings", `International offer. Accept and you are no longer ${clubName()}'s manager: it gets a new one. You pick ${natName(o.nat)}'s squad and play their games at the breaks while the league goes on without you. Club offers can still come, and taking one ends the national job. Two missed tournaments in a row and the FA will let you go.`));
 			ul.append(li); n++;
 		}
 		const ask = I.ask && (league.jobOffers || []).find(o => offerKey(o) === I.ask);
 		if (I.ask && !ask) { delete I.ask; }
 		if (ask && I.nat) {
 			const li = el("li", "intl-ask");
-			li.append(el("span", "pos", "FA"), el("span", "who", `The ${natName(I.nat)} FA ask you to choose: ${ask.name || TEAMS[ask.id].name} is a club in another country.`));
+			li.append(el("span", "pos", "FA"), el("span", "who", `${ask.name || TEAMS[ask.id].name} want you as manager, but you can't manage a club and a country. Choose.`));
 			const btns = el("span", "bids");
 			const a = el("button", "", "Take the club job"); a.type = "button"; a.addEventListener("click", () => intlChoose(false));
 			const r = el("button", "", `Stay with ${natName(I.nat)}`); r.type = "button"; r.addEventListener("click", () => intlChoose(true));
 			btns.append(a, r); li.append(btns);
-			li.append(el("span", "ratings", `Take the club job and you leave ${natName(I.nat)}. Stay, and the club offer is turned down.`));
+			li.append(el("span", "ratings", `Take the club job and you leave ${natName(I.nat)}: you won't manage the country any more. Stay, and the club offer is turned down.`));
+			ul.append(li); n++;
+		}
+		if (intlLegacy(league)) {
+			const li = el("li", "intl-ask");
+			li.append(el("span", "pos", "CHOOSE"), el("span", "who", "Club or country? You can't manage both any more"));
+			const btns = el("span", "bids");
+			const k = el("button", "", `Keep ${clubName()}`); k.type = "button"; k.id = "intlKeepClub"; k.addEventListener("click", () => intlLegacyChoose(false));
+			const c = el("button", "", `Keep ${natName(I.nat)}`); c.type = "button"; c.id = "intlKeepCountry"; c.addEventListener("click", () => intlLegacyChoose(true));
+			btns.append(k, c); li.append(btns);
+			li.append(el("span", "ratings", `This save has you managing ${clubName()} and ${natName(I.nat)}. Keep the club and the national job ends. Keep the country and you leave ${clubName()}, which gets a new manager.`));
 			ul.append(li); n++;
 		}
 		const box = $("intlJob");
 		if (box) {
 			box.replaceChildren();
-			box.hidden = !I.nat;
-			if (I.nat) {
+			box.hidden = !(I.nat || I.only);
+			if (I.nat && I.only) {
 				const rec = I.record.filter(r => r.nat === I.nat), w = rec.filter(r => r.gf > r.ga).length, d = rec.filter(r => r.gf === r.ga).length;
-				box.append(el("span", "", `National team: you manage ${natName(I.nat)} as well as ${YOU.name}. Record: ${rec.length} game${rec.length === 1 ? "" : "s"}, ${w} won, ${d} drawn, ${rec.length - w - d} lost.${I.missed ? " One missed tournament: miss the next and the FA will let you go." : ""} `));
+				box.append(el("span", "", `National team: you manage ${natName(I.nat)} full-time and no club. Record: ${rec.length} game${rec.length === 1 ? "" : "s"}, ${w} won, ${d} drawn, ${rec.length - w - d} lost.${I.missed ? " One missed tournament: miss the next and the FA will let you go." : ""} `));
+				const b = el("button", "", `Resign from ${natName(I.nat)}`); b.type = "button"; b.id = "intlResign"; b.addEventListener("click", resignIntl);
+				box.append(b);
+			} else if (I.only) {
+				box.append(el("span", "", "You are between jobs: no club and no country. Take one of the offers above to get back to work."));
+			} else if (I.nat) {
+				const rec = I.record.filter(r => r.nat === I.nat);
+				box.append(el("span", "", `National team: ${natName(I.nat)}. Record: ${rec.length} game${rec.length === 1 ? "" : "s"}. `));
 				const b = el("button", "", `Resign from ${natName(I.nat)}`); b.type = "button"; b.id = "intlResign"; b.addEventListener("click", resignIntl);
 				box.append(b);
 			}
@@ -8085,20 +8156,47 @@
 		head.append(el("h4", "", `International · ${natName(I.nat)}`), el("span", "lg-meta", `${stars(Math.round(side.str))} · OVR ${Math.round(side.ovr)}`));
 		const ap = el("button", "", "Auto-pick best XI"); ap.type = "button"; ap.id = "intlAuto"; ap.setAttribute("aria-pressed", String(auto)); ap.addEventListener("click", intlAutoPick);
 		head.append(ap);
-		box.append(head, el("p", "win-note", `${intlNext(league)} ${auto ? "Auto-pick: the best eleven in the save by position." : "Your picks: the players you left out are below."} Your club's players who play lose fitness for the next league match, as a start would cost them.`));
+		box.append(head, el("p", "win-note", `${intlNext(league)} ${auto ? "Auto-pick: the best eleven in the save by position." : "Your picks: the players you left out are below."} ${I.only ? "" : "Your club's players who play lose fitness for the next league match, as a start would cost them."}`));
 		const ol = el("ol", "nat-xi"), row = (e, on) => {
 			const r = el("li", e.own ? "mine" : "");
 			r.append(el("span", "pos", POS_LABEL[e.pl.pos]), el("span", "who", `${e.pl.name} · ${ovrOf(e.pl)} · ${e.club}${e.own ? ` · fit ${Math.round(fitOf(e.pl))}%` : ""}`));
-			if (e.own) { const b = el("button", "", on ? "Leave out" : "Recall"); b.type = "button"; b.addEventListener("click", () => intlRestToggle(e.pl.name)); r.append(b); }
+			if (e.own || I.only) { const b = el("button", "", on ? "Leave out" : "Recall"); b.type = "button"; b.addEventListener("click", () => intlRestToggle(e.pl.name)); r.append(b); }
 			return r;
 		};
 		for (const i of slotsFor(league.fmt)) { if (side.xi[i]) { ol.append(row(side.xi[i], true)); } }
 		box.append(ol);
 		if (side.bench.length) { box.append(el("span", "eyebrow", "Bench")); const b = el("ol", "nat-xi"); for (const e of side.bench) { b.append(row(e, true)); } box.append(b); }
-		const out = [ ...league.club.squad, ...league.club.bench ].filter(pl => I.rest.includes(pl.name));
-		if (out.length) { box.append(el("span", "eyebrow", "Left out")); const b = el("ol", "nat-xi"); for (const pl of out) { b.append(row({ pl, own: true, club: YOU.name }, false)); } box.append(b); }
+		const out = I.only ? intlPool(league).filter(e => e.pl.nat === I.nat && I.rest.includes(e.pl.name)) : [ ...league.club.squad, ...league.club.bench ].filter(pl => I.rest.includes(pl.name)).map(pl => ({ pl, own: true, club: clubName() }));
+		if (out.length) { box.append(el("span", "eyebrow", "Left out")); const b = el("ol", "nat-xi"); for (const e of out) { b.append(row(e, false)); } box.append(b); }
 	}
-	queueMicrotask(() => { if (window.__ff) { Object.assign(window.__ff, { nationSquads, nationSquad, nationIdent, strOfOvr, intlPool, pickNation, renderNations, NATIONS, INTL_BREAKS, ensureIntl, intlComp, intlNight, intlFixture, intlOffers, acceptIntl, declineIntl, resignIntl, intlChoose, intlCallUp, intlGroupTable, intlQualified, intlManager, intlNext, intlNewSeason, renderIntlSquad, intlRestToggle, intlAutoPick, nameTables: { FIRST, SURNAMES }, intlRep, renderOffers, newMatchTest () { clearLive(); state = "intro"; newMatch(); renderLeague(); }, readyTest () { clearLive(); state = "intro"; banner.hidden = true; newMatch(); showIntro(); renderLeague(); } }); Object.defineProperties(window.__ff, { intlSide: { get: () => intlSide, configurable: true }, leagueMatch: { get: () => leagueMatch, configurable: true } }); } });
+	/* Country only (lg.intl.only): no club. The league season still runs; your old club is played by the computer
+	   (its matches are simulated for you), and this runs them up to your next international. */
+	const clubName = () => (intlYou && intlYou.name !== undefined ? intlYou.name : YOU.name);   // your club's name, even with the country's kit swapped in
+	const intlNoClub = (lg = league) => !!(lg && lg.intl && lg.intl.only);
+	function intlOnlyAdvance () {
+		const lg = league;
+		if (!lg || !intlNoClub(lg) || bulkSim || mode !== "league" || seasonDone()) { return; }
+		let f = currentFixture();
+		if (!f || f.intl) { return; }
+		bulkSim = true;
+		try {
+			for (let guard = 0; guard < 90 && !seasonDone(); guard++) {
+				f = currentFixture();
+				if (!f || f.intl) { break; }
+				clearLive(); state = "intro"; newMatch();
+				if (!leagueMatch || leagueMatch.intl) { break; }
+				simulateMine();
+			}
+		} finally { bulkSim = false; }
+		saveLeague(); clearLive(); state = "intro"; banner.hidden = true;
+	}
+	// The tabs that are about a club: a short note instead, with the layout left alone.
+	function renderIntlOnly () {
+		const on = intlNoClub(), I = league && league.intl, note = I && I.nat ? `You manage ${natName(I.nat)}. No club duties.` : "You have no club. Take one of the job offers in Club, Career.";
+		for (const id of [ "sqBox", "transfersBox", "assistCard", "coachPanel", "clubUpgrades", "lgAcademy" ]) { const b = $(id); if (b) { b.hidden = on; } }
+		for (const id of [ "sqNoClub", "transfersNoClub", "clubNoClub" ]) { const b = $(id); if (b) { b.hidden = !on; b.textContent = note; } }
+	}
+	queueMicrotask(() => { if (window.__ff) { Object.assign(window.__ff, { intlOnlyAdvance, intlFreeOffers, intlNoClub, intlLegacy, intlLegacyChoose, renderIntlOnly, nationSquads, nationSquad, nationIdent, strOfOvr, intlPool, pickNation, renderNations, NATIONS, INTL_BREAKS, ensureIntl, intlComp, intlNight, intlFixture, intlOffers, acceptIntl, declineIntl, resignIntl, intlChoose, intlCallUp, intlGroupTable, intlQualified, intlManager, intlNext, intlNewSeason, renderIntlSquad, intlRestToggle, intlAutoPick, nameTables: { FIRST, SURNAMES }, intlRep, renderOffers, newMatchTest () { clearLive(); state = "intro"; newMatch(); renderLeague(); }, readyTest () { clearLive(); state = "intro"; banner.hidden = true; newMatch(); showIntro(); renderLeague(); } }); Object.defineProperties(window.__ff, { intlSide: { get: () => intlSide, configurable: true }, leagueMatch: { get: () => leagueMatch, configurable: true } }); } });
 	/* ---------- audio ----------
 	   Everything is synthesised in WebAudio: the ball off a boot, the referee's whistle, and a
 	   crowd built from layered noise and detuned voices that breathes with the match. */
@@ -11812,6 +11910,7 @@
 	/* ---------- flow ---------- */
 	function newMatch () {
 		if (typeof intlBegin === "function") { intlBegin(null); }   // your own club's identity back, if an international had it
+		if (mode === "league" && typeof intlOnlyAdvance === "function") { intlOnlyAdvance(); }   // no club: the club's matchdays are played for you, up to the next international (18j)
 		leagueMatch = mode === "league" ? currentFixture() : null;
 		if (leagueMatch && leagueMatch.intl && typeof intlBegin === "function") { intlBegin(leagueMatch); }   // your national side, in its kit (18j)
 		applyFormat(mode === "league" && league ? league.fmt : fmtSel.value);
@@ -12191,6 +12290,10 @@
 		// welcome card sent the player there, otherwise a friendly to practise in.
 		if (tutDone) { tutDone = false; const back = store.get("ff-tut-return") === "league"; store.set("ff-tut-return", ""); setMode(back ? "league" : "friendly"); return; }
 		if (state === "intro" || state === "full") {
+			if (mode === "league" && typeof intlOnlyAdvance === "function" && intlNoClub()) {   // country only: on to the next international, or the end of the season (18j)
+				intlOnlyAdvance();
+				if (seasonDone()) { showOverlay(`Season ${league.season} complete`, "The rest of the league season was played without you. The job offers and the season's news are in the tabs below.", `Start season ${league.season + 1}`); renderLeague(); return; }
+			}
 			if (mode === "league" && seasonDone()) { newSeason(league.fmt); renderLeague(); renderShapes(); }
 			clearLive();
 			newMatch();
@@ -12272,9 +12375,10 @@
 				const rep2 = league.club.report;
 				if (rep2 && rep2.round === league.round && rep2.gains.length) { nudge += ` Training: ${rep2.gains.slice(0, 4).join(", ")}${rep2.gains.length > 4 ? ` and ${rep2.gains.length - 4 + (rep2.more || 0)} more` : ""}.`; }
 				btn = `Play matchday ${league.round + 1}`;
+				if (league.intl && league.intl.only) { btn = "Continue"; } else
 				{ const nf = currentFixture(); if (nf && nf.label) { btn = `Play: ${nf.label.replace(/^[^·]*· /, "")}`; } }   // a continental night next (18f)
 				if (leagueMatch.intl && league.intl && league.intl.lastNote) {   // an international (18j): its result, and only what matters for the next league match
-					nudge = `${league.intl.lastNote} You are ${ordinal(pos)} in the league on ${pts} point${pts === 1 ? "" : "s"}.${tired.length ? ` ⚠ Before the next league match: ${tiredText(tired)}` : ""}`;
+					nudge = `${league.intl.lastNote}${league.intl.only ? "" : ` You are ${ordinal(pos)} in the league on ${pts} point${pts === 1 ? "" : "s"}.`}${!league.intl.only && tired.length ? ` ⚠ Before the next league match: ${tiredText(tired)}` : ""}`;
 				}
 			}
 		}
@@ -21767,7 +21871,7 @@
 			get charging () { return charging; }, get passCharge () { return passCharge; }, get meterRect () { return meterRect; }, get drawMs () { return drawMs; }, get drawn () { return drawn; }, frameDue, get scale () { return scale; }, get kits () { return KITS; }, get stats () { return stats; }, get oppStats () { return oppStats; }, get steerAt () { return steerAt; }, set steerAt (v) { steerAt = v; }, set possTeam (v) { possTeam = v; },
 			set steerSwitchDone (v) { steerSwitchDone = !!v; },
 			get lastSwitchKind () { return lastSwitchKind; }, get line () { return line; }, get tackling () { return tackling; }, setLine (t, v) { line[t] = v; }, setTackling (t, v) { tackling[t] = v; }, set lastSwitchKind (v) { lastSwitchKind = v; }, get setPiece () { return setPiece; },
-			get G3 () { return G3; }, get matchLog () { return matchLog; }, get league () { return league; }, driOf, phyOf, ovrOf, holdMul, phyD, driD, ratingsOf, genPlayer, ensurePlayer, simSeasonTest () { simulateSeason(); }, balanceTest () { const sl = slotsFor(league.fmt), avg = a => a.reduce((t, v) => t + v, 0) / a.length; const you = avg(sl.map(i => ovrOf(league.club.squad[i]))); const all = [], per = league.members.filter(id => id !== 0).map(id => { const sq = cpuSquad(id, getStr(id)); all.push(...sq.map(ovrOf)); return avg(sl.map(i => ovrOf(sq[i]))); }); all.sort((a, b) => b - a); return { season: league.season, you, lg: avg(per), max: all[0], top5: all.slice(0, 5).join("/") }; }, nextSeasonTest () { if (seasonDone()) { newSeason(league.fmt); newMatch(); renderLeague(); } }, renderLeagueTest () { renderLeague(); }, get crowdHush () { return crowdHush; }, get crowdHeat () { return crowdHeat; }, renderLineupTest () { renderLineup(); }, crowdReactTest (k, t) { crowdReactImpl(k, t); }, get shoot () { return shoot; }, cornerTest (att, top = true) { if (state !== "play") { return; } freeze = 0; awardCorner(att, att === 1, top); }, get cornerPlan () { return cornerPlan; },
+			get G3 () { return G3; }, get matchLog () { return matchLog; }, get league () { return league; }, driOf, phyOf, ovrOf, holdMul, phyD, driD, ratingsOf, genPlayer, ensurePlayer, simSeasonTest () { simulateSeason(); }, simSeasonAllTest () { simulateSeason(true); }, balanceTest () { const sl = slotsFor(league.fmt), avg = a => a.reduce((t, v) => t + v, 0) / a.length; const you = avg(sl.map(i => ovrOf(league.club.squad[i]))); const all = [], per = league.members.filter(id => id !== 0).map(id => { const sq = cpuSquad(id, getStr(id)); all.push(...sq.map(ovrOf)); return avg(sl.map(i => ovrOf(sq[i]))); }); all.sort((a, b) => b - a); return { season: league.season, you, lg: avg(per), max: all[0], top5: all.slice(0, 5).join("/") }; }, nextSeasonTest () { if (seasonDone()) { newSeason(league.fmt); newMatch(); renderLeague(); } }, renderLeagueTest () { renderLeague(); }, get crowdHush () { return crowdHush; }, get crowdHeat () { return crowdHeat; }, renderLineupTest () { renderLineup(); }, crowdReactTest (k, t) { crowdReactImpl(k, t); }, get shoot () { return shoot; }, cornerTest (att, top = true) { if (state !== "play") { return; } freeze = 0; awardCorner(att, att === 1, top); }, get cornerPlan () { return cornerPlan; },
 			fkTest (t, x, y, indirect = false) { if (state !== "play") { return; } freeze = 0; const v = outfield(t).sort((a, b) => Math.hypot(a.x - x, a.y - y) - Math.hypot(b.x - x, b.y - y))[0]; v.x = x; v.y = y; awardFreeKick(t, v, { indirect }); },
 			penTest (t) { if (state !== "play") { return; } freeze = 0; awardPenalty(t, outfield(t)[0]); },
 			throwTest (t, x, top) { if (state !== "play") { return; } freeze = 0; awardThrow(t, x, top); },

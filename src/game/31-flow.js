@@ -1,6 +1,7 @@
 	/* ---------- flow ---------- */
 	function newMatch () {
 		if (typeof intlBegin === "function") { intlBegin(null); }   // your own club's identity back, if an international had it
+		if (mode === "league" && typeof intlOnlyAdvance === "function") { intlOnlyAdvance(); }   // no club: the club's matchdays are played for you, up to the next international (18j)
 		leagueMatch = mode === "league" ? currentFixture() : null;
 		if (leagueMatch && leagueMatch.intl && typeof intlBegin === "function") { intlBegin(leagueMatch); }   // your national side, in its kit (18j)
 		applyFormat(mode === "league" && league ? league.fmt : fmtSel.value);

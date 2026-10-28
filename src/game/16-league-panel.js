@@ -28,16 +28,17 @@
 			const champ = TEAMS[rows[0].id];
 			next.append(el("span", "eyebrow", `Season ${league.season} champions`));
 			const name = el("div", "opp"); name.append(dotFor(champ), el("span", "", champ.name)); next.append(name);
-			next.append(el("span", "detail", rows[0].id === 0
+			if (league.intl && league.intl.only) { next.append(el("span", "detail", `You were not managing a club. ${league.intl.nat ? intlNext(league) : ""} Start a new season from the pitch.`)); } else next.append(el("span", "detail", rows[0].id === 0
 				? `That's you, with ${me.pts} point${me.pts === 1 ? "" : "s"}. Start a new season from the pitch.`
 				: `You finished ${ordinal(myPos)} with ${me.pts} point${me.pts === 1 ? "" : "s"}. Start a new season from the pitch.`));
 		} else {
 			const f = currentFixture(), o = TEAMS[f.opp];
 			next.append(el("span", "eyebrow", `Next · ${f.label || `Matchday ${f.round + 1}`} · ${f.neutral ? "Neutral ground" : f.home ? "Home" : "Away"}${derbyOf(0, f.opp) ? " · Derby" : ""}`));
 			const name = el("div", "opp"); name.append(dotFor(o), el("span", "", o.name)); next.append(name);
-			const det = el("span", "detail");
-			det.append(el("span", "stars", stars(getStr(f.opp))), document.createTextNode(` rating. You are ${ordinal(myPos)} on ${me.pts} point${me.pts === 1 ? "" : "s"}.`));
+			const det = el("span", "detail"), only = !!(league.intl && league.intl.only);
+			det.append(el("span", "stars", stars(getStr(f.opp))), document.createTextNode(only ? ` rating. ${intlNext(league)}` : ` rating. You are ${ordinal(myPos)} on ${me.pts} point${me.pts === 1 ? "" : "s"}.`));
 			next.append(det);
+			if (!only) {
 			const host = f.home ? YOU : o;
 			const wn = league.wind[f.round];
 			const cc = typeof ensureCont === "function" ? ensureCont(league) : null, path = cc && cc.none ? ccPath(league) : "";
@@ -45,6 +46,7 @@
 			next.append(el("span", "detail", `${host.ground} · ${SURFACES[host.surface].label} · ${league.ko[f.round] === "day" ? "Afternoon" : "Night"} kick-off, ${koLabel(league.ko[f.round])} · Forecast: ${WEATHER[league.weather[f.round]].label.toLowerCase()}, ${wn.s >= 6 ? `${windWord(wn.s)} of ${wn.s} km/h` : "still air"}`));
 			const tired = tiredStarters();
 			if (tired.length) { next.append(el("span", "detail tiredwarn", `⚠ ${tiredText(tired)}`)); }
+			}
 		}
 
 		const list = $("lgRound");

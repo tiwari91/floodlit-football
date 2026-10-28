@@ -211,6 +211,7 @@
 		if (typeof renderIntl === "function") { renderIntl(box); }   // the international breaks (18j)
 		if (typeof renderNations === "function") { renderNations(box); }   // national squads (18j)
 		if (typeof renderIntlSquad === "function") { renderIntlSquad(); }   // and your national squad, on the Squad tab
+		if (typeof renderIntlOnly === "function") { renderIntlOnly(); }   // no club: the club tabs say so
 		const aw = league.awards;
 		if (aw && aw.season === league.season) {
 			const a = el("div", "lg-awards");

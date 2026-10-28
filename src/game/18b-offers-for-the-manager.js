@@ -152,9 +152,9 @@
 	function takeOffer (key) {
 		const o = (league && league.jobOffers || []).find(x => offerKey(x) === key);
 		if (!o) { return false; }
-		// A club in another country while you manage a national side: the FA asks you to choose (18j).
+		// A club job while you manage a country: you can't do both, so one confirm, and the national job ends (18j).
 		// A move agreed in January has already been chosen: it ends the national job.
-		if (o.abroad && league.intl && league.intl.nat) {
+		if (league.intl && league.intl.nat) {
 			if (!o.agreed && typeof intlAsk === "function") { return intlAsk(key); }
 			if (typeof intlEndJob === "function") { intlEndJob(league, "club"); }
 		}
@@ -182,6 +182,7 @@
 		c.log = [ `You took the ${YOU.name} job, from ${from.name} (budget ${money(offer.budget)})` ];
 		if (typeof ensureCoaching === "function") { ensureCoaching(c, lg); }
 		lg.club = c;
+		if (lg.intl) { lg.intl.only = false; }   // back in club mode (18j)
 		if (lg.cpuIn) { delete lg.cpuIn[id]; }
 		lg.bidsIn = []; lg.jobOffers = [];
 		lg.career = { ...(lg.career || {}), clubs: [ ...((lg.career && lg.career.clubs) || [ from.name ]), YOU.name ] };

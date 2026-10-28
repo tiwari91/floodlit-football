@@ -29,7 +29,8 @@
 	// Everyone in the save who could be picked, with where he plays.
 	function intlPool (lg) {
 		const out = [], add = (pl, club, own) => { if (pl && NATIONS[pl.nat]) { out.push({ pl, club, own }); } };
-		for (const p of [ ...(lg.club.squad || []), ...(lg.club.bench || []) ]) { add(p, YOU.name, true); }
+		const mine = !(lg.intl && lg.intl.only);   // country only: your old club's players are anyone else's (the club has a CPU manager)
+		for (const p of [ ...(lg.club.squad || []), ...(lg.club.bench || []) ]) { add(p, YOU.name, mine); }
 		const guest = lg.contGuest ? lg.contGuest.slot : -1;
 		for (let i = 1; i < TEAMS.length; i++) {
 			if (i === guest) { continue; }   // a cup guest's eleven is made up on the night; not one of the save's players
@@ -170,6 +171,7 @@
 		let I = lg.intl;
 		if (!plainObj(I) || I.v !== 1) { I = lg.intl = { v: 1, nat: null, offers: [], record: [], season: lg.season, missed: 0, rest: [], next: null, comp: intlNone(lg.season) }; }
 		if (!natOk(I.nat)) { I.nat = null; }
+		I.only = I.only === true;   // true: no club, the country is the whole job (or neither, after resigning)
 		I.offers = Array.isArray(I.offers) ? I.offers.filter(o => plainObj(o) && natOk(o.nat) && o.season === lg.season).slice(0, 1) : [];
 		I.record = Array.isArray(I.record) ? I.record.filter(r => plainObj(r) && natOk(r.nat) && natOk(r.opp) && Number.isInteger(r.gf) && Number.isInteger(r.ga)).slice(-30) : [];
 		I.missed = Number.isInteger(I.missed) ? clamp(I.missed, 0, 2) : 0;
@@ -184,7 +186,7 @@
 	// A new season: the job, the record and the qualifiers carry over; the offers lapse; a new draw.
 	function intlNewSeason (prev) {
 		const lg = league, P = prev && plainObj(prev.intl) && prev.intl.v === 1 ? prev.intl : null;
-		lg.intl = { v: 1, nat: P && natOk(P.nat) ? P.nat : null, offers: [], record: P && Array.isArray(P.record) ? P.record.slice(-30) : [], season: lg.season, missed: P && Number.isInteger(P.missed) ? P.missed : 0, rest: [], next: P && P.next ? P.next : null, comp: intlNone(lg.season) };
+		lg.intl = { v: 1, nat: P && natOk(P.nat) ? P.nat : null, offers: [], record: P && Array.isArray(P.record) ? P.record.slice(-30) : [], season: lg.season, only: !!(P && P.only === true), missed: P && Number.isInteger(P.missed) ? P.missed : 0, rest: [], next: P && P.next ? P.next : null, comp: intlNone(lg.season) };
 		ensureIntl(lg);
 		lg.intl.comp = drawIntl(lg, lg.intl);
 		const C = lg.intl.comp, me = lg.intl.nat;
@@ -314,7 +316,7 @@
 	function intlCallUp (lg = league) {
 		const I = ensureIntl(lg);
 		if (!I || !I.nat) { return null; }
-		const rest = new Set(I.rest), pool = intlPool(lg).filter(e => !(e.own && (e.pl.inj > 0 || e.pl.ban > 0 || rest.has(e.pl.name))));
+		const rest = new Set(I.rest), pool = intlPool(lg).filter(e => !((e.own || I.only) && (e.pl.inj > 0 || e.pl.ban > 0 || rest.has(e.pl.name))));
 		return pickNation(I.nat, pool, lg);
 	}
 	const matchSquad = () => (intlSide ? intlSide.club : league && league.club);
@@ -392,18 +394,24 @@
 		if (!I || !I.nat) { return; }
 		const was = I.nat;
 		I.nat = null; I.missed = 0; I.rest = []; delete I.ask;
+		if (why === "club") { I.only = false; }   // a club job is next: the country job is over and so is any time without a club
 		if (lg.contGuest && lg.contGuest.intl) { restoreGuest(lg); }
 		if (why === "resigned") { lg.news = `${lg.news || ""} You resigned as ${natName(was)} manager.`.trim(); }
 		else if (why === "club") { lg.news = `${lg.news || ""} You left the ${natName(was)} job for a club abroad.`.trim(); }
 		if (lg === league) { intlNight(); }   // anything of theirs that was waiting is played out
+		if (lg === league && why === "sacked") { intlFreeOffers(lg); }
 	}
 	function acceptIntl (nat) {
 		const lg = league, I = ensureIntl(lg), o = I && I.offers.find(x => x.nat === nat);
 		if (!o || I.nat) { return false; }
-		I.nat = nat; I.offers = []; I.missed = 0; I.rest = [];
-		lg.news = `${lg.news || ""} You are the new manager of ${natName(nat)}, alongside the ${YOU.name} job.`.trim();
-		lastDeal = `You are the new ${natName(nat)} manager. Your club job goes on as before; the internationals come at the breaks.`;
+		const club = clubName();
+		I.nat = nat; I.only = true; I.offers = []; I.missed = 0; I.rest = [];
+		lg.career = { ...(lg.career || { history: [] }), clubs: [ ...((lg.career && lg.career.clubs) || [ club ]), `${natName(nat)} (national team)` ] };
+		lg.news = `${lg.news || ""} You left ${club} to manage ${natName(nat)} full-time. ${club} have a new manager.`.trim();
+		lastDeal = `You left ${club} and are the new ${natName(nat)} manager. The league carries on without you; you play the internationals.`;
 		afterClubChange();
+		newMatch();   // the club's matchdays are played for you, up to the next international
+		renderLeague();
 		return true;
 	}
 	function declineIntl (nat) {
@@ -413,7 +421,44 @@
 		lastDeal = `You turned ${natName(nat)} down.`;
 		afterClubChange();
 	}
-	function resignIntl () { if (!league || !league.intl || !league.intl.nat) { return false; } intlEndJob(league, "resigned"); lastDeal = "You resigned from the national job."; afterClubChange(); return true; }
+	// No club and no country: the club offers come straight away (the career history isn't doubled).
+	function intlFreeOffers (lg) {
+		if (!lg.intl || !lg.intl.only || lg.intl.nat || (lg.jobOffers || []).length) { return false; }
+		const hist = lg.career && Array.isArray(lg.career.history) ? lg.career.history.slice() : null;
+		offerJobs();
+		if (hist) { lg.career.history = hist; }
+		lg.intl.offers = [];
+		return true;
+	}
+	function resignIntl () {
+		const lg = league;
+		if (!lg || !lg.intl || !lg.intl.nat) { return false; }
+		const noClub = lg.intl.only;
+		intlEndJob(lg, "resigned");
+		lastDeal = "You resigned from the national job.";
+		if (noClub && intlFreeOffers(lg)) { lastDeal = "You resigned from the national job. Pick a club from the offers in Club, Career."; }
+		afterClubChange();
+		return true;
+	}
+	// An old save that holds a club and a country: the one-time choice (renderIntlOffers shows the card).
+	const intlLegacy = (lg = league) => !!(lg && lg.intl && lg.intl.nat && !lg.intl.only);
+	function intlLegacyChoose (keepCountry) {
+		const lg = league, I = lg && lg.intl;
+		if (!intlLegacy(lg)) { return; }
+		if (keepCountry) {
+			I.only = true; const club = clubName();
+			lg.career = { ...(lg.career || { history: [] }), clubs: [ ...((lg.career && lg.career.clubs) || [ club ]), `${natName(I.nat)} (national team)` ] };
+			lg.news = `${lg.news || ""} You left ${club} to manage ${natName(I.nat)} full-time. ${club} have a new manager.`.trim();
+			lastDeal = `You keep ${natName(I.nat)} and left ${club}.`;
+		} else {
+			const was = natName(I.nat);
+			intlEndJob(lg, "choice");
+			lastDeal = `You keep ${clubName()}; the ${was} job is over.`;
+		}
+		afterClubChange();
+		newMatch();
+		renderLeague();
+	}
 	// A club job in another country: the FA asks you to choose (see takeOffer, 18b).
 	function intlAsk (key) { const I = ensureIntl(league); if (!I || !I.nat) { return false; } I.ask = key; afterClubChange(); return true; }
 	function intlChoose (keepCountry) {
@@ -431,33 +476,50 @@
 		let n = 0;
 		for (const o of I.offers) {
 			const li = el("li");
-			li.append(el("span", "pos", "NATIONAL"), el("span", "who", `${natName(o.nat)} want you as manager: strength ${"★".repeat(Math.round(o.str))}, alongside your club job`));
+			li.append(el("span", "pos", "NATIONAL"), el("span", "who", `${natName(o.nat)} want you as manager: strength ${"★".repeat(Math.round(o.str))}. You'll leave ${clubName()} to manage ${natName(o.nat)} full-time`));
 			const btns = el("span", "bids");
 			const a = el("button", "", "Accept"); a.type = "button"; a.addEventListener("click", () => acceptIntl(o.nat));
 			const r = el("button", "", "Decline"); r.type = "button"; r.addEventListener("click", () => declineIntl(o.nat));
 			btns.append(a, r); li.append(btns);
-			li.append(el("span", "ratings", `International offer. You keep ${YOU.name}; you pick ${natName(o.nat)}'s squad and play their games at the international breaks. Two missed tournaments in a row and the FA will let you go.`));
+			li.append(el("span", "ratings", `International offer. Accept and you are no longer ${clubName()}'s manager: it gets a new one. You pick ${natName(o.nat)}'s squad and play their games at the breaks while the league goes on without you. Club offers can still come, and taking one ends the national job. Two missed tournaments in a row and the FA will let you go.`));
 			ul.append(li); n++;
 		}
 		const ask = I.ask && (league.jobOffers || []).find(o => offerKey(o) === I.ask);
 		if (I.ask && !ask) { delete I.ask; }
 		if (ask && I.nat) {
 			const li = el("li", "intl-ask");
-			li.append(el("span", "pos", "FA"), el("span", "who", `The ${natName(I.nat)} FA ask you to choose: ${ask.name || TEAMS[ask.id].name} is a club in another country.`));
+			li.append(el("span", "pos", "FA"), el("span", "who", `${ask.name || TEAMS[ask.id].name} want you as manager, but you can't manage a club and a country. Choose.`));
 			const btns = el("span", "bids");
 			const a = el("button", "", "Take the club job"); a.type = "button"; a.addEventListener("click", () => intlChoose(false));
 			const r = el("button", "", `Stay with ${natName(I.nat)}`); r.type = "button"; r.addEventListener("click", () => intlChoose(true));
 			btns.append(a, r); li.append(btns);
-			li.append(el("span", "ratings", `Take the club job and you leave ${natName(I.nat)}. Stay, and the club offer is turned down.`));
+			li.append(el("span", "ratings", `Take the club job and you leave ${natName(I.nat)}: you won't manage the country any more. Stay, and the club offer is turned down.`));
+			ul.append(li); n++;
+		}
+		if (intlLegacy(league)) {
+			const li = el("li", "intl-ask");
+			li.append(el("span", "pos", "CHOOSE"), el("span", "who", "Club or country? You can't manage both any more"));
+			const btns = el("span", "bids");
+			const k = el("button", "", `Keep ${clubName()}`); k.type = "button"; k.id = "intlKeepClub"; k.addEventListener("click", () => intlLegacyChoose(false));
+			const c = el("button", "", `Keep ${natName(I.nat)}`); c.type = "button"; c.id = "intlKeepCountry"; c.addEventListener("click", () => intlLegacyChoose(true));
+			btns.append(k, c); li.append(btns);
+			li.append(el("span", "ratings", `This save has you managing ${clubName()} and ${natName(I.nat)}. Keep the club and the national job ends. Keep the country and you leave ${clubName()}, which gets a new manager.`));
 			ul.append(li); n++;
 		}
 		const box = $("intlJob");
 		if (box) {
 			box.replaceChildren();
-			box.hidden = !I.nat;
-			if (I.nat) {
+			box.hidden = !(I.nat || I.only);
+			if (I.nat && I.only) {
 				const rec = I.record.filter(r => r.nat === I.nat), w = rec.filter(r => r.gf > r.ga).length, d = rec.filter(r => r.gf === r.ga).length;
-				box.append(el("span", "", `National team: you manage ${natName(I.nat)} as well as ${YOU.name}. Record: ${rec.length} game${rec.length === 1 ? "" : "s"}, ${w} won, ${d} drawn, ${rec.length - w - d} lost.${I.missed ? " One missed tournament: miss the next and the FA will let you go." : ""} `));
+				box.append(el("span", "", `National team: you manage ${natName(I.nat)} full-time and no club. Record: ${rec.length} game${rec.length === 1 ? "" : "s"}, ${w} won, ${d} drawn, ${rec.length - w - d} lost.${I.missed ? " One missed tournament: miss the next and the FA will let you go." : ""} `));
+				const b = el("button", "", `Resign from ${natName(I.nat)}`); b.type = "button"; b.id = "intlResign"; b.addEventListener("click", resignIntl);
+				box.append(b);
+			} else if (I.only) {
+				box.append(el("span", "", "You are between jobs: no club and no country. Take one of the offers above to get back to work."));
+			} else if (I.nat) {
+				const rec = I.record.filter(r => r.nat === I.nat);
+				box.append(el("span", "", `National team: ${natName(I.nat)}. Record: ${rec.length} game${rec.length === 1 ? "" : "s"}. `));
 				const b = el("button", "", `Resign from ${natName(I.nat)}`); b.type = "button"; b.id = "intlResign"; b.addEventListener("click", resignIntl);
 				box.append(b);
 			}
@@ -567,17 +629,44 @@
 		head.append(el("h4", "", `International · ${natName(I.nat)}`), el("span", "lg-meta", `${stars(Math.round(side.str))} · OVR ${Math.round(side.ovr)}`));
 		const ap = el("button", "", "Auto-pick best XI"); ap.type = "button"; ap.id = "intlAuto"; ap.setAttribute("aria-pressed", String(auto)); ap.addEventListener("click", intlAutoPick);
 		head.append(ap);
-		box.append(head, el("p", "win-note", `${intlNext(league)} ${auto ? "Auto-pick: the best eleven in the save by position." : "Your picks: the players you left out are below."} Your club's players who play lose fitness for the next league match, as a start would cost them.`));
+		box.append(head, el("p", "win-note", `${intlNext(league)} ${auto ? "Auto-pick: the best eleven in the save by position." : "Your picks: the players you left out are below."} ${I.only ? "" : "Your club's players who play lose fitness for the next league match, as a start would cost them."}`));
 		const ol = el("ol", "nat-xi"), row = (e, on) => {
 			const r = el("li", e.own ? "mine" : "");
 			r.append(el("span", "pos", POS_LABEL[e.pl.pos]), el("span", "who", `${e.pl.name} · ${ovrOf(e.pl)} · ${e.club}${e.own ? ` · fit ${Math.round(fitOf(e.pl))}%` : ""}`));
-			if (e.own) { const b = el("button", "", on ? "Leave out" : "Recall"); b.type = "button"; b.addEventListener("click", () => intlRestToggle(e.pl.name)); r.append(b); }
+			if (e.own || I.only) { const b = el("button", "", on ? "Leave out" : "Recall"); b.type = "button"; b.addEventListener("click", () => intlRestToggle(e.pl.name)); r.append(b); }
 			return r;
 		};
 		for (const i of slotsFor(league.fmt)) { if (side.xi[i]) { ol.append(row(side.xi[i], true)); } }
 		box.append(ol);
 		if (side.bench.length) { box.append(el("span", "eyebrow", "Bench")); const b = el("ol", "nat-xi"); for (const e of side.bench) { b.append(row(e, true)); } box.append(b); }
-		const out = [ ...league.club.squad, ...league.club.bench ].filter(pl => I.rest.includes(pl.name));
-		if (out.length) { box.append(el("span", "eyebrow", "Left out")); const b = el("ol", "nat-xi"); for (const pl of out) { b.append(row({ pl, own: true, club: YOU.name }, false)); } box.append(b); }
+		const out = I.only ? intlPool(league).filter(e => e.pl.nat === I.nat && I.rest.includes(e.pl.name)) : [ ...league.club.squad, ...league.club.bench ].filter(pl => I.rest.includes(pl.name)).map(pl => ({ pl, own: true, club: clubName() }));
+		if (out.length) { box.append(el("span", "eyebrow", "Left out")); const b = el("ol", "nat-xi"); for (const e of out) { b.append(row(e, false)); } box.append(b); }
 	}
-	queueMicrotask(() => { if (window.__ff) { Object.assign(window.__ff, { nationSquads, nationSquad, nationIdent, strOfOvr, intlPool, pickNation, renderNations, NATIONS, INTL_BREAKS, ensureIntl, intlComp, intlNight, intlFixture, intlOffers, acceptIntl, declineIntl, resignIntl, intlChoose, intlCallUp, intlGroupTable, intlQualified, intlManager, intlNext, intlNewSeason, renderIntlSquad, intlRestToggle, intlAutoPick, nameTables: { FIRST, SURNAMES }, intlRep, renderOffers, newMatchTest () { clearLive(); state = "intro"; newMatch(); renderLeague(); }, readyTest () { clearLive(); state = "intro"; banner.hidden = true; newMatch(); showIntro(); renderLeague(); } }); Object.defineProperties(window.__ff, { intlSide: { get: () => intlSide, configurable: true }, leagueMatch: { get: () => leagueMatch, configurable: true } }); } });
+	/* Country only (lg.intl.only): no club. The league season still runs; your old club is played by the computer
+	   (its matches are simulated for you), and this runs them up to your next international. */
+	const clubName = () => (intlYou && intlYou.name !== undefined ? intlYou.name : YOU.name);   // your club's name, even with the country's kit swapped in
+	const intlNoClub = (lg = league) => !!(lg && lg.intl && lg.intl.only);
+	function intlOnlyAdvance () {
+		const lg = league;
+		if (!lg || !intlNoClub(lg) || bulkSim || mode !== "league" || seasonDone()) { return; }
+		let f = currentFixture();
+		if (!f || f.intl) { return; }
+		bulkSim = true;
+		try {
+			for (let guard = 0; guard < 90 && !seasonDone(); guard++) {
+				f = currentFixture();
+				if (!f || f.intl) { break; }
+				clearLive(); state = "intro"; newMatch();
+				if (!leagueMatch || leagueMatch.intl) { break; }
+				simulateMine();
+			}
+		} finally { bulkSim = false; }
+		saveLeague(); clearLive(); state = "intro"; banner.hidden = true;
+	}
+	// The tabs that are about a club: a short note instead, with the layout left alone.
+	function renderIntlOnly () {
+		const on = intlNoClub(), I = league && league.intl, note = I && I.nat ? `You manage ${natName(I.nat)}. No club duties.` : "You have no club. Take one of the job offers in Club, Career.";
+		for (const id of [ "sqBox", "transfersBox", "assistCard", "coachPanel", "clubUpgrades", "lgAcademy" ]) { const b = $(id); if (b) { b.hidden = on; } }
+		for (const id of [ "sqNoClub", "transfersNoClub", "clubNoClub" ]) { const b = $(id); if (b) { b.hidden = !on; b.textContent = note; } }
+	}
+	queueMicrotask(() => { if (window.__ff) { Object.assign(window.__ff, { intlOnlyAdvance, intlFreeOffers, intlNoClub, intlLegacy, intlLegacyChoose, renderIntlOnly, nationSquads, nationSquad, nationIdent, strOfOvr, intlPool, pickNation, renderNations, NATIONS, INTL_BREAKS, ensureIntl, intlComp, intlNight, intlFixture, intlOffers, acceptIntl, declineIntl, resignIntl, intlChoose, intlCallUp, intlGroupTable, intlQualified, intlManager, intlNext, intlNewSeason, renderIntlSquad, intlRestToggle, intlAutoPick, nameTables: { FIRST, SURNAMES }, intlRep, renderOffers, newMatchTest () { clearLive(); state = "intro"; newMatch(); renderLeague(); }, readyTest () { clearLive(); state = "intro"; banner.hidden = true; newMatch(); showIntro(); renderLeague(); } }); Object.defineProperties(window.__ff, { intlSide: { get: () => intlSide, configurable: true }, leagueMatch: { get: () => leagueMatch, configurable: true } }); } });

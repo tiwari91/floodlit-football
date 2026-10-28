@@ -35,8 +35,7 @@ national managers' names are generated the same way club staff names are.
 
 ## 2. International jobs alongside the club job
 
-- State: `lg.intl = { nat: null | code, offers: [], record: [], season }`. The club job doesn't
-  change; the national job is a second hat.
+- State: `lg.intl = { nat: null | code, offers: [], record: [], season }`. (Superseded by section 9: a national job now replaces the club job.)
 - Offers come after the season, in `offerJobs` (18b): one at most, from a country whose squad
   strength is within about one star of your reputation (league position, trophies, seasons).
   Your own nationality's FA is twice as likely to ask. Offers are shown under Club, Career, as
@@ -195,3 +194,26 @@ Generic name ("European Nations Cup"), no real competition names.
   finals: no fixtures, no missed tournament counted against you (the FA does not sack you for it), and the
   Cups card and Overview say so. The job carries on into the next World Championship cycle.
 - Tests: `tests/euro.mjs` (six seasons of the cycle, the pool, a non-European job, a European fixture).
+
+## 9. Club or country, never both
+
+Replaces the "second hat" of section 2. Managing a national team and managing a club are mutually exclusive.
+
+- **State.** `lg.intl.only` (boolean). `nat` set and `only` true: country only. `only` true and `nat` null: between jobs
+  (resigned or sacked from the country, no club yet). `nat` set and `only` not true: an old save holding both jobs.
+- **Accepting** an offer sets `only`, records "(national team)" in the career clubs, and the old club (still id 0 in the
+  league, with its squad frozen) is played by the computer. The offer card says "You'll leave X to manage Y full-time".
+- **The league still runs.** `intlOnlyAdvance` (18j) is called from `newMatch` (31) and `startPlay` (35): it simulates your
+  club's fixtures, cups included, through the normal `simulateMine` path with `bulkSim`, and stops at the next
+  international fixture or the end of the season. The Overview shows the national side, the next international and the
+  competition status (`intlNext`). The full-time card after an international says "Continue".
+- **Tabs.** `renderIntlOnly` hides the club squad, Transfers, assistant, coaching, upgrades and academy and shows
+  "You manage Spain. No club duties." The Squad tab keeps the International card, where any player of your nationality
+  (not only your old club's) can be left out or recalled, and nobody loses fitness for the club.
+- **Club offers** still arrive each season (and after a resignation or a sacking, straight away, via `intlFreeOffers`).
+  `takeOffer` (18b) asks once ("Take the club job" or "Stay with Spain"); taking it ends the national job and
+  clears `only`.
+- **Old saves** with `nat` set and `only` unset get a Club, Career card, "Club or country? You can't manage both any
+  more": keep the club (the national job ends) or keep the country (you leave the club). Until chosen the save behaves as before.
+- Tests: `tests/intl.mjs` (accepting leaves the club, fixture and simulated matchdays, no-club tabs, club offer ends the job,
+  the old-save choice, whole-season simulation).
