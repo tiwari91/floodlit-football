@@ -169,6 +169,7 @@
 		$("announce").textContent = `Full time. ${line}`;
 		const wasSim = simulated;
 		track(wasSim ? "match-simulated" : "match-finished", leagueMatch ? "league match" : "friendly");
+		sendResult(RESULTS_API, resultPayload({ mode, sim: wasSim, score: [ h, a ], len: matchLen }));
 		simulated = false;
 		showOverlay(wasSim ? (leagueMatch ? "Simulated result" : "Simulated friendly") : "Full time", `${line} ${nudge}`, btn,
 			wasSim ? null : matchStats(Math.round(100 * possFrames[0] / Math.max(1, possFrames[0] + possFrames[1]))));

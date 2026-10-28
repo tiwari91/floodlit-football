@@ -2850,6 +2850,28 @@
 			if (location.hostname === "tiwari91.github.io" && window.goatcounter && window.goatcounter.count) { window.goatcounter.count({ path, title: title || path, event: true }); }
 		} catch (e) { /* analytics never breaks the game */ }
 	};
+	// Floodlit Live: the final score of each played league or friendly match, posted to the results
+	// API. Off while empty (nothing is sent). The server reads the country from the connection.
+	const RESULTS_API = "";
+	const RESULT_LENGTHS = [ 120, 180, 300, 420, 600, 900, 1200 ];
+	// The body for one finished match, or null when it should not be posted. score[0] is always yours.
+	function resultPayload (m) {
+		if (m.sim || (m.mode !== "league" && m.mode !== "friendly") || !RESULT_LENGTHS.includes(m.len)) { return null; }
+		const [ gf, ga ] = m.score;
+		const ok = n => Number.isInteger(n) && n >= 0 && n <= 99;
+		return ok(gf) && ok(ga) ? { goalsFor: gf, goalsAgainst: ga, mode: m.mode, lengthSeconds: m.len } : null;
+	}
+	// Fire and forget: never awaited, never throws, gives up after 2.5 s.
+	function sendResult (base, body) {
+		if (!base || !body) { return; }
+		try {
+			const ac = new AbortController(), t = setTimeout(() => ac.abort(), 2500);
+			fetch(`${base.replace(/\/+$/, "")}/matches`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), keepalive: true, signal: ac.signal })
+				.catch(e => console.debug("result not sent", e && e.name))
+				.finally(() => clearTimeout(t));
+		} catch (e) { /* results never break the game */ }
+	}
+	queueMicrotask(() => { if (window.__ff) { Object.assign(window.__ff, { resultPayload, sendResult }); } });
 
 	const YOU_HOME_KIT = { outfield: "#f2b52e", second: "#1f2a36", gk: "#7ec8e3", ink: "#1d1604", pattern: "plain" };
 	// Your kit is your club's own colours (an edit, an option file or a move abroad can change them);
@@ -11581,6 +11603,7 @@
 		$("announce").textContent = `Full time. ${line}`;
 		const wasSim = simulated;
 		track(wasSim ? "match-simulated" : "match-finished", leagueMatch ? "league match" : "friendly");
+		sendResult(RESULTS_API, resultPayload({ mode, sim: wasSim, score: [ h, a ], len: matchLen }));
 		simulated = false;
 		showOverlay(wasSim ? (leagueMatch ? "Simulated result" : "Simulated friendly") : "Full time", `${line} ${nudge}`, btn,
 			wasSim ? null : matchStats(Math.round(100 * possFrames[0] / Math.max(1, possFrames[0] + possFrames[1]))));
@@ -20809,7 +20832,7 @@
 				<li><i style="border-color:rgba(255,255,255,0.4);border-width:3px"></i>Grey arc: tackle recharging</li>
 				<li><i style="border-color:#de4f5a;border-radius:2px;height:4px;border-width:2px 0 0"></i>Red dashed line: the offside line while you have the ball; OFF marks anyone beyond it</li>
 			</ul></section>`,
-			`<section><h3>Privacy</h3><p>This page counts visits and plays anonymously with GoatCounter: no cookies, no personal data. Your saves stay in your browser.</p></section>`
+			`<section><h3>Privacy</h3><p>This page counts visits and plays anonymously with GoatCounter: no cookies, no personal data. Your saves stay in your browser. When Floodlit Live results are switched on, the final score, mode and match length of each match you play are also sent, with no name or account; the server notes only the country of the connection.</p></section>`
 		].join("");
 		for (const [ id, s ] of [ [ "howKeys", "keys" ], [ "howTouch", "touch" ], [ "howPad", "pad" ] ]) { $(id).setAttribute("aria-pressed", String(howScheme === s)); }
 	}

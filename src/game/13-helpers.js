@@ -12,6 +12,28 @@
 			if (location.hostname === "tiwari91.github.io" && window.goatcounter && window.goatcounter.count) { window.goatcounter.count({ path, title: title || path, event: true }); }
 		} catch (e) { /* analytics never breaks the game */ }
 	};
+	// Floodlit Live: the final score of each played league or friendly match, posted to the results
+	// API. Off while empty (nothing is sent). The server reads the country from the connection.
+	const RESULTS_API = "";
+	const RESULT_LENGTHS = [ 120, 180, 300, 420, 600, 900, 1200 ];
+	// The body for one finished match, or null when it should not be posted. score[0] is always yours.
+	function resultPayload (m) {
+		if (m.sim || (m.mode !== "league" && m.mode !== "friendly") || !RESULT_LENGTHS.includes(m.len)) { return null; }
+		const [ gf, ga ] = m.score;
+		const ok = n => Number.isInteger(n) && n >= 0 && n <= 99;
+		return ok(gf) && ok(ga) ? { goalsFor: gf, goalsAgainst: ga, mode: m.mode, lengthSeconds: m.len } : null;
+	}
+	// Fire and forget: never awaited, never throws, gives up after 2.5 s.
+	function sendResult (base, body) {
+		if (!base || !body) { return; }
+		try {
+			const ac = new AbortController(), t = setTimeout(() => ac.abort(), 2500);
+			fetch(`${base.replace(/\/+$/, "")}/matches`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), keepalive: true, signal: ac.signal })
+				.catch(e => console.debug("result not sent", e && e.name))
+				.finally(() => clearTimeout(t));
+		} catch (e) { /* results never break the game */ }
+	}
+	queueMicrotask(() => { if (window.__ff) { Object.assign(window.__ff, { resultPayload, sendResult }); } });
 
 	const YOU_HOME_KIT = { outfield: "#f2b52e", second: "#1f2a36", gk: "#7ec8e3", ink: "#1d1604", pattern: "plain" };
 	// Your kit is your club's own colours (an edit, an option file or a move abroad can change them);
