@@ -95,6 +95,7 @@
 			if (club.resigned && club.resigned.length) { league.news = `${league.news} Signed new deals: ${club.resigned.join(", ")}.`.trim(); }
 		}
 		if (typeof intlNewSeason === "function") { intlNewSeason(prev); }   // the national job carries on; a new draw (18j)
+		if (typeof contSeed === "function") { contSeed(league); }   // "Start in the Continental Champions Cup" (18f)
 		saveLeague();
 	}
 
