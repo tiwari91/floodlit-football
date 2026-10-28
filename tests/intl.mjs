@@ -304,6 +304,19 @@ const sim = await page.evaluate(() => {
 	return { done: F.league.round >= F.league.fixtures.length, rec: F.league.intl.record.length, nat: F.league.intl.nat, only: F.league.intl.only, same: F.league.season === season };
 });
 check("simulate whole season works in country mode: the league ends and your internationals were played", sim.done && sim.rec >= 1 && sim.nat === only.nat && sim.only && sim.same, JSON.stringify(sim));
+// The user's bug: at "Season N complete" the START SEASON N+1 button did nothing (country only).
+const btnRoll = await page.evaluate(() => {
+	const F = window.__ff, lg = F.league, s0 = lg.season;
+	F.simSeasonAllTest();
+	lg.intl.lastNote = "Spain won the European Nations Cup."; lg.intl.titles = (lg.intl.titles || 0) + 1;
+	F.renderLeague();
+	return { s0, done: F.league.round >= F.league.fixtures.length };
+});
+await page.evaluate(() => { const F = window.__ff; F.newMatchTest(); document.getElementById("ovButton").click(); });   // first press: the "complete" card
+const btnRoll2 = await page.evaluate(() => { const b = document.getElementById("ovButton"); return { label: b.textContent, shown: !document.getElementById("overlay").hidden, season: window.__ff.league.season }; });
+await page.evaluate(() => document.getElementById("ovButton").click());
+const btnRoll3 = await page.evaluate(() => { const F = window.__ff, lg = F.league; return { season: lg.season, only: lg.intl.only, nat: lg.intl.nat, round: lg.round, intl: !!(F.leagueMatch && F.leagueMatch.intl) }; });
+check("country only: clicking Start season N+1 at season complete rolls over and leads to the next international", btnRoll.done && btnRoll3.season === btnRoll.s0 + 1 && btnRoll3.only && btnRoll3.nat === only.nat && (btnRoll3.intl || btnRoll3.round >= 9), JSON.stringify({ btnRoll, btnRoll2, btnRoll3 }));
 const roll = await page.evaluate(() => {
 	const F = window.__ff; F.nextSeasonTest();
 	const lg = F.league;

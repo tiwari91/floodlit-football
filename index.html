@@ -12291,8 +12291,9 @@
 		if (tutDone) { tutDone = false; const back = store.get("ff-tut-return") === "league"; store.set("ff-tut-return", ""); setMode(back ? "league" : "friendly"); return; }
 		if (state === "intro" || state === "full") {
 			if (mode === "league" && typeof intlOnlyAdvance === "function" && intlNoClub()) {   // country only: on to the next international, or the end of the season (18j)
-				intlOnlyAdvance();
-				if (seasonDone()) { showOverlay(`Season ${league.season} complete`, "The rest of the league season was played without you. The job offers and the season's news are in the tabs below.", `Start season ${league.season + 1}`); renderLeague(); return; }
+				const wasDone = seasonDone();   // already complete: this press is "Start season N+1", not another card
+				if (!wasDone) { intlOnlyAdvance(); }
+				if (!wasDone && seasonDone()) { showOverlay(`Season ${league.season} complete`, "The rest of the league season was played without you. The job offers and the season's news are in the tabs below.", `Start season ${league.season + 1}`); renderLeague(); return; }
 			}
 			if (mode === "league" && seasonDone()) { newSeason(league.fmt); renderLeague(); renderShapes(); }
 			clearLive();
