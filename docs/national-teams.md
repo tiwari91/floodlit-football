@@ -217,3 +217,12 @@ Replaces the "second hat" of section 2. Managing a national team and managing a 
   more": keep the club (the national job ends) or keep the country (you leave the club). Until chosen the save behaves as before.
 - Tests: `tests/intl.mjs` (accepting leaves the club, fixture and simulated matchdays, no-club tabs, club offer ends the job,
   the old-save choice, whole-season simulation).
+
+### 9.1 What a country-only manager does (intl-mode-polish)
+
+- **Next step.** The match bar's `New match` button is relabelled in country-only mode: `Next international`, or `Start season N+1` once the season is complete (`Restart match` while a game is live). It never starts a club match and is on screen on every tab. The `Start season N+1` card button used to loop back to the same card (`startPlay` re-ran the advance on a finished season); it now rolls the season over.
+- **Call-up of 23** (`I.sel`, up to 23 names; empty means auto-pick). The Squad tab lists every eligible player of the nationality with position, rating, club, form (season average) and fitness; `Call up` / `Drop`, and `Auto-pick 23`. `intlCallUp` only takes called-up players of your nation. This replaces the old leave-out/recall (`I.rest` is still read, so old saves work).
+- **Formation and captain.** The Squad card has the club game's own formation buttons (same `setLineupShape`), and a captain select (`I.capt`, name) that overrides the best-form armband in `42-the-officials` for the national side.
+- **Friendlies** (`I.fr`, `I.frDone`). At the next break (after matchday 9, 20 or 30) where your country has no competitive game, one friendly is arranged against a random nation; the Squad card lets you change the opponent or skip it. It is recorded as `Friendly`, moves no league round and is not offered twice.
+- **FA objective and confidence** (`I.obj`, `I.conf` 0..100, start 60). A target from the side's strength rank: `qualify` in qualifying seasons; in a tournament season `reach the knockout rounds`, `reach the semi-finals` or `win the tournament`. A win is +4, a defeat -4 (friendlies +-1); when the competition ends, meeting the target is +15 and missing it -15. Shown on Overview (the international line) and as a meter on the International card. Missing targets only lowers confidence; the sacking rule is still two missed tournaments.
+- All new fields are optional and validated in `ensureIntl`; tests are in `tests/intl.mjs`.
