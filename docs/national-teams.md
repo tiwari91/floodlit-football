@@ -139,9 +139,14 @@ Calls made where the plan above did not fit the code, smallest change each time:
   and text rules as a club (18g `checkNationFields`); unknown codes and bad values are skipped and counted
   in the preview. Kept in the save's edits, exported with them, and in `docs/option-file-schema.json`.
 
+- **The opponent on the night is a copy** of the guest seat's identity (`setOpponent` in 31), so the
+  full-time card still names the right country when the next country has already taken the seat (two
+  qualifiers in one break). The full-time card after an international shows its result, your league
+  place and any tired club players, not the last league match's bans and injuries.
+- **Winning the tournament** queues its own trophy ("International Tournament") for the ceremony (44a).
+
 Known limits:
 
-- The match report after an international can name the guest seat's own club in the stats header, as
-  the continental cup's does, because the guest is restored when the result is recorded.
+- Simulate whole season counts internationals in its matches-played summary.
 - Edit-mode changes to computer players are not seen by the national squads until the cache rebuilds
   (section 1's limit still applies).

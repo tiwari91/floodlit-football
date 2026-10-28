@@ -231,6 +231,18 @@ const t = await page.evaluate(() => {
 });
 check("the tournament runs quarter-finals, semi-finals and a final to a winner, and the Cups card shows the bracket", t.done && !!t.winner && t.sf === 2 && t.f === 1 && t.card && /won the International Tournament/.test(t.detail), JSON.stringify(t));
 
+// Winning the tournament: its own trophy on the stage, not the league's.
+const tro = await page.evaluate(async () => {
+	const F = window.__ff;
+	F.readyTest(); F.state = "full";
+	F.queueTrophy("International Tournament"); F.trophyDue();
+	await new Promise(r => setTimeout(r, 2500));
+	const t = document.getElementById("ovTrophyText"), cap = [ ...document.querySelectorAll("#overlay, #ovTrophy, .cer-caption, #cerCaption") ].map(e => e.textContent).join(" ");
+	return { text: (t && t.textContent) || "", cap: /International Tournament/i.test(cap) || /International Tournament/i.test(document.body.innerText) };
+});
+check("winning the tournament puts its own trophy on the stage", tro.cap, JSON.stringify(tro));
+await page.evaluate(() => { const F = window.__ff; F.readyTest(); });
+
 // Two missed tournaments in a row and the FA lets you go.
 const sack = await page.evaluate(() => {
 	const F = window.__ff;

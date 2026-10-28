@@ -158,7 +158,9 @@
 				if (rep2 && rep2.round === league.round && rep2.gains.length) { nudge += ` Training: ${rep2.gains.slice(0, 4).join(", ")}${rep2.gains.length > 4 ? ` and ${rep2.gains.length - 4 + (rep2.more || 0)} more` : ""}.`; }
 				btn = `Play matchday ${league.round + 1}`;
 				{ const nf = currentFixture(); if (nf && nf.label) { btn = `Play: ${nf.label.replace(/^[^·]*· /, "")}`; } }   // a continental night next (18f)
-				if (leagueMatch.intl && league.intl && league.intl.lastNote) { nudge = `${league.intl.lastNote} ${nudge}`; }   // an international (18j)
+				if (leagueMatch.intl && league.intl && league.intl.lastNote) {   // an international (18j): its result, and only what matters for the next league match
+					nudge = `${league.intl.lastNote} You are ${ordinal(pos)} in the league on ${pts} point${pts === 1 ? "" : "s"}.${tired.length ? ` ⚠ Before the next league match: ${tiredText(tired)}` : ""}`;
+				}
 			}
 		}
 		if (!simulated) {

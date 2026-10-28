@@ -5,7 +5,8 @@
 		if (leagueMatch && leagueMatch.intl && typeof intlBegin === "function") { intlBegin(leagueMatch); }   // your national side, in its kit (18j)
 		applyFormat(mode === "league" && league ? league.fmt : fmtSel.value);
 		track(`match-start-${mode}`, `${mode} ${FMT.label}`);
-		setOpponent(leagueMatch ? TEAMS[leagueMatch.opp] : FRIENDLY, !leagueMatch || leagueMatch.home);
+		// An international's opponent is a copy: the guest seat can change hands (the next country) before the full-time card goes (18j).
+		setOpponent(leagueMatch ? (leagueMatch.intl ? { ...TEAMS[leagueMatch.opp] } : TEAMS[leagueMatch.opp]) : FRIENDLY, !leagueMatch || leagueMatch.home);
 		homeSide = !leagueMatch || leagueMatch.home ? 0 : 1;
 		cond = leagueMatch
 			? makeConditions((leagueMatch.home ? YOU : TEAMS[leagueMatch.opp]).surface, league.weather[leagueMatch.round], league.wind[leagueMatch.round], league.ko[leagueMatch.round])

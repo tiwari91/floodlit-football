@@ -28,6 +28,7 @@
 	function trophyKind (what) {
 		const w = String(what || "").toLowerCase();
 		if (/continental/.test(w)) { return { shape: "ears", comp: "CONTINENTAL CHAMPIONS CUP", head: "WINNERS", label: "the Continental Champions Cup" }; }
+		if (/international/.test(w)) { return { shape: "cup", comp: "INTERNATIONAL TOURNAMENT", head: "WINNERS", label: "the International Tournament trophy" }; }   // a national side's (18j)
 		if (/league cup/.test(w)) { return { shape: "lid", comp: "LEAGUE CUP", head: "WINNERS", label: "the League Cup" }; }
 		return { shape: "cup", comp: "THE LEAGUE", head: "CHAMPIONS", label: "the league trophy" };
 	}
