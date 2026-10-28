@@ -314,6 +314,40 @@
 		}
 		signPlayer(i, offer);
 	}
+	// Buy from any club: the transfers screen can search every computer club's eleven. A player found there
+	// joins your market list (priced a fifth over his value, from his club) so the same bid, cheeky offer
+	// and refusal rules apply; when you sign him his club replaces him from its own pool.
+	const mkQ = { name: "", pos: "", min: 0, club: "", max: 0 };
+	const SEARCH_SHOW = 25;
+	function searchAnyClub (q) {
+		const out = [], name = (q.name || "").trim().toLowerCase();
+		for (const id of league.members) {
+			if (id === 0 || !TEAMS[id] || (q.club !== "" && String(id) !== String(q.club))) { continue; }
+			cpuSquad(id, getStr(id)).forEach((pl, slot) => {
+				if (!pl || (name && !pl.name.toLowerCase().includes(name)) || (q.pos && pl.pos !== q.pos) || ovrOf(pl) < (q.min || 0)) { return; }
+				const held = league.club.market.find(m => m.name === pl.name && m.cpuClub === id), ask = held ? askOf(held) : round1(priceOf(pl) * 1.2);
+				if (q.max > 0 && ask > q.max + 1e-9) { return; }
+				out.push({ id, slot, pl, ask, held });
+			});
+		}
+		return out.sort((a, b) => ovrOf(b.pl) - ovrOf(a.pl) || a.ask - b.ask);
+	}
+	function bidAnyClub (r, low) {
+		const c = league.club;
+		if (!windowOpen()) { return; }
+		let i = c.market.findIndex(m => m.name === r.pl.name && m.cpuClub === r.id);
+		if (i < 0) { c.market.push({ ...r.pl, from: TEAMS[r.id].name, ask: r.ask, cpuClub: r.id, cpuSlot: r.slot }); i = c.market.length - 1; }
+		bidFor(i, low);
+	}
+	// His club fills the gap with a younger man of a similar level, and keeps him all season.
+	function backfillCpu (id, slot) {
+		const lg = league, old = cpuSquad(id, getStr(id))[slot], nat = clubNat(id);
+		const pl = genPlayer(old.pos, clamp(ovrOf(old) - 3, 50, 92), null, Math.random, { lg: nat }), keep = { name: pl.name, pos: pl.pos, pac: pl.pac, sho: pl.sho, pas: pl.pas, def: pl.def, age: pl.age, nat: pl.nat };
+		for (const k of [ "dri", "phy" ]) { if (Number.isFinite(pl[k])) { keep[k] = pl[k]; } }
+		lg.cpuIn = lg.cpuIn || {};
+		lg.cpuIn[id] = [ ...(lg.cpuIn[id] || []).filter(d => d.slot !== slot), { slot, pl: keep, fixed: true } ];
+	}
+	const capIn = list => [ ...list.filter(d => d.fixed), ...list.filter(d => !d.fixed).slice(-4) ];
 	function scoutPlayer (i) {
 		const c = league.club, pl = c.market[i];
 		if (!pl || pl.scouted || !(c.scoutLeft > 0)) { return; }
@@ -331,13 +365,16 @@
 	function signPlayer (i, offer) {
 		const c = league.club, pl = c.market[i];
 		if (!pl || !windowOpen()) { return; }
+		const cpuFrom = Number.isInteger(pl.cpuClub) ? { id: pl.cpuClub, slot: pl.cpuSlot } : null;
+		if (cpuFrom && (cpuSquad(cpuFrom.id, getStr(cpuFrom.id))[cpuFrom.slot] || {}).name !== pl.name) { c.market.splice(i, 1); lastDeal = `${pl.name} is no longer at ${TEAMS[cpuFrom.id].name}.`; afterClubChange(); return; }
 		const price = Number.isFinite(offer) ? offer : askOf(pl);
 		if (c.budget + 1e-9 < price || c.budget < 0) { return; }
 		const no = typeof signRefusal === "function" ? signRefusal(pl, c, price) : null;
 		if (no) { lastDeal = no.why; addIssue("signing", pl, no.why, { offer: no.offer }); afterClubChange(); return; }
 		const m = MARKETS[pl.region];
 		pl.adapt = m ? Math.max(0, m.adapt - staffLvl(c, "scout") * 0.5) : 0;
-		delete pl.ask; delete pl.bids; delete pl.from; delete pl.scouted;
+		delete pl.ask; delete pl.bids; delete pl.from; delete pl.scouted; delete pl.cpuClub; delete pl.cpuSlot;
+		if (cpuFrom) { backfillCpu(cpuFrom.id, cpuFrom.slot); }
 		const tgt = signingTarget(pl.pos), out = tgt.out, fee = out ? round1(priceOf(out) * 0.5) : 0;
 		c.budget = round1(c.budget - price + fee);
 		c[tgt.list][tgt.i] = pl;
@@ -708,6 +745,6 @@
 		if (typeof editCpuSquad === "function") { editCpuSquad(clubId, sq); }   // names edited by slot (18g)
 		// This season's signings, from the transfer windows, take their places.
 		const ins = league && league.cpuIn && league.cpuIn[clubId];
-		if (Array.isArray(ins)) { for (const d of ins) { if (d && d.pl && Number.isInteger(d.slot) && d.slot > 0 && d.slot < sq.length) { sq[d.slot] = { ...d.pl }; } } }
+		if (Array.isArray(ins)) { for (const d of ins) { if (d && d.pl && Number.isInteger(d.slot) && (d.slot > 0 || d.fixed) && d.slot < sq.length) { sq[d.slot] = { ...d.pl }; } } }
 		return sq;
 	}

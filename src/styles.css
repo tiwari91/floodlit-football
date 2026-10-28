@@ -1380,3 +1380,5 @@
 		.mc-toggle { top: 40px; padding: 3px 8px; font-size: 11px; }
 		.mc { top: 68px; right: 6px; width: min(240px, 64%); max-height: calc(100% - 84px); font-size: 12px; }
 	}
+	.mk-f { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; }
+	.mk-f input { width: 90px; }

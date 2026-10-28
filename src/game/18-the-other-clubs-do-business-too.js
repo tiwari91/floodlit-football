@@ -28,7 +28,7 @@
 			const keep = { name: pl.name, pos: pl.pos, pac: pl.pac, sho: pl.sho, pas: pl.pas, def: pl.def, age: pl.age, nat: pl.nat };
 			for (const k of [ "dri", "phy" ]) { if (Number.isFinite(pl[k])) { keep[k] = pl[k]; } }
 			if (typeof carryEdits === "function") { carryEdits(pl, keep); }   // an edited player keeps his edits (18g)
-			lg.cpuIn[buyer] = [ ...(lg.cpuIn[buyer] || []).filter(d => d.slot !== slot), { slot, pl: keep } ].slice(-4);
+			lg.cpuIn[buyer] = [ ...(lg.cpuIn[buyer] || []).filter(d => d.slot !== slot), { slot, pl: keep } ]; lg.cpuIn[buyer] = capIn(lg.cpuIn[buyer]);
 			lg.clubStr[buyer] = clamp(lg.clubStr[buyer] + 0.12, 1, 5);
 			news.push(`${TEAMS[buyer].short || TEAMS[buyer].name} sign ${pl.name} (${pl.nat}, ${ovrOf(pl)}) from ${from} for ${money(fee)}`);
 		}
@@ -59,7 +59,7 @@
 		if (inSq >= 0) { c.squad.splice(inSq, 1); } else { c.bench.splice(inB, 1); }
 		c.budget = round1(c.budget + fee);
 		league.bidsIn = (league.bidsIn || []).filter(b => b.name !== name);
-		if (Number.isInteger(club)) { const slot = POS_OF_SLOT.indexOf(pl.pos) > 0 ? POS_OF_SLOT.indexOf(pl.pos) + Math.floor(Math.random() * 2) : 1; league.cpuIn = league.cpuIn || {}; league.cpuIn[club] = [ ...(league.cpuIn[club] || []), { slot: clamp(slot, 1, 10), pl: (typeof carryEdits === "function" ? carryEdits : (_, k) => k)(pl, { name: pl.name, pos: pl.pos, pac: pl.pac, sho: pl.sho, pas: pl.pas, def: pl.def, age: pl.age, nat: pl.nat }) } ].slice(-4); league.clubStr[club] = clamp(league.clubStr[club] + 0.1, 1, 5); }
+		if (Number.isInteger(club)) { const slot = POS_OF_SLOT.indexOf(pl.pos) > 0 ? POS_OF_SLOT.indexOf(pl.pos) + Math.floor(Math.random() * 2) : 1; league.cpuIn = league.cpuIn || {}; league.cpuIn[club] = [ ...(league.cpuIn[club] || []), { slot: clamp(slot, 1, 10), pl: (typeof carryEdits === "function" ? carryEdits : (_, k) => k)(pl, { name: pl.name, pos: pl.pos, pac: pl.pac, sho: pl.sho, pas: pl.pas, def: pl.def, age: pl.age, nat: pl.nat }) } ]; league.cpuIn[club] = capIn(league.cpuIn[club]); league.clubStr[club] = clamp(league.clubStr[club] + 0.1, 1, 5); }
 		refillSquad(c);
 		openPl = null;
 		lastDeal = `${pl.name} sold${Number.isInteger(club) ? ` to ${TEAMS[club].name}` : ""} for ${money(fee)}.`;
