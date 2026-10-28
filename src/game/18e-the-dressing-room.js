@@ -28,6 +28,8 @@
 				if (!Number.isFinite(pl.benched)) { pl.benched = 0; }
 				if (!Number.isFinite(pl.oopN)) { pl.oopN = 0; }
 				if (typeof pl.wantsOut !== "boolean") { pl.wantsOut = false; }
+				if (typeof pl.leaving !== "string") { pl.leaving = ""; }
+				if (!Number.isFinite(pl.unhappy)) { pl.unhappy = 0; }
 			}
 		}
 		return d;
@@ -58,6 +60,7 @@
 	function choicesFor (issue) {
 		if (issue.kind === "contract") { return [ [ "pay", issue.wantsOut ? "Talk him round" : `Pay what he asks (${wageWeek(issue.ask || 0)})` ], [ "letgo", issue.wantsOut ? "Sell him or let him go" : "Let him go" ] ]; }
 		if (issue.kind === "signing") { return [ [ "offer", `Offer ${money(issue.offer || 0)}` ], [ "forget", "Forget him" ] ]; }
+		if (issue.kind === "request") { return [ [ "accept", "Accept and list him" ], [ "refuse", "Refuse" ], [ "talk", "Talk to him" ] ]; }
 		return MANAGER_CHOICES;
 	}
 	// Morale, dressing room and form, per kind and choice. A calm man takes a talk better; a hot-head
@@ -78,13 +81,20 @@
 		else if (issue.kind === "contract") {
 			if (choice === "pay" && issue.wantsOut) {
 				const hot = temperOf(pl) >= 75;
-				if (pl.morale >= 50 && !hot) { pl.wantsOut = false; pl.benched = 0; pl.morale = clamp(pl.morale + 6, 5, 100); note = `${pl.name} has calmed down and will talk about a new deal again.`; }
+				if (pl.morale >= 50 && !hot && !(pl.leaving && unrestReasons(pl, c).length)) { pl.wantsOut = false; pl.leaving = ""; pl.benched = 0; pl.morale = clamp(pl.morale + 6, 5, 100); note = `${pl.name} has calmed down and will talk about a new deal again.`; }
 				else { note = `${pl.name} won't be talked round yet. Pick him for a few games, or sell him in the window.`; addIssue("contract", pl, issue.text, { wantsOut: true }); }
 			} else if (choice === "pay") {
 				pl.askPaid = league.season;
 				const r = renewDeal(pl, c, { years: 2, rise: issue.rise || 1.35, fee: issue.fee || 0 });
 				note = r.ok ? `${pl.name} gets his rise and signs. ${r.why}` : r.why;
 			} else { pl.letGo = true; note = `${pl.name} will leave when his contract runs out${pl.wantsOut && windowOpen() ? ", or sell him now from the squad list" : ""}.`; }
+		} else if (issue.kind === "request" && (choice === "accept" || choice === "refuse")) {
+			if (choice === "accept") { pl.listed = true; pl.wantsOut = true; note = `${pl.name} is on the transfer list. Clubs will bid for him when a window is open${windowOpen() ? ", or sell him now from the squad list" : ""}.`; }
+			else {
+				pl.morale = clamp(pl.morale - 8, 5, 100); pl.wantsOut = false; pl.unhappy = 0; pl.benched = 0; pl.listed = false;
+				d.room = clamp(d.room - 1, 0, 100); nudgeForm(pl, -0.3);
+				note = `You refused ${pl.name}'s transfer request. He stays, and he isn't happy (morale ${pl.morale}).`;
+			}
 		} else if (issue.kind === "signing") {
 			const i = c.market.findIndex(m => m.name === issue.name);
 			if (choice === "offer" && i >= 0) { signPlayer(i, issue.offer); return lastDeal; }
@@ -126,6 +136,35 @@
 		c.squad[i] = c.bench[j]; c.bench[j] = pl;
 	}
 
+	// Why a player in his last year won't sign: unhappy, not playing, a bigger club has bid, or he's
+	// better than the club he's at. Empty when he is willing. Used by the weekly review and the talk.
+	function unrestReasons (pl, c) {
+		const out = [];
+		if (pl.morale < 45) { out.push(`he is unhappy (morale ${pl.morale})`); }
+		if ((pl.benched || 0) >= 3 && pl.age > 20 && pl.pos !== "gk") { out.push(`he hasn't played in ${pl.benched} games`); }
+		if ((league.bidsIn || []).some(b => b.name === pl.name && getStr(b.club) > yourStr())) { out.push("a bigger club has bid for him"); }
+		const rows = standings(), pos = rows.findIndex(r => r.id === 0) + 1, top = [ ...c.squad, ...c.bench ].map(ovrNow).sort((a, b) => b - a)[2] || 0;
+		if (league.round >= 8 && pos > rows.length / 2 && pl.age <= 29 && ovrNow(pl) >= top && ovrNow(pl) >= 72) { out.push("he wants to play at a higher level than the club's"); }
+		return out;
+	}
+	// Players in the last year of a deal: the club's renewal (assistant or the summer one, both through
+	// renewDeal) is refused while one of these reasons stands. He says so once, is marked "wants out" in
+	// the squad table, and leaves at the end of the season or can be sold, unless it changes.
+	function finalYearReview (c) {
+		if (!league || !c) { return []; }
+		const made = [];
+		for (const pl of [ ...c.squad, ...c.bench ]) {
+			if (pl.contract !== 1 || lastSeason(pl)) { pl.leaving = ""; continue; }
+			const r = unrestReasons(pl, c);
+			if (!r.length) { pl.leaving = ""; continue; }
+			if (pl.leaving) { continue; }
+			pl.leaving = r[0];
+			const x = addIssue("contract", pl, `${pl.name} won't sign a new deal: ${r.join(" and ")}. He wants to leave at the end of the season. Win him round, or sell him${windowOpen() ? " now" : " in the window"}.`, { wantsOut: true });
+			if (x) { made.push(x); toast(`${pl.name} won't renew: wants to leave`, "#f2b52e"); }
+		}
+		return made;
+	}
+
 	// After each league match (from weeklyClub): count games on the bench, spot a star left out or
 	// a man played out of position, a hammering, and the mood of the dressing room. rnd is for tests.
 	function dramaAfterMatch (played, gf, ga, rnd = Math.random) {
@@ -136,6 +175,14 @@
 			const on = played.has(pl.name), role = roleOf(pl, c), t = temperOf(pl);
 			pl.benched = on ? 0 : (pl.benched || 0) + 1;
 			if (pl.promised > 0) { pl.promised--; if (!on && pl.promised === 0 && pl.benched >= 2) { pl.morale = clamp(pl.morale - 12, 5, 100); pl.wantsOut = true; const x = addIssue("request", pl, `${pl.name} says you promised him games and didn't keep your word. He wants to leave.`); if (x) { made.push(x); } } }
+			// Weeks of low morale (or a refused renewal): a transfer request.
+			pl.unhappy = pl.morale < 40 || pl.leaving ? (pl.unhappy || 0) + 1 : 0;
+			if (!pl.wantsOut && !pl.listed && pl.unhappy >= 4 && pl.pos !== "gk") {
+				pl.wantsOut = true; pl.unhappy = 0;
+				const x = addIssue("request", pl, `${pl.name} has handed in a transfer request. He has been unhappy for weeks (morale ${pl.morale}) and wants a fresh start.`);
+				if (x) { made.push(x); }
+				continue;
+			}
 			// Repeated benching: a transfer request. Not the young ones, and not a keeper who is the backup.
 			if (!pl.wantsOut && pl.benched >= 4 && pl.age > 20 && pl.pos !== "gk" && ovrNow(pl) >= squadMedian(c) - 4) {
 				pl.wantsOut = true; pl.morale = clamp(pl.morale - 6, 5, 100);
@@ -175,6 +222,7 @@
 		} else if (gf > ga) { d.room = clamp(d.room + 2, 0, 100); }
 		// The mood of the dressing room rubs off on everyone a little.
 		for (const pl of all) { pl.morale = clamp(Math.round(pl.morale + (d.room - 60) * 0.03), 5, 100); }
+		made.push(...finalYearReview(c));
 		return made;
 	}
 
@@ -183,6 +231,7 @@
 	// than the club's offer. Returns null when he'll sign, otherwise the reason and what to do next.
 	function renewRefusal (pl, c, terms) {
 		if (!league) { return null; }
+		if (pl.leaving && !pl.wantsOut) { return { why: `${pl.name} won't sign a new deal: ${pl.leaving}.` }; }
 		if (pl.wantsOut) {
 			const why = `${pl.name} has asked to leave and won't sign a new deal. Play him and talk to him to win him back, or sell him while he still has a contract.`;
 			addIssue("contract", pl, why, { wantsOut: true });
@@ -217,7 +266,7 @@
 	}
 	// Selling one of yours to a smaller club: a first-team man refuses the step down, unless he wants out.
 	function sellRefusal (pl, club) {
-		if (!league || !Number.isInteger(club) || pl.wantsOut || pl.listed) { return null; }
+		if (!league || !Number.isInteger(club) || pl.wantsOut || pl.listed || pl.leaving) { return null; }
 		const role = roleOf(pl, league.club);
 		if ((role === "key" || role === "first") && getStr(club) < yourStr() - 0.4) {
 			return { why: `${pl.name} won't go to ${TEAMS[club].name}. He thinks it's a step down. Wait for a bid from a bigger club, or put him up for sale (Back yourself if he complains) and he'll go anywhere.` };
