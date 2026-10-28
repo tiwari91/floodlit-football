@@ -1498,6 +1498,11 @@ td, th { font-variant-numeric: tabular-nums; }
 .intl-squad ol.nat-xi li button { min-width: 6.5em; }
 .intl-squad ol.nat-xi li .swap:last-child { margin-right: calc(6.5em + var(--sp-2)); }
 .intl-squad select { font-size: var(--fs-md); padding: 5px 10px; }
+@media (max-width: 640px) {
+	.market .bids { grid-column: 2 / -1; grid-row: auto; justify-content: flex-start; margin-block: 2px 4px; }
+	.intl-squad ol.nat-xi li button { min-width: 0; }
+	.intl-squad ol.nat-xi li .swap:last-child { margin-right: 0; }
+}
 </style>
 
 <main class="wrap">
