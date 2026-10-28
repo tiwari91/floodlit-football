@@ -1548,7 +1548,7 @@
 				<thead><tr><th>#</th><th class="club">Club</th><th>P</th><th>W</th><th>D</th><th>L</th><th class="wide">GF</th><th class="wide">GA</th><th>GD</th><th>Pts</th><th class="wide">Form</th></tr></thead>
 				<tbody id="lgBody"></tbody>
 				</table>
-				<p class="zones"><span class="zk z-cl"></span>Champions Cup <span class="zk z-el"></span>Continental Cup <span class="zk z-rel"></span>Relegation</p>
+				<p class="zones"><span class="zk z-cl"></span>Continental Champions Cup (qualifies) <span class="zk z-el"></span>Continental Cup <span class="zk z-rel"></span>Relegation</p>
 				</div>
 				</div>
 				<div class="lg-clubs">
@@ -1645,6 +1645,7 @@
 				<button type="button" id="lgEdit" title="Rename clubs, kits and players, and share your edits as an option file">Edit names</button>
 				<button type="button" id="lgLeagues" title="Start a career in another country, or take your club there">Play in another league</button>
 				</div>
+				<label class="ed-toggle" for="ccStart"><input type="checkbox" id="ccStart"> <span>Start in the Continental Champions Cup (season one begins with your club in it; otherwise finish in the top four to qualify)</span></label>
 				<input type="file" id="lgFile" accept=".json,application/json" hidden>
 				<div class="bargroups">
 				<div class="bargroup" role="group" aria-labelledby="bgTeam">
@@ -3023,6 +3024,7 @@
 			if (gone.length) { league.news = `${league.news} Out of contract and gone: ${gone.join(", ")}. Academy players fill the gaps.`.trim(); }
 			if (club.resigned && club.resigned.length) { league.news = `${league.news} Signed new deals: ${club.resigned.join(", ")}.`.trim(); }
 		}
+		if (typeof contSeed === "function") { contSeed(league); }   // "Start in the Continental Champions Cup" (18f)
 		saveLeague();
 	}
 
@@ -3247,6 +3249,8 @@
 			next.append(det);
 			const host = f.home ? YOU : o;
 			const wn = league.wind[f.round];
+			const cc = typeof ensureCont === "function" ? ensureCont(league) : null, path = cc && cc.none ? ccPath(league) : "";
+			if (path && !(league.club.contQual && league.club.contQual.season === league.season + 1)) { next.append(el("span", "detail", path)); }
 			next.append(el("span", "detail", `${host.ground} · ${SURFACES[host.surface].label} · ${league.ko[f.round] === "day" ? "Afternoon" : "Night"} kick-off, ${koLabel(league.ko[f.round])} · Forecast: ${WEATHER[league.weather[f.round]].label.toLowerCase()}, ${wn.s >= 6 ? `${windWord(wn.s)} of ${wn.s} km/h` : "still air"}`));
 			const tired = tiredStarters();
 			if (tired.length) { next.append(el("span", "detail tiredwarn", `⚠ ${tiredText(tired)}`)); }
@@ -3278,7 +3282,7 @@
 			const gd = r.gf - r.ga;
 			// Zones: top four Champions Cup, fifth Continental Cup, bottom three relegated.
 			const zone = i < 4 ? "z-cl" : i === 4 ? "z-el" : i >= rows.length - 3 ? "z-rel" : "";
-			tr.append(el("td", zone, String(i + 1)), club, el("td", "", String(r.p)), el("td", "", String(r.w)), el("td", "", String(r.d)),
+			tr.append(Object.assign(el("td", zone, String(i + 1)), zone === "z-cl" ? { title: "Qualifies for the Continental Champions Cup" } : {}), club, el("td", "", String(r.p)), el("td", "", String(r.w)), el("td", "", String(r.d)),
 				el("td", "", String(r.l)), el("td", "wide", String(r.gf)), el("td", "wide", String(r.ga)),
 				el("td", "", (gd > 0 ? "+" : "") + gd), el("td", "pts", String(r.pts)), form);
 			body.append(tr);
@@ -5902,29 +5906,30 @@
 		return { note, morale: pl.morale, room: d.room, attr: p ? { ...p.attr } : null, onPitch: !!(p && players.includes(p) && p.name === pl.name) };
 	}
 	/* ---------- the Continental Champions Cup ----------
-	   The top four of the league qualify for next season's continental cup, with thirty-two clubs from
-	   the leagues abroad (named and coloured the way 18c names a country's clubs). One league phase:
-	   four pots of nine, seeded by each club's results over the last five seasons, and every club plays
-	   two from each pot, one at home and one away, never a club from its own country, in one table.
-	   The top eight go to the round of sixteen; ninth to twenty-fourth play two-legged play-offs (the
-	   higher placed at home in the second leg); the rest go out. Then two-legged ties to the final, a
-	   one-off at a neutral ground. Level on aggregate after the second leg: extra time, then penalties.
-	   The nights fall between league matchdays, like the League Cup's. Your games are real fixtures
-	   (play them or simulate them); everyone else's are played out from the two sides' strength.
+	   The top four of the league qualify for next season's continental cup (or you can start a career in it:
+	   Settings, "Start in the Continental Champions Cup"), with twenty-eight clubs from the leagues abroad
+	   (named and coloured the way 18c names a country's clubs). The classic format: thirty-two clubs in
+	   eight groups of four, one from each of four pots seeded by each club's results over the last five
+	   seasons, never two clubs of one country in a group. Each group is a double round-robin over six
+	   nights; the top two go through. Then two-legged ties (group winners against runners-up of another
+	   group, the winner at home in the second leg) in the round of 16, quarter-finals and semi-finals,
+	   and a one-off final at a neutral ground. Level on aggregate after the second leg: extra time, then
+	   penalties. The nights fall between league matchdays, like the League Cup's. Your games are real
+	   fixtures (play them or simulate them); everyone else's are played out from the two sides' strength.
 	   A club from abroad borrows a seat outside the division (the "guest", the last club below it)
-	   for as long as your game with it is next, and gives it back afterwards. */
+	   for as long as your game with it is next, and gives it back afterwards. A cup drawn by the older
+	   league-phase format (v1) is dropped on load: that season has no cup, and the next is drawn afresh. */
 	const CC_NAME = "Continental Champions Cup", CC_SHORT = "Continental Cup";
 	// Played after these league matchdays (none on a League Cup night).
 	const CC_NIGHTS = [
-		...[ 2, 4, 6, 8, 10, 13, 15, 17 ].map((r, i) => ({ r, stage: "lp", md: i + 1 })),
-		{ r: 21, stage: "po", leg: 1 }, { r: 23, stage: "po", leg: 2 },
-		{ r: 25, stage: "r16", leg: 1 }, { r: 26, stage: "r16", leg: 2 },
-		{ r: 28, stage: "qf", leg: 1 }, { r: 29, stage: "qf", leg: 2 },
-		{ r: 31, stage: "sf", leg: 1 }, { r: 32, stage: "sf", leg: 2 },
-		{ r: 36, stage: "f" }
+		...[ 2, 4, 6, 8, 10, 13 ].map((r, i) => ({ r, stage: "lp", md: i + 1 })),
+		{ r: 21, stage: "r16", leg: 1 }, { r: 23, stage: "r16", leg: 2 },
+		{ r: 25, stage: "qf", leg: 1 }, { r: 26, stage: "qf", leg: 2 },
+		{ r: 28, stage: "sf", leg: 1 }, { r: 29, stage: "sf", leg: 2 },
+		{ r: 31, stage: "f" }
 	];
-	const CC_STAGE = { lp: "League phase", po: "Knockout play-offs", r16: "Round of 16", qf: "Quarter-finals", sf: "Semi-finals", f: "Final" };
-	const CC_PRIZE = { start: 1, win: 0.2, draw: 0.07, top8: 0.4, r16: 0.6, qf: 0.8, sf: 1.1, f: 1.5, winner: 2 };
+	const CC_STAGE = { lp: "Group stage", r16: "Round of 16", qf: "Quarter-finals", sf: "Semi-finals", f: "Final" };
+	const CC_PRIZE = { start: 1, win: 0.2, draw: 0.07, r16: 0.6, qf: 0.8, sf: 1.1, f: 1.5, winner: 2 };
 	// The countries that send clubs, how many and how strong their best are.
 	const CC_NATIONS = [ [ "ESP", 4, 4.9 ], [ "GER", 4, 4.8 ], [ "ITA", 4, 4.7 ], [ "FRA", 4, 4.5 ], [ "POR", 3, 4.2 ], [ "NED", 3, 4.1 ], [ "BEL", 2, 3.7 ], [ "CRO", 2, 3.4 ], [ "DEN", 2, 3.3 ], [ "SWE", 1, 3.1 ], [ "POL", 1, 3.1 ], [ "SRB", 2, 3.2 ], [ "SEN", 0, 0 ] ];
 	const ccStr = (C, i) => { const c = C.clubs[i]; return c.id !== undefined ? getStr(c.id) : c.str; };
@@ -5969,72 +5974,51 @@
 		}
 		return out.slice(0, n);
 	}
-	// The league-phase draw: pots of nine; two from each pot (one home, one away), nobody from the same country.
-	function ccLeaguePhase (C) {
-		const N = C.clubs.length, P = N / 4, pots = [ 0, 1, 2, 3 ].map(k => C.pots.slice(k * P, k * P + P));
-		const nat = i => C.clubs[i].nat;
-		for (let tries = 0; tries < 400; tries++) {
-			const strict = tries < 300, games = [], seen = new Set(), ok = (a, b) => a !== b && (!strict || nat(a) !== nat(b)) && !seen.has(Math.min(a, b) * 100 + Math.max(a, b));
-			const add = (h, a) => { games.push({ h, a }); seen.add(Math.min(h, a) * 100 + Math.max(h, a)); };
+	// The group draw: eight groups of four, one club from each pot, nobody from the same country in a group.
+	// Each group plays a double round-robin over six nights (the second three the return of the first three).
+	function ccGroups (C) {
+		const nat = i => C.clubs[i].nat, P = C.clubs.length / 4, pots = [ 0, 1, 2, 3 ].map(k => C.pots.slice(k * P, k * P + P));
+		let groups = null;
+		for (let tries = 0; tries < 500 && !groups; tries++) {
+			const strict = tries < 400, g = Array.from({ length: P }, () => []);
 			let bad = false;
-			for (let x = 0; x < 4 && !bad; x++) {
-				// Within a pot: a ring, so each plays one at home and one away.
-				let ring = null;
-				for (let t = 0; t < 60 && !ring; t++) { const r = shuffle(pots[x].slice()); if (r.every((v, i) => ok(v, r[(i + 1) % P]))) { ring = r; } }
-				if (!ring) { bad = true; break; }
-				ring.forEach((v, i) => add(v, ring[(i + 1) % P]));
-				for (let y = x + 1; y < 4 && !bad; y++) {
-					// Between two pots: A_i at home to B_s(i) and away at B_t(i).
-					let s = null, t2 = null;
-					for (let t = 0; t < 200 && !s; t++) {
-						const ps = shuffle(pots[y].slice()), pt = shuffle(pots[y].slice());
-						if (pots[x].every((v, i) => ok(v, ps[i]) && ok(v, pt[i]) && ps[i] !== pt[i])) { s = ps; t2 = pt; }
-					}
-					if (!s) { bad = true; break; }
-					pots[x].forEach((v, i) => { add(v, s[i]); add(t2[i], v); });
+			for (const pot of pots) {
+				const order = shuffle(pot.slice()), free = g.map((_, k) => k);
+				for (const c of order) {
+					const k = shuffle(free.slice()).find(x => !strict || !g[x].some(m => nat(m) === nat(c)));
+					if (k === undefined) { bad = true; break; }
+					g[k].push(c); free.splice(free.indexOf(k), 1);
 				}
+				if (bad) { break; }
 			}
-			if (bad) { continue; }
-			// Eight nights, one game each a night if it can be done: a greedy colouring, tried many times, your
-			// games placed first; the best try is kept (a stray clash elsewhere only means a club plays twice one night).
-			const me = C.clubs.findIndex(c => c.id === 0);
-			let best = null, bestBad = 1e9;
-			for (let t = 0; t < 150 && bestBad > 0; t++) {
-				const busy = Array.from({ length: 8 }, () => new Set()), order = shuffle(games.map((g, i) => i)).sort((x, y) => ((games[y].h === me || games[y].a === me) - (games[x].h === me || games[x].a === me)));
-				const nOf = [];
-				let clash = 0;
-				for (const gi of order) {
-					const g = games[gi];
-					let n = [ 0, 1, 2, 3, 4, 5, 6, 7 ].find(k => !busy[k].has(g.h) && !busy[k].has(g.a));
-					if (n === undefined) { clash++; n = [ 0, 1, 2, 3, 4, 5, 6, 7 ].sort((x, y) => (busy[x].has(g.h) + busy[x].has(g.a)) - (busy[y].has(g.h) + busy[y].has(g.a)) || busy[x].size - busy[y].size)[0]; }
-					nOf[gi] = n; busy[n].add(g.h); busy[n].add(g.a);
-				}
-				if (clash < bestBad) { bestBad = clash; best = nOf; }
-			}
-			games.forEach((g, i) => { g.n = best[i]; });
-			return games.sort((a, b) => a.n - b.n);
+			if (!bad) { groups = g; }
 		}
-		return null;
+		if (!groups) { return null; }
+		const games = [], PAIRS = [ [ [ 0, 1 ], [ 2, 3 ] ], [ [ 2, 0 ], [ 3, 1 ] ], [ [ 0, 3 ], [ 1, 2 ] ] ];
+		for (const half of [ 0, 1 ]) {
+			PAIRS.forEach((md, m) => groups.forEach((g, gi) => md.forEach(([ x, y ]) => games.push(half ? { h: g[y], a: g[x], n: 3 + m, grp: gi } : { h: g[x], a: g[y], n: m, grp: gi }))));
+		}
+		C.groups = groups;
+		return games.sort((a, b) => a.n - b.n);
 	}
 	function drawCont (lg, ids) {
 		const own = ids.filter(id => TEAMS[id]).map(id => ({ id, name: TEAMS[id].name, nat: "_league" }));
-		const clubs = [ ...own, ...ccForeign(lg, 36 - own.length) ];
-		const C = { v: 1, season: lg.season, clubs, games: [], ties: { po: [], r16: [], qf: [], sf: [], f: [] }, night: 0, winner: null, out: null, earned: 0, paid: {} };
+		const clubs = [ ...own, ...ccForeign(lg, 32 - own.length) ];
+		const C = { v: 2, season: lg.season, clubs, games: [], groups: [], ties: { r16: [], qf: [], sf: [], f: [] }, night: 0, winner: null, out: null, earned: 0, paid: {} };
 		C.pots = clubs.map((c, i) => [ i, ccCoef(lg, c) ]).sort((a, b) => b[1] - a[1]).map(x => x[0]);
-		C.games = ccLeaguePhase(C) || [];
-		if (!C.games.length) { return { v: 1, season: lg.season, none: true }; }
+		C.games = ccGroups(C) || [];
+		if (!C.games.length) { return { v: 2, season: lg.season, none: true }; }
 		const me = ccMe(C);
-		const opps = me >= 0 ? C.games.filter(g => g.h === me || g.a === me).map(g => ccName(C, g.h === me ? g.a : g.h)) : [];
-		lg.news = `${lg.news || ""} ${CC_NAME} draw: ${me >= 0 ? `your league phase: ${opps.join(", ")}.` : `${own.map(c => c.name).join(", ")} go into the league phase.`}`.trim();
+				lg.news = `${lg.news || ""} ${CC_NAME} draw: ${me >= 0 ? `your group: ${C.groups[C.groups.findIndex(g => g.includes(me))].filter(i => i !== me).map(i => ccName(C, i)).join(", ")}.` : `${own.map(c => c.name).join(", ")} go into the group stage.`}`.trim();
 		return C;
 	}
 	// Ready for this season: drawn if the club qualified and the first night is still to come; none otherwise.
 	function ensureCont (lg) {
 		if (!lg || !Array.isArray(lg.members) || !lg.club) { return null; }
 		const c = lg.cont;
-		if (c && c.v === 1 && c.season === lg.season && (c.none || (Array.isArray(c.clubs) && Array.isArray(c.games) && c.ties))) { return c; }
+		if (c && c.v === 2 && c.season === lg.season && (c.none || (Array.isArray(c.clubs) && Array.isArray(c.games) && Array.isArray(c.groups) && c.ties))) { return c; }
 		const q = lg.club.contQual;
-		lg.cont = q && q.season === lg.season && Array.isArray(q.ids) && q.ids.length && lg.round <= CC_NIGHTS[0].r ? drawCont(lg, q.ids) : { v: 1, season: lg.season, none: true };
+		lg.cont = q && q.season === lg.season && Array.isArray(q.ids) && q.ids.length && lg.round <= CC_NIGHTS[0].r ? drawCont(lg, q.ids) : { v: 2, season: lg.season, none: true };
 		return lg.cont;
 	}
 	const ccAgg = (C, t) => {
@@ -6066,11 +6050,12 @@
 		const [ a, b ] = ccAgg(C, t);
 		return a > b ? t.a : t.b;
 	};
-	function ccTable (C) {
-		const rows = C.clubs.map((c, i) => ({ i, p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, pts: 0 }));
+	// A group's table, best first: points, goal difference, goals for, then the draw's seeding.
+	function ccTable (C, gi) {
+		const rows = C.groups[gi].map(i => ({ i, p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, pts: 0 })), at = new Map(rows.map(r => [ r.i, r ]));
 		for (const g of C.games) {
-			if (g.stage || g.hg === undefined) { continue; }
-			const H = rows[g.h], A = rows[g.a];
+			if (g.grp !== gi || g.hg === undefined) { continue; }
+			const H = at.get(g.h), A = at.get(g.a);
 			H.p++; A.p++; H.gf += g.hg; H.ga += g.ag; A.gf += g.ag; A.ga += g.hg;
 			if (g.hg > g.ag) { H.w++; A.l++; H.pts += 3; } else if (g.hg < g.ag) { A.w++; H.l++; A.pts += 3; } else { H.d++; A.d++; H.pts++; A.pts++; }
 		}
@@ -6087,16 +6072,15 @@
 	// After a round: who goes where.
 	function ccAdvance (lg, C, k) {
 		const night = CC_NIGHTS[k], me = ccMe(C), news = [];
-		if (night.stage === "lp" && night.md === 8) {
-			const rows = ccTable(C), seed = rows.map(r => r.i);
-			C.rank = seed;
-			for (let i = 0; i < 8; i++) { ccTie(C, "po", seed[23 - i], seed[8 + i]); }
-			const pos = seed.indexOf(me) + 1;
+		if (night.stage === "lp" && night.md === 6) {
+			const tabs = C.groups.map((_, gi) => ccTable(C, gi)), win = tabs.map(t => t[0].i), run = tabs.map(t => t[1].i);
+			C.rank = [ ...tabs.map(t => t[0]).sort((a, b) => b.pts - a.pts || (b.gf - b.ga) - (a.gf - a.ga)).map(r => r.i), ...tabs.map(t => t[1]).sort((a, b) => b.pts - a.pts || (b.gf - b.ga) - (a.gf - a.ga)).map(r => r.i) ];
+			for (let g = 0; g < win.length; g++) { ccTie(C, "r16", run[g ^ 1], win[g]); }   // winners of one group against the runners-up of the next, at home second
+			const gm = C.groups.findIndex(g => g.includes(me)), pos = gm < 0 ? 0 : tabs[gm].findIndex(r => r.i === me) + 1;
 			if (me >= 0) {
-				if (pos <= 8) { ccPay(lg, C, "top8"); news.push(`League phase over: you finished ${ordinal(pos)}, straight into the round of 16.`); }
-				else if (pos <= 24) { news.push(`League phase over: you finished ${ordinal(pos)} and go into the knockout play-offs against ${ccName(C, seed[32 - pos])}.`); }
-				else { C.out = { stage: "lp", pos }; news.push(`League phase over: you finished ${ordinal(pos)} and are out.`); }
-			} else { news.push(`${CC_SHORT} league phase over: ${ccName(C, seed[0])} top the table.`); }
+				if (pos <= 2) { ccPay(lg, C, "r16"); news.push(`Group stage over: you finished ${ordinal(pos)} in your group and go through to the round of 16.`); }
+				else { C.out = { stage: "lp", pos }; news.push(`Group stage over: you finished ${ordinal(pos)} in your group and are out.`); }
+			} else { news.push(`${CC_SHORT} group stage over: ${ccName(C, C.rank[0])} had the best group record.`); }
 		} else if (night.stage !== "lp" && night.leg !== 1) {
 			const stage = night.stage, ties = C.ties[stage], wins = ties.map(t => ccWinner(C, t));
 			const mine = ties.find(t => t.a === me || t.b === me);
@@ -6107,11 +6091,7 @@
 				if (w === me) { if (stage !== "f") { news.push(`${CC_STAGE[stage]}: through against ${ccName(C, opp)}, ${score}${how}.`); } }
 				else { C.out = { stage, by: opp }; news.push(`${CC_STAGE[stage]}: out against ${ccName(C, opp)}, ${score}${how}.`); }
 			}
-			if (stage === "po") {
-				const SO = [ 0, 7, 3, 4, 1, 6, 2, 5 ];
-				for (const s of SO) { ccTie(C, "r16", wins[7 - s], C.rank[s]); }
-				if (me >= 0 && C.rank.indexOf(me) < 8 || wins.includes(me)) { ccPay(lg, C, "r16"); }
-			} else if (stage !== "f") {
+			if (stage !== "f") {
 				const next = { r16: "qf", qf: "sf", sf: "f" }[stage];
 				for (let j = 0; j < wins.length; j += 2) {
 					const [ x, y ] = [ wins[j], wins[j + 1] ], better = C.rank.indexOf(x) <= C.rank.indexOf(y);
@@ -6213,7 +6193,7 @@
 		const g = C.games[gi], me = ccMe(C), o = g.h === me ? g.a : g.h, oc = C.clubs[o], night = CC_NIGHTS[g.n];
 		const opp = oc.id !== undefined ? (restoreGuest(lg), oc.id) : applyGuest(lg, oc);
 		if (opp < 0) { return null; }
-		const label = `${CC_SHORT} · ${night.stage === "lp" ? `League phase, matchday ${night.md}` : `${CC_STAGE[night.stage]}${night.leg ? `, ${night.leg === 1 ? "first" : "second"} leg` : ""}`}`;
+		const label = `${CC_SHORT} · ${night.stage === "lp" ? `Group stage, matchday ${night.md}` : `${CC_STAGE[night.stage]}${night.leg ? `, ${night.leg === 1 ? "first" : "second"} leg` : ""}`}`;
 		return { round: lg.round, home: g.h === me, opp, cont: { gi, season: C.season }, label, neutral: !!g.neutral };
 	}
 	// Your result, from a played or simulated match: the rest of the night follows.
@@ -6229,26 +6209,51 @@
 		const opp = g.h === me ? g.a : g.h, mine = g.h === me ? [ g.hg, g.ag ] : [ g.ag, g.hg ];
 		const extra = g.pens ? ` After extra time it went to penalties: ${g.h === me ? g.pens[0] : g.pens[1]}–${g.h === me ? g.pens[1] : g.pens[0]}.` : g.et ? " It went to extra time." : "";
 		const night = CC_NIGHTS[g.n];
-		const note = `${CC_SHORT}, ${night.stage === "lp" ? `league phase matchday ${night.md}` : `${CC_STAGE[night.stage].toLowerCase()}${night.leg ? `, ${night.leg === 1 ? "first" : "second"} leg` : ""}`}: ${g.h === me ? `you ${mine[0]}–${mine[1]} ${ccName(C, opp)}` : `${ccName(C, opp)} ${mine[1]}–${mine[0]} you`}.${extra}`;
+		const note = `${CC_SHORT}, ${night.stage === "lp" ? `group stage matchday ${night.md}` : `${CC_STAGE[night.stage].toLowerCase()}${night.leg ? `, ${night.leg === 1 ? "first" : "second"} leg` : ""}`}: ${g.h === me ? `you ${mine[0]}–${mine[1]} ${ccName(C, opp)}` : `${ccName(C, opp)} ${mine[1]}–${mine[0]} you`}.${extra}`;
 		lg.news = `${lg.news || ""} ${note}`.trim();
 		restoreGuest(lg);
 		contNight();
 		return note;
 	}
 	// Prize money for league-phase results: a win or a draw, paid once per game.
-	for (let n = 0; n < 8; n++) { CC_PRIZE["win" + n] = CC_PRIZE.win; CC_PRIZE["draw" + n] = CC_PRIZE.draw; }
+	for (let n = 0; n < 6; n++) { CC_PRIZE["win" + n] = CC_PRIZE.win; CC_PRIZE["draw" + n] = CC_PRIZE.draw; }
+	// The way in: where you stand against the top four, for the Cups tab and the Overview.
+	function ccPath (lg) {
+		if (!lg || !lg.club) { return ""; }
+		const rows = standings(), pos = rows.findIndex(r => r.id === 0) + 1, me = rows[pos - 1];
+		if (seasonDone()) { return pos <= 4 ? "" : `You finished ${ordinal(pos)}: the top four qualify for the ${CC_NAME}.`; }
+		const gap = rows[3].pts - me.pts;
+		return `Finish top 4 to qualify for next season's ${CC_NAME}. You are ${ordinal(pos)}${pos <= 4 ? ", inside the places" : `, ${gap} point${gap === 1 ? "" : "s"} behind 4th`}.`;
+	}
+	// "Start in the Continental Champions Cup": season one begins with your club already in the cup.
+	const ccStartOn = () => { try { return store.get("ff-cc-start") === "1"; } catch (e) { return false; } };
+	function contSeed (lg) {
+		if (!ccStartOn() || !lg || !lg.club || lg.season !== 1 || lg.round > CC_NIGHTS[0].r) { return; }
+		const ids = [ 0, ...lg.members.filter(i => i !== 0).sort((a, b) => getStr(b) - getStr(a)).slice(0, 3) ];
+		lg.club.contQual = { season: lg.season, ids };
+		delete lg.cont;
+	}
+	function setCcStart (on) {
+		store.set("ff-cc-start", on ? "1" : "0");
+		const lg = league;
+		if (!lg || !lg.club || lg.season !== 1 || lg.round > CC_NIGHTS[0].r) { return; }
+		if (on) { contSeed(lg); } else if (lg.club.contQual && lg.club.contQual.season === 1) { delete lg.club.contQual; delete lg.cont; }
+		saveLeague(); renderLeague();
+	}
+	const ccBox = document.getElementById("ccStart");
+	if (ccBox) { ccBox.checked = ccStartOn(); ccBox.addEventListener("change", () => setCcStart(ccBox.checked)); }
 	// For the panel and the tests: what comes next.
 	function contNext () {
 		const lg = league, C = ensureCont(lg);
-		if (!C || C.none) { return lg && lg.club && lg.club.contQual && lg.club.contQual.season === lg.season + 1 ? (lg.club.contQual.ids.includes(0) ? "You've qualified for next season." : "") : `Finish in the top four to qualify for next season.`; }
+		if (!C || C.none) { return lg && lg.club && lg.club.contQual && lg.club.contQual.season === lg.season + 1 ? (lg.club.contQual.ids.includes(0) ? "You've qualified for next season." : "") : ccPath(lg); }
 		const me = ccMe(C);
 		if (C.winner !== null) { return C.winner === me ? "You won the cup!" : `${ccName(C, C.winner)} won the cup.${me >= 0 && C.out ? ` You went out in the ${CC_STAGE[C.out.stage].toLowerCase()}.` : ""}`; }
 		if (me < 0) { return "Your league's clubs in the cup this season: " + C.clubs.filter(c => c.id !== undefined).map(c => TEAMS[c.id].name).join(", ") + "."; }
-		if (C.out) { return C.out.stage === "lp" ? `Out after the league phase (${ordinal(C.out.pos)}).` : `Out in the ${CC_STAGE[C.out.stage].toLowerCase()}, beaten by ${ccName(C, C.out.by)}.`; }
+		if (C.out) { return C.out.stage === "lp" ? `Out in the group stage (${ordinal(C.out.pos)} in your group).` : `Out in the ${CC_STAGE[C.out.stage].toLowerCase()}, beaten by ${ccName(C, C.out.by)}.`; }
 		const g = C.games.find(x => x.hg === undefined && (x.h === me || x.a === me));
 		if (!g) { return "Waiting for the draw."; }
 		const n = CC_NIGHTS[g.n];
-		return `Next: ${n.stage === "lp" ? `league phase matchday ${n.md}` : CC_STAGE[n.stage].toLowerCase()}, ${g.h === me ? "at home to" : g.neutral ? "against" : "away at"} ${ccName(C, g.h === me ? g.a : g.h)}${g.neutral ? " at a neutral ground" : ""}, after league matchday ${n.r}.`;
+		return `Next: ${n.stage === "lp" ? `group stage matchday ${n.md}` : CC_STAGE[n.stage].toLowerCase()}, ${g.h === me ? "at home to" : g.neutral ? "against" : "away at"} ${ccName(C, g.h === me ? g.a : g.h)}${g.neutral ? " at a neutral ground" : ""}, after league matchday ${n.r}.`;
 	}
 	/* The panel: the league-phase table, your fixtures and the knockout ties. */
 	function renderCont (box) {
@@ -6259,8 +6264,8 @@
 		if (!C.none) {
 			const me = ccMe(C), cell = (tag, txt, st) => { const e = el(tag, "", txt); if (st) { e.style.cssText = st; } return e; };
 			if (me >= 0) {
-				const d = el("details"); d.open = C.night < 8;
-				d.append(el("summary", "", "Your league phase"));
+				const d = el("details"); d.open = C.night < 6;
+				d.append(el("summary", "", "Your group fixtures"));
 				const ul = el("ul", "cup-ties");
 				for (const g of C.games.filter(x => !x.stage && (x.h === me || x.a === me))) {
 					const opp = ccName(C, g.h === me ? g.a : g.h), sc = g.hg === undefined ? "v" : g.h === me ? `${g.hg}–${g.ag}` : `${g.ag}–${g.hg}`;
@@ -6268,21 +6273,26 @@
 				}
 				d.append(ul); card.append(d);
 			}
-			const tb = el("details"); tb.open = C.night >= 1 && C.night <= 8;
-			tb.append(el("summary", "", "League phase table"));
-			const t = el("table", "cc-table"); t.style.cssText = "width:100%;border-collapse:collapse;font-size:12px";
-			const hr = el("tr"); for (const h of [ "", "Club", "P", "GD", "Pts" ]) { hr.append(cell("th", h, "text-align:left;opacity:0.7;font-weight:600")); } t.append(hr);
-			ccTable(C).forEach((r, i) => {
-				const tr = el("tr"); tr.style.cssText = `${r.i === me ? "font-weight:700;color:#f2b52e;" : ""}${i === 8 || i === 24 ? "border-top:1px solid rgba(255,255,255,0.35);" : ""}`;
-				tr.append(cell("td", String(i + 1)), cell("td", ccName(C, r.i)), cell("td", String(r.p)), cell("td", (r.gf - r.ga > 0 ? "+" : "") + (r.gf - r.ga)), cell("td", String(r.pts)));
-				t.append(tr);
+			const tb = el("details"); tb.open = C.night >= 1 && C.night <= 6;
+			tb.append(el("summary", "", "The eight groups"));
+			const grid = el("div", "cc-groups"); grid.style.cssText = "display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px";
+			C.groups.forEach((grp, gi) => {
+				const box = el("div", `cc-group${grp.includes(me) ? " mine" : ""}`); box.style.cssText = grp.includes(me) ? "padding:4px;border-radius:6px;background:rgba(242,181,46,0.1)" : "padding:4px";
+				const t = el("table", "cc-table"); t.style.cssText = "width:100%;border-collapse:collapse;font-size:12px";
+				const hr = el("tr"); for (const h of [ `Group ${String.fromCharCode(65 + gi)}`, "P", "GD", "Pts" ]) { hr.append(cell("th", h, "text-align:left;opacity:0.7;font-weight:600")); } t.append(hr);
+				ccTable(C, gi).forEach((r, i) => {
+					const tr = el("tr"); tr.style.cssText = `${r.i === me ? "font-weight:700;color:#f2b52e;" : ""}${i === 2 ? "border-top:1px solid rgba(255,255,255,0.35);" : ""}`;
+					tr.append(cell("td", ccName(C, r.i)), cell("td", String(r.p)), cell("td", (r.gf - r.ga > 0 ? "+" : "") + (r.gf - r.ga)), cell("td", String(r.pts)));
+					t.append(tr);
+				});
+				box.append(t); grid.append(box);
 			});
-			tb.append(t, el("p", "detail", "Top 8: round of 16. 9th to 24th: knockout play-offs."));
+			tb.append(grid, el("p", "detail", "The top two in each group go through to the round of 16."));
 			card.append(tb);
-			if (C.ties.po.length) {
-				const kd = el("details"); kd.open = C.night >= 8;
+			if (C.ties.r16.length) {
+				const kd = el("details"); kd.open = C.night >= 6;
 				kd.append(el("summary", "", "Knockout rounds"));
-				for (const st of [ "po", "r16", "qf", "sf", "f" ]) {
+				for (const st of [ "r16", "qf", "sf", "f" ]) {
 					if (!C.ties[st].length) { continue; }
 					kd.append(el("span", "eyebrow", CC_STAGE[st]));
 					const ul = el("ul", "cup-ties");
@@ -21111,7 +21121,7 @@
 	if (window.__ff) { Object.assign(window.__ff, { kickTest (p, x, y, sp, restart) { if (restart) { deadBall = { kind: restart, taker: p }; } ball.owner = null; kick(p, x, y, sp); }, aerialTest (t) { lastTouch = t; return aerial(); }, chantLogTest () { return chantLog.slice(); }, CALLERS, COLOUR, GOAL_SHOUT, goalShout }); }
 	if (window.__ff) { Object.assign(window.__ff, { trophyCeremony, ceremonySeek, ceremonyInfo, endCeremony, queueTrophy, trophyDue, lastCeremony: () => lastCeremony }); }
 	if (window.__ff) { Object.assign(window.__ff, { setOpponent, yourKit, matchGround, welcomeCall, openMatchCentre, closeMatchCentre, formOf, makeSub, subPool, startSubWalk, applause, subPerf, logGoalTest (t, n) { (t === 0 ? matchGoals : matchGoalsOpp).push(n); } }); Object.defineProperties(window.__ff, { subWalks: { get: () => subWalks }, lastApplause: { get: () => lastApplause } }); }
-	if (window.__ff) { Object.assign(window.__ff, { ensureCont, contNight, contFixture, contSimAll, contQualify, contNext, ccTable, ccAgg, ccWinner, renderCont, CC_NIGHTS, currentFixture, simulateMine, restoreGuest, saveLeague, renderLeague }); }
+	if (window.__ff) { Object.assign(window.__ff, { ensureCont, contNight, contFixture, contSimAll, contQualify, contNext, contSeed, setCcStart, ccPath, ccGroups, ccTable, ccAgg, ccWinner, renderCont, CC_NIGHTS, currentFixture, simulateMine, restoreGuest, saveLeague, renderLeague }); }
 
 	const hot = window.claude && window.claude.hot;
 	if (hot && typeof hot.snapshot === "function") {

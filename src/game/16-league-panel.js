@@ -40,6 +40,8 @@
 			next.append(det);
 			const host = f.home ? YOU : o;
 			const wn = league.wind[f.round];
+			const cc = typeof ensureCont === "function" ? ensureCont(league) : null, path = cc && cc.none ? ccPath(league) : "";
+			if (path && !(league.club.contQual && league.club.contQual.season === league.season + 1)) { next.append(el("span", "detail", path)); }
 			next.append(el("span", "detail", `${host.ground} · ${SURFACES[host.surface].label} · ${league.ko[f.round] === "day" ? "Afternoon" : "Night"} kick-off, ${koLabel(league.ko[f.round])} · Forecast: ${WEATHER[league.weather[f.round]].label.toLowerCase()}, ${wn.s >= 6 ? `${windWord(wn.s)} of ${wn.s} km/h` : "still air"}`));
 			const tired = tiredStarters();
 			if (tired.length) { next.append(el("span", "detail tiredwarn", `⚠ ${tiredText(tired)}`)); }
@@ -71,7 +73,7 @@
 			const gd = r.gf - r.ga;
 			// Zones: top four Champions Cup, fifth Continental Cup, bottom three relegated.
 			const zone = i < 4 ? "z-cl" : i === 4 ? "z-el" : i >= rows.length - 3 ? "z-rel" : "";
-			tr.append(el("td", zone, String(i + 1)), club, el("td", "", String(r.p)), el("td", "", String(r.w)), el("td", "", String(r.d)),
+			tr.append(Object.assign(el("td", zone, String(i + 1)), zone === "z-cl" ? { title: "Qualifies for the Continental Champions Cup" } : {}), club, el("td", "", String(r.p)), el("td", "", String(r.w)), el("td", "", String(r.d)),
 				el("td", "", String(r.l)), el("td", "wide", String(r.gf)), el("td", "wide", String(r.ga)),
 				el("td", "", (gd > 0 ? "+" : "") + gd), el("td", "pts", String(r.pts)), form);
 			body.append(tr);

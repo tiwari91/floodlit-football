@@ -94,6 +94,7 @@
 			if (gone.length) { league.news = `${league.news} Out of contract and gone: ${gone.join(", ")}. Academy players fill the gaps.`.trim(); }
 			if (club.resigned && club.resigned.length) { league.news = `${league.news} Signed new deals: ${club.resigned.join(", ")}.`.trim(); }
 		}
+		if (typeof contSeed === "function") { contSeed(league); }   // "Start in the Continental Champions Cup" (18f)
 		saveLeague();
 	}
 
