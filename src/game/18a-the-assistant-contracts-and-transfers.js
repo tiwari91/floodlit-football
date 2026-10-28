@@ -37,6 +37,7 @@
 		const prospect = role === "prospect" && (pl.pot || 0) >= o + 6;
 		const backupGk = pl.pos === "gk" && [ ...c.squad, ...c.bench ].filter(q => q.pos === "gk").length <= 2;   // never leave one keeper
 		if (lastSeason(pl)) { return { keep: false, worth, why: `${pl.age}, retiring at the end of the season` }; }
+		if (pl.leaving) { return { keep: false, worth, sulk: true, why: `he won't sign: ${pl.leaving}` }; }
 		if (pl.morale < 40) { return { keep: false, worth, sulk: true, why: `unhappy (morale ${pl.morale}), so he won't talk about a new deal yet` }; }
 		if (!starter && !prospect && pl.age >= 33 && !backupGk) { return { keep: false, worth, free: true, why: `${pl.age} and not in the side` }; }
 		if (!starter && !prospect && worth < -4 && !backupGk) { return { keep: false, worth, free: true, why: "not needed, others cover his position" }; }

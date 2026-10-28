@@ -36,6 +36,10 @@
 		const yours = [ ...c.squad, ...c.bench ].filter(p => p.pos !== "gk" || ovrOf(p) > 70).sort((a, b) => valueOf(b) - valueOf(a));
 		const nb = Math.min(yours.length, 1 + Math.floor(Math.random() * 3));
 		lg.bidsIn = [];
+		// A listed player (or one who won't renew) always draws an offer, a little under his value.
+		for (const pl of [ ...c.squad, ...c.bench ].filter(p => p.listed || p.leaving)) {
+			lg.bidsIn.push({ name: pl.name, club: others[Math.floor(Math.random() * others.length)], fee: round1(Math.max(0.2, valueOf(pl) * (0.8 + Math.random() * 0.3))) });
+		}
 		for (let k = 0; k < nb; k++) {
 			const pl = yours[Math.floor(Math.random() * Math.min(6, yours.length))];
 			if (!pl || lg.bidsIn.some(b => b.name === pl.name)) { continue; }

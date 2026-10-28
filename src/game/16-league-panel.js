@@ -220,6 +220,7 @@
 			if (pl.goals > 0) { nameTd.append(el("span", "gls", `${pl.goals} goal${pl.goals === 1 ? "" : "s"}`)); }
 			ensurePlayer(pl);
 			if (pl.trait) { const tg = el("span", "trait", traitName(pl.trait)); tg.title = TRAITS[pl.trait][1]; nameTd.append(tg); }
+			if (pl.listed || pl.wantsOut || pl.leaving) { const tg = el("span", "trait wants-out", pl.listed ? "Listed" : "Wants out"); tg.title = pl.listed ? "On the transfer list: clubs will bid" : pl.leaving ? `Won't renew: ${pl.leaving}` : "Has asked to leave"; nameTd.append(tg); }
 			{
 				const fa = formAvg(pl), fb = formBonus(pl);
 				if (fa !== null) {
@@ -429,7 +430,7 @@
 			if (pl.contract > 0) { continue; }
 			// Out of contract: a happy player under 34 signs on for two more at a little more money; the rest go.
 			// The assistant may have decided to let him go on a free (pl.letGo).
-			if (pl.morale >= 50 && pl.age < 34 && !(pl.letGo && typeof assistDoes === "function" && assistMode !== "off" && assistDoes("contracts"))) { pl.contract = oneYearOnly(pl) ? 1 : 2; pl.wage = Math.round(wageOf(pl) * 1.1 * 1000) / 1000; kept.push(pl.name); } else { gone.push(pl.name); }
+			if (pl.morale >= 50 && pl.age < 34 && !pl.leaving && !(pl.letGo && typeof assistDoes === "function" && assistMode !== "off" && assistDoes("contracts"))) { pl.contract = oneYearOnly(pl) ? 1 : 2; pl.wage = Math.round(wageOf(pl) * 1.1 * 1000) / 1000; kept.push(pl.name); } else { gone.push(pl.name); }
 		}
 		if (gone.length) { c.squad = c.squad.filter(p => !gone.includes(p.name)); c.bench = c.bench.filter(p => !gone.includes(p.name)); }
 		if (gone.length || c.bench.length < 5) { refillSquad(c); }
