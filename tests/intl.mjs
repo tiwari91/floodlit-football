@@ -355,6 +355,29 @@ await page.evaluate(() => document.getElementById("simBtn").click());
 await page.waitForTimeout(800);
 const fr3 = await page.evaluate(() => { const F = window.__ff, lg = F.league, I = lg.intl, last = I.record[I.record.length - 1]; return { what: last && last.what, done: I.frDone, round: lg.round, again: F.intlFixture(), note: /Friendly/.test(I.lastNote || "") }; });
 check("a friendly is recorded, moves no league round, and is not offered again", fr3.what === "Friendly" && fr3.done === 9 && fr3.round === 9 && fr3.again === null && fr3.note, JSON.stringify(fr3));
+// The FA objective and confidence meter.
+const faA = await page.evaluate(() => {
+	const F = window.__ff, lg = F.league, I = lg.intl;
+	delete I.obj; I.conf = 60; I.comp = F.intlComp(lg).none ? I.comp : I.comp;
+	return { none: !!F.intlComp(lg).none };
+});
+const faB = await page.evaluate(() => {
+	const F = window.__ff; let lg = F.league; const I = lg.intl;
+	for (let i = 0; i < 8; i++) { F.league.round = F.league.fixtures.length; F.nextSeasonTest(); if (!F.intlComp(F.league).none && F.league.intl.nat && F.intlObjective(F.league)) { break; } }
+	lg = F.league; F.renderLeague();
+	const o = F.intlObjective(lg), C = F.intlComp(lg);
+	return { obj: o && o.key, kind: C.kind, conf: F.intlConf(lg), txt: document.getElementById("lgNext").textContent };
+});
+check("each season the FA sets a target from the side's strength and Overview shows it with a confidence figure", /FA target: .* Confidence \d+%/.test(faB.txt) && !!faB.obj, JSON.stringify({ faA, faB }));
+const faC = await page.evaluate(() => {
+	const F = window.__ff, lg = F.league, I = lg.intl; I.nat = I.nat || "ESP";
+	I.comp = { v: 1, season: lg.season, none: false, kind: "q", tour: "eu", groups: [ [ I.nat, "ITA" ] ], qualified: [], games: [], nights: [ { r: 9, md: 1 } ], night: 0, qn: 1 };
+	I.obj = { season: lg.season, key: "qualify" }; I.conf = 60;
+	F.intlMood(lg, -4); const lost = F.intlConf(lg);
+	F.renderLeague();
+	return { lost, txt: F.league.intl.obj.key };
+});
+check("results move the confidence (a defeat lowers it)", faC.lost === 56, JSON.stringify(faC));
 // The bar's button is the one next step on every tab, and never starts a club match.
 await page.evaluate(() => { window.__ff.simSeasonAllTest(); });
 const tabBtn = {};

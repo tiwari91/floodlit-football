@@ -177,6 +177,7 @@
 		I.missed = Number.isInteger(I.missed) ? clamp(I.missed, 0, 2) : 0;
 		I.rest = Array.isArray(I.rest) ? I.rest.filter(n => typeof n === "string").slice(0, 30) : [];
 		if (typeof I.capt !== "string") { delete I.capt; }
+		if (I.conf !== undefined && !Number.isInteger(I.conf)) { delete I.conf; }
 		if (!Number.isInteger(I.frDone)) { delete I.frDone; }
 		if (!(plainObj(I.fr) && Number.isInteger(I.fr.round) && natOk(I.fr.nat))) { I.fr = null; }
 		I.sel = Array.isArray(I.sel) ? I.sel.filter(n => typeof n === "string").slice(0, INTL_CALLUP) : [];   // the call-up: up to 23 names; empty = auto-pick
@@ -190,9 +191,10 @@
 	// A new season: the job, the record and the qualifiers carry over; the offers lapse; a new draw.
 	function intlNewSeason (prev) {
 		const lg = league, P = prev && plainObj(prev.intl) && prev.intl.v === 1 ? prev.intl : null;
-		lg.intl = { v: 1, nat: P && natOk(P.nat) ? P.nat : null, offers: [], record: P && Array.isArray(P.record) ? P.record.slice(-30) : [], season: lg.season, only: !!(P && P.only === true), missed: P && Number.isInteger(P.missed) ? P.missed : 0, rest: [], sel: P && Array.isArray(P.sel) ? P.sel.slice() : [], capt: P && typeof P.capt === "string" ? P.capt : undefined, next: P && P.next ? P.next : null, comp: intlNone(lg.season) };
+		lg.intl = { v: 1, nat: P && natOk(P.nat) ? P.nat : null, offers: [], record: P && Array.isArray(P.record) ? P.record.slice(-30) : [], season: lg.season, only: !!(P && P.only === true), missed: P && Number.isInteger(P.missed) ? P.missed : 0, rest: [], sel: P && Array.isArray(P.sel) ? P.sel.slice() : [], capt: P && typeof P.capt === "string" ? P.capt : undefined, conf: P && Number.isInteger(P.conf) ? P.conf : undefined, next: P && P.next ? P.next : null, comp: intlNone(lg.season) };
 		ensureIntl(lg);
 		lg.intl.comp = drawIntl(lg, lg.intl);
+		if (lg.intl.nat) { intlObjective(lg); }
 		const C = lg.intl.comp, me = lg.intl.nat;
 		if (C.kind === "q") { lg.news = `${lg.news || ""} Qualifiers for the ${INTL_TOURS[C.tour]} this season: breaks after matchdays 9, 20 and 30.${me ? ` ${natName(me)} are in Group ${groupLetter(C.groups.findIndex(g => g.includes(me)))}.` : ""}`.trim(); }
 		else { lg.news = `${lg.news || ""} The ${tn(C)} is played over the breaks after matchdays 9, 20 and 30: ${C.teams.length} countries in groups of four, then knockouts. ${C.teams.map(natName).join(", ")}.${me ? (C.teams.includes(me) ? ` ${natName(me)} are in it.` : ` ${natName(me)} didn't qualify.`) : ""}`.trim(); }
@@ -246,7 +248,7 @@
 		const I = lg.intl, me = I.nat, news = [];
 		if (C.kind === "q") {
 			if (k !== C.nights.length - 1) { return; }
-			C.qualified = intlQualified(C); C.done = true;
+			C.qualified = intlQualified(C); C.done = true; intlJudge(lg, C);
 			I.next = { season: C.season + 1, nats: C.qualified.slice() };
 			news.push(`International qualifying is over: ${C.qualified.map(natName).join(", ")} go to next season's ${tn(C)}.`);
 			if (me && C.tour === "eu" && !inEurope(me)) { news.push(`${natName(me)} are not a European side: there is no ${tn(C)} for them.`); }
@@ -272,7 +274,7 @@
 				}
 				news.push(`${tn(C)} groups are over: ${[ ...W, ...R ].map(natName).join(", ")} go through.`);
 			} else if (stage === "f") {
-				C.winner = wins[0]; C.done = true;
+				C.winner = wins[0]; C.done = true; intlJudge(lg, C);
 				news.push(`${tn(C)} final: ${intlScore(games[0])}. ${natName(C.winner)} are the winners.`);
 				if (me && C.winner === me) { news.push(`You've won the ${tn(C)} with ${natName(me)}!`); if (typeof queueTrophy === "function") { queueTrophy(tn(C)); } }
 			} else {
@@ -402,7 +404,7 @@
 			const me = I.nat, opp = lm.intl.nat, note = `Friendly: ${natName(me)} ${h}–${a} ${natName(opp)}.`;
 			intlTire(lg, I); matchSta = {};
 			I.record = [ ...I.record, { season: lg.season, nat: me, opp, gf: h, ga: a, what: "Friendly" } ].slice(-30);
-			I.fr = null; I.frDone = lm.round;
+			I.fr = null; I.frDone = lm.round; intlMood(lg, h > a ? 1 : h < a ? -1 : 0);
 			I.lastNote = note; lg.news = `${lg.news || ""} ${note}`.trim();
 			restoreGuest(lg); intlBegin(null);
 			return note;
@@ -417,6 +419,7 @@
 		const opp = g.h === me ? g.a : g.h, my = g.h === me ? [ g.hg, g.ag ] : [ g.ag, g.hg ];
 		I.record = [ ...I.record, { season: C.season, nat: me, opp, gf: my[0], ga: my[1], what: intlWhat(C, g) } ].slice(-30);
 		const won = intlWinner(g) === me || (!g.stage && my[0] > my[1]);
+		intlMood(lg, won ? 4 : my[0] === my[1] && !g.stage ? 0 : -4);
 		const note = `${intlLabel(C, g).replace(/^International · /, "")}: ${natName(me)} ${my[0]}–${my[1]} ${natName(opp)}${g.pens ? ` (after extra time, ${g.h === me ? g.pens[0] : g.pens[1]}–${g.h === me ? g.pens[1] : g.pens[0]} on penalties)` : g.et ? " (after extra time)" : ""}.`;
 		I.lastNote = `${note}${I.tired && I.tired.length ? ` Your club's ${I.tired.join(", ")} played and will be a little tired for the next league match.` : ""}`;
 		lg.news = `${lg.news || ""} ${note}`.trim();
@@ -454,7 +457,7 @@
 		const I = lg && lg.intl;
 		if (!I || !I.nat) { return; }
 		const was = I.nat;
-		I.nat = null; I.missed = 0; I.rest = []; I.sel = []; delete I.capt; delete I.ask;
+		I.nat = null; I.missed = 0; I.rest = []; I.sel = []; delete I.capt; delete I.obj; delete I.conf; delete I.ask;
 		if (why === "club") { I.only = false; }   // a club job is next: the country job is over and so is any time without a club
 		if (lg.contGuest && lg.contGuest.intl) { restoreGuest(lg); }
 		if (why === "resigned") { lg.news = `${lg.news || ""} You resigned as ${natName(was)} manager.`.trim(); }
@@ -466,7 +469,7 @@
 		const lg = league, I = ensureIntl(lg), o = I && I.offers.find(x => x.nat === nat);
 		if (!o || I.nat) { return false; }
 		const club = clubName();
-		I.nat = nat; I.only = true; I.offers = []; I.missed = 0; I.rest = []; I.sel = []; delete I.capt;
+		I.nat = nat; I.only = true; I.offers = []; I.missed = 0; I.rest = []; I.sel = []; delete I.capt; delete I.obj; delete I.conf;
 		lg.career = { ...(lg.career || { history: [] }), clubs: [ ...((lg.career && lg.career.clubs) || [ club ]), `${natName(nat)} (national team)` ] };
 		lg.news = `${lg.news || ""} You left ${club} to manage ${natName(nat)} full-time. ${club} have a new manager.`.trim();
 		lastDeal = `You left ${club} and are the new ${natName(nat)} manager. The league carries on without you; you play the internationals.`;
@@ -589,7 +592,50 @@
 	}
 
 	/* The Cups tab: the International card (its first line is the Overview's line for the breaks). */
+	/* The FA's objective and its confidence in you: a target from your side's strength, results move the meter,
+	   missing the target only lowers it (the sacking rule is the two missed tournaments above). */
+	const OBJ_TXT = { qualify: "qualify for the tournament", ko: "reach the knockout rounds", sf: "reach the semi-finals", win: "win the tournament" };
+	const confLabel = v => (v >= 75 ? "Backed by the FA" : v >= 45 ? "Steady" : v >= 25 ? "Under pressure" : "On thin ice");
+	const intlConf = lg => { const I = lg.intl; return Number.isInteger(I.conf) ? clamp(I.conf, 0, 100) : 60; };
+	function intlMood (lg, d) { const I = lg.intl; I.conf = clamp(intlConf(lg) + d, 0, 100); }
+	function intlObjective (lg = league) {
+		const I = ensureIntl(lg), C = I && I.comp;
+		if (!I || !I.nat || !C || C.none) { return null; }
+		if (plainObj(I.obj) && I.obj.season === lg.season && OBJ_TXT[I.obj.key]) { return I.obj; }
+		const inIt = C.kind === "q" ? C.groups.some(g => g.includes(I.nat)) : C.teams.includes(I.nat);
+		if (!inIt) { return null; }
+		let key = "qualify";
+		if (C.kind === "t") {
+			const sq = nationSquads(lg), rk = sq.findIndex(x => x.nat === I.nat) / Math.max(1, sq.length);
+			key = rk < 0.1 ? "win" : rk < 0.35 ? "sf" : "ko";
+		}
+		return (I.obj = { season: lg.season, key });
+	}
+	function intlObjText (lg = league) {
+		const o = intlObjective(lg);
+		if (!o) { return `FA confidence ${intlConf(lg)}%: ${confLabel(intlConf(lg))}.`; }
+		return `FA target: ${OBJ_TXT[o.key]}${o.done ? (o.done === "met" ? " (met)" : " (missed)") : ""}. Confidence ${intlConf(lg)}%: ${confLabel(intlConf(lg))}.`;
+	}
+	// The competition is over: was the target met?
+	function intlJudge (lg, C) {
+		const I = lg.intl, o = intlObjective(lg);
+		if (!o || o.done || !I.nat) { return; }
+		const me = I.nat, mine = C.games.filter(g => g.h === me || g.a === me);
+		let hit;
+		if (o.key === "qualify") { hit = C.qualified.includes(me); }
+		else {
+			const got = C.winner === me ? 3 : mine.some(g => g.stage === "sf" || g.stage === "f") ? 2 : mine.some(g => g.stage) ? 1 : 0;
+			hit = got >= { ko: 1, sf: 2, win: 3 }[o.key];
+		}
+		o.done = hit ? "met" : "missed";
+		intlMood(lg, hit ? 15 : -15);
+		lg.news = `${lg.news || ""} The FA's target was to ${OBJ_TXT[o.key]}: ${hit ? "met" : "missed"}. Confidence in you is ${intlConf(lg)}%.`.trim();
+	}
 	function intlNext (lg = league) {
+		const base = intlNextBase(lg), I = lg.intl, ob = I && I.nat && I.only ? intlObjText(lg) : "";
+		return ob ? `${base} ${ob}` : base;
+	}
+	function intlNextBase (lg = league) {
 		const C = intlComp(lg), I = lg.intl, me = I.nat;
 		if (!C || C.none) { return "No internationals this season: the breaks start again next season."; }
 		if (C.done) {
@@ -611,6 +657,7 @@
 		if (!C) { return; }
 		const me = lg.intl.nat, card = el("div", "lg-cup lg-intl");
 		card.append(el("h4", "", me ? `International · ${natName(me)}` : "International"), el("p", "detail", intlNext(lg)));
+		if (me && lg.intl.only) { const m = el("div", "intl-meter"); m.id = "intlConf"; m.setAttribute("role", "meter"); m.setAttribute("aria-valuenow", String(intlConf(lg))); m.setAttribute("aria-valuemin", "0"); m.setAttribute("aria-valuemax", "100"); m.setAttribute("aria-label", "FA confidence"); const f = el("span", "fill"); f.style.width = `${intlConf(lg)}%`; m.append(f); card.append(m); }
 		const cell = (tag, txt, cls) => el(tag, cls || "", txt);
 		if (!C.none && C.kind === "q") {
 			const mineG = me ? C.groups.findIndex(g => g.includes(me)) : -1;
@@ -677,7 +724,7 @@
 		I.rest = I.rest.includes(name) ? I.rest.filter(n => n !== name) : [ ...I.rest, name ];
 		saveLeague(); renderIntlSquad();
 	}
-	function intlAutoPick () { const I = ensureIntl(league); if (!I) { return; } I.rest = []; I.sel = []; delete I.capt; saveLeague(); renderIntlSquad(); }
+	function intlAutoPick () { const I = ensureIntl(league); if (!I) { return; } I.rest = []; I.sel = []; delete I.capt; delete I.obj; delete I.conf; saveLeague(); renderIntlSquad(); }
 	function renderIntlSquad () {
 		const box = $("intlSquad");
 		if (!box) { return; }
@@ -760,4 +807,4 @@
 		for (const id of [ "sqBox", "transfersBox", "assistCard", "coachPanel", "clubUpgrades", "lgAcademy" ]) { const b = $(id); if (b) { b.hidden = on; } }
 		for (const id of [ "sqNoClub", "transfersNoClub", "clubNoClub" ]) { const b = $(id); if (b) { b.hidden = !on; b.textContent = note; } }
 	}
-	queueMicrotask(() => { if (window.__ff) { Object.assign(window.__ff, { intlOnlyAdvance, intlFreeOffers, intlNoClub, intlLegacy, intlLegacyChoose, renderIntlOnly, nationSquads, nationSquad, nationIdent, strOfOvr, intlPool, pickNation, renderNations, NATIONS, INTL_BREAKS, ensureIntl, intlComp, intlNight, intlFixture, intlOffers, acceptIntl, declineIntl, resignIntl, intlChoose, intlCallUp, intlGroupTable, intlQualified, intlManager, intlNext, intlNewSeason, renderIntlSquad, intlRestToggle, intlFriendly, intlAutoPick, intlSelToggle, intlCalled, intlEligible, nameTables: { FIRST, SURNAMES }, intlRep, renderOffers, newMatchTest () { clearLive(); state = "intro"; newMatch(); renderLeague(); }, readyTest () { clearLive(); state = "intro"; banner.hidden = true; newMatch(); showIntro(); renderLeague(); } }); Object.defineProperties(window.__ff, { intlSide: { get: () => intlSide, configurable: true }, leagueMatch: { get: () => leagueMatch, configurable: true } }); } });
+	queueMicrotask(() => { if (window.__ff) { Object.assign(window.__ff, { intlOnlyAdvance, intlFreeOffers, intlNoClub, intlLegacy, intlLegacyChoose, renderIntlOnly, nationSquads, nationSquad, nationIdent, strOfOvr, intlPool, pickNation, renderNations, NATIONS, INTL_BREAKS, ensureIntl, intlComp, intlNight, intlFixture, intlOffers, acceptIntl, declineIntl, resignIntl, intlChoose, intlCallUp, intlGroupTable, intlQualified, intlManager, intlNext, intlNewSeason, renderIntlSquad, intlRestToggle, intlFriendly, intlObjective, intlConf, intlMood, intlAutoPick, intlSelToggle, intlCalled, intlEligible, nameTables: { FIRST, SURNAMES }, intlRep, renderOffers, newMatchTest () { clearLive(); state = "intro"; newMatch(); renderLeague(); }, readyTest () { clearLive(); state = "intro"; banner.hidden = true; newMatch(); showIntro(); renderLeague(); } }); Object.defineProperties(window.__ff, { intlSide: { get: () => intlSide, configurable: true }, leagueMatch: { get: () => leagueMatch, configurable: true } }); } });

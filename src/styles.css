@@ -889,6 +889,11 @@
 	.lg-extras ol.nat-xi .who { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 	/* International breaks (18j): group tables in a grid, and the national squad on the Squad tab. */
 	.lg-extras .lg-intl { grid-column: 1 / -1; }
+	.lg-extras ol.intl-selist li:not(.called) { opacity: .6; }
+	.lg-extras ol.intl-selist li .who { flex: 1; }
+	.lg-extras .intl-meter { height: 8px; border-radius: 4px; background: rgba(255,255,255,.12); margin: 4px 0 8px; overflow: hidden; }
+	.lg-extras .intl-meter .fill { display: block; height: 100%; background: #7fd49b; }
+	.lg-extras .intl-friendly { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0; }
 	.lg-extras .intl-groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr)); gap: 8px 14px; margin: 6px 0; }
 	.lg-extras .intl-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 	.lg-extras .intl-table th { text-align: left; opacity: 0.7; font-weight: 600; }
