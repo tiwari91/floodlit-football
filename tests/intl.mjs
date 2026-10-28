@@ -319,6 +319,18 @@ const cu = await page.evaluate(() => {
 	return { head, first, n0, victim, out, n1, sel, back: F.intlCalled(F.league).includes(victim), total: rows().length };
 });
 check("Squad selection lists the eligible players with position, rating, club, form and fitness; the manager drops and calls up, max 23, and a player dropped cannot play", /called up/.test(cu.head) && /form/.test(cu.first) && /fit \d+%/.test(cu.first) && cu.n0 <= 23 && cu.n0 >= 11 && cu.out && cu.n1 === cu.n0 - 1 && cu.back, JSON.stringify(cu));
+// Formation and captain for the national side.
+const fc = await page.evaluate(() => {
+	const F = window.__ff, box = document.getElementById("intlSquad"), I = F.league.intl;
+	const btns = [ ...box.querySelectorAll("#intlShape button") ], other = btns.find(b => b.getAttribute("aria-pressed") === "false");
+	const before = btns.map(b => b.getAttribute("aria-pressed")).join(), lab = other && other.textContent;
+	other && other.click();
+	const after = [ ...document.querySelectorAll("#intlShape button") ].find(b => b.getAttribute("aria-pressed") === "true");
+	const cs = document.getElementById("intlCapt"), pick = [ ...cs.options ].find(o => o.value);
+	cs.value = pick.value; cs.dispatchEvent(new Event("change"));
+	return { n: btns.length, lab, now: after && after.textContent, capt: I.capt, want: pick.value };
+});
+check("the national side has a formation choice (the club shapes) and a captain pick, both stored", fc.n >= 2 && fc.now === fc.lab && fc.capt === fc.want, JSON.stringify(fc));
 // The bar's button is the one next step on every tab, and never starts a club match.
 await page.evaluate(() => { window.__ff.simSeasonAllTest(); });
 const tabBtn = {};

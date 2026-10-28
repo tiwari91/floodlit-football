@@ -132,7 +132,8 @@
 			F.capt = [ 0, 1 ].map(t => outfield(t).reduce((a, q) => (!a || A(q, "pas") + A(q, "def") > A(a, "pas") + A(a, "def") ? q : a), null));
 			const ms = league && league.club ? matchSquad() : null, sq = ms ? [ ...ms.squad, ...ms.bench ] : [];
 			const mine = new Map(outfield(0).map(q => [ sq.find(pl => pl.name === q.name), q ]).filter(([ pl ]) => pl));
-			const best = pickCaptain([ ...mine.keys() ]);
+			const ic = intlSide && league.intl && league.intl.capt ? [ ...mine.keys() ].find(pl => pl.name === league.intl.capt) : null;   // the national side's own captain (18j)
+			const best = ic || pickCaptain([ ...mine.keys() ]);
 			if (best) { F.capt[0] = mine.get(best); }
 			// Theirs, in a league match, by form: the last five ratings (see rateCpuRound), eased in the same way.
 			const rec = league && leagueMatch && league.cpuForm && league.cpuForm.season === league.season && league.cpuForm.clubs[leagueMatch.opp];

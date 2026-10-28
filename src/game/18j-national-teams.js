@@ -176,6 +176,7 @@
 		I.record = Array.isArray(I.record) ? I.record.filter(r => plainObj(r) && natOk(r.nat) && natOk(r.opp) && Number.isInteger(r.gf) && Number.isInteger(r.ga)).slice(-30) : [];
 		I.missed = Number.isInteger(I.missed) ? clamp(I.missed, 0, 2) : 0;
 		I.rest = Array.isArray(I.rest) ? I.rest.filter(n => typeof n === "string").slice(0, 30) : [];
+		if (typeof I.capt !== "string") { delete I.capt; }
 		I.sel = Array.isArray(I.sel) ? I.sel.filter(n => typeof n === "string").slice(0, INTL_CALLUP) : [];   // the call-up: up to 23 names; empty = auto-pick
 		if (!(plainObj(I.next) && Number.isInteger(I.next.season) && Array.isArray(I.next.nats) && I.next.nats.every(natOk))) { I.next = null; }
 		if (I.ask !== undefined && typeof I.ask !== "string") { delete I.ask; }
@@ -187,7 +188,7 @@
 	// A new season: the job, the record and the qualifiers carry over; the offers lapse; a new draw.
 	function intlNewSeason (prev) {
 		const lg = league, P = prev && plainObj(prev.intl) && prev.intl.v === 1 ? prev.intl : null;
-		lg.intl = { v: 1, nat: P && natOk(P.nat) ? P.nat : null, offers: [], record: P && Array.isArray(P.record) ? P.record.slice(-30) : [], season: lg.season, only: !!(P && P.only === true), missed: P && Number.isInteger(P.missed) ? P.missed : 0, rest: [], sel: P && Array.isArray(P.sel) ? P.sel.slice() : [], next: P && P.next ? P.next : null, comp: intlNone(lg.season) };
+		lg.intl = { v: 1, nat: P && natOk(P.nat) ? P.nat : null, offers: [], record: P && Array.isArray(P.record) ? P.record.slice(-30) : [], season: lg.season, only: !!(P && P.only === true), missed: P && Number.isInteger(P.missed) ? P.missed : 0, rest: [], sel: P && Array.isArray(P.sel) ? P.sel.slice() : [], capt: P && typeof P.capt === "string" ? P.capt : undefined, next: P && P.next ? P.next : null, comp: intlNone(lg.season) };
 		ensureIntl(lg);
 		lg.intl.comp = drawIntl(lg, lg.intl);
 		const C = lg.intl.comp, me = lg.intl.nat;
@@ -417,7 +418,7 @@
 		const I = lg && lg.intl;
 		if (!I || !I.nat) { return; }
 		const was = I.nat;
-		I.nat = null; I.missed = 0; I.rest = []; I.sel = []; delete I.ask;
+		I.nat = null; I.missed = 0; I.rest = []; I.sel = []; delete I.capt; delete I.ask;
 		if (why === "club") { I.only = false; }   // a club job is next: the country job is over and so is any time without a club
 		if (lg.contGuest && lg.contGuest.intl) { restoreGuest(lg); }
 		if (why === "resigned") { lg.news = `${lg.news || ""} You resigned as ${natName(was)} manager.`.trim(); }
@@ -429,7 +430,7 @@
 		const lg = league, I = ensureIntl(lg), o = I && I.offers.find(x => x.nat === nat);
 		if (!o || I.nat) { return false; }
 		const club = clubName();
-		I.nat = nat; I.only = true; I.offers = []; I.missed = 0; I.rest = []; I.sel = [];
+		I.nat = nat; I.only = true; I.offers = []; I.missed = 0; I.rest = []; I.sel = []; delete I.capt;
 		lg.career = { ...(lg.career || { history: [] }), clubs: [ ...((lg.career && lg.career.clubs) || [ club ]), `${natName(nat)} (national team)` ] };
 		lg.news = `${lg.news || ""} You left ${club} to manage ${natName(nat)} full-time. ${club} have a new manager.`.trim();
 		lastDeal = `You left ${club} and are the new ${natName(nat)} manager. The league carries on without you; you play the internationals.`;
@@ -640,7 +641,7 @@
 		I.rest = I.rest.includes(name) ? I.rest.filter(n => n !== name) : [ ...I.rest, name ];
 		saveLeague(); renderIntlSquad();
 	}
-	function intlAutoPick () { const I = ensureIntl(league); if (!I) { return; } I.rest = []; I.sel = []; saveLeague(); renderIntlSquad(); }
+	function intlAutoPick () { const I = ensureIntl(league); if (!I) { return; } I.rest = []; I.sel = []; delete I.capt; saveLeague(); renderIntlSquad(); }
 	function renderIntlSquad () {
 		const box = $("intlSquad");
 		if (!box) { return; }
@@ -654,6 +655,19 @@
 		const ap = el("button", "", "Auto-pick 23"); ap.type = "button"; ap.id = "intlAuto"; ap.setAttribute("aria-pressed", String(auto)); ap.addEventListener("click", intlAutoPick);
 		head.append(ap);
 		box.append(head, el("p", "win-note", `${intlNext(league)} ${auto ? "Auto-pick: the best 23 of your nationality." : "Your own call-up."} Only the ${INTL_CALLUP} called up can play. ${I.only ? "" : "Your club's players who play lose fitness for the next league match, as a start would cost them."}`));
+		// The formation (the club game's own shapes) and the captain, for the national side.
+		const ctl = el("div", "intl-ctl"), pre = el("div", "lu-presets"), cur = shapeKeyOf(league.fmt);
+		pre.setAttribute("role", "group"); pre.setAttribute("aria-label", "Formation"); pre.id = "intlShape";
+		for (const k of LU_PRESETS[league.fmt] || Object.keys(SHAPES[league.fmt] || {})) {
+			const b = el("button", "", SHAPES[league.fmt][k].label.split(" ")[0]); b.type = "button"; b.setAttribute("aria-pressed", String(k === cur));
+			b.addEventListener("click", () => setLineupShape(league.fmt, k)); pre.append(b);
+		}
+		const cs = el("select"); cs.id = "intlCapt"; cs.setAttribute("aria-label", "Captain");
+		const ao = el("option", "", "Captain: best form"); ao.value = ""; cs.append(ao);
+		for (const e of [ ...side.xi, ...side.bench ].filter(e => !e.gen && e.pl.pos !== "gk")) { const o = el("option", "", `Captain: ${e.pl.name}`); o.value = e.pl.name; cs.append(o); }
+		cs.value = I.capt && [ ...cs.options ].some(o => o.value === I.capt) ? I.capt : "";
+		cs.addEventListener("change", () => { if (cs.value) { I.capt = cs.value; } else { delete I.capt; } saveLeague(); });
+		ctl.append(pre, cs); box.append(ctl);
 		const ol = el("ol", "nat-xi"), row = (e, on) => {
 			const r = el("li", e.own ? "mine" : "");
 			r.append(el("span", "pos", POS_LABEL[e.pl.pos]), el("span", "who", `${e.pl.name} · ${ovrOf(e.pl)} · ${e.club}${e.own ? ` · fit ${Math.round(fitOf(e.pl))}%` : ""}`));
