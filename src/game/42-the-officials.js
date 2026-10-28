@@ -130,7 +130,7 @@
 		if (!F.capt || F.captFor !== players || F.capt.some((c, t) => c && !players.includes(c))) {
 			F.captFor = players;
 			F.capt = [ 0, 1 ].map(t => outfield(t).reduce((a, q) => (!a || A(q, "pas") + A(q, "def") > A(a, "pas") + A(a, "def") ? q : a), null));
-			const sq = league && league.club ? [ ...league.club.squad, ...league.club.bench ] : [];
+			const ms = league && league.club ? matchSquad() : null, sq = ms ? [ ...ms.squad, ...ms.bench ] : [];
 			const mine = new Map(outfield(0).map(q => [ sq.find(pl => pl.name === q.name), q ]).filter(([ pl ]) => pl));
 			const best = pickCaptain([ ...mine.keys() ]);
 			if (best) { F.capt[0] = mine.get(best); }

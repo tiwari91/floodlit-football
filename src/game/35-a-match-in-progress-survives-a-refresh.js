@@ -2,7 +2,7 @@
 	   Every couple of seconds (and when you leave the page) the score, clock and match
 	   state are kept in this browser. Reopen the page and the same fixture comes back
 	   paused where you left it. The season itself is saved separately after every result. */
-	const liveKey = () => (mode === "league" && league ? `L${league.season}-${league.round}-${league.fmt}` : `F-${fmtKey}`);
+	const liveKey = () => (mode === "league" && league ? `L${league.season}-${league.round}-${league.fmt}${leagueMatch && leagueMatch.intl ? `-i${leagueMatch.intl.gi}` : ""}` : `F-${fmtKey}`);
 	function saveLive () {
 		if (tut || shoot || mode === "tutorial" || mode === "corners" || !(state === "play" || state === "paused" || state === "goal" || state === "half") || !(timeLeft > 0)) { return; }
 		store.set("ff-live", JSON.stringify({
@@ -158,6 +158,9 @@
 				if (rep2 && rep2.round === league.round && rep2.gains.length) { nudge += ` Training: ${rep2.gains.slice(0, 4).join(", ")}${rep2.gains.length > 4 ? ` and ${rep2.gains.length - 4 + (rep2.more || 0)} more` : ""}.`; }
 				btn = `Play matchday ${league.round + 1}`;
 				{ const nf = currentFixture(); if (nf && nf.label) { btn = `Play: ${nf.label.replace(/^[^·]*· /, "")}`; } }   // a continental night next (18f)
+				if (leagueMatch.intl && league.intl && league.intl.lastNote) {   // an international (18j): its result, and only what matters for the next league match
+					nudge = `${league.intl.lastNote} You are ${ordinal(pos)} in the league on ${pts} point${pts === 1 ? "" : "s"}.${tired.length ? ` ⚠ Before the next league match: ${tiredText(tired)}` : ""}`;
+				}
 			}
 		}
 		if (!simulated) {

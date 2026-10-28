@@ -417,7 +417,7 @@
 		if (mode === "tutorial" || mode === "corners" || !(state === "intro" || state === "paused" || state === "half")) { return; }
 		const left = state === "intro" ? 1 : clamp(timeLeft / matchLen, 0, 1);
 		if (state === "intro") { score = [ 0, 0 ]; }
-		const mine = league && league.club ? yourStr() : 3;
+		const mine = intlSide ? intlSide.str : league && league.club ? yourStr() : 3;   // an international: your national side's strength (18j)
 		const home = leagueMatch ? (leagueMatch.home ? 0.3 : -0.3) : 0.3;
 		const d = mine - oppStrength + home;
 		const add = [ poisson(clamp(1.3 + 0.32 * d, 0.2, 3.2) * left), poisson(clamp(1.2 - 0.32 * d, 0.2, 3.2) * left) ];
@@ -538,7 +538,7 @@
 			}
 			// Fresh legs: the most tired starters make way late on.
 			if ((m === 64 || m === 76) && subsLeft > 0 && league && league.club) {
-				const tired = outfielders(0).filter(p => !cameOn.includes(p.name)).map(p => ({ p, pl: [ ...league.club.squad, ...league.club.bench ].find(q => q.name === p.name) })).filter(x => x.pl && fitOf(x.pl) < 75).sort((a, b) => fitOf(a.pl) - fitOf(b.pl))[0];
+				const sqd = matchSquad(), tired = outfielders(0).filter(p => !cameOn.includes(p.name)).map(p => ({ p, pl: [ ...sqd.squad, ...sqd.bench ].find(q => q.name === p.name) })).filter(x => x.pl && fitOf(x.pl) < 75).sort((a, b) => fitOf(a.pl) - fitOf(b.pl))[0];
 				const pool = tired ? subPool().filter(pl => pl.pos === tired.p.role) : [];
 				if (tired && pool.length) { const saved = timeLeft; timeLeft = matchLen * (1 - m / 90); makeSub(tired.p, pool.sort((a, b) => ovrNow(b) - ovrNow(a))[0], true); timeLeft = saved; }
 			}
@@ -581,7 +581,8 @@
 		else if (press[1] === "low") { tips.push("they sit deep: Possession and patience, or crosses for your runners"); }
 		if (tackling[1] === "hard") { tips.push("they get stuck in, so expect free kicks"); }
 		let squad = "";
-		if (league && league.club && mode === "league") {
+		if (intlSide) { squad = `${natName(intlSide.nat)}'s best available eleven, rated ${stars(Math.round(intlSide.str))}`; }   // an international (18j)
+		else if (league && league.club && mode === "league") {
 			const c = league.club, xi = slotsFor(league.fmt).map(i => c.squad[i]).filter(Boolean), mor = Math.round(xi.reduce((t, p) => t + (p.morale || 70), 0) / Math.max(1, xi.length));
 			ensureCoaching(c, league);
 			squad = `morale ${mor}${mor < 50 ? " (low: a win would lift it)" : ""}, tactical familiarity ${Math.round(c.drill)}%, training ${c.training.focus} at ${c.training.load} intensity`;
@@ -631,7 +632,7 @@
 		if (leagueMatch) {
 			const o = TEAMS[leagueMatch.opp], derby = isDerby();
 			// One fact per line, so the card reads at a glance instead of as a paragraph.
-			const k = keyMenParts(), b = coachBrief(), first = firstVisit(), tired = tiredStarters();
+			const k = keyMenParts(), b = coachBrief(), first = firstVisit(), tired = leagueMatch.intl ? [] : tiredStarters();
 			showOverlay(`${leagueMatch.label || `Matchday ${leagueMatch.round + 1}`}${derby ? " · Derby" : ""}`, "", "Kick off");
 			cardLines([
 				tired.length ? `Fitness: ⚠ ${tiredText(tired)} Tired players are slower and less sharp. Rest them: press "Rest tired players", or swap them yourself in the squad panel.` : "",

@@ -90,6 +90,7 @@
 		if (!Array.isArray(lg.wind) || lg.wind.length !== lg.fixtures.length || !lg.wind.every(w => w && Number.isFinite(w.s) && Number.isFinite(w.a))) { lg.wind = genWind(lg.fixtures.length, lg.ident && lg.ident.country); }
 		if (!Array.isArray(lg.ko) || lg.ko.length !== lg.fixtures.length) { lg.ko = genKickoff(lg.fixtures.length, lg.ident && lg.ident.country); }
 		if (typeof ensureDrama === "function") { ensureDrama(lg); }   // older saves: no dressing room yet
+		if (typeof ensureIntl === "function") { ensureIntl(lg); }   // older saves: no national job, no breaks until next season (18j)
 		return lg;
 	}
 

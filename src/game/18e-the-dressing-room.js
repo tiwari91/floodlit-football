@@ -264,7 +264,7 @@
 		const old = $("htRow");
 		if (old) { old.remove(); }
 		htRow = null;
-		if (!league || !league.club || (!leagueMatch && !o.force) || tut) { return null; }
+		if (!league || !league.club || (!leagueMatch && !o.force) || (leagueMatch && leagueMatch.intl) || tut) { return null; }   // not on international duty
 		const rnd = o.rnd || Math.random, behind = score[1] - score[0], c = league.club;
 		const clubOf = name => [ ...c.squad, ...c.bench ].find(q => q.name === name);
 		const onPitch = team(0).filter(p => p.role !== "gk" && clubOf(p.name));

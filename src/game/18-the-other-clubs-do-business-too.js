@@ -104,7 +104,7 @@
 	let oppSquad = [];
 
 	function applySquad () {
-		const club = league && league.club;
+		const club = matchSquad();   // your club, or your national side on an international night (18j)
 		const slots = slotsFor(fmtKey);
 		players.forEach(p => {
 			if (p.team === 0 && club) { p.num = FORMATS["11"].nums[slots[p.idx]]; }

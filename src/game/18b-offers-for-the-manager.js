@@ -11,6 +11,7 @@
 	const DEFAULT_IDENT = TEAMS.map(identOf);
 	function rememberIdentity (lg) {
 		if (!lg) { return; }
+		if (typeof intlRestoreYou === "function") { intlRestoreYou(); }   // never bake a national kit into your club (18j)
 		const edits = typeof stripClubEdits === "function" && stripClubEdits();   // record the clubs without option-file edits (18g)
 		const clubs = {};
 		TEAMS.forEach((t, i) => { if (i !== 0 && JSON.stringify(identOf(t)) !== JSON.stringify(DEFAULT_IDENT[i])) { clubs[i] = identOf(t); } });
@@ -42,6 +43,7 @@
 		// What you agreed with your agent in January comes first.
 		if (lg.agreed) { lg.jobOffers.unshift({ ...lg.agreed, agreed: true }); lg.agreed = null; }
 		lg.career = { ...(lg.career || { clubs: [ YOU.name ] }), history: [ ...((lg.career && lg.career.history) || []), { season: lg.season, club: YOU.name, pos } ] };
+		if (typeof intlOffers === "function") { intlOffers(pos); }   // and perhaps a country (18j)
 		honourAgreed();
 		return (league && league.jobOffers) || [];
 	}
@@ -133,8 +135,10 @@
 		c.budget = offer.budget; c.autoRotate = lg.club.autoRotate; c.scoutLeft = 2;
 		c.log = [ `You moved abroad: ${offer.name}, ${country}, from ${from} (budget ${money(offer.budget)})` ];
 		applyForeignLeague(offer.nat);   // the other clubs become that country's
+		const intl = lg.intl;   // your international record travels (18j)
 		league = null;
 		newSeason(fmt, c);
+		if (intl && league.intl && Array.isArray(intl.record)) { league.intl.record = intl.record.slice(-30); }
 		league.career = career;
 		rememberIdentity(league);
 		league.ident.country = FOREIGN[offer.nat] ? offer.nat : undefined;
@@ -148,6 +152,12 @@
 	function takeOffer (key) {
 		const o = (league && league.jobOffers || []).find(x => offerKey(x) === key);
 		if (!o) { return false; }
+		// A club in another country while you manage a national side: the FA asks you to choose (18j).
+		// A move agreed in January has already been chosen: it ends the national job.
+		if (o.abroad && league.intl && league.intl.nat) {
+			if (!o.agreed && typeof intlAsk === "function") { return intlAsk(key); }
+			if (typeof intlEndJob === "function") { intlEndJob(league, "club"); }
+		}
 		return o.abroad ? moveAbroad(o) : takeJob(o.id);
 	}
 	function declineJob (id) {
@@ -196,6 +206,8 @@
 		ul.replaceChildren();
 		const offers = league ? (league.jobOffers || []) : [], best = bestOffer(offers);
 		title.hidden = !offers.length;
+		const intlN = typeof renderIntlOffers === "function" ? renderIntlOffers(ul) : 0;   // a country's offer, or the FA's question (18j)
+		if (intlN) { title.hidden = false; }
 		for (const o of offers) {
 			const li = el("li"), key = offerKey(o), isBest = best && best.key === key;
 			li.append(el("span", "pos", o.agreed ? "AGREED" : isBest ? "BEST MOVE" : "JOB"), el("span", "who", offerWho(o) + (o.agreed ? " (agreed in January)" : "")));

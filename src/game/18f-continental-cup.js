@@ -306,7 +306,7 @@
 	function contFixture () {
 		const lg = league, C = ensureCont(lg);
 		const gi = C && !C.none ? ccMine(C) : null;
-		if (gi === null) { if (lg && lg.contGuest) { restoreGuest(lg); } return null; }
+		if (gi === null) { if (lg && lg.contGuest && !lg.contGuest.intl) { restoreGuest(lg); } return null; }   // an international's guest is 18j's
 		const g = C.games[gi], me = ccMe(C), o = g.h === me ? g.a : g.h, oc = C.clubs[o], night = CC_NIGHTS[g.n];
 		const opp = oc.id !== undefined ? (restoreGuest(lg), oc.id) : applyGuest(lg, oc);
 		if (opp < 0) { return null; }
