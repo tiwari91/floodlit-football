@@ -38,6 +38,16 @@
 		--chalk: #eef6ea;
 		--display: "Big Shoulders Display", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
 		--body: "Barlow", "Helvetica Neue", Arial, sans-serif;
+		/* Design tokens: spacing, type scale, radii, elevation, surfaces. */
+		--sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px; --sp-6: 32px;
+		--fs-xs: 11px; --fs-sm: 12px; --fs-md: 13px; --fs-base: 15px; --fs-lg: 18px; --fs-xl: 22px;
+		--r-sm: 4px; --r-md: 6px; --r-lg: 8px; --r-pill: 999px;
+		--elev-1: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 1px 2px rgba(0, 0, 0, 0.35);
+		--elev-2: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 8px 24px rgba(0, 0, 0, 0.35);
+		--hover: rgba(255, 255, 255, 0.06);
+		--row-hover: rgba(255, 255, 255, 0.025);
+		--rule-strong: #3d5a4a;
+		--ease: 120ms ease-out;
 	}
 
 	* { box-sizing: border-box; }
@@ -1409,6 +1419,90 @@
 	}
 	.mk-f { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; }
 	.mk-f input { width: 90px; }
+
+/* ---------- Polish layer: one button, row, card, chip and table language for the hub. ---------- */
+
+/* Buttons. Default = secondary (solid panel); .primary = amber; row actions = ghost. */
+button { transition: background-color var(--ease), border-color var(--ease), color var(--ease); }
+button:not(.primary):not(.pad):not(.hub-tab):not(:disabled):hover { background-color: #1e3329; border-color: var(--rule-strong); }
+button:focus-visible, select:focus-visible, summary:focus-visible, a:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+select { border-radius: var(--r-sm); }
+
+/* Ghost buttons: secondary per-row actions read as quiet text until hovered or focused. */
+.market .bids button ~ button,
+.intl-squad ol.nat-xi li button,
+.lg-extras .academy .acts button,
+.staff .cands button,
+.lg-extras ol.intl-selist li button {
+	background: transparent; border-color: transparent; color: #b9c9be; font-weight: 600;
+}
+.market .bids button ~ button:not(:disabled):hover,
+.intl-squad ol.nat-xi li button:not(:disabled):hover,
+.lg-extras .academy .acts button:not(:disabled):hover,
+.staff .cands button:not(:disabled):hover,
+.lg-extras ol.intl-selist li button:not(:disabled):hover { background: var(--hover); border-color: var(--rule); color: var(--text); }
+/* Hire candidates are choices, not commands: an outlined chip each. */
+.staff .cands button { border-color: var(--rule); border-radius: var(--r-pill); padding: 3px 10px; }
+
+/* Filter tabs (market regions, club lists) are a pill segmented control, not buttons. */
+.tabs { flex-wrap: wrap; gap: 6px; }
+.tabs button { border-radius: var(--r-pill); padding: 4px 12px; font-size: var(--fs-sm); background: transparent; color: #b9c9be; }
+.tabs button[aria-pressed="true"] { background: var(--amber); color: var(--amber-ink); border-color: var(--amber); }
+.mk-actions { padding-top: var(--sp-1); }
+
+/* Cards: one surface, radius, padding and elevation. */
+.ov-card, .lg-drama, .hub .win, .lg-extras > div, .win {
+	padding: var(--sp-4); border-radius: var(--r-lg); box-shadow: var(--elev-1);
+}
+.lg-extras h4, .ov-card h4 { margin-top: 0; }
+
+/* Position chip: fixed width so names line up down a list. */
+.pos { min-width: 40px; border-radius: var(--r-sm); font-variant-numeric: tabular-nums; }
+.intl-squad ol.nat-xi .pos, .lg-extras ol.nat-xi .pos {
+	flex: 0 0 40px; padding: 1px 0; text-align: center; border: 1px solid var(--rule); border-radius: var(--r-sm);
+	background: var(--panel-2); color: var(--muted); font-size: var(--fs-xs); letter-spacing: 0.06em;
+}
+
+/* List rows: even rhythm, a quiet hover, actions grouped on the right. */
+.market li, .upgrades li { padding: 10px var(--sp-2); margin-inline: calc(-1 * var(--sp-2)); border-radius: var(--r-sm); gap: 2px 12px; }
+.market li:hover, .upgrades li:hover, .intl-squad ol.nat-xi li:hover, .lg-extras .academy li:hover { background: var(--row-hover); }
+.market .bids { grid-column: 3; grid-row: 1 / span 5; align-self: start; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--sp-1); }
+.market .bids button { padding: 4px 10px; font-size: var(--fs-sm); }
+.market .who { font-size: var(--fs-base); }
+.intl-squad ol.nat-xi li { gap: var(--sp-2); padding: 5px var(--sp-1); min-height: 38px; }
+.intl-squad ol.nat-xi li button { padding: 3px 10px; font-size: var(--fs-sm); }
+.intl-squad ol.nat-xi li.picked { background: rgba(242, 181, 46, 0.1); box-shadow: inset 3px 0 0 var(--amber); }
+.intl-squad select + select { margin-left: var(--sp-2); }
+
+/* Squad header: title and strength on the left, the two actions together on the right. */
+#panel-squad .sq-head { justify-content: flex-start; align-items: center; flex-wrap: wrap; gap: var(--sp-2) var(--sp-4); }
+#panel-squad .sq-head #autoPick { margin-left: auto; }
+
+/* Tables: tabular figures everywhere; group tables sit in their own tiles. */
+td, th { font-variant-numeric: tabular-nums; }
+.lg-extras .intl-groups { align-items: start; gap: var(--sp-3); }
+.lg-extras .intl-groups .intl-table {
+	border-collapse: separate; border-spacing: 0; padding: 6px 10px; background: var(--panel-2);
+	border: 1px solid var(--rule); border-radius: var(--r-md);
+}
+.lg-extras .intl-table td, .lg-extras .intl-table th { padding: 3px 0; line-height: 1.35; }
+.lg-extras .intl-table th:first-child { color: var(--text); opacity: 1; letter-spacing: 0.04em; text-transform: uppercase; font-size: var(--fs-xs); }
+.lg-extras .intl-table th:not(:first-child) { color: var(--muted); opacity: 1; font-size: var(--fs-xs); }
+
+/* Club tab: two balanced columns so the short cards don't leave a hole. */
+@media (min-width: 820px) {
+	.club-grid-hub { display: block; columns: 2; column-gap: 14px; }
+	.club-grid-hub > * { break-inside: avoid; margin-bottom: 14px; }
+}
+/* Keep Move in one column whether or not the row also has Leave out. */
+.intl-squad ol.nat-xi li button { min-width: 6.5em; }
+.intl-squad ol.nat-xi li .swap:last-child { margin-right: calc(6.5em + var(--sp-2)); }
+.intl-squad select { font-size: var(--fs-md); padding: 5px 10px; }
+@media (max-width: 640px) {
+	.market .bids { grid-column: 2 / -1; grid-row: auto; justify-content: flex-start; margin-block: 2px 4px; }
+	.intl-squad ol.nat-xi li button { min-width: 0; }
+	.intl-squad ol.nat-xi li .swap:last-child { margin-right: 0; }
+}
 </style>
 
 <main class="wrap">
