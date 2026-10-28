@@ -139,7 +139,16 @@
 	pauseBtn.addEventListener("click", () => {
 		if (state === "play") { pause(); } else if (state === "paused") { startPlay(); }
 	});
+	// Country only: the bar's "New match" is the one next-step button, on every tab (never a club match).
+	function renderCountryBtn () {
+		const on = mode === "league" && typeof intlNoClub === "function" && intlNoClub() && league;
+		const live = state === "play" || state === "paused" || state === "half";
+		const label = !on ? "New match" : live ? "Restart match" : seasonDone() ? `Start season ${league.season + 1}` : "Next international";
+		if (restartBtn.textContent !== label) { restartBtn.textContent = label; }
+		restartBtn.classList.toggle("primary", !!on && !live);
+	}
 	restartBtn.addEventListener("click", () => {
+		if (mode === "league" && typeof intlNoClub === "function" && intlNoClub() && league && seasonDone()) { newSeason(league.fmt); renderLeague(); renderShapes(); }
 		clearLive();
 		state = "intro";
 		banner.hidden = true;

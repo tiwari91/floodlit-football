@@ -304,6 +304,19 @@ const sim = await page.evaluate(() => {
 	return { done: F.league.round >= F.league.fixtures.length, rec: F.league.intl.record.length, nat: F.league.intl.nat, only: F.league.intl.only, same: F.league.season === season };
 });
 check("simulate whole season works in country mode: the league ends and your internationals were played", sim.done && sim.rec >= 1 && sim.nat === only.nat && sim.only && sim.same, JSON.stringify(sim));
+// The bar's button is the one next step on every tab, and never starts a club match.
+await page.evaluate(() => { window.__ff.simSeasonAllTest(); });
+const tabBtn = {};
+for (const t of [ "overview", "squad", "league", "cups" ]) {
+	await showTab(page, t); await page.waitForTimeout(300);
+	tabBtn[t] = await page.evaluate(() => { const b = document.getElementById("restartBtn"), r = b.getBoundingClientRect(); return { label: b.textContent, vis: !b.hidden && r.width > 0, s: window.__ff.league.season }; });
+}
+check("country only, season complete: the bar button reads Start season N+1 on Overview, Squad, League and Cups", Object.values(tabBtn).every(x => x.vis && x.label === `Start season ${x.s + 1}`), JSON.stringify(tabBtn));
+await page.evaluate(() => document.getElementById("restartBtn").click());
+const nb = await page.evaluate(() => { const F = window.__ff; return { s: F.league.season, label: document.getElementById("restartBtn").textContent, intl: !!(F.leagueMatch && F.leagueMatch.intl), round: F.league.round }; });
+await page.waitForTimeout(300);
+const nb2 = await page.evaluate(() => ({ label: document.getElementById("restartBtn").textContent }));
+check("country only: the bar button rolls the season over and leads to an international, never a club match", nb.s === tabBtn.squad.s + 1 && (nb.intl || nb.round >= 9) && /Restart match|Next international/.test(nb2.label), JSON.stringify({ nb, nb2 }));
 // The user's bug: at "Season N complete" the START SEASON N+1 button did nothing (country only).
 const btnRoll = await page.evaluate(() => {
 	const F = window.__ff, lg = F.league, s0 = lg.season;

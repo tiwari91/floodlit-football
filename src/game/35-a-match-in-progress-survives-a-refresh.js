@@ -375,6 +375,7 @@
 		const b = $("simBtn");
 		const show = mode !== "tutorial" && mode !== "corners" && (state === "intro" || state === "play" || state === "paused" || state === "half");
 		const label = !show ? "" : state === "intro" ? "Simulate match" : "Simulate rest";
+		if (typeof renderCountryBtn === "function") { renderCountryBtn(); }
 		if (label === lastSimLabel) { return; }
 		lastSimLabel = label;
 		b.hidden = !show;
