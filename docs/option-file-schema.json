@@ -14,7 +14,14 @@
   "clubs": "v1: object keyed by a club's default name -> club fields (renames in the current save)",
   "markets": "v1: object keyed by a foreign market club's default name -> new name",
   "slots": "v1: object keyed by '<club default name>#<squad slot 0-10>' -> player fields",
-  "players": "v1: object keyed by a player id of your own club -> player fields"
+  "players": "v1: object keyed by a player id of your own club -> player fields",
+  "nations": "optional, object keyed by nationality code (one of nationalities) -> nation fields: the national team's look. See nation."
+ },
+ "nation": {
+  "color": "optional shirt colour, '#rrggbb'",
+  "color2": "optional second colour, '#rrggbb', clearly different from color (CIE76 delta E of at least 12); defaults to one worked out from color",
+  "ground": "optional string, 2-32 characters: the national stadium's name",
+  "note": "National squads are always picked from the players in the save; a file sets only how a country looks. Unknown codes and bad values are skipped."
  },
  "league": {
   "shape": { "clubs": "array of league clubs, at most 28, each with a distinct slot" },

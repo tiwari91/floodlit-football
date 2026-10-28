@@ -64,6 +64,15 @@
 		if (out.color && out.color2 && deltaE(out.color, out.color2) < 12) { bad.push("Pick a second colour that stands apart from the shirt."); delete out.color2; }
 		return { out, bad };
 	}
+	// A country's look (an option file's nations section, used by the national teams in 18j): shirt, second colour, ground.
+	function checkNationFields (src) {
+		const out = {}, bad = [];
+		if (!plainObj(src)) { return { out, bad: [ "not a nation" ] }; }
+		for (const k of [ "color", "color2" ]) { if (own(src, k)) { const c = checkColor(src[k]); if (c) { out[k] = c; } else { bad.push(`${k === "color" ? "Shirt" : "Second"} colour must look like #1d4fa0.`); } } }
+		if (own(src, "ground")) { const r = checkText(src.ground, "ground", "Ground name"); if (r.error) { bad.push(r.error); } else { out.ground = r.value; } }
+		if (out.color && out.color2 && deltaE(out.color, out.color2) < 12) { bad.push("Pick a second colour that stands apart from the shirt."); delete out.color2; }
+		return { out, bad };
+	}
 	function checkLook (v) {
 		if (!plainObj(v)) { return null; }
 		const lk = {};
@@ -94,21 +103,22 @@
 	}
 	// A save's edits (from storage or an imported season): keep what checks out, quietly drop the rest.
 	function sanitizeEdits (raw) {
-		const e = { clubs: {}, markets: {}, slots: {}, custom: false };
+		const e = { clubs: {}, markets: {}, slots: {}, nations: {}, custom: false };
 		if (!plainObj(raw)) { return e; }
 		e.custom = raw.custom === true;
 		const each = (o, fn) => { if (plainObj(o)) { Object.keys(o).slice(0, OPTION_MAX_ENTRIES).forEach(k => { if (!BAD_KEYS.has(k) && k.length <= 64) { fn(k, o[k]); } }); } };
 		each(raw.clubs, (k, v) => { const { out } = checkClubFields(v, false); if (Object.keys(out).length) { e.clubs[k] = out; } });
 		each(raw.markets, (k, v) => { const r = checkText(v, "club", "Club name"); if (!r.error) { e.markets[k] = r.value; } });
 		each(raw.slots, (k, v) => { const { out } = checkPlayerFields(v, true); if (/#(10|[0-9])$/.test(k) && Object.keys(out).length) { e.slots[k] = out; } });
+		each(raw.nations, (k, v) => { const { out } = checkNationFields(v); if (own(NATIONS, k) && Object.keys(out).length) { e.nations[k] = out; } });
 		return e;
 	}
 	const editsOf = lg => {
 		if (!lg) { return sanitizeEdits(null); }
-		if (!plainObj(lg.edits) || !plainObj(lg.edits.clubs) || !plainObj(lg.edits.markets) || !plainObj(lg.edits.slots)) { lg.edits = sanitizeEdits(lg.edits); }
+		if (!plainObj(lg.edits) || !plainObj(lg.edits.clubs) || !plainObj(lg.edits.markets) || !plainObj(lg.edits.slots) || !plainObj(lg.edits.nations)) { lg.edits = sanitizeEdits(lg.edits); }
 		return lg.edits;
 	};
-	const hasEdits = e => !!e && (Object.keys(e.clubs).length + Object.keys(e.markets).length + Object.keys(e.slots).length > 0 || e.custom);
+	const hasEdits = e => !!e && (Object.keys(e.clubs).length + Object.keys(e.markets).length + Object.keys(e.slots).length + Object.keys(e.nations || {}).length > 0 || e.custom);
 	// The edits also wait in this browser, so a new career (or a move abroad) starts with them.
 	function mirrorEdits (lg) {
 		const e = editsOf(lg);
@@ -320,6 +330,7 @@
 		if (Object.keys(e.clubs).length) { file.clubs = e.clubs; }
 		if (Object.keys(e.markets).length) { file.markets = e.markets; }
 		if (Object.keys(e.slots).length) { file.slots = e.slots; }
+		if (Object.keys(e.nations || {}).length) { file.nations = e.nations; }
 		const players = {};
 		for (const pl of allOwn(lg.club)) {
 			if (!pl || !plainObj(pl.orig) || typeof pl.id !== "string") { continue; }
@@ -339,24 +350,31 @@
 		if (v.kind !== OPTION_KIND) { return { error: v.league || v.app === "floodlit-football" ? "That's a saved season. Use Import league for it." : "That file isn't a Floodlit option file." }; }
 		if (!Number.isInteger(v.version) || v.version < 1) { return { error: "The option file has no valid version number." }; }
 		if (v.version > OPTION_VERSION) { return { error: "That option file is from a newer version of Floodlit." }; }
-		for (const k of [ "clubs", "markets", "slots", "players" ]) {
+		for (const k of [ "clubs", "markets", "slots", "players", "nations" ]) {
 			if (own(v, k) && !plainObj(v[k])) { return { error: `The option file is damaged: "${k}" should be a list of named entries.` }; }
 			if (own(v, k) && Object.keys(v[k]).length > OPTION_MAX_ENTRIES) { return { error: `The option file has too many ${k}.` }; }
 		}
 		for (const k of [ "leagues", "cup" ]) { if (own(v, k) && !plainObj(v[k])) { return { error: `The option file is damaged: "${k}" should be a list of countries.` }; } }
-		const file = { edits: { clubs: {}, markets: {}, slots: {}, custom: v.customRatings === true }, players: {} };
-		const sum = { clubs: 0, players: 0, ratings: 0, unknown: 0, bad: 0, extra: 0 };
+		const file = { edits: { clubs: {}, markets: {}, slots: {}, nations: {}, custom: v.customRatings === true }, players: {} };
+		const sum = { clubs: 0, players: 0, ratings: 0, unknown: 0, bad: 0, extra: 0, nations: 0 };
 		file.lf = readLeagueSections(v, sum);   // whole leagues and the cup's clubs (18h)
 		const knownClubs = new Set([ ...DEFAULT_IDENT.map(d => d.name), ...TEAMS.map(baseName) ]);
 		const knownMarkets = new Set(Object.values(MARKET_BASE).flat());
 		const ids = new Map(allOwn(lg && lg.club).map(pl => [ pl.id, pl ]));
 		const keysOf = o => Object.keys(o || {}).filter(k => { if (BAD_KEYS.has(k) || k.length > 64) { sum.bad++; return false; } return true; });
-		sum.extra = Object.keys(v).filter(k => ![ "kind", "version", "note", "customRatings", "clubs", "markets", "slots", "players", "leagues", "cup" ].includes(k)).length;
+		sum.extra = Object.keys(v).filter(k => ![ "kind", "version", "note", "customRatings", "clubs", "markets", "slots", "players", "leagues", "cup", "nations" ].includes(k)).length;
 		for (const k of keysOf(v.clubs)) {
 			if (!knownClubs.has(k)) { sum.unknown++; continue; }
 			const { out, bad } = checkClubFields(v.clubs[k], false);
 			if (bad.length) { sum.bad++; }
 			if (Object.keys(out).length) { file.edits.clubs[k] = out; sum.clubs++; }
+		}
+		// National teams' kits and grounds (18j), by country code.
+		for (const k of keysOf(v.nations)) {
+			if (!own(NATIONS, k)) { sum.unknown++; continue; }
+			const { out, bad } = checkNationFields(v.nations[k]);
+			if (bad.length) { sum.bad++; }
+			if (Object.keys(out).length) { file.edits.nations[k] = out; sum.nations++; }
 		}
 		for (const k of keysOf(v.markets)) {
 			if (!knownMarkets.has(k)) { sum.unknown++; continue; }
@@ -389,9 +407,10 @@
 	}
 	function previewText (sum) {
 		const n = (k, one, many) => `${k} ${k === 1 ? one : many}`;
-		const lines = [ sum.clubs || sum.players ? `This file renames ${n(sum.clubs, "club", "clubs")} and ${n(sum.players, "player", "players")}.` : "This file has nothing that matches this save." ];
+		const lines = [ sum.clubs || sum.players ? `This file renames ${n(sum.clubs, "club", "clubs")} and ${n(sum.players, "player", "players")}.` : sum.nations ? "" : "This file has nothing that matches this save." ].filter(Boolean);
 		const per = leagueSummary(sum);
 		if (per) { lines.push(`${per}.`); }
+		if (sum.nations) { lines.push(`It sets the kit or ground of ${n(sum.nations, "national team", "national teams")}.`); }
 		const here = leagueCountry(league), away = (sum.countries || []).map(c => c.nat).filter(c => c !== here);
 		if (away.length) { lines.push(`You play in ${natLabel(here)}, so ${away.map(natLabel).join(", ")} ${away.length === 1 ? "shows" : "show"} when you play there (the Leagues tab: Play in another league) and in the continental cup.`); }
 		const skip = [];
@@ -409,6 +428,7 @@
 		const noRatings = o => { if (ratings) { return o; } const c = { ...o }; for (const k of RATING_KEYS) { delete c[k]; } return c; };
 		Object.assign(e.clubs, file.edits.clubs);
 		Object.assign(e.markets, file.edits.markets);
+		Object.assign(e.nations, file.edits.nations || {});
 		for (const [ k, o ] of Object.entries(file.edits.slots)) { const c = noRatings(o); if (Object.keys(c).length) { e.slots[k] = c; } }
 		if (ratings && file.edits.custom) { e.custom = true; }
 		const ids = new Map(allOwn(lg.club).map(pl => [ pl.id, pl ]));

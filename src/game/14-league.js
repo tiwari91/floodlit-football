@@ -94,6 +94,7 @@
 			if (gone.length) { league.news = `${league.news} Out of contract and gone: ${gone.join(", ")}. Academy players fill the gaps.`.trim(); }
 			if (club.resigned && club.resigned.length) { league.news = `${league.news} Signed new deals: ${club.resigned.join(", ")}.`.trim(); }
 		}
+		if (typeof intlNewSeason === "function") { intlNewSeason(prev); }   // the national job carries on; a new draw (18j)
 		saveLeague();
 	}
 
@@ -108,6 +109,7 @@
 	function currentFixture () {
 		if (!league || seasonDone()) { return null; }
 		if (typeof contFixture === "function") { const cf = contFixture(); if (cf) { return cf; } }   // a continental night comes first (18g)
+		if (typeof intlFixture === "function") { const nf = intlFixture(); if (nf) { return nf; } }   // then an international break (18j)
 		const pair = league.fixtures[league.round].find(([ a, b ]) => a === 0 || b === 0);
 		return { round: league.round, home: pair[0] === 0, opp: pair[0] === 0 ? pair[1] : pair[0] };
 	}
@@ -173,6 +175,14 @@
 	// Record your result and play out the rest of the matchday.
 	function recordLeagueResult (lm, h, a) {
 		if (!league || league.round !== lm.round) { return; }
+		// An international (18j): its own competition. No league round, no wages, and no club injuries, bans or stats.
+		if (lm.intl && typeof recordIntlResult === "function") {
+			recordIntlResult(lm, h, a);
+			matchCards = []; matchInjuries = []; matchInjInfo = {};
+			saveLeague();
+			renderLeague();
+			return;
+		}
 		if (lm.cont && typeof recordContResult === "function") { recordContResult(lm, h, a); updateFitness(); } else {   // a continental tie: its own table, not the league's
 		const mine = lm.home ? [ 0, lm.opp, h, a ] : [ lm.opp, 0, a, h ];
 		const others = tickPlan && tickPlan.round === lm.round ? tickPlan.res.map(r => r.slice()) : league.fixtures[lm.round].filter(([ x, y ]) => x !== 0 && y !== 0).map(([ x, y ]) => simMatch(x, y));
@@ -186,6 +196,7 @@
 		if (typeof assistRun === "function") { assistRun(league.round === JANUARY ? "January window" : "this week"); }
 		if (typeof cupNight === "function") { cupNight(); }   // a cup night between matchdays
 		if (typeof contNight === "function") { contNight(); }   // and a continental one
+		if (typeof intlNight === "function") { intlNight(); }   // and an international break (18j)
 		if (typeof contractAlerts === "function" && (league.round === JANUARY || league.round === league.fixtures.length - 10 || league.round === league.fixtures.length - 2)) { contractAlerts(); }
 		}
 		// Knocks from this match: out for one to three games, and off the team sheet.

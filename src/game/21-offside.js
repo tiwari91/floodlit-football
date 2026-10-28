@@ -117,7 +117,7 @@
 		const order = r => ({ gk: 0, def: 1, mid: 2, fwd: 3 }[r]);
 		const mine = players.filter(q => q.team === t).sort((a, b) => order(a.role) - order(b.role) || a.by - b.by);
 		const spots = sh.pos.map((q, k) => ({ q, k })).sort((a, b) => order(a.q[1]) - order(b.q[1]) || a.q[3] - b.q[3]);
-		const club = league && league.club;
+		const club = matchSquad();
 		mine.forEach((p, i) => {
 			const q = spots[i].q;
 			p.role = q[1];

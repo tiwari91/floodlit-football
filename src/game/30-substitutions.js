@@ -2,7 +2,7 @@
 	// Who can come on: squad players not starting in this format and the bench, less
 	// anyone injured, banned, already on or already taken off.
 	function subPool () {
-		const c = league && league.club;
+		const c = matchSquad();
 		const onNow = new Set(team(0).map(p => p.name));
 		let pool;
 		if (c) {

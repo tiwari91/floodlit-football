@@ -208,7 +208,9 @@
 		}
 		box.append(cupBox);
 		if (typeof renderCont === "function") { renderCont(box); }   // the continental cup (18f)
+		if (typeof renderIntl === "function") { renderIntl(box); }   // the international breaks (18j)
 		if (typeof renderNations === "function") { renderNations(box); }   // national squads (18j)
+		if (typeof renderIntlSquad === "function") { renderIntlSquad(); }   // and your national squad, on the Squad tab
 		const aw = league.awards;
 		if (aw && aw.season === league.season) {
 			const a = el("div", "lg-awards");

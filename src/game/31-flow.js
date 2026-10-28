@@ -1,6 +1,8 @@
 	/* ---------- flow ---------- */
 	function newMatch () {
+		if (typeof intlBegin === "function") { intlBegin(null); }   // your own club's identity back, if an international had it
 		leagueMatch = mode === "league" ? currentFixture() : null;
+		if (leagueMatch && leagueMatch.intl && typeof intlBegin === "function") { intlBegin(leagueMatch); }   // your national side, in its kit (18j)
 		applyFormat(mode === "league" && league ? league.fmt : fmtSel.value);
 		track(`match-start-${mode}`, `${mode} ${FMT.label}`);
 		setOpponent(leagueMatch ? TEAMS[leagueMatch.opp] : FRIENDLY, !leagueMatch || leagueMatch.home);
@@ -16,8 +18,9 @@
 		diff = strengthCfg(oppStr);
 		applyLevel();
 		subNo = [ 0, 0 ]; stall = 0; addedDone = [ false, false ];
-		planOthers(leagueMatch);
+		planOthers(leagueMatch && !leagueMatch.intl ? leagueMatch : null);   // the ticker follows league matchdays
 		oppSquad = cpuSquad(leagueMatch ? leagueMatch.opp : 99, oppStr);
+		if (intlSide && intlSide.opp) { oppSquad = intlSide.opp; }   // the other country's picked eleven
 		youSquad = leagueMatch ? null : cpuSquad(99, friendlyYouStr());
 		$("fmtName").textContent = FMT.label;
 		score = [ 0, 0 ];
