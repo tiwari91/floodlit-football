@@ -202,7 +202,7 @@ const sv = await page.evaluate(() => {
 check("export and import carry the national job and the competition", sv.ok && sv.nat === pick.nat && sv.games > 0 && sv.played === sv.live, JSON.stringify(sv));
 check("an old save loads with no national job and no breaks until next season; a damaged one is cleaned", sv.oldOk && sv.oldNat === null && sv.oldNone && /No internationals this season/.test(sv.oldNext) && sv.badNat === null && sv.badNone && sv.badOffers, JSON.stringify(sv));
 
-// The last break and the end of qualifying: eight go through (the six group winners first), and the job carries into an even season's tournament.
+// The last break and the end of qualifying: sixteen go through (the six group winners first), and the job carries into an even season's tournament.
 const q = await page.evaluate(() => {
 	const F = window.__ff, lg = F.league, C = F.intlComp(lg);
 	lg.round = 30; F.intlNight();
@@ -213,32 +213,32 @@ const q = await page.evaluate(() => {
 	lg.round = lg.fixtures.length;
 	F.nextSeasonTest();
 	const L = F.league, T = F.intlComp(L);
-	res.s2 = { season: L.season, kind: T.kind, teams: T.teams, nat: L.intl.nat, record: L.intl.record.length, r: [ ...new Set(T.nights.map(n => n.r)) ], qf: T.games.filter(g => g.stage === "qf").length, neutral: T.games.every(g => g.neutral) };
+	res.s2 = { season: L.season, kind: T.kind, teams: T.teams, nat: L.intl.nat, record: L.intl.record.length, r: [ ...new Set(T.nights.map(n => n.r)) ], groups: T.groups.length, neutral: T.games.every(g => g.neutral) };
 	return res;
 });
-check("qualifying ends at the last break: eight countries through, every group winner among them", q.done && q.q.length === 8 && new Set(q.q).size === 8 && q.winnersIn && q.next && q.next.nats.join() === q.q.join(), JSON.stringify(q));
-check("the national job and record carry into the next season, an even one: the eight qualifiers' tournament at the last break, at neutral grounds", q.s2.season % 2 === 0 && q.s2.kind === "t" && q.s2.nat === pick.nat && q.s2.record >= 3 && q.s2.teams.slice().sort().join() === q.q.slice().sort().join() && q.s2.r.join() === "30" && q.s2.qf === 4 && q.s2.neutral, JSON.stringify(q.s2));
+check("qualifying ends at the last break: sixteen countries through, every group winner among them", q.done && q.q.length === 16 && new Set(q.q).size === 16 && q.winnersIn && q.next && q.next.nats.join() === q.q.join(), JSON.stringify(q));
+check("the national job and record carry into the next season, an even one: the sixteen qualifiers' World Championship over the three breaks, at neutral grounds", q.s2.season % 2 === 0 && q.s2.kind === "t" && q.s2.nat === pick.nat && q.s2.record >= 3 && q.s2.teams.slice().sort().join() === q.q.slice().sort().join() && q.s2.r.join() === "9,20,30" && q.s2.groups === 4 && q.s2.neutral, JSON.stringify(q.s2));
 
 // The tournament plays out to a winner (your games through the match flow if you are in it), one round a night.
 const t = await page.evaluate(() => {
 	const F = window.__ff, lg = F.league, T = F.intlComp(lg);
 	lg.round = 30; F.intlNight();
 	let guard = 0;
-	while (F.currentFixture() && F.currentFixture().intl && guard++ < 4) { F.newMatchTest(); F.simulateMineTest(); }
+	while (F.currentFixture() && F.currentFixture().intl && guard++ < 12) { F.newMatchTest(); F.simulateMineTest(); }
 	F.renderLeague();
 	const card = document.querySelector("#lgExtras .lg-intl");
 	return { done: T.done, winner: T.winner, sf: T.games.filter(g => g.stage === "sf").length, f: T.games.filter(g => g.stage === "f").length, card: card && card.textContent.includes("Final"), detail: card && card.querySelector(".detail").textContent };
 });
-check("the tournament runs quarter-finals, semi-finals and a final to a winner, and the Cups card shows the bracket", t.done && !!t.winner && t.sf === 2 && t.f === 1 && t.card && /won the International Tournament/.test(t.detail), JSON.stringify(t));
+check("the World Championship runs groups, quarter-finals, semi-finals and a final to a winner, and the Cups card shows the bracket", t.done && !!t.winner && t.sf === 2 && t.f === 1 && t.card && /won the World Championship/.test(t.detail), JSON.stringify(t));
 
 // Winning the tournament: its own trophy on the stage, not the league's.
 const tro = await page.evaluate(async () => {
 	const F = window.__ff;
 	F.readyTest(); F.state = "full";
-	F.queueTrophy("International Tournament"); F.trophyDue();
+	F.queueTrophy("World Championship"); F.trophyDue();
 	await new Promise(r => setTimeout(r, 2500));
 	const t = document.getElementById("ovTrophyText"), cap = [ ...document.querySelectorAll("#overlay, #ovTrophy, .cer-caption, #cerCaption") ].map(e => e.textContent).join(" ");
-	return { text: (t && t.textContent) || "", cap: /International Tournament/i.test(cap) || /International Tournament/i.test(document.body.innerText) };
+	return { text: (t && t.textContent) || "", cap: /World Championship/i.test(cap) || /World Championship/i.test(document.body.innerText) };
 });
 check("winning the tournament puts its own trophy on the stage", tro.cap, JSON.stringify(tro));
 await page.evaluate(() => { const F = window.__ff; F.readyTest(); });
