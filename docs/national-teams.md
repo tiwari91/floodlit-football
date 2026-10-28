@@ -1,6 +1,6 @@
 # National teams and international jobs: design note
 
-Status: Phases A, B and C built (sections 1 to 4: `src/game/18j-national-teams.js`, hooks in 07, 14, 17, 18, 18b,
+Status: (finals now in the summer: section 10) Phases A, B and C built (sections 1 to 4: `src/game/18j-national-teams.js`, hooks in 07, 14, 17, 18, 18b,
 18d, 18e, 18f, 18g, 21, 30, 31, 35 and 42, tests in `tests/intl.mjs`). As-built notes and the calls made where this
 plan was ambiguous or did not fit the code are in section 6.
 This note is the plan, so the work can be picked up in its own session.
@@ -228,3 +228,40 @@ Replaces the "second hat" of section 2. Managing a national team and managing a 
 - **Friendlies** (`I.fr`, `I.frDone`). At the next break (after matchday 9, 20 or 30) where your country has no competitive game, one friendly is arranged against a random nation; the Squad card lets you change the opponent or skip it. It is recorded as `Friendly`, moves no league round and is not offered twice.
 - **FA objective and confidence** (`I.obj`, `I.conf` 0..100, start 60). A target from the side's strength rank: `qualify` in qualifying seasons; in a tournament season `reach the knockout rounds`, `reach the semi-finals` or `win the tournament`. A win is +4, a defeat -4 (friendlies +-1); when the competition ends, meeting the target is +15 and missing it -15. Shown on Overview (the international line) and as a meter on the International card. Missing targets only lowers confidence; the sacking rule is still two missed tournaments.
 - All new fields are optional and validated in `ensureIntl`; tests are in `tests/intl.mjs`.
+
+## 10. The summer finals (summer-tournament)
+
+The finals of the World Championship (seasons 2, 6, 10 ...) and the European Nations Cup (4, 8, 12 ...) are played the
+way a real tournament is: in one block in the summer, after the league season, instead of over the three breaks.
+Section 3 and sections 6 to 8 describe the older spread schedule; where they disagree, this section wins for a new save.
+
+- **Odd seasons are unchanged**: qualifiers at the breaks after matchdays 9, 20 and 30.
+- **Finals seasons**: the breaks hold friendlies only (the friendlies feature, country-only managers). The draw is made at
+  the season start as before (groups of four, 16 or 8 or 4 countries), but `drawTournament` stamps `comp.summer = true`
+  and gives every day `r = fixtures.length` (38). Those days open once `lg.round` reaches 38, which is the moment the
+  last league matchday is played. The club cup and the continental finals are before matchday 38, so they are over.
+- **A day** is one entry of `comp.nights`: group matchdays 1 to 3, the quarter-finals (16 countries), the semi-finals,
+  the final. Other nations' games are played out from the squads' strength; yours is a real fixture on the match screen
+  through the guest seat (18f), at a neutral ground. `intlFixture` returns it even though the league season is complete
+  (`currentFixture` in 14 now asks it first once `seasonDone()`); its `round` is the last matchday's, so the weather and
+  kick-off lookups work, and `intl.summer` is set so `recordLeagueResult` accepts it.
+- **Club manager, no national job**: `intlNight` does not run the summer days by itself. The season-end card, the
+  League tab's Next card and the Cups tab's International card say "The World Championship is on: group matchday 1. Group
+  A: ..." with two buttons, "Follow: play the next day" (`intlSummerRun("day")`) and "Simulate the tournament"
+  (`intlSummerRun("all")`). Starting the next season plays out whatever is left (`intlSummerSettle`), so the rollover
+  never skips the final or loses the trophy line and the FA objective.
+- **Country manager** (country only, or an old save that still holds both): `intlNight` plays everyone else's games and
+  stops at yours. `intlSummerBlocked` is true while your game is due: Start season N+1, the bar button
+  ("Next international" until the final) and the "complete" card all wait. Once the tournament is done the label is
+  "Start season N+1". A country that did not qualify has its tournament played out straight away.
+- **Call-up**: before the first finals game one card ("Your squad", `intlCallupDue`, stored as `comp.callup`) sends you
+  to the Squad tab's 23-player selection, once.
+- **Overview and Cups**: the International card's first line (which the Overview copies) reads "After the league season:
+  World Championship finals, Spain in Group B. The breaks are friendlies." until matchday 38, then "Summer: the World
+  Championship, group matchday 2." The Cups card shows the groups and then the bracket, titled "summer finals".
+- **Trophy and FA objective** are unchanged: `intlAdvance` raises them when the final is played.
+- **Old saves**: `comp.summer` is optional. A finals season drawn by the earlier build has none, and its days keep
+  `r = 9, 20, 30`, so it finishes the old way (all the old code paths are the same ones). `intlCompOk` drops any other
+  value of `summer`. Nothing new is required on load.
+- Tests: `tests/summer.mjs` (club flow, country-only flow, friendlies only at the breaks, the held rollover, an old
+  mid-finals save); `worldcup.mjs`, `euro.mjs` and `intl.mjs` were moved to the new calendar.

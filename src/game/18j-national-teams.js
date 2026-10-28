@@ -102,8 +102,8 @@
 	   nights (two at each of the first two breaks, one at the last); the group winners, runners-up and
 	   best thirds (on points a game, since the groups differ in size) fill next season's finals.
 	   Even seasons are the World Championship: the countries through (16 with 32 in the save, else 8 or 4)
-	   in groups of four, matchdays 1 and 2 at the first break, 3 and the quarter-finals at the second, the
-	   semi-finals and the final at the last, all at neutral grounds; the top two of each group go on. Everyone else's games are played out from the two
+	   in groups of four, played in one block in the summer after the league season (a finals season's breaks are friendlies; a
+	   save from before that keeps the old spread over the breaks), all at neutral grounds; the top two of each group go on. Everyone else's games are played out from the two
 	   squads' strength; yours, if you manage a country, are real fixtures, played through the
 	   continental cup's guest seat (18f). */
 	const INTL_BREAKS = [ 9, 20, 30 ];
@@ -119,6 +119,8 @@
 	const intlFinalsSize = n => (n >= 32 ? 16 : n >= 16 ? 8 : 4);
 	// The finals' nights: group matchdays 1 and 2 at the first break, 3 and the quarter-finals at the second, the rest at the last.
 	const intlFinalsNights = T => [ { r: 9, stage: "g", md: 1 }, { r: 9, stage: "g", md: 2 }, { r: 20, stage: "g", md: 3 }, ...(T >= 16 ? [ { r: 20, stage: "qf" } ] : []), { r: 30, stage: "sf" }, { r: 30, stage: "f" } ];
+	// The summer finals (a finals season from the summer-tournament release on): the same days, all after the last league matchday.
+	const intlSummerNights = (T, R) => intlFinalsNights(T).map(n => ({ ...n, r: R }));
 	const intlWhat = (C, g) => (C.kind === "q" ? "Qualifier" : g.stage ? INTL_KO[g.stage] : `Group ${groupLetter(g.grp)}`);
 	const INTL_GROUP_NIGHTS = [ 9, 9, 20, 20, 30 ];
 	const groupLetter = g => String.fromCharCode(65 + g);
@@ -152,7 +154,7 @@
 		for (let k = 0; k < 4; k++) { shuffle(teams.slice(k * G, k * G + G)).forEach((nat, j) => groups[j].push(nat)); }
 		const games = [];
 		groups.forEach((grp, gi) => roundRobin(grp.slice()).forEach((pairs, n) => { for (const [ h, a ] of pairs) { games.push({ h, a, n, grp: gi, neutral: true }); } }));
-		return { v: 1, season: lg.season, kind: "t", tour, teams, groups, games, nights: intlFinalsNights(teams.length), night: 0, done: false, winner: null };
+		return { v: 1, season: lg.season, kind: "t", tour, teams, groups, games, nights: intlSummerNights(teams.length, lg.fixtures.length), summer: true, night: 0, done: false, winner: null };
 	}
 	const drawIntl = (lg, I) => (lg.season % 2 ? drawQualifiers(lg) : drawTournament(lg, I));
 	// lg.intl: versioned and optional. An older save gets no national job and no breaks until next season.
@@ -162,6 +164,7 @@
 		if (C.none) { return true; }
 		if (!Array.isArray(C.games) || !Array.isArray(C.nights) || !C.nights.length || !Number.isInteger(C.night) || C.night < 0 || C.night > C.nights.length) { return false; }
 		if (!C.nights.every(n => plainObj(n) && Number.isInteger(n.r))) { return false; }
+		if (C.summer !== undefined && C.summer !== true) { delete C.summer; }   // optional: only the summer finals carry it; an older finals season keeps its breaks
 		if (!C.games.every(g => plainObj(g) && natOk(g.h) && natOk(g.a) && Number.isInteger(g.n) && g.n >= 0 && g.n < C.nights.length && (g.hg === undefined || (Number.isInteger(g.hg) && Number.isInteger(g.ag))))) { return false; }
 		if (C.kind === "q") { return Array.isArray(C.groups) && C.groups.every(g => Array.isArray(g) && g.every(natOk)) && Array.isArray(C.qualified) && C.qualified.every(natOk); }
 		return C.kind === "t" && Array.isArray(C.teams) && C.teams.every(natOk) && (C.groups === undefined || (Array.isArray(C.groups) && C.groups.every(g => Array.isArray(g) && g.every(natOk))));
@@ -199,7 +202,7 @@
 		if (lg.intl.nat) { intlObjective(lg); }
 		const C = lg.intl.comp, me = lg.intl.nat;
 		if (C.kind === "q") { lg.news = `${lg.news || ""} Qualifiers for the ${INTL_TOURS[C.tour]} this season: breaks after matchdays 9, 20 and 30.${me ? ` ${natName(me)} are in Group ${groupLetter(C.groups.findIndex(g => g.includes(me)))}.` : ""}`.trim(); }
-		else { lg.news = `${lg.news || ""} The ${tn(C)} is played over the breaks after matchdays 9, 20 and 30: ${C.teams.length} countries in groups of four, then knockouts. ${C.teams.map(natName).join(", ")}.${me ? (C.teams.includes(me) ? ` ${natName(me)} are in it.` : ` ${natName(me)} didn't qualify.`) : ""}`.trim(); }
+		else { lg.news = `${lg.news || ""} The ${tn(C)} finals are played in the summer, after the league season: ${C.teams.length} countries in groups of four, then knockouts. ${C.teams.map(natName).join(", ")}. The breaks this season are friendlies.${me ? (C.teams.includes(me) ? ` ${natName(me)} are in it.` : ` ${natName(me)} didn't qualify.`) : ""}`.trim(); }
 	}
 	// A game played out from the two squads' strength; a knockout tie level after ninety minutes goes to extra time, then penalties.
 	function intlPlay (g, lg = league) {
@@ -287,17 +290,55 @@
 		if (news.length) { lg.news = `${lg.news || ""} ${news.join(" ")}`.trim(); }
 	}
 	// The nights: open each one that is due, play everyone else's games, and stop at yours until it is played.
-	function intlNight () {
+	// The summer finals (C.summer) are held for a manager with no country until the card's buttons run them (how: "day" or "all").
+	function intlNight (how) {
 		const lg = league, C = intlComp(lg);
 		if (!C || C.none) { return; }
 		const me = lg.intl.nat;
+		if (C.summer && !me && !how) { return; }
 		while (!C.done && C.night < C.nights.length && C.nights[C.night].r <= lg.round) {
 			const k = C.night;
 			for (const g of C.games) { if (g.n === k && g.hg === undefined && !(me && (g.h === me || g.a === me))) { intlPlay(g, lg); } }
 			if (intlMine(lg, C) >= 0) { break; }   // wait for yours
 			C.night++;
 			intlAdvance(lg, C, k);
+			if (how === "day") { break; }
 		}
+	}
+	// The summer finals still to play: the league season is over and the tournament isn't.
+	const intlSummer = (lg = league) => { const C = lg && lg.club && lg.intl && lg.intl.comp; return !!(C && C.summer && !C.none && !C.done && lg.round >= lg.fixtures.length) && C; };
+	// Your own game is due (a manager with a country): the season can't roll over until it is played.
+	const intlSummerBlocked = (lg = league) => { const C = intlSummer(lg); return !!C && intlMine(lg, C) >= 0; };
+	// A line for the season-end cards: the summer finals are on (club manager, no country).
+	const intlSummerNote = (lg = league) => (intlSummer(lg) && !lg.intl.nat ? ` ${intlSummerText(lg)} Follow it in the League or Cups tab, or start the next season and the rest is played out.` : "");
+	// Before the first finals game: the 23-player squad is offered once (the Squad tab holds the call-up).
+	function intlCallupDue (lg = league) {
+		const C = intlSummer(lg), me = lg && lg.intl && lg.intl.nat;
+		return !!(C && me && C.night === 0 && !C.callup && C.teams.includes(me) && intlSummerBlocked(lg));
+	}
+	// The season can roll over: a summer tournament that is still going gets played out first (yours is never skipped).
+	function intlSummerSettle (lg = league) {
+		if (!intlSummer(lg)) { return true; }
+		if (intlSummerBlocked(lg)) { return false; }
+		intlNight("all"); saveLeague();
+		return true;
+	}
+	// Play a day (how "day") or the rest (how "all") of the summer finals, for a manager with no game of their own due.
+	function intlSummerRun (how) {
+		const lg = league, C = intlSummer(lg);
+		if (!C || intlSummerBlocked(lg)) { return false; }
+		intlNight(how === "day" ? "day" : "all");
+		saveLeague();
+		return true;
+	}
+	// Today's finals line for the card: where the tournament stands.
+	function intlSummerText (lg = league) {
+		const C = intlSummer(lg), me = lg.intl.nat;
+		if (!C) { return ""; }
+		const night = C.nights[C.night], gi = me ? C.groups.findIndex(g => g.includes(me)) : -1, pick = gi >= 0 ? gi : 0;
+		const stage = night.stage === "g" ? `group matchday ${night.md}` : `the ${INTL_KO[night.stage].toLowerCase()}${night.stage === "f" ? "" : "s"}`;
+		const grp = night.stage === "g" && C.groups[pick] ? ` ${me && gi >= 0 ? "" : "First draw: "}Group ${groupLetter(pick)}: ${C.groups[pick].map(natName).join(", ")}.` : "";
+		return `The ${tn(C)} is on: ${stage}.${grp}`;
 	}
 	const intlLabel = (C, g) => (C.kind === "q" ? `International · Qualifier, Group ${groupLetter(g.grp)}` : g.stage ? `International · ${INTL_KO[g.stage]}` : `International · ${tn(C)}, Group ${groupLetter(g.grp)}`);
 	/* Friendlies: a break (after matchday 9, 20 or 30) where your country has no competitive game gets one friendly,
@@ -331,7 +372,8 @@
 		const slot = applyGuest(lg, { ...s.ident, str: s.str, manager: intlManager(other), managerNat: other });
 		if (slot < 0) { return null; }
 		lg.contGuest.intl = true;
-		return { round: lg.round, home: g.neutral ? true : g.h === me, opp: slot, intl: { gi, season: C.season, nat: other }, label: intlLabel(C, g), neutral: !!g.neutral };
+		const R = lg.fixtures.length, sum = !!C.summer && lg.round >= R;   // after the last matchday: the weather and the kick-off of the last one stand in
+		return { round: sum ? R - 1 : lg.round, home: g.neutral ? true : g.h === me, opp: slot, intl: { gi, season: C.season, nat: other, ...(sum ? { summer: true } : {}) }, label: intlLabel(C, g), neutral: !!g.neutral };
 	}
 
 	/* Your national side on the night: the squad called up (less your own injured or rested players), your
@@ -689,6 +731,14 @@
 			return `${natName(C.winner)} won the ${tn(C)}.${me && C.winner === me ? " That's your side!" : ""}`;
 		}
 		if (me && C.kind === "q" && C.tour === "eu" && !inEurope(me)) { return `No ${tn(C)} for ${natName(me)} this season: it is for European countries. The breaks pass without a game for you.`; }
+		if (C.summer) {
+			if (lg.round < lg.fixtures.length) { return `After the league season: ${tn(C)} finals${me ? (C.teams.includes(me) ? `, ${natName(me)} in Group ${groupLetter(C.groups.findIndex(g => g.includes(me)))}` : `: ${natName(me)} aren't in it`) : ""}. The breaks are friendlies.`; }
+			const sn = C.nights[C.night], sgi = me ? C.games.findIndex(g => g.n === C.night && g.hg === undefined && (g.h === me || g.a === me)) : -1;
+			const where = sn.stage === "g" ? `group matchday ${sn.md}` : `the ${INTL_KO[sn.stage].toLowerCase()}${sn.stage === "f" ? "" : "s"}`;
+			if (sgi >= 0) { const g = C.games[sgi], opp = g.h === me ? g.a : g.h; return `Summer: the ${tn(C)}, ${where}: ${natName(me)} v ${natName(opp)}, neutral ground.`; }
+			const gone = me && !C.games.some(g => g.n >= C.night && (g.h === me || g.a === me)) ? ` ${natName(me)} ${C.teams.includes(me) ? "are out" : "aren't in it"}.` : "";
+			return `Summer: the ${tn(C)}, ${where}.${gone}`;
+		}
 		const night = C.nights[C.night], gi = me ? C.games.findIndex(g => g.n === C.night && g.hg === undefined && (g.h === me || g.a === me)) : -1;
 		const now = night.r <= lg.round, when = now ? "International break now" : `International break after matchday ${night.r}`;
 		if (gi >= 0) {
@@ -698,11 +748,23 @@
 		const out = me && C.kind === "t" && !C.games.some(g => g.n >= C.night && (g.h === me || g.a === me)) ? ` ${natName(me)} ${C.teams.includes(me) ? "are out" : "aren't in it"}.` : "";
 		return `${when}: ${C.kind === "q" ? `qualifiers, group matchday ${night.md}` : `the ${tn(C)}, ${night.stage === "g" ? `group matchday ${night.md}` : `${INTL_KO[night.stage].toLowerCase()}${night.stage === "f" ? "" : "s"}`}`}.${out}`;
 	}
+	// The summer finals, for a manager with no country: where it stands, and a way to follow it a day at a time or play the lot.
+	function intlSummerCard (parent, pre = "sum") {
+		const lg = league, C = intlSummer(lg);
+		if (!C || lg.intl.nat) { return false; }
+		const row = el("div", "intl-summer");
+		row.append(el("span", "detail", `${intlSummerText(lg)} Follow it a day at a time, or simulate the lot; starting the next season plays out whatever is left.`));
+		const day = el("button", "", "Follow: play the next day"); day.type = "button"; day.id = `${pre}Day`; day.addEventListener("click", () => { intlSummerRun("day"); renderLeague(); });
+		const all = el("button", "", "Simulate the tournament"); all.type = "button"; all.id = `${pre}All`; all.addEventListener("click", () => { intlSummerRun("all"); renderLeague(); });
+		row.append(day, all); parent.append(row);
+		return true;
+	}
 	function renderIntl (box) {
 		const lg = league, C = intlComp(lg);
 		if (!C) { return; }
 		const me = lg.intl.nat, card = el("div", "lg-cup lg-intl");
 		card.append(el("h4", "", me ? `International · ${natName(me)}` : "International"), el("p", "detail", intlNext(lg)));
+		if (!me && intlSummer(lg)) { intlSummerCard(card, "cups"); }
 		if (me && lg.intl.only) { const m = el("div", "intl-meter"); m.id = "intlConf"; m.setAttribute("role", "meter"); m.setAttribute("aria-valuenow", String(intlConf(lg))); m.setAttribute("aria-valuemin", "0"); m.setAttribute("aria-valuemax", "100"); m.setAttribute("aria-label", "FA confidence"); const f = el("span", "fill"); f.style.width = `${intlConf(lg)}%`; m.append(f); card.append(m); }
 		const cell = (tag, txt, cls) => el(tag, cls || "", txt);
 		if (!C.none && C.kind === "q") {
@@ -734,7 +796,7 @@
 			}
 		} else if (!C.none) {
 			const d = el("details"); d.open = true;
-			d.append(el("summary", "", tn(C)));
+			d.append(el("summary", "", C.summer ? `${tn(C)} · summer finals` : tn(C)));
 			if (C.groups) {
 				const mg = me ? C.groups.findIndex(g => g.includes(me)) : -1, grid = el("div", "intl-groups");
 				for (const gi of C.groups.map((g, i) => i).sort((a, b) => (b === mg) - (a === mg))) {
@@ -791,7 +853,7 @@
 		head.append(ap);
 		box.append(head, el("p", "win-note", `${intlNext(league)} ${auto ? "Auto-pick: the best 23 of your nationality." : "Your own call-up."} Only the ${INTL_CALLUP} called up can play. ${I.only ? "" : "Your club's players who play lose fitness for the next league match, as a start would cost them."}`));
 		// The formation (the club game's own shapes) and the captain, for the national side.
-		const ctl = el("div", "intl-ctl"), pre = el("div", "lu-presets"), cur = shapeKeyOf(league.fmt);
+		const ctl = el("div", "intl-ctl"), pre = el("div", "lu-presets"), cur = I.tac && I.tac.shape && SHAPES[league.fmt] && SHAPES[league.fmt][I.tac.shape] ? I.tac.shape : shapeKeyOf(league.fmt);   // your stored pick, even while a match has the controls
 		pre.setAttribute("role", "group"); pre.setAttribute("aria-label", "Formation"); pre.id = "intlShape";
 		for (const k of LU_PRESETS[league.fmt] || Object.keys(SHAPES[league.fmt] || {})) {
 			const b = el("button", "", SHAPES[league.fmt][k].label.split(" ")[0]); b.type = "button"; b.setAttribute("aria-pressed", String(k === cur));
@@ -866,4 +928,4 @@
 		for (const id of [ "sqBox", "transfersBox", "assistCard", "coachPanel", "clubUpgrades", "lgAcademy" ]) { const b = $(id); if (b) { b.hidden = on; } }
 		for (const id of [ "sqNoClub", "transfersNoClub", "clubNoClub" ]) { const b = $(id); if (b) { b.hidden = !on; b.textContent = note; } }
 	}
-	queueMicrotask(() => { if (window.__ff) { Object.assign(window.__ff, { intlOnlyAdvance, intlFreeOffers, intlNoClub, intlLegacy, intlLegacyChoose, renderIntlOnly, nationSquads, nationSquad, nationIdent, strOfOvr, intlPool, pickNation, renderNations, NATIONS, INTL_BREAKS, ensureIntl, intlComp, intlNight, intlFixture, intlOffers, acceptIntl, declineIntl, resignIntl, intlChoose, intlCallUp, intlGroupTable, intlQualified, intlManager, intlNext, intlNewSeason, renderIntlSquad, intlRestToggle, intlSwap, intlTacSet, intlFriendly, intlObjective, intlConf, intlMood, intlAutoPick, intlSelToggle, intlCalled, intlEligible, nameTables: { FIRST, SURNAMES }, intlRep, renderOffers, newMatchTest () { clearLive(); state = "intro"; newMatch(); renderLeague(); }, readyTest () { clearLive(); state = "intro"; banner.hidden = true; newMatch(); showIntro(); renderLeague(); } }); Object.defineProperties(window.__ff, { intlSide: { get: () => intlSide, configurable: true }, leagueMatch: { get: () => leagueMatch, configurable: true } }); } });
+	queueMicrotask(() => { if (window.__ff) { Object.assign(window.__ff, { intlOnlyAdvance, intlFreeOffers, intlNoClub, intlLegacy, intlLegacyChoose, renderIntlOnly, nationSquads, nationSquad, nationIdent, strOfOvr, intlPool, pickNation, renderNations, NATIONS, INTL_BREAKS, ensureIntl, intlComp, intlNight, intlSummer, intlSummerBlocked, intlSummerNote, intlCallupDue, intlSummerSettle, intlSummerRun, intlSummerText, intlSummerCard, intlFixture, intlOffers, acceptIntl, declineIntl, resignIntl, intlChoose, intlCallUp, intlGroupTable, intlQualified, intlManager, intlNext, intlNewSeason, renderIntlSquad, intlRestToggle, intlSwap, intlTacSet, intlFriendly, intlObjective, intlConf, intlMood, intlAutoPick, intlSelToggle, intlCalled, intlEligible, nameTables: { FIRST, SURNAMES }, intlRep, renderOffers, newMatchTest () { clearLive(); state = "intro"; newMatch(); renderLeague(); }, readyTest () { clearLive(); state = "intro"; banner.hidden = true; newMatch(); showIntro(); renderLeague(); } }); Object.defineProperties(window.__ff, { intlSide: { get: () => intlSide, configurable: true }, leagueMatch: { get: () => leagueMatch, configurable: true } }); } });

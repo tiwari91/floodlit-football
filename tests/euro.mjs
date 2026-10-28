@@ -14,7 +14,7 @@ const seasons = await page.evaluate(() => {
 	for (let k = 0; k < 6; k++) {
 		const lg = F.league, C = F.intlComp(lg);
 		const nats = C.kind === "q" ? C.groups.flat() : C.teams;
-		lg.round = 30; F.intlNight();
+		lg.round = lg.fixtures.length; F.intlNight("all");
 		out.push({ season: lg.season, kind: C.kind, tour: C.tour, n: nats.length, allEurope: nats.every(n => [ "home", "europe" ].includes(F.NATIONS[n][1])), qn: C.qn, done: C.done, winner: C.winner || null, groups: C.groups.length, nights: C.nights.map(n => n.stage).join(), next: lg.intl.next ? lg.intl.next.nats.length : 0 });
 		lg.round = lg.fixtures.length; F.nextSeasonTest();
 	}
@@ -52,7 +52,7 @@ const eu = await page.evaluate(() => {
 check("the next season is the European Nations Cup finals and the news names it", eu.tour === "eu" && eu.kind === "t" && eu.news, JSON.stringify(eu));
 const play = await page.evaluate(() => {
 	const F = window.__ff, L = F.league, T = F.intlComp(L), me = T.teams[0];
-	L.intl.nat = me; L.round = 9; F.intlNight();
+	L.intl.nat = me; L.round = L.fixtures.length; F.intlNight();
 	const fx = F.currentFixture();
 	return { intl: !!(fx && fx.intl), label: fx && fx.label, text: F.intlNext(L) };
 });

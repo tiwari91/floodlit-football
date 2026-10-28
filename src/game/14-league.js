@@ -108,7 +108,8 @@
 	const seasonDone = () => !!league && league.round >= league.fixtures.length;
 
 	function currentFixture () {
-		if (!league || seasonDone()) { return null; }
+		if (league && seasonDone()) { return typeof intlFixture === "function" ? intlFixture() : null; }   // the summer finals, if your country plays (18j)
+		if (!league) { return null; }
 		if (typeof contFixture === "function") { const cf = contFixture(); if (cf) { return cf; } }   // a continental night comes first (18g)
 		if (typeof intlFixture === "function") { const nf = intlFixture(); if (nf) { return nf; } }   // then an international break (18j)
 		const pair = league.fixtures[league.round].find(([ a, b ]) => a === 0 || b === 0);
@@ -175,7 +176,7 @@
 	}
 	// Record your result and play out the rest of the matchday.
 	function recordLeagueResult (lm, h, a) {
-		if (!league || league.round !== lm.round) { return; }
+		if (!league || (league.round !== lm.round && !(lm.intl && lm.intl.summer))) { return; }   // a summer final stands in the last matchday's round (18j)
 		// An international (18j): its own competition. No league round, no wages, and no club injuries, bans or stats.
 		if (lm.intl && typeof recordIntlResult === "function") {
 			recordIntlResult(lm, h, a);

@@ -25,20 +25,20 @@ const t = await page.evaluate(() => {
 	return { season: L.season, kind: T.kind, groups: T.groups.length, pots, uniq: new Set(all).size, teams: T.teams.length, games: T.games.length, rr: T.groups.every((g, gi) => g.every(a => g.every(b => a === b || T.games.filter(x => x.grp === gi && ((x.h === a && x.a === b) || (x.h === b && x.a === a))).length === 1))), nights: T.nights.map(n => n.stage + n.r).join(), clash: nights.filter(r => F.CUP_NIGHTS.includes(r) || cc.includes(r)), neutral: T.games.every(g => g.neutral), news: /groups of four/.test(L.news) };
 });
 check("an even season draws the finals: 16 countries in 4 groups of 4, a single round-robin each", t.season === 2 && t.kind === "t" && t.groups === 4 && t.pots && t.uniq === 16 && t.teams === 16 && t.games === 24 && t.rr && t.news, JSON.stringify(t));
-check("the stages fit the three breaks (9, 20, 30) and no cup or continental night", t.nights === "g9,g9,g20,qf20,sf30,f30" && t.clash.length === 0 && t.neutral, JSON.stringify(t));
+check("the finals are a summer block after the last league matchday (not the breaks): same stages, all on day 38", t.nights === "g38,g38,g38,qf38,sf38,f38" && t.clash.length === 0 && t.neutral, JSON.stringify(t));
 
 // Play it through: groups, the top two go on, quarter-finals, semi-finals, a final.
 const f = await page.evaluate(() => {
 	const F = window.__ff, lg = F.league, T = F.intlComp(lg);
-	lg.round = 30; F.intlNight();
+	lg.round = lg.fixtures.length; F.intlNight(); const held = !T.done && T.night === 0; F.intlNight("all");   // no country: held for the card until it is run
 	const tabs = T.groups.map((_, gi) => F.intlGroupTable(T, gi)), top2 = tabs.flatMap(x => [ x[0].nat, x[1].nat ]);
 	const qf = T.games.filter(g => g.stage === "qf"), sf = T.games.filter(g => g.stage === "sf"), fin = T.games.filter(g => g.stage === "f");
 	const winners = tabs.map(x => x[0].nat), runners = tabs.map(x => x[1].nat);
 	F.renderLeague();
 	const card = document.querySelector(".lg-intl");
-	return { done: T.done, winner: !!T.winner, played: tabs.every(x => x.every(r => r.p === 3)), qf: qf.length, qfIn: qf.every(g => top2.includes(g.h) && top2.includes(g.a)), pairing: qf.every(g => winners.includes(g.h) !== winners.includes(g.a)) && qf.every(g => tabs.findIndex(x => x.some(r => r.nat === g.h)) !== tabs.findIndex(x => x.some(r => r.nat === g.a))), sf: sf.length, f: fin.length, tables: card ? card.querySelectorAll(".intl-table").length : 0, text: card ? card.textContent.includes("Final") : false };
+	return { held, done: T.done, winner: !!T.winner, played: tabs.every(x => x.every(r => r.p === 3)), qf: qf.length, qfIn: qf.every(g => top2.includes(g.h) && top2.includes(g.a)), pairing: qf.every(g => winners.includes(g.h) !== winners.includes(g.a)) && qf.every(g => tabs.findIndex(x => x.some(r => r.nat === g.h)) !== tabs.findIndex(x => x.some(r => r.nat === g.a))), sf: sf.length, f: fin.length, tables: card ? card.querySelectorAll(".intl-table").length : 0, text: card ? card.textContent.includes("Final") : false };
 });
-check("each group plays 3 games and the top two go through", f.played && f.qf === 4 && f.qfIn, JSON.stringify(f));
+check("each group plays 3 games and the top two go through (the summer block waits for the card, then runs)", f.held && f.played && f.qf === 4 && f.qfIn, JSON.stringify(f));
 check("quarter-finals pair a group winner with another group's runner-up, then semi-finals and a final to a winner", f.pairing && f.sf === 2 && f.f === 1 && f.done && f.winner, JSON.stringify(f));
 check("the Cups tab shows the four group tables and the bracket", f.tables === 4 && f.text, JSON.stringify(f));
 

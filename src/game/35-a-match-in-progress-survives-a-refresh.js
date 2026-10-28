@@ -79,9 +79,14 @@
 			if (mode === "league" && typeof intlOnlyAdvance === "function" && intlNoClub()) {   // country only: on to the next international, or the end of the season (18j)
 				const wasDone = seasonDone();   // already complete: this press is "Start season N+1", not another card
 				if (!wasDone) { intlOnlyAdvance(); }
-				if (!wasDone && seasonDone()) { showOverlay(`Season ${league.season} complete`, "The rest of the league season was played without you. The job offers and the season's news are in the tabs below.", `Start season ${league.season + 1}`); renderLeague(); return; }
+				if (!wasDone && seasonDone() && !(typeof intlSummerBlocked === "function" && intlSummerBlocked())) { showOverlay(`Season ${league.season} complete`, "The rest of the league season was played without you. The job offers and the season's news are in the tabs below.", `Start season ${league.season + 1}`); renderLeague(); return; }
 			}
-			if (mode === "league" && seasonDone()) { newSeason(league.fmt); renderLeague(); renderShapes(); }
+			if (mode === "league" && seasonDone() && typeof intlCallupDue === "function" && intlCallupDue()) {   // the finals are next: the 23 first (18j)
+				league.intl.comp.callup = true; saveLeague();
+				showOverlay(`${tn(league.intl.comp)}: your squad`, `The ${tn(league.intl.comp)} finals start now. Pick your 23 in the Squad tab (auto-pick is on unless you choose) and set the formation, then play the first game.`, "Play the first game");
+				renderLeague(); renderIntlSquad(); return;
+			}
+			if (mode === "league" && seasonDone() && (typeof intlSummerSettle !== "function" || intlSummerSettle())) { newSeason(league.fmt); renderLeague(); renderShapes(); }
 			clearLive();
 			newMatch();
 			freeze = KICKOFF_FREEZE;
@@ -146,9 +151,9 @@
 		if (leagueMatch) {
 			recordLeagueResult(leagueMatch, h, a);
 			const rows = standings(), pos = rows.findIndex(r => r.id === 0) + 1, pts = rows[pos - 1].pts;
-			if (seasonDone()) {
+			if (seasonDone() && !leagueMatch.intl) {
 				nudge = (rows[0].id === 0 ? `You are champions with ${pts} points!` : `Season over: ${TEAMS[rows[0].id].name} are champions. You finished ${ordinal(pos)}.`) +
-					` Prize money: ${money(league.prize || 0)}. The transfer window is open below the pitch.`;
+					` Prize money: ${money(league.prize || 0)}. The transfer window is open below the pitch.${typeof intlSummerNote === "function" ? intlSummerNote() : ""}`;
 				btn = `Start season ${league.season + 1}`;
 			} else {
 				nudge = `You are ${ordinal(pos)} on ${pts} point${pts === 1 ? "" : "s"}.`;
@@ -164,6 +169,7 @@
 				btn = `Play matchday ${league.round + 1}`;
 				if (league.intl && league.intl.only) { btn = "Continue"; } else
 				{ const nf = currentFixture(); if (nf && nf.label) { btn = `Play: ${nf.label.replace(/^[^·]*· /, "")}`; } }   // a continental night next (18f)
+				if (leagueMatch.intl && seasonDone()) { btn = typeof intlSummerBlocked === "function" && intlSummerBlocked() ? (league.intl.only ? "Continue" : `Play: ${currentFixture().label.replace(/^[^·]*· /, "")}`) : `Start season ${league.season + 1}`; }   // the summer finals (18j)
 				if (leagueMatch.intl && league.intl && league.intl.lastNote) {   // an international (18j): its result, and only what matters for the next league match
 					nudge = `${league.intl.lastNote}${league.intl.only ? "" : ` You are ${ordinal(pos)} in the league on ${pts} point${pts === 1 ? "" : "s"}.`}${!league.intl.only && tired.length ? ` ⚠ Before the next league match: ${tiredText(tired)}` : ""}`;
 				}
@@ -182,7 +188,7 @@
 		showOverlay(wasSim ? (leagueMatch ? "Simulated result" : "Simulated friendly") : "Full time", `${line} ${nudge}`, btn,
 			wasSim ? null : matchStats(Math.round(100 * possFrames[0] / Math.max(1, possFrames[0] + possFrames[1]))));
 		if (leagueMatch && !seasonDone() && tiredStarters().length) { $("ovFix").textContent = "Rotate now"; $("ovFix").hidden = false; }
-		if (leagueMatch && seasonDone() && standings()[0].id === 0) { celebrateTrophy("league trophy"); }
+		if (leagueMatch && !leagueMatch.intl && seasonDone() && standings()[0].id === 0) { celebrateTrophy("league trophy"); }
 		if (typeof trophyDue === "function") { trophyDue(); }   // a cup won on the night
 		$("ovHelp").hidden = false;
 		renderReport();

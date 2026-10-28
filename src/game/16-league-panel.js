@@ -24,15 +24,17 @@
 
 		const next = $("lgNext");
 		next.replaceChildren();
-		if (done) {
+		const summerFix = done ? currentFixture() : null;   // the summer finals, with your country in them (18j)
+		if (done && !summerFix) {
 			const champ = TEAMS[rows[0].id];
 			next.append(el("span", "eyebrow", `Season ${league.season} champions`));
 			const name = el("div", "opp"); name.append(dotFor(champ), el("span", "", champ.name)); next.append(name);
 			if (league.intl && league.intl.only) { next.append(el("span", "detail", `You were not managing a club. ${league.intl.nat ? intlNext(league) : ""} Start a new season from the pitch.`)); } else next.append(el("span", "detail", rows[0].id === 0
 				? `That's you, with ${me.pts} point${me.pts === 1 ? "" : "s"}. Start a new season from the pitch.`
 				: `You finished ${ordinal(myPos)} with ${me.pts} point${me.pts === 1 ? "" : "s"}. Start a new season from the pitch.`));
+			if (typeof intlSummerCard === "function") { intlSummerCard(next, "sum"); }   // the finals are on: follow or simulate (18j)
 		} else {
-			const f = currentFixture(), o = TEAMS[f.opp];
+			const f = summerFix || currentFixture(), o = TEAMS[f.opp];
 			next.append(el("span", "eyebrow", `Next · ${f.label || `Matchday ${f.round + 1}`} · ${f.neutral ? "Neutral ground" : f.home ? "Home" : "Away"}${derbyOf(0, f.opp) ? " · Derby" : ""}`));
 			const name = el("div", "opp"); name.append(dotFor(o), el("span", "", o.name)); next.append(name);
 			const det = el("span", "detail"), only = !!(league.intl && league.intl.only);

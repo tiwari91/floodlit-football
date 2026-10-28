@@ -219,12 +219,12 @@ const q = await page.evaluate(() => {
 	return res;
 });
 check("qualifying ends at the last break: sixteen countries through, every group winner among them", q.done && q.q.length === 16 && new Set(q.q).size === 16 && q.winnersIn && q.next && q.next.nats.join() === q.q.join(), JSON.stringify(q));
-check("the national job and record carry into the next season, an even one: the sixteen qualifiers' World Championship over the three breaks, at neutral grounds", q.s2.season % 2 === 0 && q.s2.kind === "t" && q.s2.nat === pick.nat && q.s2.record >= 3 && q.s2.teams.slice().sort().join() === q.q.slice().sort().join() && q.s2.r.join() === "9,20,30" && q.s2.groups === 4 && q.s2.neutral, JSON.stringify(q.s2));
+check("the national job and record carry into the next season, an even one: the sixteen qualifiers' World Championship as a summer block after the league season, at neutral grounds", q.s2.season % 2 === 0 && q.s2.kind === "t" && q.s2.nat === pick.nat && q.s2.record >= 3 && q.s2.teams.slice().sort().join() === q.q.slice().sort().join() && q.s2.r.join() === "38" && q.s2.groups === 4 && q.s2.neutral, JSON.stringify(q.s2));
 
 // The tournament plays out to a winner (your games through the match flow if you are in it), one round a night.
 const t = await page.evaluate(() => {
 	const F = window.__ff, lg = F.league, T = F.intlComp(lg);
-	lg.round = 30; for (let i = 0; i < lg.round; i++) { lg.results[i] = lg.results[i] || []; } F.intlNight();
+	lg.round = lg.fixtures.length; for (let i = 0; i < lg.round; i++) { lg.results[i] = lg.results[i] || []; } F.intlNight();
 	let guard = 0;
 	while (F.currentFixture() && F.currentFixture().intl && guard++ < 12) { F.newMatchTest(); F.simulateMineTest(); }
 	F.renderLeague();
@@ -284,7 +284,7 @@ const only = await page.evaluate(() => {
 	return { club, name: window.__onlyName, said, only: I.only, nat: I.nat, intl: !!(fx && fx.intl), round: lg.round, played: lg.results.filter(r => r && r.length).length, news: /full-time/.test(lg.news), career: lg.career.clubs.join("|"), ov: document.querySelector("#lgNext").textContent };
 });
 check("accepting a national job: the card says you leave the club, and you are unattached from it", only.said.includes(`leave ${only.club} to manage ${only.name} full-time`) && only.only && only.nat === only.nat && /national team/.test(only.career) && only.news, JSON.stringify(only));
-check("in country-only mode the next fixture is the international and the league matchdays before it were simulated; the Overview shows the country and the competition", only.intl && only.round >= 9 && only.played >= 9 && /Italy|International break|qualifier/i.test(only.ov), JSON.stringify(only));
+check("in country-only mode the next fixture is the international and the league matchdays before it were simulated; the Overview shows the country and the competition", only.intl && only.round >= 9 && only.played >= 9 && /Italy|International break|qualifier|After the league season|Friendly/i.test(only.ov), JSON.stringify(only));
 const tabs = {};
 for (const k of [ "transfers", "club", "squad" ]) {
 	await showTab(page, k);
@@ -453,7 +453,24 @@ await page.evaluate(() => { const F = window.__ff; F.newMatchTest(); document.ge
 const btnRoll2 = await page.evaluate(() => { const b = document.getElementById("ovButton"); return { label: b.textContent, shown: !document.getElementById("overlay").hidden, season: window.__ff.league.season }; });
 await page.evaluate(() => document.getElementById("ovButton").click());
 const btnRoll3 = await page.evaluate(() => { const F = window.__ff, lg = F.league; return { season: lg.season, only: lg.intl.only, nat: lg.intl.nat, round: lg.round, intl: !!(F.leagueMatch && F.leagueMatch.intl) }; });
-check("country only: clicking Start season N+1 at season complete rolls over and leads to the next international", btnRoll.done && btnRoll3.season === btnRoll.s0 + 1 && btnRoll3.only && btnRoll3.nat === only.nat && (btnRoll3.intl || btnRoll3.round >= 9), JSON.stringify({ btnRoll, btnRoll2, btnRoll3 }));
+// A finals season: the first press shows the call-up card, the next plays the first finals game; the button can't roll the season over until the final is done.
+const btnRoll4 = await page.evaluate(() => {
+	const F = window.__ff, lg = F.league, s0 = lg.season, res = { s0, summer: !!F.intlSummer(lg), blockedAtStart: F.intlSummerBlocked(lg), games: 0 };
+	let guard = 0;
+	while (F.intlSummer(lg) && guard++ < 12) {
+		F.newMatchTest();
+		if (!(F.leagueMatch && F.leagueMatch.intl)) { res.noFixture = true; break; }
+		F.simulateMineTest(); res.games++;
+		res.midSeason = lg.season; res.midLabel = document.getElementById("restartBtn").textContent;
+	}
+	res.over = !F.intlSummer(lg); res.done = F.intlComp(lg).done;
+	res.labelEnd = document.getElementById("restartBtn").textContent;
+	F.newMatchTest(); document.getElementById("ovButton").click();   // the "complete" card, then
+	document.getElementById("ovButton").click();   // Start season N+1
+	res.next = lg.season === s0 + 1 || F.league.season === s0 + 1;
+	return res;
+});
+check("country only, finals: Start season N+1 is held until your tournament games are played, then rolls over", btnRoll.done && btnRoll3.season === btnRoll.s0 + (btnRoll4.summer ? 0 : 1) && btnRoll3.only && btnRoll3.nat === only.nat && (btnRoll4.summer ? btnRoll4.blockedAtStart && btnRoll4.games >= 1 && btnRoll4.over && btnRoll4.next && /Start season|Restart/.test(btnRoll4.labelEnd) : true), JSON.stringify({ btnRoll, btnRoll2, btnRoll3, btnRoll4 }));
 const roll = await page.evaluate(() => {
 	const F = window.__ff; F.nextSeasonTest();
 	const lg = F.league;
