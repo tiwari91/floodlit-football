@@ -77,7 +77,7 @@ check("3D camera renders with the new poses, no errors", cam === "3d" && errs.le
 // frame it goes, a diving keeper's gloves and a header's head go to the ball.
 const anim = await page.evaluate(() => {
 	const F = window.__ff, W = n => n.getWorldPosition(n.position.clone()), out = {};
-	for (let i = 0; i < 3000 && F.state !== "play"; i++) { F.step(1); }
+	for (let i = 0; i < 3000 && (F.state !== "play" || F.setPiece || F.restartWalk); i++) { F.step(1); }
 	F.freeze = 0;
 	const p = F.outfield(0)[2], keep = [ p.x, p.y, p.vx, p.vy, p.dir, p.stride, p.runAmt, p.shuf ], owner = F.ball.owner;
 	Object.assign(p, { kickA: 0, windUp: 0, lunge: 0, slideAI: 0, fall: 0, celebA: 0, jump: 0, dive: 0, plant: 0, recv: 0, jockW: 0, shieldW: 0, sta: 1, sprintAmt: 0 });
@@ -101,7 +101,7 @@ const anim = await page.evaluate(() => {
 check("running and backpedalling, a planted boot stays put (sliding under a sixth of his speed)", anim.run.planted > 10 && anim.run.slip < 0.17 && anim.back.planted > 10 && anim.back.slip < 0.17, JSON.stringify(anim));
 const strike = await page.evaluate(() => {
 	const F = window.__ff, out = {};
-	for (let i = 0; i < 3000 && F.state !== "play"; i++) { F.step(1); }
+	for (let i = 0; i < 3000 && (F.state !== "play" || F.setPiece || F.restartWalk); i++) { F.step(1); }
 	F.freeze = 0; F.timeLeft = 1e9; F.autoSwitchMode = "manual"; F.manualLock = 1e9;
 	const me = F.human(), FW = F.FW, FH = F.FH;
 	const park = () => { for (const q of F.players) { if (q !== me && q.role !== "gk") { q.x = q.team === 1 ? FW - 60 : 60; q.y = 30 + 20 * F.players.indexOf(q); q.vx = q.vy = 0; } } };
@@ -133,14 +133,17 @@ const save = await page.evaluate(() => {
 		park(); gk.x = FW - 22; gk.y = FH / 2; gk.vx = gk.vy = 0; gk.dive = 0; gk.diveCd = 0; gk.kickCd = 0; gk.dir = Math.PI;
 		const B = F.ball, ty = FH / 2 + side * (F.GOAL_B - F.GOAL_T) * 0.2, x0 = FW - 230;
 		B.owner = null; B.x = x0; B.y = FH / 2; B.z = z; B.vz = vz; B.vx = 13; B.vy = (ty - FH / 2) / ((FW - 20 - x0) / 13); B.lastBy = me; B.shot = true; B.kickedAt = F.frame; B.curlT = 0; B.dipG = 0; B.beaten = null; B.pen = null;
-		let best = 1e9, dove = false;
+		let best = 1e9, dove = false; const tr = [];
 		for (let f = 0; f < 30 && F.state === "play" && B.owner !== gk; f++) {
 			F.step(1); park(); if (gk.dive > 0) { dove = true; }
+			tr.push([ Math.round(B.x - gk.x), Math.round(B.y - gk.y), Math.round(B.z || 0), F.state, B.owner ? B.owner.role : "-" ]);
 			const r = F.poseProbe(gk, 1), b = { x: B.x, y: (B.z || 0) * 0.71, z: B.y };
-			if (Math.abs(B.x - gk.x) < 30) { for (const k of [ 0, 1 ]) { const h = W(r.ha[k]); best = Math.min(best, Math.hypot(h.x - b.x, h.y - b.y, h.z - b.z)); } }
+			// (or the frame he holds it: a keeper square to the shot catches it at full reach, about 31 out, and the
+			// window used to miss that frame: the check failed about 1 run in 10)
+			if (Math.abs(B.x - gk.x) < 30 || B.owner === gk) { for (const k of [ 0, 1 ]) { const h = W(r.ha[k]); best = Math.min(best, Math.hypot(h.x - b.x, h.y - b.y, h.z - b.z)); } }
 		}
-		res.push({ dove, reach: +best.toFixed(1) });
 		for (let i = 0; i < 600 && F.state !== "play"; i++) { F.step(1); }
+		res.push({ dove, reach: +best.toFixed(1), tr: best > 1e8 ? tr.slice(0, 20) : undefined });
 	}
 	return res;
 });
@@ -156,7 +159,7 @@ const looks = await page.evaluate(async () => {
 check("every player has a face, hair colour and style", looks.length > 0 && looks.every(l => l.face >= 0 && l.face < 16 && /^#/.test(l.hair || "") && [ "short", "crop", "curly", "afro", "long", "tied", "buzz", "shaved" ].includes(l.style)), JSON.stringify(looks.filter(l => !(l.face >= 0 && l.face < 16 && l.hair)).slice(0, 2)));
 check("a player's look is fixed by name (same after a rebuild)", looks.every(l => l.a === l.b), JSON.stringify(looks.filter(l => l.a !== l.b).slice(0, 1)));
 // Brace and hat-trick captions: the same man scoring again is named in the goal caption.
-const caps = await page.evaluate(() => { const F = window.__ff, out = []; F.autoPilot = false; F.timeLeft = 1e9; for (let k = 0; k < 3; k++) { F.freeze = 0; F.forceGoal(0); const s0 = F.score[0]; for (let i = 0; i < 200 && F.score[0] === s0; i++) { F.step(1); } out.push(F.lastCaption && F.lastCaption.sub); for (let i = 0; i < 3000 && F.state !== "play"; i++) { F.step(1); } } return out; });
+const caps = await page.evaluate(() => { const F = window.__ff, out = []; F.autoPilot = false; F.timeLeft = 1e9; for (let k = 0; k < 3; k++) { F.freeze = 0; F.forceGoal(0); const s0 = F.score[0]; for (let i = 0; i < 200 && F.score[0] === s0; i++) { F.step(1); } out.push(F.lastCaption && F.lastCaption.sub); for (let i = 0; i < 3000 && (F.state !== "play" || F.setPiece || F.restartWalk); i++) { F.step(1); } } return out; });
 check("same scorer: first goal plain, then Brace, then Hat-trick", caps.length === 3 && !/Brace|Hat-trick/.test(caps[0]) && /Brace/.test(caps[1]) && /Hat-trick/.test(caps[2]), JSON.stringify(caps));
 // The score bug clock is always a sane mm:ss, even with the test-sized timeLeft above (once read "16666666:36").
 const clk = await page.evaluate(() => { const F = window.__ff; F.forceGoal(0); for (let i = 0; i < 5; i++) { F.step(1); } return { shown: document.getElementById("clock").textContent, f: [ F.fmtClock(1e9, 180), F.fmtClock(NaN, 180), F.fmtClock(-5, 180), F.fmtClock(95.2, 180), F.fmtClock(1e12) ] }; });
@@ -167,7 +170,7 @@ check("first-match coach mark is stored as shown and dismissable", coach.stored 
 // 3D figures turn, they don't snap: the drawn facing never swings faster than ~16 rad/s even when the
 // simulation swings p.dir round in a frame. Every player has his own running style; the ball is near true size close up.
 const feel = await page.evaluate(() => new Promise(res => {
-	const F = window.__ff; for (let i = 0; i < 3000 && F.state !== "play"; i++) { F.step(1); }
+	const F = window.__ff; for (let i = 0; i < 3000 && (F.state !== "play" || F.setPiece || F.restartWalk); i++) { F.step(1); }
 	F.freeze = 0;
 	const prev = new Map(); let max = 0, n = 0, snaps = 0;
 	const tick = () => {
@@ -213,7 +216,7 @@ const dress = await page.evaluate(async () => {
 // so it no longer depends on catching a sprinting man mid-lean.
 const tired = await page.evaluate(() => {
 	const F = window.__ff, W = n => n.getWorldPosition(n.position.clone());
-	for (let i = 0; i < 3000 && F.state !== "play"; i++) { F.step(1); }
+	for (let i = 0; i < 3000 && (F.state !== "play" || F.setPiece || F.restartWalk); i++) { F.step(1); }
 	const fz = F.freeze; F.freeze = 0;
 	const p = F.outfield(0)[3], keep = [ p.sta, p.vx, p.vy, p.runAmt ], owner = F.ball.owner;
 	Object.assign(p, { kickA: 0, lunge: 0, slideAI: 0, fall: 0, celebA: 0, celebK: 0, jump: 0, throwA: 0, dive: 0, headHands: 0, fistPump: 0, kneel: 0, hug: 0, sulk: 0, plant: 0, recv: 0, recvK: null, vx: 0, vy: 0, runAmt: 0, sprintAmt: 0, jockW: 0, shieldW: 0, shuf: 0 });
@@ -304,7 +307,7 @@ const sides = await page.evaluate(async () => {
 	const F = window.__ff, G3 = F.G3, out = [];
 	for (let i = 0; i < 4000 && F.state !== "play"; i++) { F.step(1); }
 	F.freeze = 0;
-	for (let k = 0; k < 60 && out.length < 40; k++) {
+	for (let k = 0; k < 200 && out.length < 40; k++) {   // live play: wait (up to 8 s) until some stand still
 		await new Promise(r => setTimeout(r, 40));
 		F.players.forEach((p, i) => {
 			const r = G3.fig && G3.fig.rigOf && G3.fig.rigOf.get(p);
@@ -692,14 +695,14 @@ const rpBall = await page.evaluate(async () => {
 	const weathers = [ {}, { fog: true }, { snow: true }, {} ];
 	for (let g = 0; g < 4; g++) {
 		const w = weathers[g], keep = {}; for (const k of [ "fog", "snow" ]) { keep[k] = F.cond[k]; F.cond[k] = !!w[k]; } G.stadiumKey = "";
-		for (let i = 0; i < 3000 && F.state !== "play"; i++) { F.step(1); }
+		for (let i = 0; i < 3000 && (F.state !== "play" || F.setPiece || F.restartWalk); i++) { F.step(1); }
 		F.timeLeft = 1e9; F.autoPilot = true; F.step(240); F.autoPilot = false; F.freeze = 0;
 		F.forceGoal(g % 2);
 		for (let i = 0; i < 600 && !F.replayOn; i++) { F.step(1); }
 		window.__ffCam3D = () => { window.__ffCam3D = null; look(`goal${g}`); };
 		for (let n = 0; n < 6 && F.replayOn; n++) { await new Promise(r => setTimeout(r, 300)); window.__ffCam3D = window.__ffCam3D || (() => { window.__ffCam3D = null; look(`goal${g}${JSON.stringify(w)}`); }); }
 		window.__ffCam3D = null;
-		for (let i = 0; i < 3000 && F.state !== "play"; i++) { F.step(1); }
+		for (let i = 0; i < 3000 && (F.state !== "play" || F.setPiece || F.restartWalk); i++) { F.step(1); }
 		Object.assign(F.cond, keep); G.stadiumKey = "";
 	}
 	return { n: out.length, bad: out.filter(o => !o.on || !o.near || !o.vis || o.pop < 60) };
