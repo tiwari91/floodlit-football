@@ -57,13 +57,13 @@
 			// upper lid, a small iris and pupil half under it, a soft lid shadow, a faint lower lid, no big glint.
 			const eh = (open ? 4.2 : 3.3) * (narrow ? 0.82 : 1), ew = 6.6;
 			g.save(); g.beginPath(); g.ellipse(x, ey, ew, eh, 0, 0, Math.PI * 2); g.clip();
-			g.fillStyle = "#d9d0c4"; g.fillRect(x - ew, ey - eh, ew * 2, eh * 2);
-			g.fillStyle = v % 3 === 1 ? "#3d5a74" : v % 3 === 2 ? "#4f6340" : "#3b2414"; g.beginPath(); g.arc(x + sgn * 0.4, ey + 0.6, 3.3, 0, Math.PI * 2); g.fill();
-			g.fillStyle = "#0c0604"; g.beginPath(); g.arc(x + sgn * 0.4, ey + 0.6, 1.5, 0, Math.PI * 2); g.fill();
+			g.fillStyle = "#cbbfb1"; g.fillRect(x - ew, ey - eh, ew * 2, eh * 2);
+			g.fillStyle = v % 3 === 1 ? "#3d5a74" : v % 3 === 2 ? "#4f6340" : "#3b2414"; g.beginPath(); g.arc(x + sgn * 0.4, ey + 0.4, 3.9, 0, Math.PI * 2); g.fill();
+			g.fillStyle = "#0c0604"; g.beginPath(); g.arc(x + sgn * 0.4, ey + 0.4, 1.7, 0, Math.PI * 2); g.fill();
 			g.fillStyle = "rgba(30, 14, 6, 0.45)"; g.fillRect(x - ew, ey - eh, ew * 2, eh * 0.75);   // the lid's shadow over the top of the eye
 			g.restore();
 			g.fillStyle = "rgba(255, 255, 255, 0.55)"; g.beginPath(); g.arc(x - 1 + sgn * 0.4, ey - 0.4, 0.6, 0, Math.PI * 2); g.fill();
-			g.strokeStyle = "rgba(34, 21, 14, 0.85)"; g.lineWidth = 1.6; g.beginPath(); g.ellipse(x, ey, ew, eh, 0, Math.PI * 1.08, Math.PI * 1.92); g.stroke();
+			g.strokeStyle = "rgba(26, 15, 10, 0.92)"; g.lineWidth = 2.1; g.beginPath(); g.ellipse(x, ey, ew, eh, 0, Math.PI * 1.04, Math.PI * 1.96); g.stroke();
 			g.strokeStyle = "rgba(60, 30, 18, 0.22)"; g.lineWidth = 1.4; g.beginPath(); g.ellipse(x, ey - 1.5, ew + 1, eh + 2.5, 0, Math.PI * 1.15, Math.PI * 1.85); g.stroke();   // the lid crease
 			g.strokeStyle = "rgba(40, 20, 10, 0.22)"; g.lineWidth = 1; g.beginPath(); g.ellipse(x, ey, ew, eh, 0, Math.PI * 0.2, Math.PI * 0.8); g.stroke();
 			// the brow: flat, arched, heavy or angled; raised when celebrating
@@ -118,6 +118,7 @@
 			g.fillStyle = "#b8524a"; g.beginPath(); g.ellipse(cx, ey + 36, 6, 2.4, 0, 0, Math.PI * 2); g.fill();
 			g.strokeStyle = "rgba(120, 40, 34, 0.9)"; g.lineWidth = 2; g.beginPath(); g.ellipse(cx, ey + 31, 10, 8, 0, 0, Math.PI * 2); g.stroke();
 		} else {
+			g.fillStyle = "rgba(105, 42, 34, 0.2)"; g.filter = "blur(0.8px)"; g.beginPath(); g.ellipse(cx, ey + 27.2, 9.5, 2.2, 0, 0, Math.PI * 2); g.fill(); g.filter = "none";
 			g.strokeStyle = "rgba(70, 26, 20, 0.6)"; g.lineWidth = 2; g.beginPath();
 			if (mouth === 1) { g.moveTo(cx - 10, ey + 28); g.quadraticCurveTo(cx, ey + 34, cx + 10, ey + 28); }
 			else if (mouth === 2) { g.moveTo(cx - 9, ey + 30); g.quadraticCurveTo(cx, ey + 27, cx + 9, ey + 30); }
@@ -173,7 +174,7 @@
 	const TORSO3 = [
 		[ -0.75, 3.12, 2.08, 2.0 ], [ -0.45, 3.1, 2.06, 1.98 ], [ -0.4, 3.0, 1.98, 1.9 ], [ 1.2, 2.95, 1.95, 1.88 ], [ 3.0, 3.2, 2.08, 2.0 ],
 		[ 4.8, 3.66, 2.36, 2.1 ], [ 6.3, 4.02, 2.56, 2.24 ], [ 7.6, 4.26, 2.42, 2.36 ], [ 8.3, 4.24, 2.16, 2.24 ],
-		[ 8.9, 4.0, 1.96, 2.08 ], [ 9.45, 3.05, 1.7, 1.84 ], [ 9.85, 1.95, 1.42, 1.52 ], [ 10.05, 1.6, 1.3, 1.4 ]   // the trapezius slopes from the neck down to the shoulder
+		[ 8.9, 4.0, 1.96, 2.08 ], [ 9.45, 3.15, 1.72, 1.9 ], [ 9.85, 2.05, 1.46, 1.6 ], [ 10.05, 1.6, 1.3, 1.4 ]   // the trapezius slopes from the neck down to the shoulder
 	];
 	const TORSO_EX3 = 2.5;
 	// How far the back of the shirt is from the spine at height y, across at z.
@@ -230,8 +231,8 @@
 		[ -0.04, 0.62, 0.14, 0.16, 0.1, 1 ], [ -0.04, -0.62, 0.14, 0.16, 0.1, 1 ],   // cheekbones
 		[ -0.3, 0.55, 0.14, 0.16, -0.08, 1 ], [ -0.3, -0.55, 0.14, 0.16, -0.08, 1 ], // hollows under them
 		[ -0.55, 0, 0.18, 0.28, 0.1, 1 ],                                           // the muzzle and lips
-		[ -0.84, 0, 0.14, 0.3, 0.16, 1 ],                                           // the chin, square rather than pointed
-		[ -0.55, 0.8, 0.18, 0.16, 0.09, 0 ], [ -0.55, -0.8, 0.18, 0.16, 0.09, 0 ],  // the angle of the jaw
+		[ -0.84, 0, 0.14, 0.4, 0.15, 1 ],                                           // the chin, broad and square rather than pointed
+		[ -0.55, 0.8, 0.2, 0.18, 0.13, 0 ], [ -0.55, -0.8, 0.2, 0.18, 0.13, 0 ],    // the angle of the jaw
 		[ 0.6, 0.0, 0.25, 0.5, 0.05, 1 ],                                           // the forehead, rounded
 		[ 0.42, 0.8, 0.16, 0.14, -0.06, 1 ], [ 0.42, -0.8, 0.16, 0.14, -0.06, 1 ]   // temples
 	];
@@ -239,7 +240,7 @@
 		let x = dx * HEAD_R3[0], y = dy * HEAD_R3[1], z = dz * HEAD_R3[2];
 		const t = clamp(-dy, 0, 1), front = clamp((dx - 0.15) / 0.5, 0, 1), back = clamp(-dx / 0.6, 0, 1);
 		// the jaw: narrower toward the chin, the angle of the jaw kept under the ears
-		z *= 1 - 0.2 * Math.pow(t, 2.2) * (0.5 + 0.5 * front);
+		z *= 1 - 0.12 * Math.pow(t, 2.2) * (0.5 + 0.5 * front);   // a man's jaw: square, only a little narrower at the chin
 		// under the skull at the back, the head tucks in to the neck; the back of the skull bulges a little
 		x *= 1 - 0.38 * back * Math.pow(t, 1.3) + 0.06 * back * Math.exp(-Math.pow((dy - 0.2) / 0.4, 2));
 		// the face plane is flatter than the skull: the front is pulled back at the sides, kept at the middle
@@ -288,7 +289,7 @@
 	function noseGeo3 () {
 		const surf = y => { const dy = (y - HEAD_C3[1]) / HEAD_R3[1]; return headPoint3(Math.sqrt(Math.max(0, 1 - dy * dy)), dy, 0)[0]; };
 		const ring = (dy, w, df) => { const y = HEAD_C3[1] + dy * HEAD_R3[1], sx = surf(y); return [ y, w, df, 0.25, sx - 0.25 ]; };
-		const g = loft3D([ ring(0.24, 0.12, 0.27), ring(0.14, 0.17, 0.33), ring(0.0, 0.22, 0.46), ring(-0.14, 0.27, 0.62), ring(-0.24, 0.36, 0.7), ring(-0.3, 0.38, 0.6), ring(-0.35, 0.3, 0.36) ], 10, 2.0);
+		const g = loft3D([ ring(0.24, 0.16, 0.22), ring(0.14, 0.2, 0.28), ring(0.0, 0.24, 0.4), ring(-0.14, 0.29, 0.54), ring(-0.24, 0.4, 0.62), ring(-0.3, 0.43, 0.54), ring(-0.35, 0.34, 0.34) ], 10, 2.0);
 		return g;
 	}
 	// Hair styles drawn by the hair shader on a copy of the skull surface: [ thickness over the top, at the
@@ -333,51 +334,51 @@
 		const defs = {
 			torso: () => loft3D(TORSO3, 16, TORSO_EX3),
 			// A ribbed collar round the base of the neck, in the trim colour.
-			collar: () => loft3D([ [ 9.2, 1.95, 1.62, 1.72 ], [ 9.55, 2.0, 1.66, 1.76 ], [ 10.05, 1.7, 1.48, 1.56 ], [ 10.25, 1.5, 1.3, 1.38 ] ], 12, 2.2),
+			collar: () => loft3D([ [ 9.2, 2.03, 1.66, 1.78 ], [ 9.55, 2.08, 1.7, 1.83 ], [ 10.05, 1.78, 1.52, 1.62 ], [ 10.25, 1.56, 1.34, 1.44 ] ], 12, 2.2),
 			// The shorts: a waistband and seat on the hips, and a leg for each thigh (shortLeg) so they move with the stride.
 			// The seat ends at the top of the thighs and closes up into the crotch, so the legs carry the shorts
 			// below it (no box hanging between the legs); the hips are as wide as the legs' outsides, so no step.
-			shorts: () => loft3D([ [ 1.6, 3.05, 2.02, 2.05 ], [ 1.75, 3.12, 2.08, 2.1 ], [ 0.6, 3.62, 2.15, 2.3 ], [ -0.5, 4.05, 2.16, 2.36 ], [ -1.25, 3.7, 2.02, 2.2 ], [ -1.75, 2.5, 1.55, 1.7 ], [ -2.0, 0.9, 0.8, 0.9 ] ], 14, 2.5),
-			shortLeg: () => loft3D([ [ 1.1, 1.6, 1.8, 1.95 ], [ 0.2, 1.95, 2.05, 2.15 ], [ -0.9, 2.08, 2.16, 2.2 ], [ -2.5, 2.04, 2.22, 2.1, 0.1 ], [ -2.75, 2.1, 2.28, 2.14, 0.12 ], [ -2.95, 2.07, 2.24, 2.12, 0.12 ], [ -3.0, 1.62, 1.7, 1.6, 0.12 ] ], 14, 2.2),   // shorts to mid-thigh, over the fuller quads, a hem at the bottom
-			neck: () => loft3D([ [ -0.6, 1.6, 1.38, 1.5 ], [ 0.4, 1.42, 1.24, 1.3, -0.05 ], [ 1.4, 1.3, 1.16, 1.18, 0.05 ], [ 2.3, 1.18, 1.1, 1.1, 0.1 ], [ 2.5, 0.7, 0.7, 0.7, 0.1 ] ], 10, 2),   // a footballer's neck, not a stalk
+			shorts: () => loft3D([ [ 1.6, 3.05, 2.02, 2.05 ], [ 1.75, 3.12, 2.08, 2.1 ], [ 0.6, 3.62, 2.15, 2.3 ], [ -0.5, 4.05, 2.16, 2.36 ], [ -1.25, 3.7, 2.02, 2.2 ], [ -1.75, 2.5, 1.55, 1.7 ], [ -2.0, 0.9, 0.8, 0.9 ] ], 14, 2.2),
+			shortLeg: () => loft3D([ [ 1.1, 1.6, 1.8, 1.95 ], [ 0.2, 1.98, 2.08, 2.18 ], [ -0.9, 2.12, 2.2, 2.24 ], [ -2.2, 2.15, 2.26, 2.22, 0.08 ], [ -3.05, 2.2, 2.3, 2.26, 0.12 ], [ -3.15, 2.02, 2.1, 2.06, 0.12 ], [ -3.2, 1.55, 1.62, 1.55, 0.12 ] ], 16, 2.1),   // shorts to mid-thigh, hanging loose and straight off the quads to a light flare at the hem
+			neck: () => loft3D([ [ -0.8, 2.1, 1.5, 1.75 ], [ -0.2, 1.85, 1.42, 1.62 ], [ 0.5, 1.56, 1.32, 1.44, -0.05 ], [ 1.3, 1.42, 1.24, 1.32, 0.0 ], [ 2.0, 1.34, 1.16, 1.24, 0.08 ], [ 2.3, 0.8, 0.8, 0.8, 0.1 ] ], 12, 2),   // a footballer's neck: thick, flaring into the trapezius at the base, not a stalk
 			head: () => sculpt3D(new T.SphereGeometry(1, 48, 36)),
 		ear: () => { const g = new T.SphereGeometry(0.58, 10, 8); g.scale(0.5, 1.0, 0.32); g.rotateZ(0.18); return g; },
 		nose: () => noseGeo3(),
 		tail: () => new T.SphereGeometry(1, 9, 7),
 			hair: () => sculpt3D(new T.SphereGeometry(1, 48, 36)),   // the skull's own surface; the hair shader lifts it by style
 			// Short sleeves over the shoulder (a rounded cap, the deltoid under it) ending in a cuff.
-			sleeve: () => loft3D([ [ 0.5, 0.3, 0.3, 0.3 ], [ 0.36, 0.9, 0.92, 0.92 ], [ 0.0, 1.2, 1.2, 1.2 ], [ -0.5, 1.28, 1.27, 1.27 ], [ -1.9, 1.22, 1.2, 1.2 ], [ -2.35, 1.18, 1.16, 1.16 ], [ -2.4, 0.85, 0.85, 0.85 ] ], 10, 2.0),   // a fitted sleeve: the cap no higher than the shoulder line, so no pads
+			sleeve: () => loft3D([ [ 0.5, 0.3, 0.3, 0.3 ], [ 0.42, 0.72, 0.74, 0.74 ], [ 0.24, 1.08, 1.1, 1.1 ], [ 0.0, 1.27, 1.29, 1.29 ], [ -0.5, 1.36, 1.38, 1.36 ], [ -1.9, 1.32, 1.36, 1.3 ], [ -2.35, 1.28, 1.32, 1.26 ], [ -2.4, 0.9, 0.9, 0.9 ] ], 12, 2.0),   // a fitted sleeve: the cap rounded and no higher than the shoulder line, so no pads or square corners
 			// The captain's armband on the left upper arm, just below the sleeve.
-			armband: () => loft3D([ [ -2.75, 1.12, 1.16, 1.14 ], [ -2.8, 1.17, 1.21, 1.19 ], [ -3.65, 1.12, 1.16, 1.12 ], [ -3.7, 1.06, 1.1, 1.06 ] ], 12, 2.0),
-			cuff: () => loft3D([ [ -2.05, 1.23, 1.21, 1.21 ], [ -2.4, 1.23, 1.21, 1.21 ], [ -2.45, 0.92, 0.92, 0.92 ] ], 10, 2.0),
+			armband: () => loft3D([ [ -2.75, 1.18, 1.36, 1.2 ], [ -2.8, 1.23, 1.41, 1.25 ], [ -3.65, 1.16, 1.3, 1.17 ], [ -3.7, 1.1, 1.24, 1.1 ] ], 12, 2.0),
+			cuff: () => loft3D([ [ -2.05, 1.33, 1.37, 1.31 ], [ -2.4, 1.33, 1.37, 1.31 ], [ -2.45, 0.98, 0.98, 0.98 ] ], 12, 2.0),
 			// An athlete's arm: the biceps and triceps fuller, rounded into the elbow, which is capped (the forearm's
 			// top is a dome round the joint), so a bent arm never shows a gap or a crease at the elbow.
-			upperArm: () => loft3D([ [ 0.25, 0.72, 0.72, 0.72 ], [ -0.1, 1.08, 1.06, 1.06 ], [ -1.6, 1.08, 1.2, 1.08 ], [ -3.1, 0.98, 1.16, 1.02 ], [ -4.7, 0.82, 0.84, 0.86 ], [ -5.6, 0.76, 0.76, 0.8 ], [ -6.05, 0.62, 0.62, 0.66 ], [ -6.3, 0.3, 0.3, 0.34 ] ], 12, 2.0),
-			foreArm: () => loft3D([ [ 0.95, 0.28, 0.28, 0.3 ], [ 0.75, 0.64, 0.64, 0.7 ], [ 0.4, 0.8, 0.8, 0.86 ], [ 0, 0.9, 0.86, 0.92 ], [ -1.1, 1.0, 0.96, 1.02 ], [ -2.6, 0.84, 0.8, 0.82 ], [ -4.2, 0.62, 0.52, 0.54 ], [ -4.9, 0.55, 0.47, 0.47 ], [ -5.2, 0.32, 0.3, 0.3 ] ], 12, 2.0),   // muscle below the elbow, a slimmer wrist
+			upperArm: () => loft3D([ [ 0.25, 0.75, 0.75, 0.75 ], [ -0.1, 1.12, 1.1, 1.12 ], [ -1.6, 1.15, 1.26, 1.2 ], [ -2.9, 1.1, 1.3, 1.14 ], [ -3.8, 1.0, 1.16, 1.06 ], [ -4.8, 0.86, 0.86, 0.92 ], [ -5.5, 0.76, 0.72, 0.82 ], [ -5.95, 0.64, 0.58, 0.7 ], [ -6.2, 0.34, 0.3, 0.38 ] ], 14, 2.0),
+			foreArm: () => loft3D([ [ 0.85, 0.3, 0.26, 0.34 ], [ 0.6, 0.62, 0.56, 0.68 ], [ 0.2, 0.74, 0.7, 0.8 ], [ -0.5, 0.9, 0.88, 0.9 ], [ -1.3, 1.04, 1.0, 0.98 ], [ -2.6, 0.9, 0.82, 0.82 ], [ -4.0, 0.66, 0.52, 0.54 ], [ -4.8, 0.58, 0.46, 0.46 ], [ -5.15, 0.34, 0.3, 0.3 ] ], 14, 2.0),   // narrow at the elbow (its point behind), muscle swelling below it, a slimmer wrist
 			// A flat hand with the fingers together and a thumb in front.
 			// A relaxed hand, half closed: the palm with a wrist and knuckles, four fingers curled forward in
 			// two bends (shorter at the little finger), and a thumb along the side of the index finger.
 			hand: () => {
-				const palm = loft3D([ [ 0.3, 0.36, 0.4, 0.4 ], [ -0.1, 0.42, 0.5, 0.48 ], [ -0.8, 0.52, 0.55, 0.5 ], [ -1.35, 0.58, 0.52, 0.48 ], [ -1.55, 0.52, 0.46, 0.42 ] ], 10, 2.4);
+				const palm = loft3D([ [ 0.3, 0.4, 0.32, 0.32 ], [ -0.1, 0.48, 0.32, 0.33 ], [ -0.8, 0.56, 0.32, 0.3 ], [ -1.35, 0.58, 0.29, 0.26 ], [ -1.55, 0.52, 0.22, 0.2 ] ], 10, 2.4);
 				const parts = [ palm ];
 				[ [ 0.36, 1.0 ], [ 0.12, 1.06 ], [ -0.12, 1.0 ], [ -0.36, 0.86 ] ].forEach(([ z, k ]) => {
 					const f1 = loft3D([ [ 0, 0.13, 0.15, 0.14 ], [ -0.55 * k, 0.12, 0.14, 0.13 ], [ -0.62 * k, 0.1, 0.12, 0.1 ] ], 6, 2);
-					f1.rotateZ(-0.7); f1.translate(0, -1.45, z);
+					f1.rotateZ(-0.4); f1.translate(0, -1.45, z);
 					const f2 = loft3D([ [ 0, 0.12, 0.13, 0.12 ], [ -0.5 * k, 0.1, 0.11, 0.1 ], [ -0.58 * k, 0.05, 0.06, 0.05 ] ], 6, 2);
-					f2.rotateZ(-1.5); f2.translate(-0.36 * k, -1.62 - 0.2 * k, z);
+					f2.rotateZ(-0.95); f2.translate(-0.21 * k, -1.86 - 0.17 * k, z);
 					parts.push(f1, f2);
 				});
 				const th = loft3D([ [ 0.1, 0.17, 0.18, 0.18 ], [ -0.35, 0.18, 0.2, 0.2 ], [ -0.85, 0.14, 0.16, 0.15 ], [ -0.98, 0.06, 0.07, 0.07 ] ], 6, 2);
-				th.rotateZ(-0.45); th.rotateX(-0.35); th.translate(-0.3, -0.55, 0.42);
+				th.rotateZ(-0.35); th.rotateX(-0.35); th.translate(-0.18, -0.55, 0.46);
 				parts.push(th);
 				return merge3D(parts);
 			},
-			thigh: () => loft3D([ [ 0.9, 1.5, 1.5, 1.6 ], [ -0.6, 1.88, 1.98, 1.86 ], [ -2.6, 1.82, 2.1, 1.78 ], [ -4.6, 1.56, 1.86, 1.5 ], [ -6.3, 1.2, 1.38, 1.14 ], [ -7.0, 1.08, 1.2, 1.02 ], [ -7.35, 0.9, 0.95, 0.88 ], [ -7.45, 0.5, 0.5, 0.5 ] ], 12, 2.0),   // ends inside the kneecap, never into the sock   // a footballer's quads: full above the knee, the front bulging
-			knee: () => { const g = new T.SphereGeometry(1.02, 14, 10); g.scale(1.08, 1.0, 1.02); g.translate(0.08, -0.15, 0); return g; },
+			thigh: () => loft3D([ [ 0.9, 1.5, 1.5, 1.6 ], [ -0.6, 1.88, 1.98, 1.86 ], [ -2.6, 1.84, 2.12, 1.8 ], [ -4.6, 1.6, 1.9, 1.52 ], [ -6.0, 1.3, 1.5, 1.2 ], [ -6.9, 1.12, 1.24, 1.04 ], [ -7.5, 1.04, 1.08, 0.98 ], [ -7.95, 0.84, 0.86, 0.8 ], [ -8.2, 0.4, 0.4, 0.4 ] ], 14, 2.0),   // a footballer's quads: full above the knee, the front bulging; the end runs past the joint, so a bent knee keeps its shape
+			knee: () => loft3D([ [ 0.85, 0.36, 0.36, 0.36 ], [ 0.55, 0.88, 0.9, 0.86 ], [ 0.1, 1.04, 1.1, 0.98 ], [ -0.35, 1.02, 1.12, 1.0 ], [ -0.75, 0.98, 1.02, 1.04 ], [ -1.0, 0.5, 0.5, 0.5 ] ], 12, 2.1),   // skin over the joint, the kneecap a little proud in front, running down inside the sock
 			// The sock over the calf and the shin pad: the calf bulges behind, the pad stands proud in front.
 			shin: () => loft3D([ [ -0.6, 1.08, 1.05, 1.1 ], [ -1.3, 1.16, 1.3, 1.48 ], [ -2.6, 1.1, 1.34, 1.46 ], [ -3.8, 0.94, 1.24, 1.06 ], [ -4.4, 0.8, 0.86, 0.84 ], [ -5.6, 0.7, 0.7, 0.72 ], [ -6.5, 0.68, 0.66, 0.7 ], [ -6.9, 0.45, 0.45, 0.45 ] ], 10, 2.1),   // the calf full behind, tapering to the ankle
-			// The sock turned over below the knee, in the trim colour.
-			band: () => loft3D([ [ -0.5, 1.15, 1.14, 1.18 ], [ -0.65, 1.19, 1.2, 1.25 ], [ -1.15, 1.24, 1.38, 1.52 ], [ -1.35, 1.26, 1.42, 1.58 ], [ -1.4, 1.18, 1.32, 1.48 ] ], 10, 2.1),   // always just outside the calf under it, so the leg never shows through the fold
+			// A stripe in the trim colour round the top of the sock.
+			band: () => loft3D([ [ -0.58, 1.1, 1.08, 1.13 ], [ -0.63, 1.13, 1.12, 1.17 ], [ -0.93, 1.16, 1.2, 1.3 ], [ -0.98, 1.12, 1.15, 1.25 ] ], 12, 2.1),   // a thin stripe just outside the sock's top, never a dark collar
 			// The boot: lofted heel to toe (built along y, then laid along x with the sole underneath).
 			boot: () => {
 				const g = loft3D([ [ -1.3, 0.5, 0.46, 0.5, 0.22 ], [ -1.05, 0.76, 0.54, 1.0, 0.16 ], [ 0, 0.82, 0.52, 0.96, 0.18 ], [ 1.2, 0.86, 0.36, 0.56, 0.34 ], [ 2.4, 0.8, 0.28, 0.38, 0.42 ], [ 3.1, 0.62, 0.24, 0.26, 0.46 ], [ 3.5, 0.28, 0.2, 0.12, 0.5 ] ], 10, 2.3);
@@ -596,8 +597,8 @@
 		for (let i = 0; i < MAXF3; i++) {
 			const root = new T.Object3D();
 			root.rotation.order = "YXZ";   // lean and roll in his own frame, then face the way he runs
-			const hips = node(root, 0, 15.6, 0), spine = node(hips, 0, 0.6, 0), chest = node(spine, 0, 5.4, 0), neck = node(chest, 0, 3.6, 0), head = node(neck, 0, 2.0, 0);
-			head.scale.setScalar(0.86);   // the head (and its hair, ears and nose) about 1/7.5 of his height
+			const hips = node(root, 0, 15.6, 0), spine = node(hips, 0, 0.6, 0), chest = node(spine, 0, 5.4, 0), neck = node(chest, 0, 3.6, 0), head = node(neck, 0, 1.55, 0);
+			head.scale.setScalar(0.94);   // the head (and its hair, ears and nose) about 1/7.3 of his height, set down on a short neck
 			const sh = [ node(chest, 0, 2.75, -4.35), node(chest, 0, 2.75, 4.35) ], el = sh.map(s => node(s, 0, -5.6, 0)), ha = el.map(e => node(e, 0, -4.95, 0));
 			const hip = [ node(hips, 0, -1.0, -2.45), node(hips, 0, -1.0, 2.45) ], kn = hip.map(h => node(h, 0, -7.3, 0)), an = kn.map(k => node(k, 0, -6.5, 0));
 			rigs.push({ root, hips, spine, chest, neck, head, sh, el, ha, hip, kn, an });
@@ -670,7 +671,7 @@
 			// by the hip, level with the shoulder line, while the upper arm stays within 25 degrees of
 			// vertical behind. The forearm hangs nearer straight down behind (about 0.45 rad) and comes up
 			// toward the horizontal in front (about 1.6), so neither hand is held out in front the whole way round.
-			r.sh[i].rotation.z = armA * (sw > 0 ? 0.48 * sw : 0.5 * sw);
+			r.sh[i].rotation.z = armA * (sw > 0 ? 0.58 * sw : 0.5 * sw);   // a fuller drive forward; the backswing as measured
 			// Sideways (OUT3): the arms hang a little away from the sides, coming in as they swing forward.
 			r.sh[i].rotation.x = OUT3(i) * (0.12 + 0.05 * a - 0.2 * a * clamp(sw, 0, 1));
 			const fore = 0.42 + 1.18 * (sw + 1) / 2 + gv.elbow * 0.5;
@@ -683,8 +684,11 @@
 		// A little roll and sideways shift of the hips onto the standing leg.
 		if (!rm && a > 0.05) {
 			const tw = Math.sin(ph) * a * (1 - 0.5 * shuf) * gv.twist;
-			r.hips.rotation.y = -0.14 * tw; r.chest.rotation.y = 0.34 * tw; r.neck.rotation.y = -0.18 * tw;
+			r.hips.rotation.y = -0.14 * tw; r.chest.rotation.y = 0.4 * tw; r.neck.rotation.y = -0.22 * tw;
 			r.hips.rotation.x += 0.05 * Math.cos(ph) * a; r.hips.position.z = 0.35 * Math.cos(ph) * a;
+			// the shoulders roll against the hips, and the trunk dips forward a touch as each foot takes his weight
+			r.chest.rotation.x -= 0.07 * Math.cos(ph) * a * (1 - 0.5 * shuf); r.neck.rotation.x += 0.05 * Math.cos(ph) * a * (1 - 0.5 * shuf);
+			r.spine.rotation.z -= 0.035 * a * Math.abs(Math.sin(ph));
 		}
 		// Speeding up he leans into it; braking, he sits back (r.acc from the caller, smoothed).
 		if (!rm && acc) { r.spine.rotation.z -= clamp(acc * 2.2, -0.16, 0.2); }
