@@ -9998,9 +9998,14 @@ td, th { font-variant-numeric: tabular-nums; }
 			return null;
 		}
 		if (setPiece && setPiece.kind === "corner" && setPiece.taker === p) {
-			// The computer's corner: a moment to set, then a cross to one of the runners in the box.
-			if (++p.hold < 30) { prepRelease(p, 30 - p.hold, "corner"); return null; }
+			// The computer's corner: a moment to set, then the runners set off just before he strikes
+			// it, and a cross to one of them in the box (or, now and then, short to the man by the flag).
+			if (++p.hold < 30) { return null; }
+			const cp = cornerPlan;
+			if (cp && cp.runAt === undefined) { cp.runAt = frame + 22; cp.running = true; }
+			if (cp && frame < cp.runAt) { prepRelease(p, cp.runAt - frame, "corner"); return null; }
 			prepDone(p);
+			if (cp && cp.short && players.includes(cp.short) && Math.random() < 0.6) { cornerShort(p, cp.short); return null; }
 			const r = Math.random();
 			cornerCross(p, null, r < 0.4 ? "near" : r < 0.75 ? "far" : "spot", Math.random() < 0.6 ? "in" : "out");
 			return null;
@@ -10672,7 +10677,7 @@ td, th { font-variant-numeric: tabular-nums; }
 			}
 			// Attacking a ball in the air (or a corner run once it's struck): flat out, straight at it.
 			if (setRole) {
-				const live = !setPiece && (!cornerPlan || cornerPlan.delivered);
+				const live = (!setPiece || (cornerPlan && cornerPlan.running)) && (!cornerPlan || cornerPlan.delivered || cornerPlan.running);
 				sprint = live ? 1.05 : Math.min(sprint, 0.5);
 				p.tx = target[0]; p.ty = target[1];
 			}
@@ -11224,6 +11229,19 @@ td, th { font-variant-numeric: tabular-nums; }
 		}
 		const edgeMan = rest.filter(q => q !== taker).sort((a, b) => Math.abs(a.x - gx) - Math.abs(b.x - gx))[0];
 		if (edgeMan) { const spot = [ gx + inward * (FMT.box + 45), FH / 2 - sy * 40 ]; edgeMan.x = spot[0]; edgeMan.y = spot[1]; plan.role.set(edgeMan, { kind: "edge", spot }); }
+		// A side with men to spare: now and then one waits by the flag for a short one, and in an
+		// eleven-a-side game one more stands on the keeper to block his path to the ball.
+		const spare = rest.filter(q => q !== taker && q !== edgeMan && q.role !== "def");
+		if (!shoot && atk.length >= 5 && spare.length && Math.random() < 0.25) {
+			const q = spare.shift(), spot = [ corner.x + inward * 70 * GH, corner.y - sy * 34 * GH ];
+			q.x = spot[0]; q.y = spot[1]; plan.role.set(q, { kind: "short", spot }); plan.short = q;
+		}
+		if (atk.length >= 10 && spare.length) {
+			const q = spare.shift(), spot = [ gx + inward * 26 * GH, FH / 2 - sy * 6 * GH ];
+			q.x = spot[0]; q.y = spot[1]; plan.role.set(q, { kind: "block", spot });
+		}
+		// Nobody stands still in a crowded box, and each runner bends his run a different way.
+		for (const r of plan.role.values()) { r.ph = Math.random() * 6; r.curl = Math.random() < 0.5 ? 1 : -1; }
 		cornerPlan = plan;
 		const gk = team(def).find(q => q.role === "gk");
 		if (gk) { gk.x = gx + inward * 20; gk.y = FH / 2 + sy * 8; }
@@ -11866,6 +11884,13 @@ td, th { font-variant-numeric: tabular-nums; }
 			if (m) { handOff(m, 160); }
 		}
 	}
+	// A short corner: rolled to the man by the flag, and the move goes on from there.
+	function cornerShort (p, m) {
+		passTo(p, m); aiHandOff(p, m, 100);
+		setPiece = null; cornerPlan = null;
+		cornerAt[p.team] = frame;
+		tally.shortCorners = (tally.shortCorners || 0) + 1;
+	}
 	// A corner in progress: who runs where, who marks whom, until the ball is won or dies.
 	let cornerPlan = null;
 	function stepCornerPlan () {
@@ -11891,7 +11916,18 @@ td, th { font-variant-numeric: tabular-nums; }
 		if (!r) { return null; }
 		const flying = cp.delivered && !ball.owner;
 		if (flying && (cp.attacker === p || cp.defender === p)) { return [ ball.landX - (cp.defender === p ? cp.inward * 8 : 0), ball.landY ]; }
-		if (r.kind === "run") { return cp.delivered ? r.aim : r.start; }
+		const jit = a => Math.sin(frame * 0.045 + (r.ph || 0)) * a;   // the jostling: never quite still
+		if (r.kind === "run") {
+			if (!cp.delivered && !cp.running) { return [ r.start[0] + jit(5), r.start[1] + jit(7) ]; }
+			// The run bends: out and round first (to lose the marker), then in to the zone.
+			const [ sx, sy ] = r.start, [ ax, ay ] = r.aim, L = Math.hypot(ax - sx, ay - sy) || 1;
+			if (Math.hypot(ax - p.x, ay - p.y) > 0.55 * L) {
+				const c = 22 * GH * (r.curl || 1);
+				return [ (sx + ax) / 2 - (ay - sy) / L * c, (sy + ay) / 2 + (ax - sx) / L * c ];
+			}
+			return r.aim;
+		}
+		if (r.kind === "block" && !cp.delivered) { return [ r.spot[0] + jit(4), r.spot[1] + jit(6) ]; }
 		if (r.kind === "mark") {
 			const q = r.man, dx = cp.gx - q.x, dy = FH / 2 - q.y, d = Math.hypot(dx, dy) || 1;
 			return [ q.x + dx / d * 15, q.y + dy / d * 15 ];

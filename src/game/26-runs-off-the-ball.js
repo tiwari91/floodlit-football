@@ -349,9 +349,14 @@
 			return null;
 		}
 		if (setPiece && setPiece.kind === "corner" && setPiece.taker === p) {
-			// The computer's corner: a moment to set, then a cross to one of the runners in the box.
-			if (++p.hold < 30) { prepRelease(p, 30 - p.hold, "corner"); return null; }
+			// The computer's corner: a moment to set, then the runners set off just before he strikes
+			// it, and a cross to one of them in the box (or, now and then, short to the man by the flag).
+			if (++p.hold < 30) { return null; }
+			const cp = cornerPlan;
+			if (cp && cp.runAt === undefined) { cp.runAt = frame + 22; cp.running = true; }
+			if (cp && frame < cp.runAt) { prepRelease(p, cp.runAt - frame, "corner"); return null; }
 			prepDone(p);
+			if (cp && cp.short && players.includes(cp.short) && Math.random() < 0.6) { cornerShort(p, cp.short); return null; }
 			const r = Math.random();
 			cornerCross(p, null, r < 0.4 ? "near" : r < 0.75 ? "far" : "spot", Math.random() < 0.6 ? "in" : "out");
 			return null;

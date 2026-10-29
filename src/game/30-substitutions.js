@@ -442,6 +442,13 @@
 			if (m) { handOff(m, 160); }
 		}
 	}
+	// A short corner: rolled to the man by the flag, and the move goes on from there.
+	function cornerShort (p, m) {
+		passTo(p, m); aiHandOff(p, m, 100);
+		setPiece = null; cornerPlan = null;
+		cornerAt[p.team] = frame;
+		tally.shortCorners = (tally.shortCorners || 0) + 1;
+	}
 	// A corner in progress: who runs where, who marks whom, until the ball is won or dies.
 	let cornerPlan = null;
 	function stepCornerPlan () {
@@ -467,7 +474,18 @@
 		if (!r) { return null; }
 		const flying = cp.delivered && !ball.owner;
 		if (flying && (cp.attacker === p || cp.defender === p)) { return [ ball.landX - (cp.defender === p ? cp.inward * 8 : 0), ball.landY ]; }
-		if (r.kind === "run") { return cp.delivered ? r.aim : r.start; }
+		const jit = a => Math.sin(frame * 0.045 + (r.ph || 0)) * a;   // the jostling: never quite still
+		if (r.kind === "run") {
+			if (!cp.delivered && !cp.running) { return [ r.start[0] + jit(5), r.start[1] + jit(7) ]; }
+			// The run bends: out and round first (to lose the marker), then in to the zone.
+			const [ sx, sy ] = r.start, [ ax, ay ] = r.aim, L = Math.hypot(ax - sx, ay - sy) || 1;
+			if (Math.hypot(ax - p.x, ay - p.y) > 0.55 * L) {
+				const c = 22 * GH * (r.curl || 1);
+				return [ (sx + ax) / 2 - (ay - sy) / L * c, (sy + ay) / 2 + (ax - sx) / L * c ];
+			}
+			return r.aim;
+		}
+		if (r.kind === "block" && !cp.delivered) { return [ r.spot[0] + jit(4), r.spot[1] + jit(6) ]; }
 		if (r.kind === "mark") {
 			const q = r.man, dx = cp.gx - q.x, dy = FH / 2 - q.y, d = Math.hypot(dx, dy) || 1;
 			return [ q.x + dx / d * 15, q.y + dy / d * 15 ];

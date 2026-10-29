@@ -568,7 +568,7 @@
 			}
 			// Attacking a ball in the air (or a corner run once it's struck): flat out, straight at it.
 			if (setRole) {
-				const live = !setPiece && (!cornerPlan || cornerPlan.delivered);
+				const live = (!setPiece || (cornerPlan && cornerPlan.running)) && (!cornerPlan || cornerPlan.delivered || cornerPlan.running);
 				sprint = live ? 1.05 : Math.min(sprint, 0.5);
 				p.tx = target[0]; p.ty = target[1];
 			}
