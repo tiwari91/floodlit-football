@@ -297,6 +297,9 @@
 		for (let i = 0; i < NT; i++) { const c = i % 3 === 0 ? C1 : i % 3 === 1 ? C2 : W; col.set([ c.r, c.g, c.b ], i * 3); pos[i * 3 + 1] = -500; }
 		const tg = new T.BufferGeometry(); tg.setAttribute("position", new T.BufferAttribute(pos, 3)); tg.setAttribute("color", new T.BufferAttribute(col, 3));
 		const tape = new T.Points(tg, new T.PointsMaterial({ size: 5, vertexColors: true, sizeAttenuation: true, transparent: true, opacity: 0.95, depthWrite: false }));
+		// A point grows without limit as it nears the camera: a piece by a close-up or replay camera drew as a flat
+		// block of the club's colour across the picture. Capped at a few pixels, and gone within 30 units of the lens.
+		tape.material.onBeforeCompile = sh => { sh.vertexShader = sh.vertexShader.replace("#include <fog_vertex>", "gl_PointSize = min(gl_PointSize, 8.0);\n\tif (-mvPosition.z < 30.0) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); }\n#include <fog_vertex>"); };
 		tape.userData.ownGeo = true; tape.userData.ownMat = true; tape.frustumCulled = false; tape.visible = false;
 		st.add(tape);
 		G3.tape = { pts: tape, vel: new Float32Array(NT * 3), t: 0, ends: ends.map(rows => { const r = rows[Math.floor(rows.length * 0.4)]; return { x: r.x / r.n, y: r.y, z0: r.zMin, z1: r.zMax, dir: r.x / r.n < FW / 2 ? 1 : -1 }; }) };
