@@ -68,11 +68,20 @@
 		if (!w && el) { w = document.createElement("span"); w.id = "commWho"; w.className = "comm-who"; el.insertBefore(w, $("commText")); }
 		if (w) { w.textContent = CALLERS[who].short; w.dataset.role = CALLERS[who].role; }
 	}
+	// A CSS bottom (px, within the pitch) that clears the minimap by gap, or "" (the stylesheet's) when it is off.
+	// (soon: true for something shown at kick-off, a moment before the minimap itself appears.)
+	function aboveRadar (gap, soon = false) {
+		const cr = canvas.getBoundingClientRect(), wr = $("pitchwrap").getBoundingClientRect(), k = cr.width / SW;
+		return (soon ? minimapOn : radarShown()) && k > 0 ? `${Math.round(wr.bottom - (cr.top + (SH - FH * RADAR_W / FW - 18 - tickerUp()) * k) + gap)}px` : "";
+	}
 	function showCommLine (text, t, who, ms) {
 		const el = $("commLine");
 		commWho(who);
 		$("commText").textContent = text;
 		el.style.setProperty("--comm-kit", (KITS[t] || KITS[0]).outfield);
+		// Just above the minimap (it used to sit across the lower half of it), or above the first-match hint.
+		const cm = $("coachMark"), wb = $("pitchwrap").getBoundingClientRect().bottom;
+		el.style.bottom = cm && !cm.hidden && cm.offsetHeight ? `${Math.round(wb - cm.getBoundingClientRect().top + 6)}px` : aboveRadar(6);
 		el.hidden = false; el.classList.remove("in"); void el.offsetWidth; el.classList.add("in");
 		clearTimeout(commTimer);
 		commTimer = setTimeout(() => { el.hidden = true; }, ms);

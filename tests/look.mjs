@@ -88,12 +88,15 @@ for (const [ label, opts ] of [
 		const F = window.__ff, bug = document.getElementById("scoreBug"), chips = [ ...bug.querySelectorAll(".chip") ].map(c => getComputedStyle(c).backgroundColor);
 		F.startAdded(0); await new Promise(r => setTimeout(r, 300));
 		const ad = document.getElementById("bugAdded"), R = F.radarRect(), hit = el => { const b = el.getBoundingClientRect(); return b.width > 0 && b.left < R.right && b.right > R.left && b.top < R.bottom && b.bottom > R.top; };
-		return { shown: getComputedStyle(bug).display !== "none", chips, added: !ad.hidden && ad.textContent, radar: R, stick: hit(document.getElementById("stick")), pads: [ ...document.querySelectorAll(".pads .pad") ].some(hit) };
+		F.commReset(); F.moment("near", F.outfield(0)[2]); await new Promise(r => setTimeout(r, 400));
+		const cl = document.getElementById("commLine"), comm = !cl.hidden && getComputedStyle(cl).display !== "none" ? hit(cl) : null;
+		return { shown: getComputedStyle(bug).display !== "none", chips, added: !ad.hidden && ad.textContent, radar: R, stick: hit(document.getElementById("stick")), pads: [ ...document.querySelectorAll(".pads .pad") ].some(hit), comm };
 	});
 	await page.screenshot({ path: `${OUT}/look-hud-landscape.png` });
 	check("score box: shown, with a colour chip for each side", hud.shown && hud.chips.length === 2 && hud.chips[0] !== hud.chips[1], JSON.stringify(hud.chips));
 	check("score box: the added time shows as a badge by the clock", /^\+\d$/.test(hud.added || ""), String(hud.added));
 	check("the radar is on by default and covers none of the touch controls", hud.radar.shown && !hud.stick && !hud.pads, JSON.stringify(hud));
+	check("the commentary line sits above the radar, not across it", hud.comm === false, JSON.stringify({ comm: hud.comm, radar: hud.radar }));
 	check("HUD: no console errors", errs.length === 0, errs.join(" | "));
 	await ctx.close();
 }

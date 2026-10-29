@@ -1362,7 +1362,8 @@
 	.bc-venue { grid-column: 1 / -1; padding: 6px 12px 0; font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #c9d4cc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	.lg-upcoming .venue, #lgUpcoming .venue { display: block; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	/* The match centre: a small button under the menu toggle, and a compact card on the right of the pitch. */
-	.mc-toggle { position: absolute; top: 46px; right: 10px; z-index: 4; padding: 4px 10px; font-size: 12px; background: rgba(7, 12, 10, 0.82); border: 1px solid var(--rule); border-radius: 4px; color: var(--chalk, #eef6ea); }
+	/* Beside the menu button, not under it: under it, it sat on the weather and tactic tags the pitch draws there. */
+	.mc-toggle { position: absolute; top: 10px; right: 106px; z-index: 4; padding: 5px 10px; font-size: 13px; background: rgba(7, 12, 10, 0.82); border: 1px solid var(--rule); border-radius: 4px; color: var(--chalk, #eef6ea); }
 	.mc-toggle[aria-expanded="true"] { border-color: var(--opp-text); }
 	.mc { position: absolute; top: 78px; right: 10px; z-index: 7; width: min(290px, calc(100% - 20px)); max-height: calc(100% - 130px); display: flex; flex-direction: column;
 		background: rgba(9, 14, 12, 0.9); border: 1px solid var(--rule); border-top: 3px solid var(--opp); border-radius: 6px; color: var(--chalk, #eef6ea); font-size: 13px; line-height: 1.35;
@@ -1397,7 +1398,7 @@
 	.mc-srow .cmp-bar { grid-column: 1 / -1; }
 	.mc-shead { border-bottom: 1px solid var(--rule); padding-bottom: 3px; margin-bottom: 2px; }
 	@media (max-width: 640px) {
-		.mc-toggle { top: 40px; padding: 3px 8px; font-size: 11px; }
+		.mc-toggle { top: 40px; right: 10px; padding: 3px 8px; font-size: 11px; }
 		.mc { top: 68px; right: 6px; width: min(240px, 64%); max-height: calc(100% - 84px); font-size: 12px; }
 	}
 	.mk-f { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; }

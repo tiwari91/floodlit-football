@@ -63,6 +63,8 @@
 		let touch = false; try { touch = window.matchMedia("(pointer: coarse)").matches; } catch (e) { touch = false; }
 		if (!el || touch || store.get("ff-coach") === "1") { return; }
 		store.set("ff-coach", "1");
+		const b = aboveRadar(10, true);
+		if (b && parseFloat(b) > 96) { el.style.bottom = b; }   // never on the minimap's top edge
 		el.hidden = false;
 		coachTimer = setTimeout(hideCoachMark, 15000);
 	}

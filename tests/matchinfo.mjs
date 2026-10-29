@@ -16,6 +16,9 @@ try {
 	await kickOff(page); await page.waitForTimeout(700);
 	const shown = await page.evaluate(() => ({ btn: !document.getElementById("mcToggle").hidden, box: document.getElementById("matchCentre").hidden }));
 	check("in a match the Match info button shows and the card stays closed until asked", shown.btn && shown.box, JSON.stringify(shown));
+	// The pitch draws the weather and tactic tags top right from 44 px down: the button must sit clear of them and of Show menu.
+	const place = await page.evaluate(() => { const r = id => document.getElementById(id).getBoundingClientRect(), p = r("pitchwrap"), b = r("mcToggle"), m = r("menuToggle"); return { bottom: Math.round(b.bottom - p.top), gap: Math.round(m.left - b.right), top: Math.round(b.top - m.top) }; });
+	check("desktop: Match info sits beside Show menu, above the tags (not on them)", place.bottom < 44 && place.gap >= 4 && Math.abs(place.top) <= 2, JSON.stringify(place));
 
 	// Played a few rounds first, so form and the table mean something.
 	await page.evaluate(() => { const lg = window.__ff.league; lg.results = lg.results || []; });
