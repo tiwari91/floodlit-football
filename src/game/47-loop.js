@@ -1,5 +1,6 @@
 	/* ---------- loop ---------- */
 	let last = performance.now(), acc = 0, drawMs = 0, drawn = 0;
+	let testHold = false;   // test harness only: the clock stands still (the page draws, the test steps the match)
 	// Never more than 60 pictures a second: a 120 Hz phone would otherwise draw twice as often for
 	// no visible gain and run its battery down. A frame is due once 60 Hz worth of time has passed,
 	// with a little slack so a 60 Hz screen's own jitter never drops a frame.
@@ -33,6 +34,7 @@
 		wasCapped = cap;
 		pollPad();
 		acc = Math.min(acc + (now - last) * (slowMo > 0 && !odr ? SLOW_RATE : 1), 250);
+		if (testHold) { acc = 0; }
 		last = now;
 		while (acc >= STEP) {
 			if (odr) { stepOdr(); } else { snapshotPrev(); update(); if (slowMo > 0) { slowMo--; } }

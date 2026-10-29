@@ -363,9 +363,9 @@ const cu = await page.evaluate(() => {
 	const head = box.querySelector(".intl-sel .eyebrow").textContent, first = rows()[0].textContent, n0 = F.intlCalled(F.league).length;
 	const playing = () => new Set([ ...F.intlCallUp(F.league).xi, ...F.intlCallUp(F.league).bench ].map(e => e.pl.name));
 	const victim = F.intlCalled(F.league).find(n => F.intlCallUp(F.league).xi.some(e => e.pl.name === n && !e.gen));
-	rows().find(r => r.textContent.includes(victim)).querySelector("button").click();
+	rows().find(r => r.querySelector(".who").textContent.startsWith(victim + " · ")).querySelector("button").click();
 	const out = !playing().has(victim), n1 = F.intlCalled(F.league).length, sel = I.sel.length;
-	rows().find(r => r.textContent.includes(victim)).querySelector("button").click();
+	rows().find(r => r.querySelector(".who").textContent.startsWith(victim + " · ")).querySelector("button").click();
 	return { head, first, n0, victim, out, n1, sel, back: F.intlCalled(F.league).includes(victim), total: rows().length };
 });
 check("Squad selection lists the eligible players with position, rating, club, form and fitness; the manager drops and calls up, max 23, and a player dropped cannot play", /called up/.test(cu.head) && /form/.test(cu.first) && /fit \d+%/.test(cu.first) && cu.n0 <= 23 && cu.n0 >= 11 && cu.out && cu.n1 === cu.n0 - 1 && cu.back, JSON.stringify(cu));

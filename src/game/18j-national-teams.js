@@ -28,7 +28,9 @@
 	const intlKey = lg => `${lg.season}|${lg.round >= JANUARY ? 2 : 1}|${lg.fmt}|${[ ...lg.club.squad, ...lg.club.bench ].map(p => p && p.name).join(",")}|${(lg.club.market || []).length}|${JSON.stringify((lg.edits && lg.edits.nations) || {})}`;
 	// Everyone in the save who could be picked, with where he plays.
 	function intlPool (lg) {
-		const out = [], add = (pl, club, own) => { if (pl && NATIONS[pl.nat]) { out.push({ pl, club, own }); } };
+		// A national squad is kept by name (the order, the call-ups, the rested), so two men of one country with
+		// the same name would be one man twice: the first seen (your own club's first) is the one in the pool.
+		const out = [], seen = new Set(), add = (pl, club, own) => { if (pl && NATIONS[pl.nat] && !seen.has(`${pl.nat}|${pl.name}`)) { seen.add(`${pl.nat}|${pl.name}`); out.push({ pl, club, own }); } };
 		const mine = !(lg.intl && lg.intl.only);   // country only: your old club's players are anyone else's (the club has a CPU manager)
 		for (const p of [ ...(lg.club.squad || []), ...(lg.club.bench || []) ]) { add(p, YOU.name, mine); }
 		const guest = lg.contGuest ? lg.contGuest.slot : -1;

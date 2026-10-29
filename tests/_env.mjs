@@ -15,6 +15,10 @@ export const CHROME = process.env.FF_CHROME || "/Applications/Google Chrome.app/
 export const sleep = ms => new Promise(r => setTimeout(r, ms));
 export function serve (port) {
 	port += Number(process.env.FF_PORT_SHIFT || 0);   // a second checkout running its checks at the same time picks another port
+	// A port still held (a server left over from a crashed run, or another checkout's) would serve someone
+	// else's build to this test: step on to the first free one instead.
+	const free = q => spawnSync("python3", [ "-c", `import socket\ns=socket.socket()\ntry:\n    s.bind(("127.0.0.1", ${q}))\nexcept OSError:\n    raise SystemExit(1)` ]).status === 0;
+	for (let k = 0; k < 40 && !free(port); k++) { port += 97; }
 	const server = spawn("python3", [ "-m", "http.server", String(port), "--bind", "127.0.0.1", "--directory", root ], { stdio: "ignore" });
 	// Wait (up to 10 s) until the server answers, so the first page.goto never races its start-up.
 	spawnSync("python3", [ "-c", `import socket,time\nfor _ in range(200):\n    try:\n        socket.create_connection(("127.0.0.1", ${port}), 0.2).close(); break\n    except OSError: time.sleep(0.05)` ]);

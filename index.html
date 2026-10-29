@@ -7662,7 +7662,9 @@ td, th { font-variant-numeric: tabular-nums; }
 	const intlKey = lg => `${lg.season}|${lg.round >= JANUARY ? 2 : 1}|${lg.fmt}|${[ ...lg.club.squad, ...lg.club.bench ].map(p => p && p.name).join(",")}|${(lg.club.market || []).length}|${JSON.stringify((lg.edits && lg.edits.nations) || {})}`;
 	// Everyone in the save who could be picked, with where he plays.
 	function intlPool (lg) {
-		const out = [], add = (pl, club, own) => { if (pl && NATIONS[pl.nat]) { out.push({ pl, club, own }); } };
+		// A national squad is kept by name (the order, the call-ups, the rested), so two men of one country with
+		// the same name would be one man twice: the first seen (your own club's first) is the one in the pool.
+		const out = [], seen = new Set(), add = (pl, club, own) => { if (pl && NATIONS[pl.nat] && !seen.has(`${pl.nat}|${pl.name}`)) { seen.add(`${pl.nat}|${pl.name}`); out.push({ pl, club, own }); } };
 		const mine = !(lg.intl && lg.intl.only);   // country only: your old club's players are anyone else's (the club has a CPU manager)
 		for (const p of [ ...(lg.club.squad || []), ...(lg.club.bench || []) ]) { add(p, YOU.name, mine); }
 		const guest = lg.contGuest ? lg.contGuest.slot : -1;
@@ -21487,6 +21489,7 @@ td, th { font-variant-numeric: tabular-nums; }
 
 	/* ---------- loop ---------- */
 	let last = performance.now(), acc = 0, drawMs = 0, drawn = 0;
+	let testHold = false;   // test harness only: the clock stands still (the page draws, the test steps the match)
 	// Never more than 60 pictures a second: a 120 Hz phone would otherwise draw twice as often for
 	// no visible gain and run its battery down. A frame is due once 60 Hz worth of time has passed,
 	// with a little slack so a 60 Hz screen's own jitter never drops a frame.
@@ -21520,6 +21523,7 @@ td, th { font-variant-numeric: tabular-nums; }
 		wasCapped = cap;
 		pollPad();
 		acc = Math.min(acc + (now - last) * (slowMo > 0 && !odr ? SLOW_RATE : 1), 250);
+		if (testHold) { acc = 0; }
 		last = now;
 		while (acc >= STEP) {
 			if (odr) { stepOdr(); } else { snapshotPrev(); update(); if (slowMo > 0) { slowMo--; } }
@@ -22274,7 +22278,7 @@ td, th { font-variant-numeric: tabular-nums; }
 	// Test hook (only with ?test in the URL): lets a headless harness step the sim and read it.
 	if (/[?&]test\b/.test(location.search)) {
 		window.__ff = {
-			get state () { return state; }, set state (v) { state = v; }, get frame () { return frame; }, get ctrl () { return ctrl; }, get players () { return players; },
+			get state () { return state; }, set state (v) { state = v; }, set hold (v) { testHold = !!v; }, get frame () { return frame; }, get ctrl () { return ctrl; }, get players () { return players; },
 			get ball () { return ball; }, get score () { return score; }, get possFrames () { return possFrames; }, get possTeam () { return possTeam; },
 			get goalTimer () { return goalTimer; }, get timeLeft () { return timeLeft; }, get freeze () { return freeze; }, get FW () { return FW; }, get FH () { return FH; }, get GOAL_T () { return GOAL_T; }, get GOAL_B () { return GOAL_B; }, woodworkHit, celebPlan, faceCell: faceCell3D, headInfo () { return { ear: EAR3, fade: FACE_FADE3, pale: FACE_PALE3, centre: HEAD_C3, styles: HAIR_STYLES3 }; }, recvKind, gainBallTest (p) { gainBall(p); }, get matchLen () { return matchLen; },
 			get manualLock () { return manualLock; }, get receiver () { return receiver; }, get cond () { return cond; }, get celeb () { return typeof celeb === "undefined" ? null : celeb; },

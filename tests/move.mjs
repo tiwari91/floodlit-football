@@ -125,7 +125,8 @@ check("a shot: the boot is at the ball on the last frame before it goes (and bac
 const save = await page.evaluate(() => {
 	const F = window.__ff, W = n => n.getWorldPosition(n.position.clone()), res = [];
 	for (const [ z, vz, side ] of [ [ 0, 0, -1 ], [ 14, 1.2, 1 ] ]) {
-		for (let i = 0; i < 3000 && F.state !== "play"; i++) { F.step(1); }
+		// Open play, not a restart still being taken (the keeper walking to a goal kick doesn't dive).
+		for (let i = 0; i < 3000 && (F.state !== "play" || F.setPiece || F.restartWalk); i++) { F.step(1); }
 		F.freeze = 0;
 		const gk = F.players.find(q => q.role === "gk" && q.team === 1), me = F.human(), FW = F.FW, FH = F.FH;
 		const park = () => { for (const q of F.players) { if (q !== gk) { q.x = q.team === 1 ? FW - 400 : 300; q.y = 30 + 20 * F.players.indexOf(q); q.vx = q.vy = 0; } } };
@@ -331,7 +332,13 @@ const mom = await page.evaluate(async () => {
 	const line = document.getElementById("commLine"), shown = !line.hidden, text = document.getElementById("commText").textContent;
 	F.moment("save", F.outfield(0)[1], { keeper: F.players.find(q => q.role === "gk" && q.team === 1) });
 	const second = document.getElementById("commText").textContent;
-	await new Promise(r => setTimeout(r, 450));
+	// The page's clock is held and the match stepped here: on a busy machine 450 ms of real time could be
+	// too few frames for the hands to get there (or the play could carry him off), which made this flaky.
+	F.hold = true;
+	F.step(20);
+	const d0 = F.drawn;
+	for (let i = 0; i < 100 && F.drawn < d0 + 25; i++) { await new Promise(r => setTimeout(r, 50)); }
+	F.hold = false;
 	const r = G3.fig.rigOf.get(p), top = W(r.head).y + 1.4;
 	const d = [ 0, 1 ].map(j => { const h = W(r.ha[j]), hd = W(r.head); return +Math.hypot(h.x - hd.x, h.y - top, h.z - hd.z).toFixed(1); });
 	return { shown, named: text.includes(p.name || "") && text.length > 8, oneAtATime: second === text, kind: F.lastCommentary && F.lastCommentary.kind, d, hh: p.headHands, shz: [0,1].map(j => +r.sh[j].rotation.z.toFixed(2)), el: [0,1].map(j => +r.el[j].rotation.z.toFixed(2)), run: +(p.runAmt || 0).toFixed(2), jump: p.jump, idx: F.players.indexOf(p), n: G3.fig.n, st: F.state, kick: p.kickA, fall: p.fall, cel: p.celebA, own: F.ball.owner === p };
@@ -379,6 +386,7 @@ check("home ends dressed: banners and big flags that wave", dress.banners >= 1 &
 const wood = await page.evaluate(() => {
 	const F = window.__ff, out = {}, B = F.ball, FW = F.FW, FH = F.FH, T = F.GOAL_T, Bt = F.GOAL_B;
 	for (const id of [ "lowerThird", "commLine" ]) { const e = document.getElementById(id); if (e) { e.hidden = true; } }
+	for (let i = 0; i < 3000 && (F.state !== "play" || F.setPiece || F.restartWalk); i++) { F.step(1); }   // a live ball to start from (not a restart being taken)
 	F.freeze = 0;
 	for (const g of F.players.filter(q => q.role === "gk")) { g.y = 20; g.vx = g.vy = 0; }
 	const sh = F.outfield(0)[F.outfield(0).length - 1];

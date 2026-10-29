@@ -62,7 +62,7 @@
 	// Test hook (only with ?test in the URL): lets a headless harness step the sim and read it.
 	if (/[?&]test\b/.test(location.search)) {
 		window.__ff = {
-			get state () { return state; }, set state (v) { state = v; }, get frame () { return frame; }, get ctrl () { return ctrl; }, get players () { return players; },
+			get state () { return state; }, set state (v) { state = v; }, set hold (v) { testHold = !!v; }, get frame () { return frame; }, get ctrl () { return ctrl; }, get players () { return players; },
 			get ball () { return ball; }, get score () { return score; }, get possFrames () { return possFrames; }, get possTeam () { return possTeam; },
 			get goalTimer () { return goalTimer; }, get timeLeft () { return timeLeft; }, get freeze () { return freeze; }, get FW () { return FW; }, get FH () { return FH; }, get GOAL_T () { return GOAL_T; }, get GOAL_B () { return GOAL_B; }, woodworkHit, celebPlan, faceCell: faceCell3D, headInfo () { return { ear: EAR3, fade: FACE_FADE3, pale: FACE_PALE3, centre: HEAD_C3, styles: HAIR_STYLES3 }; }, recvKind, gainBallTest (p) { gainBall(p); }, get matchLen () { return matchLen; },
 			get manualLock () { return manualLock; }, get receiver () { return receiver; }, get cond () { return cond; }, get celeb () { return typeof celeb === "undefined" ? null : celeb; },
