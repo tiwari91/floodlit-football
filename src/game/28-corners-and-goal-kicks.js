@@ -107,16 +107,12 @@
 		}
 		const edgeMan = rest.filter(q => q !== taker).sort((a, b) => Math.abs(a.x - gx) - Math.abs(b.x - gx))[0];
 		if (edgeMan) { const spot = [ gx + inward * (FMT.box + 45), FH / 2 - sy * 40 ]; edgeMan.x = spot[0]; edgeMan.y = spot[1]; plan.role.set(edgeMan, { kind: "edge", spot }); }
-		// A side with men to spare: now and then one waits by the flag for a short one, and in an
-		// eleven-a-side game one more stands on the keeper to block his path to the ball.
+		// A side with men to spare: now and then one waits by the flag for a short one. (A man stood on
+		// the keeper was tried too: he cost the keeper too many claims, and corners scored too often.)
 		const spare = rest.filter(q => q !== taker && q !== edgeMan && q.role !== "def");
 		if (!shoot && atk.length >= 5 && spare.length && Math.random() < 0.25) {
 			const q = spare.shift(), spot = [ corner.x + inward * 70 * GH, corner.y - sy * 34 * GH ];
 			q.x = spot[0]; q.y = spot[1]; plan.role.set(q, { kind: "short", spot }); plan.short = q;
-		}
-		if (atk.length >= 10 && spare.length) {
-			const q = spare.shift(), spot = [ gx + inward * 26 * GH, FH / 2 - sy * 6 * GH ];
-			q.x = spot[0]; q.y = spot[1]; plan.role.set(q, { kind: "block", spot });
 		}
 		// Nobody stands still in a crowded box, and each runner bends his run a different way.
 		for (const r of plan.role.values()) { r.ph = Math.random() * 6; r.curl = Math.random() < 0.5 ? 1 : -1; }

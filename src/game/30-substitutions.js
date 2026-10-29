@@ -485,7 +485,6 @@
 			}
 			return r.aim;
 		}
-		if (r.kind === "block" && !cp.delivered) { return [ r.spot[0] + jit(4), r.spot[1] + jit(6) ]; }
 		if (r.kind === "mark") {
 			const q = r.man, dx = cp.gx - q.x, dy = FH / 2 - q.y, d = Math.hypot(dx, dy) || 1;
 			return [ q.x + dx / d * 15, q.y + dy / d * 15 ];

@@ -1,4 +1,4 @@
-// Corners: the box is set (runners, markers, zones, a blocker on the keeper), the computer's runners
+// Corners: the box is set (runners, markers, zones, the edge man), the computer's runners
 // set off just before the strike and bend their runs, the taker always delivers, a short one comes
 // now and then (never in a small-sided game or a shootout), and the plan ends once the ball is won.
 // Run: node tests/corners.mjs
@@ -49,7 +49,7 @@ const r = await page.evaluate(() => {
 	}
 	return out;
 });
-check("a corner sets the box: runners, markers, zones, the edge man and (eleven-a-side) a blocker", r.roles && r.roles.run >= 3 && r.roles.mark >= 3 && r.roles.zone >= 1 && r.roles.edge === 1 && r.roles.block === 1, JSON.stringify(r.roles));
+check("a corner sets the box: runners, markers, zones, and the edge man", r.roles && r.roles.run >= 3 && r.roles.mark >= 3 && r.roles.zone >= 1 && r.roles.edge === 1, JSON.stringify(r.roles));
 check("the computer's taker always plays it within a few seconds", r.stuck === 0 && r.maxWait < 200 && r.delivered + r.short === r.n, JSON.stringify(r));
 check("the runners set off before the ball is struck", r.preRun >= r.delivered * 0.9, JSON.stringify(r));
 check("most runs bend away from the straight line", r.bend >= r.n * 0.5, JSON.stringify(r));
