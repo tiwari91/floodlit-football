@@ -122,6 +122,15 @@
 		}
 		return { h, feet, runK, jogK, L, beta, vf, vl, vr, mov };
 	}
+	// A shoulder check: how far into a quick look over the shoulder he is (0 to 1 and back over about
+	// half a second), every two to four seconds, more often when his side has the ball (he is scanning
+	// for space). From the match frame and his own seed, so the same moment always draws the same way.
+	function shoulderCheck3 (p, ours) {
+		const seed = p.build && p.build.seed !== undefined ? p.build.seed : ((p.idx || 0) * 0.37) % 1;
+		const period = Math.round((ours ? 130 : 200) + 110 * seed), len = 30;
+		const t = ((frame + Math.round(seed * 997)) % period + period) % period;
+		return t < len ? Math.sin(Math.PI * t / len) ** 2 : 0;
+	}
 	// Put both legs on the feet gait3 chose, and the hips at its height (the hip joint is 1 below the hips).
 	function legsTo3 (r, G) {
 		r.hips.position.y = G.h + 1;

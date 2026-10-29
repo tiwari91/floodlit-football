@@ -1359,6 +1359,7 @@
 	@keyframes assistFlash { 0% { box-shadow: 0 0 0 3px rgba(242, 181, 46, 0.9); } 100% { box-shadow: 0 0 0 3px rgba(242, 181, 46, 0); } }
 	.win.flash { animation: assistFlash 1.6s ease-out; }
 	/* The ground's name: on the kick-off line-ups and beside each upcoming fixture. */
+	.bc-comp { grid-column: 1 / -1; padding: 8px 12px 0; font-size: 15px; font-weight: 900; letter-spacing: 0.14em; text-transform: uppercase; color: #ffffff; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	.bc-venue { grid-column: 1 / -1; padding: 6px 12px 0; font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #c9d4cc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	.lg-upcoming .venue, #lgUpcoming .venue { display: block; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	/* The match centre: a small button under the menu toggle, and a compact card on the right of the pitch. */

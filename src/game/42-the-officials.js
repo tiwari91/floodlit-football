@@ -179,7 +179,12 @@
 			// How far the head turns to follow the ball: the angle from his facing to it, within a
 			// neck's reach, fading out past 420 units, mirrored with the pitch.
 			const relB = wrapA(Math.atan2(ball.y - p.y, ball.x - p.x) - face);
-			const yaw = -clamp(relB, -0.85, 0.85) * clamp(1 - dBall / (420 * S), 0, 1);
+			let yaw = -clamp(relB, -0.85, 0.85) * clamp(1 - dBall / (420 * S), 0, 1);
+			// Shoulder checks: off the ball in open play, every few seconds a quick look over the shoulder away
+			// from the ball (to see who is behind him), as a midfielder does before the ball comes. Timed from the
+			// match frame and his own seed, so it is the same each time it is drawn; none in a replay.
+			const chk = p.role !== "gk" && p.team >= 0 && ball.owner && ball.owner !== p && p !== receiver && state === "play" && !replayOn() && !acting && dBall > 90 * S && dBall < 900 * S ? shoulderCheck3(p, ball.owner.team === p.team) : 0;
+			if (chk > 0) { yaw = lerp3(yaw, (relB >= 0 ? 1 : -1) * 1.15, chk); }
 			const mir = WX(1) < WX(0) ? -1 : 1;
 			rig.mir = mir;   // the pose needs it to tell his left from his right
 			const ride = st3 && st3.man && stretcher.p === p ? st3.man : null;   // on the stretcher: lying along it

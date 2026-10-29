@@ -1381,6 +1381,7 @@
 	@keyframes assistFlash { 0% { box-shadow: 0 0 0 3px rgba(242, 181, 46, 0.9); } 100% { box-shadow: 0 0 0 3px rgba(242, 181, 46, 0); } }
 	.win.flash { animation: assistFlash 1.6s ease-out; }
 	/* The ground's name: on the kick-off line-ups and beside each upcoming fixture. */
+	.bc-comp { grid-column: 1 / -1; padding: 8px 12px 0; font-size: 15px; font-weight: 900; letter-spacing: 0.14em; text-transform: uppercase; color: #ffffff; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	.bc-venue { grid-column: 1 / -1; padding: 6px 12px 0; font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #c9d4cc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	.lg-upcoming .venue, #lgUpcoming .venue { display: block; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	/* The match centre: a small button under the menu toggle, and a compact card on the right of the pitch. */
@@ -4549,6 +4550,7 @@ td, th { font-variant-numeric: tabular-nums; }
 				tired.length ? `Fitness: ⚠ ${tiredText(tired)} Tired players are slower and less sharp. Rest them: press "Rest tired players", or swap them yourself in the squad panel.` : "",
 				first ? "Welcome to Floodlit Football. You manage the club and play its matches. New to the controls? \"Learn the controls\" is a two-minute walk-through, then you're back here." : "",
 				`${o.name} · ${leagueMatch.home ? "at home" : "away"} at ${matchGround()} · rated ${stars(Math.round(getStr(leagueMatch.opp)))} · ${lv.name} difficulty`,
+				leagueMatch.cont && typeof ccStandLine === "function" ? ccStandLine() : "",   // where the night stands in the cup (18f)
 				o.manager ? `Their manager: ${o.manager}${NATIONS[o.managerNat] ? ` (${NATIONS[o.managerNat][0]})` : ""}.` : "",   // from an option file (18g, 18h)
 				derby ? "Derby day: the local rivals, and the loudest crowd of the season." : "",
 				k.watch ? `Watch: ${k.watch}.` : "",
@@ -6546,6 +6548,24 @@ td, th { font-variant-numeric: tabular-nums; }
 		if (!g) { return "Waiting for the draw."; }
 		const n = CC_NIGHTS[g.n];
 		return `Next: ${n.stage === "lp" ? `group stage matchday ${n.md}` : CC_STAGE[n.stage].toLowerCase()}, ${g.h === me ? "at home to" : g.neutral ? "against" : "away at"} ${ccName(C, g.h === me ? g.a : g.h)}${g.neutral ? " at a neutral ground" : ""}, after league matchday ${n.r}.`;
+	}
+	// For the matchday card: where you stand before the night. In the group stage, your place in the
+	// group (once a game is played); in a second leg, the score from the first.
+	function ccStandLine () {
+		const C = league && league.cont;
+		if (!C || C.none || !Array.isArray(C.clubs) || !Array.isArray(C.groups)) { return ""; }
+		const me = ccMe(C), gi = ccMine(C), g = gi !== null ? C.games[gi] : null;
+		if (me < 0 || !g) { return ""; }
+		if (!g.stage) {
+			const k = C.groups.findIndex(x => x.includes(me));
+			if (k < 0) { return ""; }
+			const rows = ccTable(C, k), pos = rows.findIndex(r => r.i === me) + 1, r = rows[pos - 1];
+			if (!r || !r.p) { return `Group ${String.fromCharCode(65 + k)}: six games, home and away. The top two go through to the round of 16.`; }
+			return `Group ${String.fromCharCode(65 + k)}: you are ${ordinal(pos)} with ${r.pts} point${r.pts === 1 ? "" : "s"} from ${r.p} game${r.p === 1 ? "" : "s"} (${pos <= 2 ? "in the places that go through" : "outside the top two for now"}).`;
+		}
+		const tie = Object.values(C.ties).flat().find(t => t.g.length === 2 && t.g[1] === gi);
+		if (tie) { const [ a, b ] = ccAgg(C, tie), my = tie.a === me ? [ a, b ] : [ b, a ]; return `Second leg: ${my[0]}–${my[1]} from the first leg${my[0] === my[1] ? ", all to play for" : my[0] > my[1] ? ", you lead" : ", you trail"}.`; }
+		return g.stage === "f" ? "The final, at a neutral ground. Level after 90 minutes: extra time, then penalties." : "";
 	}
 	/* The panel: the league-phase table, your fixtures and the knockout ties. */
 	function renderCont (box) {
@@ -18769,6 +18789,15 @@ td, th { font-variant-numeric: tabular-nums; }
 		}
 		return { h, feet, runK, jogK, L, beta, vf, vl, vr, mov };
 	}
+	// A shoulder check: how far into a quick look over the shoulder he is (0 to 1 and back over about
+	// half a second), every two to four seconds, more often when his side has the ball (he is scanning
+	// for space). From the match frame and his own seed, so the same moment always draws the same way.
+	function shoulderCheck3 (p, ours) {
+		const seed = p.build && p.build.seed !== undefined ? p.build.seed : ((p.idx || 0) * 0.37) % 1;
+		const period = Math.round((ours ? 130 : 200) + 110 * seed), len = 30;
+		const t = ((frame + Math.round(seed * 997)) % period + period) % period;
+		return t < len ? Math.sin(Math.PI * t / len) ** 2 : 0;
+	}
 	// Put both legs on the feet gait3 chose, and the hips at its height (the hip joint is 1 below the hips).
 	function legsTo3 (r, G) {
 		r.hips.position.y = G.h + 1;
@@ -19251,7 +19280,12 @@ td, th { font-variant-numeric: tabular-nums; }
 			// How far the head turns to follow the ball: the angle from his facing to it, within a
 			// neck's reach, fading out past 420 units, mirrored with the pitch.
 			const relB = wrapA(Math.atan2(ball.y - p.y, ball.x - p.x) - face);
-			const yaw = -clamp(relB, -0.85, 0.85) * clamp(1 - dBall / (420 * S), 0, 1);
+			let yaw = -clamp(relB, -0.85, 0.85) * clamp(1 - dBall / (420 * S), 0, 1);
+			// Shoulder checks: off the ball in open play, every few seconds a quick look over the shoulder away
+			// from the ball (to see who is behind him), as a midfielder does before the ball comes. Timed from the
+			// match frame and his own seed, so it is the same each time it is drawn; none in a replay.
+			const chk = p.role !== "gk" && p.team >= 0 && ball.owner && ball.owner !== p && p !== receiver && state === "play" && !replayOn() && !acting && dBall > 90 * S && dBall < 900 * S ? shoulderCheck3(p, ball.owner.team === p.team) : 0;
+			if (chk > 0) { yaw = lerp3(yaw, (relB >= 0 ? 1 : -1) * 1.15, chk); }
 			const mir = WX(1) < WX(0) ? -1 : 1;
 			rig.mir = mir;   // the pose needs it to tell his left from his right
 			const ride = st3 && st3.man && stretcher.p === p ? st3.man : null;   // on the stretcher: lying along it
@@ -21015,6 +21049,7 @@ td, th { font-variant-numeric: tabular-nums; }
 		const box = $("bcLineups");
 		box.replaceChildren();
 		const gr = mode === "league" || mode === "friendly" ? matchGround() : "";
+		if (leagueMatch && (leagueMatch.cont || leagueMatch.intl) && leagueMatch.label) { box.append(el("div", "bc-comp", leagueMatch.label)); }   // a cup night: the competition and the round, as the broadcast puts it
 		if (gr) { box.append(el("div", "bc-venue", leagueMatch && leagueMatch.neutral ? `${gr} · neutral ground` : gr)); }
 		for (const t of [ 0, 1 ]) {
 			const col = el("div", "bc-col");

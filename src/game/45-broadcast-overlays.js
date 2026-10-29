@@ -12,6 +12,7 @@
 		const box = $("bcLineups");
 		box.replaceChildren();
 		const gr = mode === "league" || mode === "friendly" ? matchGround() : "";
+		if (leagueMatch && (leagueMatch.cont || leagueMatch.intl) && leagueMatch.label) { box.append(el("div", "bc-comp", leagueMatch.label)); }   // a cup night: the competition and the round, as the broadcast puts it
 		if (gr) { box.append(el("div", "bc-venue", leagueMatch && leagueMatch.neutral ? `${gr} · neutral ground` : gr)); }
 		for (const t of [ 0, 1 ]) {
 			const col = el("div", "bc-col");

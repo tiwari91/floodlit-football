@@ -348,6 +348,24 @@
 		const n = CC_NIGHTS[g.n];
 		return `Next: ${n.stage === "lp" ? `group stage matchday ${n.md}` : CC_STAGE[n.stage].toLowerCase()}, ${g.h === me ? "at home to" : g.neutral ? "against" : "away at"} ${ccName(C, g.h === me ? g.a : g.h)}${g.neutral ? " at a neutral ground" : ""}, after league matchday ${n.r}.`;
 	}
+	// For the matchday card: where you stand before the night. In the group stage, your place in the
+	// group (once a game is played); in a second leg, the score from the first.
+	function ccStandLine () {
+		const C = league && league.cont;
+		if (!C || C.none || !Array.isArray(C.clubs) || !Array.isArray(C.groups)) { return ""; }
+		const me = ccMe(C), gi = ccMine(C), g = gi !== null ? C.games[gi] : null;
+		if (me < 0 || !g) { return ""; }
+		if (!g.stage) {
+			const k = C.groups.findIndex(x => x.includes(me));
+			if (k < 0) { return ""; }
+			const rows = ccTable(C, k), pos = rows.findIndex(r => r.i === me) + 1, r = rows[pos - 1];
+			if (!r || !r.p) { return `Group ${String.fromCharCode(65 + k)}: six games, home and away. The top two go through to the round of 16.`; }
+			return `Group ${String.fromCharCode(65 + k)}: you are ${ordinal(pos)} with ${r.pts} point${r.pts === 1 ? "" : "s"} from ${r.p} game${r.p === 1 ? "" : "s"} (${pos <= 2 ? "in the places that go through" : "outside the top two for now"}).`;
+		}
+		const tie = Object.values(C.ties).flat().find(t => t.g.length === 2 && t.g[1] === gi);
+		if (tie) { const [ a, b ] = ccAgg(C, tie), my = tie.a === me ? [ a, b ] : [ b, a ]; return `Second leg: ${my[0]}–${my[1]} from the first leg${my[0] === my[1] ? ", all to play for" : my[0] > my[1] ? ", you lead" : ", you trail"}.`; }
+		return g.stage === "f" ? "The final, at a neutral ground. Level after 90 minutes: extra time, then penalties." : "";
+	}
 	/* The panel: the league-phase table, your fixtures and the knockout ties. */
 	function renderCont (box) {
 		const lg = league, C = ensureCont(lg);
