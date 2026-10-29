@@ -425,6 +425,11 @@
 		.card .actions button { padding: 6px 10px; font-size: 13px; }
 		.card button.primary { font-size: 17px; padding: 6px 18px; }
 	}
+	/* Portrait phones: the card's buttons pair up in two equal columns instead of a ragged wrap. */
+	@media (max-width: 440px) {
+		.card .actions button { flex: 1 1 calc(50% - 6px); min-width: 0; padding-inline: 4px; white-space: nowrap; }
+		.card .actions button:not(.primary) { font-size: var(--fs-sm); }
+	}
 	.card.wide { max-width: min(680px, 100%); }
 	/* The trophy lift: the captain's arms raise the cup over the card, again and again, under fireworks. */
 	.fireworks { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
