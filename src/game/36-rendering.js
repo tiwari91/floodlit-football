@@ -295,6 +295,8 @@
 			lights: r() < 0.5 ? "pylons" : "roof",
 			boards: [ club.color || "#f2b52e", "#eef2ec", club.color2 || "#1f2a36", "#1f2a36" ],
 			arch: pick([ "azteca", "akron", "monterrey" ]),   // the 3D stadium's shape
+			// How big a ground the club has: a small club a little one-tier ground, a big one the full bowl.
+			size: (club.str || 3) <= 1.6 ? "small" : (club.str || 3) < 3.9 ? "mid" : "big",
 			mountains: r() < 0.4,
 			...dressFor(groundNat(), r)   // the country's way of building a ground (drawn after the rest, so those stay as they were)
 		};

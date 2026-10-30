@@ -6,7 +6,7 @@
 	   head only): at that distance arms are a pixel. The near stand is only drawn when the camera
 	   looks back at it. */
 	const crowdMood = { excite: 0, home: 0, away: 0, ooh: 0, wave: 0 };
-	const CROWD_U = { uTime: { value: 0 }, uExcite: { value: 0 }, uHome: { value: 0 }, uAway: { value: 0 }, uOoh: { value: 0 }, uWave: { value: 0 }, uOla: { value: 0 }, uOlaA: { value: 0 }, uMid: { value: [ 0, 0, 1, 1 ] } };
+	const CROWD_U = { uTime: { value: 0 }, uExcite: { value: 0 }, uHome: { value: 0 }, uAway: { value: 0 }, uOoh: { value: 0 }, uWave: { value: 0 }, uOla: { value: 0 }, uOlaA: { value: 0 }, uTense: { value: 0 }, uMid: { value: [ 0, 0, 1, 1 ] } };
 	// A fan's shape, facing +z (the pitch). Every camera looks at the stands from the pitch side, so
 	// the faces turned away from it (backs and bottoms) are left out.
 	function fanGeometry3D (kind) {   // "lite", "full" or "hi" (the rounded shape for the front rows)
@@ -89,7 +89,7 @@
 			sh.vertexShader = sh.vertexShader
 				.replace("#include <common>", `#include <common>
 					attribute float aPart; attribute vec4 aFan; attribute vec3 aSkin;
-					uniform float uTime, uExcite, uHome, uAway, uOoh, uWave, uOla, uOlaA; uniform vec4 uMid;`)
+					uniform float uTime, uExcite, uHome, uAway, uOoh, uWave, uOla, uOlaA, uTense; uniform vec4 uMid;`)
 				.replace("#include <color_vertex>", `#include <color_vertex>
 					int pt = int(aPart + 0.5);
 					if (pt == 1 || pt == 5) { vColor.rgb = aSkin; }
@@ -112,6 +112,10 @@
 					// The other side's goal: heads drop, and half of them hold their heads in their hands.
 					float dej = down * step(0.45, phase);
 					float ooh = max(uOoh * step(0.3, phase), dej);
+					// The last minutes of a close game: the stands go still, lean in, some on their feet, some with hands to their faces.
+					ooh = max(ooh, uTense * 0.55 * step(0.8, h2) * (1.0 - up));
+					stand = max(stand, uTense * 0.9 * step(0.72, h1));
+					sway *= 1.0 - 0.75 * uTense;
 					float armsUp = clamp(up * 1.4 * step(0.15, phase) + ooh * 1.2 + (excite - 0.75) * 2.0 * step(0.6, phase), 0.0, 1.0);
 					// Sitting, not all alike: some with arms folded or on their knees, some leaning on, some back.
 					armsUp = max(armsUp, (h3 > 0.8 ? 0.3 : h3 > 0.62 ? 0.16 : 0.0) * (1.0 - stand));
@@ -155,14 +159,14 @@
 					transformed.y += bounce;
 					transformed.x += sway * (0.4 + 0.6 * stand);
 					// leaning forward or back in the seat (and forward on the edge of it at a chance)
-					transformed.z += ((h1 - 0.5) * 0.22 * (1.0 - stand) + uOoh * 0.12 * step(0.3, phase) + dej * 0.08) * max(transformed.y - 1.0, 0.0);
+					transformed.z += ((h1 - 0.5) * 0.22 * (1.0 - stand) + uOoh * 0.12 * step(0.3, phase) + dej * 0.08 + uTense * 0.1 * step(0.3, h3)) * max(transformed.y - 1.0, 0.0);
 				`);
 		};
 		m.customProgramCacheKey = () => "ff-crowd";
 		return m;
 	}
 	// Fill the bowl: a fan in most seats of every row, in the home colours, with the visitors in the
-	// far corner of the main stand and gaps for the aisles. B: the bowl's plan and rows. The front
+	// end behind the right-hand goal and gaps for the aisles. B: the bowl's plan and rows. The front
 	// rows get the rounded shape, the high rows the light one, as the Graphics setting allows.
 	function buildCrowd3D (st, B) {
 		const T = THREE, GQ = gfx3(), SEAT = GQ.seat;
@@ -176,6 +180,7 @@
 		const lists = { full: [], lite: [], near: [], hi: [], nearHi: [] };
 		const fill = clamp(gs.fill * GQ.fill, 0.2, 1), terrace = gs.seats === "terrace";   // on a bare terrace they stand
 		const endRows = [ [], [] ];
+		const vis = (leagueMatch ? (leagueMatch.home ? TEAMS[leagueMatch.opp] : YOU) : null) || {}, awayFill = clamp(0.45 + (vis.str || 3) * 0.1, 0.5, 0.95);   // a big club brings a full end
 		B.rows.forEach((row, i) => {
 			const dS = row.d + row.rd * 0.66, ring = B.ring(dS), y = row.h + 1.5;
 			for (let j = 0; j < B.N; j++) {
@@ -185,9 +190,9 @@
 					if (ai.some(v => Math.abs(v - u) * L < 5.5)) { continue; }   // the aisle
 					const x = a.x + (b.x - a.x) * u, z = a.z + (b.z - a.z) * u;
 					if (nearSide && row.h < 20 && Math.abs(x - FW / 2) < 190 * Math.sqrt(S) * 1.24 + 26 && Math.abs(x - FW / 2) > 14) { continue; }   // the dugouts
-					const away = x > FW * 0.8 && z < FH * 0.22 && !nearSide;
+					const away = !nearSide && x > FW + 10 && z > FH * 0.06 && z < FH * 0.94;   // the visitors: the end behind the right-hand goal, in their colours
 					const nx = a.nx + (b.nx - a.nx) * u, nz = a.nz + (b.nz - a.nz) * u;
-					if (!(away ? rnd() < 0.9 : rnd() < fill)) { if (B.seats) { seat3D(B.seats[nearSide ? "near" : "main"], x, y - 1.5, z, nx, nz, SEAT, seatColOf(gs, i / B.rows.length, x * 0.37 + z * 0.91)); } continue; }   // an empty seat
+					if (!(away ? rnd() < awayFill : rnd() < fill)) { if (B.seats) { seat3D(B.seats[nearSide ? "near" : "main"], x, y - 1.5, z, nx, nz, SEAT, seatColOf(gs, i / B.rows.length, x * 0.37 + z * 0.91)); } continue; }   // an empty seat
 					const q = rnd();
 					// Behind the goals: the home ends, a standing, flag-waving block striped in the club's two colours.
 					const end = !away && !nearSide && (x < -10 || x > FW + 10) && z > FH * 0.12 && z < FH * 0.88;
@@ -360,6 +365,8 @@
 		if (m.olaT > 0) { m.olaT -= k; m.olaA = (m.olaA || 0) + k * 0.95; }
 		m.ola = (m.ola || 0) + ((m.olaT > 1.2 ? 1 : 0) - (m.ola || 0)) * Math.min(1, k * 1.6);
 		CROWD_U.uOla.value = reduceMotion ? 0 : m.ola;
+		m.tense = (m.tense || 0) + (lateNerves() * (1 - Math.max(0, m.home)) - (m.tense || 0)) * Math.min(1, k * 0.8);   // eased in over a few seconds
+		CROWD_U.uTense.value = reduceMotion ? 0 : m.tense;
 		animateEnds3D(k);
 		CROWD_U.uOlaA.value = m.olaA || 0;
 		// The LED boards roll on to the next sponsor every seven seconds, in a quick slide (held still with reduced motion).

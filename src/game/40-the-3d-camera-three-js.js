@@ -314,6 +314,15 @@
 		akron: { rc: 320, tiers: [ [ 15, 10, 7.6 ] ], roofIn: 0.32, ring: true },
 		monterrey: { rc: 40, tiers: [ [ 8, 10, 6.6 ], [ 8, 9.4, 9.6 ] ], roofIn: 0.4, ring: false }
 	};
+	// The ground's size, by the club's: a small club's ground is one low tier with roofs over the sides
+	// (no ring of boxes), a middling one keeps its shape with fewer rows, only the big clubs get the full bowl.
+	// It only ever takes rows away from the shape, so a small ground is cheaper to draw, never dearer.
+	function arch3 (gs) {
+		const A = ARCH3[gs && gs.arch] || ARCH3.azteca, sz = (gs && gs.size) || "big";
+		if (sz === "big") { return A; }
+		if (sz === "small") { const [ n, rd, rh ] = A.tiers[0]; return { ...A, tiers: [ [ Math.max(6, Math.round(n * 0.7)), rd, rh * 0.85 ] ], ring: false, rc: Math.min(A.rc, 60) }; }
+		return { ...A, tiers: A.tiers.map(([ n, rd, rh ], i) => [ Math.max(5, Math.round(n * (i ? 0.6 : 0.85))), rd, rh ]) };
+	}
 	const F_SIDE3 = 24, F_END3 = NET + 28;   // the stands' front: back from the touchlines, and from the goal lines
 	// The bowl's plan d out from its front: a rounded rectangle round the pitch, as points with their
 	// outward normals. Every distance gives the same number of points, so the rows line up.
@@ -416,7 +425,7 @@
 	// sun's rays, and everything outside it is in shade. Not under cloud (rain, snow) and not at night.
 	function standShadow (g, gs) {
 		if (!g || cond.ko !== "day" || cond.wet || cond.snow || !gs) { return; }
-		const A = ARCH3[gs.arch] || ARCH3.azteca, P = bowlProfile3(A), [ sx, sz ] = sunDir3D(), cot = 2.3;   // a low sun (about 23 degrees): a 3pm kick-off in the season
+		const A = arch3(gs), P = bowlProfile3(A), [ sx, sz ] = sunDir3D(), cot = 2.3;   // a low sun (about 23 degrees): a 3pm kick-off in the season
 		const r0 = bowlRing3(0, A.rc), rR = bowlRing3(P.back * A.roofIn, A.rc), rB = bowlRing3(P.back, A.rc);
 		const c = document.createElement("canvas"); c.width = g.canvas.width; c.height = g.canvas.height;
 		const s = c.getContext && c.getContext("2d");
@@ -437,7 +446,7 @@
 	}
 	function buildStadium3D () {
 		const gs = gstyle || { mow: "stripes", roof: true, lights: "roof", fill: 0.8, seat: "#3b4a58", concrete: "#1b2520", steps: "#262f21", arch: "azteca" };
-		const key = `${WW}x${WH}|${cond.label}|${cond.ko}|${cond.surfaceKey}|${gs.mow}${gs.roof}${gs.lights}${gs.fill}${gs.arch}${gs.mountains}|${gs.nat}${gs.seats}${gs.flags}${gs.bunting}${gs.concrete}|${KITS[0].outfield}${KITS[1].outfield}${homeSide}|${gfxLevel}`;
+		const key = `${WW}x${WH}|${cond.label}|${cond.ko}|${cond.surfaceKey}|${gs.mow}${gs.roof}${gs.lights}${gs.fill}${gs.arch}${gs.size}${gs.mountains}|${gs.nat}${gs.seats}${gs.flags}${gs.bunting}${gs.concrete}|${KITS[0].outfield}${KITS[1].outfield}${homeSide}|${gfxLevel}`;
 		if (G3.stadium && G3.stadiumKey === key && G3.standsRef === stands) { return; }
 		if (G3.stadium) {
 			G3.nearStand = null;
@@ -482,7 +491,7 @@
 		apron.rotation.x = -Math.PI / 2; apron.position.set(FW / 2, -0.6, FH / 2);
 		st.add(own(apron));
 		// 2. The stadium.
-		const A = ARCH3[gs.arch] || ARCH3.azteca, P = bowlProfile3(A), rings = {}, ring = d => rings[d] || (rings[d] = bowlRing3(d, A.rc));
+		const A = arch3(gs), P = bowlProfile3(A), rings = {}, ring = d => rings[d] || (rings[d] = bowlRing3(d, A.rc));
 		const N = ring(0).length, nxt = j => (j + 1) % N;
 		const isNear = j => { const a = ring(0)[j], b = ring(0)[nxt(j)]; return (a.nz + b.nz) / 2 > 0.45; };
 		const longSide = j => { const a = ring(0)[j], b = ring(0)[nxt(j)]; return Math.abs(a.nz + b.nz) / 2 > 0.92; };

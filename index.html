@@ -13379,6 +13379,8 @@ td, th { font-variant-numeric: tabular-nums; }
 			lights: r() < 0.5 ? "pylons" : "roof",
 			boards: [ club.color || "#f2b52e", "#eef2ec", club.color2 || "#1f2a36", "#1f2a36" ],
 			arch: pick([ "azteca", "akron", "monterrey" ]),   // the 3D stadium's shape
+			// How big a ground the club has: a small club a little one-tier ground, a big one the full bowl.
+			size: (club.str || 3) <= 1.6 ? "small" : (club.str || 3) < 3.9 ? "mid" : "big",
 			mountains: r() < 0.4,
 			...dressFor(groundNat(), r)   // the country's way of building a ground (drawn after the rest, so those stay as they were)
 		};
@@ -14744,6 +14746,13 @@ td, th { font-variant-numeric: tabular-nums; }
 	// A partisan crowd. The home end cheers its side's chances, saves, tackles and clearances, and
 	// applauds; the visitors' good moments get a murmur, a groan or, for a foul on one of the home
 	// side, whistles and boos. The away corner (and the 3D stands' away fans) celebrate theirs.
+	// Nerves: the last quarter of an hour of a level game or a one-goal one, 0 to 1 (full by the 88th
+	// minute). The stands go quieter and stiller between the chances; the 3D fans lean in (43).
+	function lateNerves () {
+		if (state !== "play" || !score) { return 0; }
+		const d = Math.abs(score[0] - score[1]);
+		return d > 1 ? 0 : clamp((minuteNow() - 75) / 13, 0, 1) * (d === 0 ? 0.85 : 1);
+	}
 	const reactAt = {};
 	function crowdReactImpl (kind, t) {
 		if (bulkSim || (state !== "play" && state !== "goal") || !(t === 0 || t === 1)) { return; }
@@ -14816,11 +14825,12 @@ td, th { font-variant-numeric: tabular-nums; }
 		const antTarget = own === homeSide ? deep : own >= 0 ? -0.6 * deep : 0;
 		crowd.ant = (crowd.ant || 0) + (antTarget - (crowd.ant || 0)) * 0.04;
 		const up = Math.max(0, crowd.ant), worry = Math.max(0, -crowd.ant);
-		const quiet = (state === "half" ? 0.5 : 1) * (isDerby() ? 1.35 : 1) * (crowdHush > 0 ? 0.35 : 1);   // a derby is the loudest night of the season
-		crowd.rumble.g.gain.setTargetAtTime(live ? (0.045 + 0.08 * heat + 0.03 * worry) * breathe * quiet : 0, t, 0.4);
+		const nerve = lateNerves() * (1 - heat);   // a hush between the chances late in a close game
+		const quiet = (1 - 0.4 * nerve) * (state === "half" ? 0.5 : 1) * (isDerby() ? 1.35 : 1) * (crowdHush > 0 ? 0.35 : 1);   // a derby is the loudest night of the season
+		crowd.rumble.g.gain.setTargetAtTime(live ? (0.045 + 0.08 * heat + 0.03 * worry + 0.035 * nerve) * breathe * quiet : 0, t, 0.4);
 		crowd.vox.g.gain.setTargetAtTime(live ? (0.022 + 0.085 * heat + 0.03 * up) * (1 - 0.3 * worry) * breathe * quiet : 0, t, 0.35);
 		crowd.air.g.gain.setTargetAtTime(live ? (0.004 + 0.01 * heat + 0.006 * up) * quiet : 0, t, 0.5);
-		crowd.vox.f.frequency.setTargetAtTime(620 + 650 * heat + 260 * up - 180 * crowdTense - 120 * worry + 70 * Math.sin(t * 0.9), t, 0.4);
+		crowd.vox.f.frequency.setTargetAtTime(620 + 650 * heat + 260 * up - 180 * crowdTense - 120 * worry - 110 * nerve + 70 * Math.sin(t * 0.9), t, 0.4);
 		if (crowd.pan) { crowd.pan.pan.setTargetAtTime(0.22 * Math.sin(t * 0.21), t, 0.5); }
 		// A passing move: each completed pass in a long spell of possession counts; from the fifth on the
 		// side's end sings "olé" with every one (the home end, or the away end when theirs is going).
@@ -16666,6 +16676,15 @@ td, th { font-variant-numeric: tabular-nums; }
 		akron: { rc: 320, tiers: [ [ 15, 10, 7.6 ] ], roofIn: 0.32, ring: true },
 		monterrey: { rc: 40, tiers: [ [ 8, 10, 6.6 ], [ 8, 9.4, 9.6 ] ], roofIn: 0.4, ring: false }
 	};
+	// The ground's size, by the club's: a small club's ground is one low tier with roofs over the sides
+	// (no ring of boxes), a middling one keeps its shape with fewer rows, only the big clubs get the full bowl.
+	// It only ever takes rows away from the shape, so a small ground is cheaper to draw, never dearer.
+	function arch3 (gs) {
+		const A = ARCH3[gs && gs.arch] || ARCH3.azteca, sz = (gs && gs.size) || "big";
+		if (sz === "big") { return A; }
+		if (sz === "small") { const [ n, rd, rh ] = A.tiers[0]; return { ...A, tiers: [ [ Math.max(6, Math.round(n * 0.7)), rd, rh * 0.85 ] ], ring: false, rc: Math.min(A.rc, 60) }; }
+		return { ...A, tiers: A.tiers.map(([ n, rd, rh ], i) => [ Math.max(5, Math.round(n * (i ? 0.6 : 0.85))), rd, rh ]) };
+	}
 	const F_SIDE3 = 24, F_END3 = NET + 28;   // the stands' front: back from the touchlines, and from the goal lines
 	// The bowl's plan d out from its front: a rounded rectangle round the pitch, as points with their
 	// outward normals. Every distance gives the same number of points, so the rows line up.
@@ -16768,7 +16787,7 @@ td, th { font-variant-numeric: tabular-nums; }
 	// sun's rays, and everything outside it is in shade. Not under cloud (rain, snow) and not at night.
 	function standShadow (g, gs) {
 		if (!g || cond.ko !== "day" || cond.wet || cond.snow || !gs) { return; }
-		const A = ARCH3[gs.arch] || ARCH3.azteca, P = bowlProfile3(A), [ sx, sz ] = sunDir3D(), cot = 2.3;   // a low sun (about 23 degrees): a 3pm kick-off in the season
+		const A = arch3(gs), P = bowlProfile3(A), [ sx, sz ] = sunDir3D(), cot = 2.3;   // a low sun (about 23 degrees): a 3pm kick-off in the season
 		const r0 = bowlRing3(0, A.rc), rR = bowlRing3(P.back * A.roofIn, A.rc), rB = bowlRing3(P.back, A.rc);
 		const c = document.createElement("canvas"); c.width = g.canvas.width; c.height = g.canvas.height;
 		const s = c.getContext && c.getContext("2d");
@@ -16789,7 +16808,7 @@ td, th { font-variant-numeric: tabular-nums; }
 	}
 	function buildStadium3D () {
 		const gs = gstyle || { mow: "stripes", roof: true, lights: "roof", fill: 0.8, seat: "#3b4a58", concrete: "#1b2520", steps: "#262f21", arch: "azteca" };
-		const key = `${WW}x${WH}|${cond.label}|${cond.ko}|${cond.surfaceKey}|${gs.mow}${gs.roof}${gs.lights}${gs.fill}${gs.arch}${gs.mountains}|${gs.nat}${gs.seats}${gs.flags}${gs.bunting}${gs.concrete}|${KITS[0].outfield}${KITS[1].outfield}${homeSide}|${gfxLevel}`;
+		const key = `${WW}x${WH}|${cond.label}|${cond.ko}|${cond.surfaceKey}|${gs.mow}${gs.roof}${gs.lights}${gs.fill}${gs.arch}${gs.size}${gs.mountains}|${gs.nat}${gs.seats}${gs.flags}${gs.bunting}${gs.concrete}|${KITS[0].outfield}${KITS[1].outfield}${homeSide}|${gfxLevel}`;
 		if (G3.stadium && G3.stadiumKey === key && G3.standsRef === stands) { return; }
 		if (G3.stadium) {
 			G3.nearStand = null;
@@ -16834,7 +16853,7 @@ td, th { font-variant-numeric: tabular-nums; }
 		apron.rotation.x = -Math.PI / 2; apron.position.set(FW / 2, -0.6, FH / 2);
 		st.add(own(apron));
 		// 2. The stadium.
-		const A = ARCH3[gs.arch] || ARCH3.azteca, P = bowlProfile3(A), rings = {}, ring = d => rings[d] || (rings[d] = bowlRing3(d, A.rc));
+		const A = arch3(gs), P = bowlProfile3(A), rings = {}, ring = d => rings[d] || (rings[d] = bowlRing3(d, A.rc));
 		const N = ring(0).length, nxt = j => (j + 1) % N;
 		const isNear = j => { const a = ring(0)[j], b = ring(0)[nxt(j)]; return (a.nz + b.nz) / 2 > 0.45; };
 		const longSide = j => { const a = ring(0)[j], b = ring(0)[nxt(j)]; return Math.abs(a.nz + b.nz) / 2 > 0.92; };
@@ -19364,7 +19383,7 @@ td, th { font-variant-numeric: tabular-nums; }
 	   head only): at that distance arms are a pixel. The near stand is only drawn when the camera
 	   looks back at it. */
 	const crowdMood = { excite: 0, home: 0, away: 0, ooh: 0, wave: 0 };
-	const CROWD_U = { uTime: { value: 0 }, uExcite: { value: 0 }, uHome: { value: 0 }, uAway: { value: 0 }, uOoh: { value: 0 }, uWave: { value: 0 }, uOla: { value: 0 }, uOlaA: { value: 0 }, uMid: { value: [ 0, 0, 1, 1 ] } };
+	const CROWD_U = { uTime: { value: 0 }, uExcite: { value: 0 }, uHome: { value: 0 }, uAway: { value: 0 }, uOoh: { value: 0 }, uWave: { value: 0 }, uOla: { value: 0 }, uOlaA: { value: 0 }, uTense: { value: 0 }, uMid: { value: [ 0, 0, 1, 1 ] } };
 	// A fan's shape, facing +z (the pitch). Every camera looks at the stands from the pitch side, so
 	// the faces turned away from it (backs and bottoms) are left out.
 	function fanGeometry3D (kind) {   // "lite", "full" or "hi" (the rounded shape for the front rows)
@@ -19447,7 +19466,7 @@ td, th { font-variant-numeric: tabular-nums; }
 			sh.vertexShader = sh.vertexShader
 				.replace("#include <common>", `#include <common>
 					attribute float aPart; attribute vec4 aFan; attribute vec3 aSkin;
-					uniform float uTime, uExcite, uHome, uAway, uOoh, uWave, uOla, uOlaA; uniform vec4 uMid;`)
+					uniform float uTime, uExcite, uHome, uAway, uOoh, uWave, uOla, uOlaA, uTense; uniform vec4 uMid;`)
 				.replace("#include <color_vertex>", `#include <color_vertex>
 					int pt = int(aPart + 0.5);
 					if (pt == 1 || pt == 5) { vColor.rgb = aSkin; }
@@ -19470,6 +19489,10 @@ td, th { font-variant-numeric: tabular-nums; }
 					// The other side's goal: heads drop, and half of them hold their heads in their hands.
 					float dej = down * step(0.45, phase);
 					float ooh = max(uOoh * step(0.3, phase), dej);
+					// The last minutes of a close game: the stands go still, lean in, some on their feet, some with hands to their faces.
+					ooh = max(ooh, uTense * 0.55 * step(0.8, h2) * (1.0 - up));
+					stand = max(stand, uTense * 0.9 * step(0.72, h1));
+					sway *= 1.0 - 0.75 * uTense;
 					float armsUp = clamp(up * 1.4 * step(0.15, phase) + ooh * 1.2 + (excite - 0.75) * 2.0 * step(0.6, phase), 0.0, 1.0);
 					// Sitting, not all alike: some with arms folded or on their knees, some leaning on, some back.
 					armsUp = max(armsUp, (h3 > 0.8 ? 0.3 : h3 > 0.62 ? 0.16 : 0.0) * (1.0 - stand));
@@ -19513,14 +19536,14 @@ td, th { font-variant-numeric: tabular-nums; }
 					transformed.y += bounce;
 					transformed.x += sway * (0.4 + 0.6 * stand);
 					// leaning forward or back in the seat (and forward on the edge of it at a chance)
-					transformed.z += ((h1 - 0.5) * 0.22 * (1.0 - stand) + uOoh * 0.12 * step(0.3, phase) + dej * 0.08) * max(transformed.y - 1.0, 0.0);
+					transformed.z += ((h1 - 0.5) * 0.22 * (1.0 - stand) + uOoh * 0.12 * step(0.3, phase) + dej * 0.08 + uTense * 0.1 * step(0.3, h3)) * max(transformed.y - 1.0, 0.0);
 				`);
 		};
 		m.customProgramCacheKey = () => "ff-crowd";
 		return m;
 	}
 	// Fill the bowl: a fan in most seats of every row, in the home colours, with the visitors in the
-	// far corner of the main stand and gaps for the aisles. B: the bowl's plan and rows. The front
+	// end behind the right-hand goal and gaps for the aisles. B: the bowl's plan and rows. The front
 	// rows get the rounded shape, the high rows the light one, as the Graphics setting allows.
 	function buildCrowd3D (st, B) {
 		const T = THREE, GQ = gfx3(), SEAT = GQ.seat;
@@ -19534,6 +19557,7 @@ td, th { font-variant-numeric: tabular-nums; }
 		const lists = { full: [], lite: [], near: [], hi: [], nearHi: [] };
 		const fill = clamp(gs.fill * GQ.fill, 0.2, 1), terrace = gs.seats === "terrace";   // on a bare terrace they stand
 		const endRows = [ [], [] ];
+		const vis = (leagueMatch ? (leagueMatch.home ? TEAMS[leagueMatch.opp] : YOU) : null) || {}, awayFill = clamp(0.45 + (vis.str || 3) * 0.1, 0.5, 0.95);   // a big club brings a full end
 		B.rows.forEach((row, i) => {
 			const dS = row.d + row.rd * 0.66, ring = B.ring(dS), y = row.h + 1.5;
 			for (let j = 0; j < B.N; j++) {
@@ -19543,9 +19567,9 @@ td, th { font-variant-numeric: tabular-nums; }
 					if (ai.some(v => Math.abs(v - u) * L < 5.5)) { continue; }   // the aisle
 					const x = a.x + (b.x - a.x) * u, z = a.z + (b.z - a.z) * u;
 					if (nearSide && row.h < 20 && Math.abs(x - FW / 2) < 190 * Math.sqrt(S) * 1.24 + 26 && Math.abs(x - FW / 2) > 14) { continue; }   // the dugouts
-					const away = x > FW * 0.8 && z < FH * 0.22 && !nearSide;
+					const away = !nearSide && x > FW + 10 && z > FH * 0.06 && z < FH * 0.94;   // the visitors: the end behind the right-hand goal, in their colours
 					const nx = a.nx + (b.nx - a.nx) * u, nz = a.nz + (b.nz - a.nz) * u;
-					if (!(away ? rnd() < 0.9 : rnd() < fill)) { if (B.seats) { seat3D(B.seats[nearSide ? "near" : "main"], x, y - 1.5, z, nx, nz, SEAT, seatColOf(gs, i / B.rows.length, x * 0.37 + z * 0.91)); } continue; }   // an empty seat
+					if (!(away ? rnd() < awayFill : rnd() < fill)) { if (B.seats) { seat3D(B.seats[nearSide ? "near" : "main"], x, y - 1.5, z, nx, nz, SEAT, seatColOf(gs, i / B.rows.length, x * 0.37 + z * 0.91)); } continue; }   // an empty seat
 					const q = rnd();
 					// Behind the goals: the home ends, a standing, flag-waving block striped in the club's two colours.
 					const end = !away && !nearSide && (x < -10 || x > FW + 10) && z > FH * 0.12 && z < FH * 0.88;
@@ -19718,6 +19742,8 @@ td, th { font-variant-numeric: tabular-nums; }
 		if (m.olaT > 0) { m.olaT -= k; m.olaA = (m.olaA || 0) + k * 0.95; }
 		m.ola = (m.ola || 0) + ((m.olaT > 1.2 ? 1 : 0) - (m.ola || 0)) * Math.min(1, k * 1.6);
 		CROWD_U.uOla.value = reduceMotion ? 0 : m.ola;
+		m.tense = (m.tense || 0) + (lateNerves() * (1 - Math.max(0, m.home)) - (m.tense || 0)) * Math.min(1, k * 0.8);   // eased in over a few seconds
+		CROWD_U.uTense.value = reduceMotion ? 0 : m.tense;
 		animateEnds3D(k);
 		CROWD_U.uOlaA.value = m.olaA || 0;
 		// The LED boards roll on to the next sponsor every seven seconds, in a quick slide (held still with reduced motion).

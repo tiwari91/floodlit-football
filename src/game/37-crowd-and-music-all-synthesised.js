@@ -377,6 +377,13 @@
 	// A partisan crowd. The home end cheers its side's chances, saves, tackles and clearances, and
 	// applauds; the visitors' good moments get a murmur, a groan or, for a foul on one of the home
 	// side, whistles and boos. The away corner (and the 3D stands' away fans) celebrate theirs.
+	// Nerves: the last quarter of an hour of a level game or a one-goal one, 0 to 1 (full by the 88th
+	// minute). The stands go quieter and stiller between the chances; the 3D fans lean in (43).
+	function lateNerves () {
+		if (state !== "play" || !score) { return 0; }
+		const d = Math.abs(score[0] - score[1]);
+		return d > 1 ? 0 : clamp((minuteNow() - 75) / 13, 0, 1) * (d === 0 ? 0.85 : 1);
+	}
 	const reactAt = {};
 	function crowdReactImpl (kind, t) {
 		if (bulkSim || (state !== "play" && state !== "goal") || !(t === 0 || t === 1)) { return; }
@@ -449,11 +456,12 @@
 		const antTarget = own === homeSide ? deep : own >= 0 ? -0.6 * deep : 0;
 		crowd.ant = (crowd.ant || 0) + (antTarget - (crowd.ant || 0)) * 0.04;
 		const up = Math.max(0, crowd.ant), worry = Math.max(0, -crowd.ant);
-		const quiet = (state === "half" ? 0.5 : 1) * (isDerby() ? 1.35 : 1) * (crowdHush > 0 ? 0.35 : 1);   // a derby is the loudest night of the season
-		crowd.rumble.g.gain.setTargetAtTime(live ? (0.045 + 0.08 * heat + 0.03 * worry) * breathe * quiet : 0, t, 0.4);
+		const nerve = lateNerves() * (1 - heat);   // a hush between the chances late in a close game
+		const quiet = (1 - 0.4 * nerve) * (state === "half" ? 0.5 : 1) * (isDerby() ? 1.35 : 1) * (crowdHush > 0 ? 0.35 : 1);   // a derby is the loudest night of the season
+		crowd.rumble.g.gain.setTargetAtTime(live ? (0.045 + 0.08 * heat + 0.03 * worry + 0.035 * nerve) * breathe * quiet : 0, t, 0.4);
 		crowd.vox.g.gain.setTargetAtTime(live ? (0.022 + 0.085 * heat + 0.03 * up) * (1 - 0.3 * worry) * breathe * quiet : 0, t, 0.35);
 		crowd.air.g.gain.setTargetAtTime(live ? (0.004 + 0.01 * heat + 0.006 * up) * quiet : 0, t, 0.5);
-		crowd.vox.f.frequency.setTargetAtTime(620 + 650 * heat + 260 * up - 180 * crowdTense - 120 * worry + 70 * Math.sin(t * 0.9), t, 0.4);
+		crowd.vox.f.frequency.setTargetAtTime(620 + 650 * heat + 260 * up - 180 * crowdTense - 120 * worry - 110 * nerve + 70 * Math.sin(t * 0.9), t, 0.4);
 		if (crowd.pan) { crowd.pan.pan.setTargetAtTime(0.22 * Math.sin(t * 0.21), t, 0.5); }
 		// A passing move: each completed pass in a long spell of possession counts; from the fifth on the
 		// side's end sings "olé" with every one (the home end, or the away end when theirs is going).
