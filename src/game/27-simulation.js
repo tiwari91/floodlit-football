@@ -78,8 +78,9 @@
 		const reverse = accMax >= ACC_YOU && accMax < 1 && v0 > 1.4 && want0 > 0.3 && (dvx * p.vx + dvy * p.vy) / (want0 * v0) < -0.2;
 		const halt = accMax >= ACC_YOU && accMax < 1 && v0 > 0.6 && want0 < 0.3;   // letting go at speed: he pulls up over a couple of strides, not dead on the spot
 		if (halt) { ax *= 0.55; ay *= 0.55; }
+		const burst = accMax >= ACC_YOU && accMax < 1 && faster && v0 < 1.6;   // from a standstill he drives off over a few steps, not at full pace at once
 		// Quick men get going quicker too; on the ball a good dribbler is sharper off the mark.
-		const cap = accMax * (faster ? 1 : 1.7) * (cond.grip / 0.22) * (accMax < 1 ? build(p).agil * (1 + (A(p, "pac") - 68) * 0.005) * (ball && ball.owner === p ? 1 + 0.12 * driD(p) : 1) : 1) * (reverse ? 0.6 : halt ? 0.55 : 1), a = Math.hypot(ax, ay);
+		const cap = accMax * (faster ? 1 : 1.7) * (cond.grip / 0.22) * (accMax < 1 ? build(p).agil * (1 + (A(p, "pac") - 68) * 0.005) * (ball && ball.owner === p ? 1 + 0.12 * driD(p) : 1) : 1) * (reverse ? 0.6 : halt ? 0.55 : burst ? 0.5 : 1), a = Math.hypot(ax, ay);
 		if (a > cap) { ax *= cap / a; ay *= cap / a; }
 		// At speed he can't swing round on the spot: the sideways push is limited, so a turn is a
 		// curve that tightens as he slows, and a hard change of direction means plant and cut.
