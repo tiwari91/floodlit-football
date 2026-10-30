@@ -268,7 +268,7 @@
 	// (right alongside, a shoulder; further out, a slide), and a hold is the press assist, at any
 	// distance, for as long as you hold it. He starts closing down as soon as it goes down, so a
 	// tap costs no ground on the way in.
-	const TAP_FRAMES = 8;
+	const TAP_FRAMES = 15;   // a quarter of a second: an ordinary key press is a tap (at 8 frames many presses counted as a hold, and no slide came)
 	let tackleDownAt = -1;
 	function tackleDown () { if (odr) { endOdr(); return; } tackleDownAt = frame; }
 	function tackleUp () { const tap = tackleDownAt >= 0 && frame - tackleDownAt < TAP_FRAMES; tackleDownAt = -1; if (tap) { humanTackle(); } }
@@ -304,7 +304,7 @@
 			// Further out: a slide tackle, aimed at where the carrier is heading
 			// rather than just the way you happen to face. Beyond slide range a tap does nothing.
 			const target = o && o.team === 1 ? o : null;
-			if (target ? dist(p, target) >= 95 : dist(p, ball) > 70) { return; }
+			if (target ? dist(p, target) >= 95 : dist(p, ball) > 70) { if (target) { burst(p.x, p.y, "Too far to slide"); } return; }
 			if (target) { p.dir = Math.atan2(target.y + target.vy * 6 - p.y, target.x + target.vx * 6 - p.x); }
 			p.lunge = 14;
 			p.lungeCd = LUNGE_CD;

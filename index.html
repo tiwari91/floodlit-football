@@ -9324,7 +9324,7 @@ td, th { font-variant-numeric: tabular-nums; }
 	// (right alongside, a shoulder; further out, a slide), and a hold is the press assist, at any
 	// distance, for as long as you hold it. He starts closing down as soon as it goes down, so a
 	// tap costs no ground on the way in.
-	const TAP_FRAMES = 8;
+	const TAP_FRAMES = 15;   // a quarter of a second: an ordinary key press is a tap (at 8 frames many presses counted as a hold, and no slide came)
 	let tackleDownAt = -1;
 	function tackleDown () { if (odr) { endOdr(); return; } tackleDownAt = frame; }
 	function tackleUp () { const tap = tackleDownAt >= 0 && frame - tackleDownAt < TAP_FRAMES; tackleDownAt = -1; if (tap) { humanTackle(); } }
@@ -9360,7 +9360,7 @@ td, th { font-variant-numeric: tabular-nums; }
 			// Further out: a slide tackle, aimed at where the carrier is heading
 			// rather than just the way you happen to face. Beyond slide range a tap does nothing.
 			const target = o && o.team === 1 ? o : null;
-			if (target ? dist(p, target) >= 95 : dist(p, ball) > 70) { return; }
+			if (target ? dist(p, target) >= 95 : dist(p, ball) > 70) { if (target) { burst(p.x, p.y, "Too far to slide"); } return; }
 			if (target) { p.dir = Math.atan2(target.y + target.vy * 6 - p.y, target.x + target.vx * 6 - p.x); }
 			p.lunge = 14;
 			p.lungeCd = LUNGE_CD;
@@ -20710,13 +20710,13 @@ td, th { font-variant-numeric: tabular-nums; }
 		const { W, D, H } = CER_STAGE, sx = C.sx, sz = C.sz, mine = C.team, N = mine.length;
 		C.frontZ = sz + D / 2; C.laneF = sz + 13; C.laneM = sz + 1; C.laneB = sz - 12;
 		C.presX = sx - W / 2 + 46;
-		const walkV = 62, stepGap = clamp(11 / N, 1, 1.7), tLine = 2.8;
+		const walkV = 62, stepGap = clamp(18 / N, 1.7, 2.2), tLine = 2.8;   // one man at the presenter at a time: the gap covers his stop (1.5 s) and stepping away
 		const queue = q => [ sx - W / 2 - 34 - q * 12, C.frontZ + 10 ];
 		const others = mine.filter(p => p !== C.capt), slots = others.map((p, i) => sx + W / 2 - 22 - i * (W - 50) / Math.max(1, others.length - 1 + (others.length === 1 ? 1 : 0)));
 		C.plan = new Map();
 		mine.forEach((p, i) => {
 			const start = tLine + i * stepGap, isCapt = p === C.capt;
-			const pts = [ [ ...queue(0), 0, 0 ], [ sx - W / 2 - 16, C.frontZ - 9, 0, 0 ], [ sx - W / 2 + 6, C.laneF, H, 0 ], [ C.presX - 13, C.laneF, H, isCapt ? 1.6 : 0.7 ] ];
+			const pts = [ [ ...queue(0), 0, 0 ], [ sx - W / 2 - 16, C.frontZ - 9, 0, 0 ], [ sx - W / 2 + 6, C.laneF, H, 0 ], [ C.presX - 13, C.laneF, H, isCapt ? 1.9 : 1.5 ] ];   // long enough a stop to see the medal put on
 			if (isCapt) { pts.push([ sx, C.laneF, H, 0 ]); }
 			else { const j = others.indexOf(p); pts.push([ C.presX - 13, C.laneM, H, 0 ], [ slots[j], C.laneM, H, 0 ], [ slots[j], C.laneB, H, 0 ]); }
 			// Times along the path at walking pace, holding still where a pause is asked for (the handshake).
@@ -20726,8 +20726,8 @@ td, th { font-variant-numeric: tabular-nums; }
 				legs.push({ a, b, t0: t, t1: t + dur }); t += dur;
 				if (b[3]) { legs.push({ a: b, b, t0: t, t1: t + b[3], pause: true }); t += b[3]; }
 			}
-			const medalAt = legs.find(l => l.pause).t0 + 0.35;
-			C.plan.set(p, { i, start, legs, end: t, medalAt, gather: [ sx - W / 2 - 70 + (Math.random() - 0.5) * 120, C.frontZ + 60 + Math.random() * 90 ], queue, isCapt, slot: isCapt ? sx : slots[others.indexOf(p)], jumpPh: Math.random() });
+			const stop = legs.find(l => l.pause), medalAt = stop.t0 + 0.95;   // hung round his neck once the presenter has reached over his head
+			C.plan.set(p, { i, start, legs, end: t, medalAt, stopAt: stop.t0, gather: [ sx - W / 2 - 70 + (Math.random() - 0.5) * 120, C.frontZ + 60 + Math.random() * 90 ], queue, isCapt, slot: isCapt ? sx : slots[others.indexOf(p)], jumpPh: Math.random() });
 		});
 		const cp = C.plan.get(C.capt);
 		C.tTrophy = cp.legs.find(l => l.pause).t0 + 0.6;
@@ -20909,7 +20909,7 @@ td, th { font-variant-numeric: tabular-nums; }
 		for (const p of C.team) {
 			const s = parade ? deckSpot(C, p, t) : cerSpot(C, p, t), pl = C.plan.get(p);
 			placeFig(C, p, s, k, t);
-			p.celebA = 0; p.celebK = 0; p.hug = 0; p.jump = 0;
+			p.celebA = 0; p.celebK = 0; p.hug = 0; p.jump = 0; p.sulk = 0;
 			const lifted = t >= C.tLift && !parade;
 			if (p === C.capt && t >= C.tTrophy) {
 				const up = parade ? (Math.sin((t - C.tParade) * 1.3) > -0.2 ? 1 : 0) : lifted ? 1 : 0;
@@ -20925,9 +20925,22 @@ td, th { font-variant-numeric: tabular-nums; }
 			placeFig(C, p, parade ? { x: -9000, z: -9000, h: 0, face: 0 } : { x: s[0], z: s[1], h: 0, face: Math.PI }, k, t);
 			p.celebA = 0; p.celebK = 0; p.hug = 0; p.jump = 0; p.sulk = parade ? 0 : 0.35;
 		}
+		// The medal: whoever is stopped at the presenter now. The presenter lifts it in front of him and reaches
+		// over the player's head (arms forward: the hug pose, unhurried), the player dips his head as it goes on,
+		// then the presenter's arms come down. rcv: that player; reach: 0 to 1 and back.
+		let rcv = null, reach = 0;
+		if (!parade) {
+			for (const p of C.team) {
+				const pl = C.plan.get(p), u = t - pl.stopAt;
+				if (u >= 0 && u < 1.5) { rcv = p; reach = smooth3(clamp(u / 0.7, 0, 1)) * (1 - smooth3(clamp((t - pl.medalAt - 0.15) / 0.4, 0, 1))); break; }
+			}
+			if (rcv && t < C.tLift) { rcv.sulk = 0.4 * Math.exp(-Math.pow((t - C.plan.get(rcv).medalAt) / 0.3, 2)); }
+		}
+		C.rcv = rcv;
 		officials3.forEach((o, i) => {
 			const s = !parade && i === 0 ? { x: C.presX + 2, z: C.laneF, h: CER_STAGE.H, face: Math.PI } : { x: -9000 - i * 50, z: -9000, h: 0, face: 0 };
 			placeFig(C, o, s, k, t);
+			if (i === 0) { o.celebA = reach > 0.01 ? 0.6 * reach : 0; o.celebK = 0; o.hug = reach > 0.01 ? 1 : 0; o.jump = 0; }
 		});
 		// The crowd: up on its feet for the lift, the scarves out.
 		const mineFans = homeSide === 0 ? "home" : "away";
@@ -20940,6 +20953,12 @@ td, th { font-variant-numeric: tabular-nums; }
 			const r = F.rigOf.get(p);
 			if (!r || t < C.plan.get(p).medalAt) { continue; }
 			C.medals.setMatrixAt(nm++, M.copy(r.spine.matrixWorld));
+		}
+		// Before it is hung, the medal is in the presenter's hands, held up in front of him.
+		const pr = officials3[0] && F.rigOf.get(officials3[0]);
+		if (C.rcv && pr && t < C.plan.get(C.rcv).medalAt && nm < C.medals.instanceMatrix.count) {
+			const T2 = C.Mt || (C.Mt = new THREE.Matrix4());
+			C.medals.setMatrixAt(nm++, M.copy(pr.spine.matrixWorld).multiply(T2.makeTranslation(5.5, 3.5, 0)));
 		}
 		C.medals.count = nm; C.medals.instanceMatrix.needsUpdate = true;
 		const cr = F.rigOf.get(C.capt), tr = C.trophy, V = C.V || (C.V = [ new THREE.Vector3(), new THREE.Vector3() ]);

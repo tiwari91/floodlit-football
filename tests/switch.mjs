@@ -140,6 +140,8 @@ r = await tackleKey(30, 4);
 check("A tapped alongside the carrier: a shoulder challenge when you let go, not before", !r.actedEarly && r.acted && !r.slid, JSON.stringify(r));
 r = await tackleKey(70, 4);
 check("A tapped from further out: a slide when you let go", !r.actedEarly && r.slid, JSON.stringify(r));
+r = await tackleKey(70, 12);   // an ordinary key press (a fifth of a second) is still a tap
+check("A pressed normally (about 0.2 s) from further out: still a slide", !r.actedEarly && r.slid, JSON.stringify(r));
 r = await tackleKey(70, 30);
 check("A held inside slide range: the press (he closes him down), no slide, and nothing on letting go", !r.actedEarly && !r.acted && r.closed > 15, JSON.stringify(r));
 r = await tackleKey(300, 40);
