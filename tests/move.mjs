@@ -314,9 +314,11 @@ const sides = await page.evaluate(async () => {
 	for (let k = 0; k < 300 && out.length < 40; k++) {   // live play: wait (up to 12 s) until some stand still
 		await new Promise(r => setTimeout(r, 40));
 		F.players.forEach((p, i) => {
-			const r = G3.fig && G3.fig.rigOf && G3.fig.rigOf.get(p);
 			const n = Math.hypot(p.vx || 0, p.vy || 0) > 0.3 ? 0 : (stillFor.get(p) || 0) + 1; stillFor.set(p, n);
-			if (!r || p.role === "gk" || n < 5 || p.kickA > 0 || (p.celebA || 0) > 0 || p.headHands > 0 || p.fistPump > 0 || F.staOf(p) < 0.6 || F.ball.owner === p) { return; }
+			if (!G3.fig || p.role === "gk" || n < 5 || p.kickA > 0 || (p.celebA || 0) > 0 || p.headHands > 0 || p.fistPump > 0 || F.staOf(p) < 0.6 || F.ball.owner === p) { return; }
+			// A figure posed now from his state, not the one last drawn: on a busy machine the drawing lags, and
+			// a man already standing could still be drawn mid-stride.
+			const r = F.poseProbe(p, 30);
 			const hip = r.hips.getWorldPosition(r.hips.position.clone()), o = r.root.getWorldPosition(r.root.position.clone());
 			const side = r.root.localToWorld(r.root.position.clone().set(0, 0, 1)).sub(o).normalize();
 			for (let j = 0; j < 2; j++) {
