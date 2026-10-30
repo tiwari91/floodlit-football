@@ -213,13 +213,14 @@ const dress = await page.evaluate(async () => {
 	return { flags, banners, waves: a0 !== a1, drawMs: +F.drawMs.toFixed(2) };
 });
 // Exhausted players stay upright in open play (they bend over only at a stoppage): posed on a spare figure,
-// so it no longer depends on catching a sprinting man mid-lean.
+// so it no longer depends on catching a sprinting man mid-lean. Every action is cleared, the wind-up for a pass
+// included: borrowed mid-wind-up (likelier on a slow run) he counts as acting and never takes the tired pose.
 const tired = await page.evaluate(() => {
 	const F = window.__ff, W = n => n.getWorldPosition(n.position.clone());
 	for (let i = 0; i < 3000 && (F.state !== "play" || F.setPiece || F.restartWalk); i++) { F.step(1); }
 	const fz = F.freeze; F.freeze = 0;
 	const p = F.outfield(0)[3], keep = [ p.sta, p.vx, p.vy, p.runAmt ], owner = F.ball.owner;
-	Object.assign(p, { kickA: 0, lunge: 0, slideAI: 0, fall: 0, celebA: 0, celebK: 0, jump: 0, throwA: 0, dive: 0, headHands: 0, fistPump: 0, kneel: 0, hug: 0, sulk: 0, plant: 0, recv: 0, recvK: null, vx: 0, vy: 0, runAmt: 0, sprintAmt: 0, jockW: 0, shieldW: 0, shuf: 0 });
+	Object.assign(p, { kickA: 0, windUp: 0, lunge: 0, slideAI: 0, fall: 0, celebA: 0, celebK: 0, jump: 0, throwA: 0, dive: 0, headHands: 0, fistPump: 0, kneel: 0, hug: 0, sulk: 0, plant: 0, recv: 0, recvK: null, vx: 0, vy: 0, runAmt: 0, sprintAmt: 0, jockW: 0, shieldW: 0, shuf: 0 });
 	if (owner === p) { F.ball.owner = null; }
 	const lean = () => { const r = F.poseProbe(p, 1), inv = r.root.matrixWorld.clone().invert(), hp = W(r.hips).applyMatrix4(inv), nk = W(r.neck).applyMatrix4(inv); return +(Math.atan2(nk.x - hp.x, nk.y - hp.y) * 57.3).toFixed(1); };
 	p.sta = 1; const fresh = lean(); p.sta = 0.3; const open = lean(); F.freeze = 30; const stop = lean(); F.freeze = fz;
@@ -307,11 +308,15 @@ const sides = await page.evaluate(async () => {
 	const F = window.__ff, G3 = F.G3, out = [];
 	for (let i = 0; i < 4000 && F.state !== "play"; i++) { F.step(1); }
 	F.freeze = 0;
-	for (let k = 0; k < 200 && out.length < 40; k++) {   // live play: wait (up to 8 s) until some stand still
+	// Only a man who has stood still for five samples in a row: one who has just stopped is still mid-stride in the
+	// pose (an arm swinging across him), and on a busy machine fewer frames pass between samples to settle it.
+	const stillFor = new Map();
+	for (let k = 0; k < 300 && out.length < 40; k++) {   // live play: wait (up to 12 s) until some stand still
 		await new Promise(r => setTimeout(r, 40));
 		F.players.forEach((p, i) => {
 			const r = G3.fig && G3.fig.rigOf && G3.fig.rigOf.get(p);
-			if (!r || p.role === "gk" || Math.hypot(p.vx || 0, p.vy || 0) > 0.3 || p.kickA > 0 || (p.celebA || 0) > 0 || p.headHands > 0 || p.fistPump > 0 || F.staOf(p) < 0.6 || F.ball.owner === p) { return; }
+			const n = Math.hypot(p.vx || 0, p.vy || 0) > 0.3 ? 0 : (stillFor.get(p) || 0) + 1; stillFor.set(p, n);
+			if (!r || p.role === "gk" || n < 5 || p.kickA > 0 || (p.celebA || 0) > 0 || p.headHands > 0 || p.fistPump > 0 || F.staOf(p) < 0.6 || F.ball.owner === p) { return; }
 			const hip = r.hips.getWorldPosition(r.hips.position.clone()), o = r.root.getWorldPosition(r.root.position.clone());
 			const side = r.root.localToWorld(r.root.position.clone().set(0, 0, 1)).sub(o).normalize();
 			for (let j = 0; j < 2; j++) {

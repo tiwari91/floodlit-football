@@ -476,7 +476,16 @@
 				.replace("#include <color_fragment>", `#include <color_fragment>
 					if (vCov < 0.035 * (ffHash(vHd * 140.0) - 0.35)) { discard; }   // a soft, slightly ragged hairline cut per pixel, never a triangle's edge
 					diffuseColor.rgb *= 0.84 + 0.16 * ffHash(vHd * vec3(70.0, 90.0, 70.0));
-					diffuseColor.rgb *= 0.86 + 0.14 * smoothstep(0.0, 0.12, vCov);   // thinner, darker at the line`);
+					diffuseColor.rgb *= 0.86 + 0.14 * smoothstep(0.0, 0.12, vCov);   // thinner, darker at the line
+					// Combed strands running from the crown down to the hairline (round the head, so the lines meet
+					// in a whorl at the top), a few looser clumps, and a lighter crown where the light catches it.
+					// Whole-number frequencies keep the lines unbroken across the back; they fade out with distance
+					// (fwidth) so the far players never shimmer.
+					float hAng = atan(vHd.z, vHd.x);
+					float fine = sin(hAng * 90.0 + 5.0 * sin(vHd.y * 9.0)), clump = sin(hAng * 14.0 + 3.0 * vHd.y);
+					float near = clamp(1.0 - fwidth(hAng * 90.0) * 0.5, 0.0, 1.0);
+					diffuseColor.rgb += (diffuseColor.rgb + 0.05) * (0.14 * fine * near + 0.07 * clump) * smoothstep(0.0, 0.25, vCov);   // added light, so black hair shows its strands too
+					diffuseColor.rgb += (diffuseColor.rgb * 0.12 + 0.035) * smoothstep(0.55, 0.95, vHd.y);`);
 			sh.fragmentShader = skinLight3D(sh.fragmentShader, HAIR_LIGHT3);
 		};
 		hairMat.customProgramCacheKey = () => "ff-hair";
@@ -703,7 +712,8 @@
 			go.fwd[free] += 1.3 * still; go.lift[free] += 0.25 * still; go.toe[free] -= 0.2 * still; go.crouch += 0.15 * still;   // the free foot eased forward, its knee soft and heel light
 			r.chest.rotation.y += (sd - 0.5) * 0.4 * still;
 			r.spine.rotation.z += Math.sin(idle * 1.3) * 0.015 * still;
-			for (let i = 0; i < 2; i++) { r.el[i].rotation.z += (0.1 + 0.3 * ((sd * 7.3 + i * 0.31) % 1)) * still; r.sh[i].rotation.x += OUT3(i) * 0.04 * still; }   // arms eased away from the sides
+			// Arms hang loose: the elbow eased nearly straight (his own small bend), the palms turned in toward the thighs.
+				for (let i = 0; i < 2; i++) { r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.18 + 0.22 * ((sd * 7.3 + i * 0.31) % 1), still); r.sh[i].rotation.x += OUT3(i) * 0.04 * still; r.ha[i].rotation.y = OUT3(i) * 0.9 * still; }   // arms eased away from the sides
 			const calm = state !== "play" || freeze > 0;   // only at a stoppage: in open play a tired man stays upright
 			const w = p.team >= 0 && calm ? clamp((0.6 - staOf(p)) / 0.25, 0, 1) * still : 0;
 			if (w > 0) {
