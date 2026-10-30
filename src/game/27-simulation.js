@@ -72,8 +72,12 @@
 	function movePlayer (p, dvx, dvy, grip = cond.grip, accMax = ACC_AI, turn = 0.55) {
 		let ax = (dvx - p.vx) * grip, ay = (dvy - p.vy) * grip;
 		const faster = dvx * dvx + dvy * dvy > p.vx * p.vx + p.vy * p.vy;
+		// Turning back at speed, your man has to brake through a plant rather than spin on the spot: the
+		// braking is softer (a 180 at full pace takes about a third of a second), nearer the computer's.
+		const v0 = Math.hypot(p.vx, p.vy), want0 = Math.hypot(dvx, dvy);
+		const reverse = accMax >= ACC_YOU && accMax < 1 && v0 > 1.4 && want0 > 0.3 && (dvx * p.vx + dvy * p.vy) / (want0 * v0) < -0.2;
 		// Quick men get going quicker too; on the ball a good dribbler is sharper off the mark.
-		const cap = accMax * (faster ? 1 : 1.7) * (cond.grip / 0.22) * (accMax < 1 ? build(p).agil * (1 + (A(p, "pac") - 68) * 0.005) * (ball && ball.owner === p ? 1 + 0.12 * driD(p) : 1) : 1), a = Math.hypot(ax, ay);
+		const cap = accMax * (faster ? 1 : 1.7) * (cond.grip / 0.22) * (accMax < 1 ? build(p).agil * (1 + (A(p, "pac") - 68) * 0.005) * (ball && ball.owner === p ? 1 + 0.12 * driD(p) : 1) : 1) * (reverse ? 0.6 : 1), a = Math.hypot(ax, ay);
 		if (a > cap) { ax *= cap / a; ay *= cap / a; }
 		// At speed he can't swing round on the spot: the sideways push is limited, so a turn is a
 		// curve that tightens as he slows, and a hard change of direction means plant and cut.
@@ -85,7 +89,7 @@
 			if (Math.abs(side) > latCap) { side = Math.sign(side) * latCap; }
 			ax = along * ux - side * uy; ay = along * uy + side * ux;
 			const want = Math.hypot(dvx, dvy);
-			if (want > 0.3 && v > 1.4 && (dvx * ux + dvy * uy) / want < -0.2) { p.plant = 10; }
+			if (want > 0.3 && v > 1.4 && (dvx * ux + dvy * uy) / want < -0.2) { p.plant = reverse ? 14 : 10; }
 		}
 		p.vx += ax;
 		p.vy += ay;
