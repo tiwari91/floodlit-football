@@ -659,8 +659,11 @@
 		if (!held && v > 0.6) {
 			const sprint = clamp(o.sprintAmt || 0, 0, 1);
 			const reach = 18 + Math.min(16, v * 3.2) + sprint * 7 + (cond.wet ? 3 : 0) - (build(o).agil - 1) * 20 - driD(o) * 5;   // close control: a good dribbler keeps it nearer
-			const ph = (((o.stride || 0) % Math.PI) + Math.PI) % Math.PI / Math.PI;   // 0 as a foot comes through, 1 just before the next
-			ahead = reach - (reach - 18) * ph * 0.75;
+			// The rhythm: a touch every other step at a jog (the same foot each time), every fourth flat out, so the
+			// ball is seen knocked on and run onto rather than nudged on every stride.
+			const per = sprint > 0.5 ? 4 * Math.PI : 2 * Math.PI;
+			const ph = (((o.stride || 0) % per) + per) % per / per;   // 0 as the touching foot comes through, 1 just before the next touch
+			ahead = reach - (reach - 18) * ph * 0.85;
 			o.touchPh = ph;
 		} else {
 			o.touchPh = 1;
