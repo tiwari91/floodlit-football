@@ -197,6 +197,22 @@
 		try { PASS_FN[kind](); } finally { passPow = -1; }
 	}
 
+	// Getting set for the kick while you hold the key (drawn, see the gather in pose3D): 0 to 1, how far
+	// into it he is. It builds over the first third of a second, and further with the charge, so a tap
+	// barely shows and a full drive has him set, eyes down, arms out, before the swing.
+	const GATHER3 = new WeakMap();
+	function kickGather3 (p) {
+		if (state !== "play" || p !== human() || replayOn() || reduceMotion) { return 0; }
+		const start = ball.owner !== p ? -1 : charging ? chargeStart : passCharge ? passCharge.start : -1;
+		if (start < 0) {   // let go (or the ball gone): eased off over the wind-up, which takes it over
+			const h = GATHER3.get(p), k = h ? 1 - (frame - h.f) / 8 : 0;
+			return k > 0 ? h.v * smooth3(k) : 0;
+		}
+		const t = frame - start, v = clamp(t / 20, 0, 1) * (0.55 + 0.45 * clamp(t / 50, 0, 1));
+		GATHER3.set(p, { v, f: frame });
+		return v;
+	}
+
 	function humanPass () {
 		const p = human();
 		if (!ball.owner && ball.z > 4 && state === "play") { headIntent = { kind: "pass", at: frame }; }
