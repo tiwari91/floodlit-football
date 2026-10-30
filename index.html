@@ -18105,7 +18105,7 @@ td, th { font-variant-numeric: tabular-nums; }
 		// The running cycle: hips swing the thighs, knees fold on the recovery, arms counter-swing.
 		// Each man runs his own way (gv): arm carriage, elbow bend, bounce, lean and twist.
 		const gv = p.build && p.build.arm !== undefined ? p.build : { arm: 1, elbow: 0, lean: 0, bounce: 1, twist: 1 };
-		const armA = (0.25 + 0.65 * a) * (1 - 0.5 * shuf) * gv.arm;
+		const armA = (0.25 + 0.95 * a) * (1 - 0.5 * shuf) * gv.arm;   // a real swing from the shoulder, so the arm drives rather than the forearm hanging out in front
 		for (let i = 0; i < 2; i++) {
 			const phi = ph + (i ? Math.PI : 0), sn = Math.sin(phi);
 			// The arm: the upper arm swings further back than forward, and the forearm is steered to an angle
@@ -18118,7 +18118,7 @@ td, th { font-variant-numeric: tabular-nums; }
 			// by the hip, level with the shoulder line, while the upper arm stays within 25 degrees of
 			// vertical behind. The forearm hangs nearer straight down behind (about 0.45 rad) and comes up
 			// toward the horizontal in front (about 1.6), so neither hand is held out in front the whole way round.
-			r.sh[i].rotation.z = armA * (sw > 0 ? 0.58 * sw : 0.5 * sw);   // a fuller drive forward; the backswing as measured
+			r.sh[i].rotation.z = armA * (sw > 0 ? 0.58 * sw : 0.37 * sw);   // a fuller drive forward; the backswing kept within about 25 degrees
 			// Sideways (OUT3): the arms hang a little away from the sides, coming in as they swing forward.
 			r.sh[i].rotation.x = OUT3(i) * (0.12 + 0.05 * a - 0.2 * a * clamp(sw, 0, 1));
 			const fore = 0.42 + 1.18 * (sw + 1) / 2 + gv.elbow * 0.5;
