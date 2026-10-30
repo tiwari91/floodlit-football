@@ -874,6 +874,17 @@
 			for (let i = 0; i < 2; i++) { r.sh[i].rotation.z += 0.75 * g; r.sh[i].rotation.x += OUT3(i) * 0.35 * g; r.el[i].rotation.z += 0.6 * g; }
 			r.spine.rotation.z -= 0.3 * g;
 		}
+		// Getting set while you hold the key (kickGather3): the shoulders wound back on the kicking side
+		// against the hips, eyes down, a lean in, the other arm out for balance. Set before the kick block,
+		// so the backswing takes it over from here without a jump.
+		const gth = rm || jump > 0 || down || fall >= 0 ? 0 : kickGather3(p);
+		if (gth > 0) {
+			const g = smooth3(gth), kf = p.build && p.build.left ? 0 : 1, pl = 1 - kf, sk = kf ? 1 : -1;
+			r.chest.rotation.y += sk * 0.22 * g; r.hips.rotation.y -= sk * 0.1 * g;
+			r.spine.rotation.z -= 0.12 * g; r.neck.rotation.z -= 0.16 * g;
+			r.sh[pl].rotation.x = lerp3(r.sh[pl].rotation.x, OUT3(pl) * 0.85, g); r.sh[pl].rotation.z = lerp3(r.sh[pl].rotation.z, 0.35, 0.7 * g); r.el[pl].rotation.z = lerp3(r.el[pl].rotation.z, 0.7, g);
+			r.sh[kf].rotation.x = lerp3(r.sh[kf].rotation.x, OUT3(kf) * 0.45, g); r.sh[kf].rotation.z = lerp3(r.sh[kf].rotation.z, -0.2, 0.6 * g);
+		}
 		// Kicking (see kickPose3): the standing foot beside the ball, the leg back, through the ball on the
 		// frame it goes and up after it; the arms open for balance, the hips wind and unwind against the
 		// shoulders, over the ball for a drive, back under it for a chip or a clearance.
