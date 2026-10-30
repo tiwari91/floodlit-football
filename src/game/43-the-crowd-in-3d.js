@@ -472,7 +472,7 @@
 		return out;
 	}
 	// The TV camera: high in the main stand on the halfway side with a longer lens, like the broadcast
-	// ("tele") view. It shows about the width of the action (two fifths of the pitch on a wide screen,
+	// ("tele") view. It shows about the width of the action (a little over a quarter of the pitch on a wide screen, close enough to read the players,
 	// a little less on a portrait phone, where it climbs higher and pulls back so the pitch still fills
 	// the picture). It glides along the touchline, never faster than about two thirds of the pitch a
 	// second, and barely tilts: the depth it looks at follows the ball across the pitch only a quarter
@@ -483,11 +483,11 @@
 		const fov = tall ? 46 : asp < 1.5 ? 36 : 30, tanX = Math.tan(fov * Math.PI / 360) * asp;
 		// Wider than 16:9 (a phone on its side) the picture is shallower: a touch more pitch across and a
 		// lower angle, so both touchlines still fit.
-		const k = Math.sqrt(Math.max(1, asp / 1.78)), cover = FW * (tall ? 0.13 : 0.36 * k), elev = tall ? 42 * Math.PI / 180 : Math.asin(Math.sin(28 * Math.PI / 180) / k);
+		const k = Math.sqrt(Math.max(1, asp / 1.78)), cover = FW * (tall ? 0.13 : k > 1.01 ? 0.36 * k : 0.27), elev = tall ? 42 * Math.PI / 180 : Math.asin(Math.sin(28 * Math.PI / 180) / k);
 		const dist = cover / tanX, eyeH = dist * Math.sin(elev), back = dist * Math.cos(elev);
 		const half = cover, halfNear = Math.hypot(eyeH, back - FH / 2) * tanX;
 		const wantX = half * 2 >= FW ? FW / 2 : clamp(bx, Math.min(FW / 2, halfNear - MX * 0.55), Math.max(FW / 2, FW - halfNear + MX * 0.55));
-		const wantZ = FH * (tall ? 0.5 : 0.66) + (clamp(by, 0, FH) - FH / 2) * (tall ? 0.6 : 0.25);   // on a wide screen centred a little toward the near side, so both touchlines are in
+		const wantZ = FH * (tall ? 0.5 : 0.66) + (clamp(by, 0, FH) - FH / 2) * (tall ? 0.6 : k > 1.01 ? 0.25 : 0.45);   // centred a little toward the near side; on a desktop screen it is closer in (players big enough to read, the near touchline may leave the picture) and follows the ball's depth further, so play near either touchline stays in shot
 		const now = performance.now();
 		if (G3.shot !== "tv" || now - TVC.at > 1000 || reduceMotion) { TVC.x = wantX; TVC.z = wantZ; }   // a cut into the shot
 		else {

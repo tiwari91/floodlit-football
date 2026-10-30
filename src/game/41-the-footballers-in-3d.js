@@ -306,12 +306,15 @@
 	// surfaces facing down (under the brow, nose and chin), a warm band where the key light turns to shadow,
 	// a rim of floodlight on the edge turned to the light, and a faint sheen. All of it fades out by
 	// distance, so the broadcast camera sees the figures as before. k: [ fill, warmth, rim, sheen ].
-	const SKIN_LIGHT3 = [ 1, 1, 1, 1 ], HAIR_LIGHT3 = [ 0.6, 0, 0.7, 0.5 ], BODY_LIGHT3 = [ 1, 0, 0.8, 0 ];
+	const SKIN_LIGHT3 = [ 1, 1, 1, 1 ], HAIR_LIGHT3 = [ 0.6, 0, 0.7, 0.5 ], BODY_LIGHT3 = [ 1, 0, 0.8, 0 ], SHIRT_LIGHT3 = [ 1, 0, 0.9, 0.7 ];   // the shirt: a soft fabric sheen
 	function skinLight3D (fs, k) {
 		return fs.replace("#include <aomap_fragment>", `#include <aomap_fragment>
 			{
 				vec3 sN = normalize(normal), sV = normalize(vViewPosition);
 				float sNear = 1.0 - smoothstep(160.0, 560.0, length(vViewPosition));
+				// The match camera sits 1100 to 1800 away: the floodlit edge light and the sheen carry out to there
+				// (sFar), so the players stand out on the TV picture, not only in close-ups.
+				float sFar = 1.0 - smoothstep(1900.0, 2800.0, length(vViewPosition));
 				float sUp = dot(sN, normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz));
 				reflectedLight.indirectDiffuse *= 1.0 - ${(0.16 * k[0]).toFixed(3)} * sNear - ${(0.3 * k[0]).toFixed(3)} * sNear * (1.0 - smoothstep(-0.7, 0.5, sUp));
 				reflectedLight.directDiffuse *= 1.0 + ${(0.3 * k[0]).toFixed(3)} * sNear;   // the key light carries more of the shape
@@ -325,8 +328,8 @@
 				}
 				#endif
 				float sRim = pow(1.0 - clamp(dot(sN, sV), 0.0, 1.0), 3.0);
-				reflectedLight.directDiffuse += sKey * mix(diffuseColor.rgb, vec3(1.0), 0.4) * sRim * ${(0.26 * k[2]).toFixed(3)} * sNear;
-				reflectedLight.directDiffuse += vec3(1.0, 0.95, 0.88) * sSheen * ${(0.045 * k[3]).toFixed(4)} * sNear;
+				reflectedLight.directDiffuse += sKey * mix(diffuseColor.rgb, vec3(1.0), 0.4) * sRim * ${(0.26 * k[2]).toFixed(3)} * max(sNear, 0.85 * sFar);
+				reflectedLight.directDiffuse += vec3(1.0, 0.95, 0.88) * sSheen * ${(0.045 * k[3]).toFixed(4)} * max(sNear, 0.6 * sFar);
 			}`);
 	}
 	function initFigures3D () {
@@ -416,9 +419,10 @@
 					else if (vPat > 3.5 && vPat < 4.5) { km = 1.0 - step(1.5, abs(vKp.y - 4.7 + vKp.z * 0.95)); }
 					else if (vPat > 4.5) { km = max(smoothstep(2.6, 2.8, abs(vKp.z)) * step(vKp.y, 8.3), smoothstep(8.3, 8.5, vKp.y)); }   // the keeper's shirt: side panels and a shoulder yoke
 					diffuseColor.rgb = mix(diffuseColor.rgb, vCol2, km);
-					diffuseColor.rgb *= 1.0 + 0.04 * sin(vKp.y * 2.3 + sin(vKp.z * 1.7) * 1.3) * sin(vKp.z * 1.15 + vKp.y * 0.45);   // the cloth's creases, faint
+					diffuseColor.rgb *= 1.0 + 0.08 * sin(vKp.y * 2.3 + sin(vKp.z * 1.7) * 1.3) * sin(vKp.z * 1.15 + vKp.y * 0.45);   // the cloth's creases
+					diffuseColor.rgb *= 1.0 - 0.07 * smoothstep(2.0, 3.6, abs(vKp.z)) * smoothstep(3.0, 6.5, vKp.y) * (1.0 - smoothstep(6.5, 8.0, vKp.y)) * (0.5 + 0.5 * sin(vKp.y * 3.1 - abs(vKp.z) * 1.4));   // folds pulled from under the arms toward the waist
 					diffuseColor.rgb *= 0.8 + 0.2 * smoothstep(-0.6, 6.8, vKp.y);   // cloth in shade toward the hem, under the chest`);
-			sh.fragmentShader = skinLight3D(sh.fragmentShader, BODY_LIGHT3);
+			sh.fragmentShader = skinLight3D(sh.fragmentShader, SHIRT_LIGHT3);
 		};
 		shirtMat.customProgramCacheKey = () => "ff-shirt";
 		// Faces: an atlas of sixteen, each also open-mouthed, painted once (eyes, brows, a nose, a mouth,

@@ -31,7 +31,8 @@ for (const [ label, opts ] of [
 	const f = await framing(page);
 	await page.screenshot({ path: `${OUT}/look-tv-${label.replace(/ /g, "-")}.png` });
 	check(`${label}: the TV camera draws the 3D scene with the TV shot`, f.cam === "tv" && f.v3 && f.shot === "tv" && f.canvas3d, JSON.stringify(f));
-	check(`${label}: the far touchline and the ball are in the picture${label === "portrait phone" ? "" : ", the near touchline too"}`, f.farIn && f.ballIn && (label === "portrait phone" || f.nearIn), JSON.stringify(f));
+	// On a desktop screen the TV camera is closer in (players big enough to read), so only phones keep both touchlines.
+	check(`${label}: the far touchline and the ball are in the picture${label === "landscape phone" ? ", the near touchline too" : ""}`, f.farIn && f.ballIn && (label !== "landscape phone" || f.nearIn), JSON.stringify(f));
 	check(`${label}: no console errors`, errs.length === 0, errs.join(" | "));
 	await ctx.close();
 }
