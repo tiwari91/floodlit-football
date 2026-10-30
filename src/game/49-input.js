@@ -128,6 +128,9 @@
 		const chip = $("simChip");
 		const show = state === "play" && mode !== "tutorial" && mode !== "corners" && $("bcLineups").hidden && now - lastHumanInput > SIM_CHIP_IDLE_MS;
 		if (chip.hidden === show) { chip.hidden = !show; }
+		// Pause only means something once the match is under way: before kick-off and at half or full time it is greyed out.
+		const canPause = state === "play" || state === "paused" || state === "goal";
+		if (pauseBtn.disabled === canPause) { pauseBtn.disabled = !canPause; }
 		return show;
 	}
 	setInterval(renderSimChip, 500);

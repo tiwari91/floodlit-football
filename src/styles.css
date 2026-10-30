@@ -1260,8 +1260,9 @@
 .wipe.go::before { animation: wipe 0.56s cubic-bezier(0.55, 0, 0.35, 1) forwards; }
 @keyframes wipe { from { left: -70%; } to { left: 115%; } }
 
-/* Simulate the rest, on the pitch itself once the computer has been playing for you a while. */
-.simchip { position: absolute; right: 12px; top: 92px; z-index: 6; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--amber); background: rgba(12, 18, 24, 0.82); color: var(--amber); font-weight: 600; font-size: 14px; cursor: pointer; }
+/* Simulate the rest, on the pitch itself once the computer has been playing for you a while; below the
+   TACTIC tag the HUD draws at the top right, so it never covers it. */
+.simchip { position: absolute; right: 12px; top: 118px; z-index: 6; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--amber); background: rgba(12, 18, 24, 0.82); color: var(--amber); font-weight: 600; font-size: 14px; cursor: pointer; }
 .simchip:hover, .simchip:focus-visible { background: rgba(12, 18, 24, 0.95); }
 
 /* Edit mode: rename clubs, kits and players; option files (18f). */
