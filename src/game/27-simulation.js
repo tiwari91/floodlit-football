@@ -78,6 +78,8 @@
 		const reverse = accMax >= ACC_YOU && accMax < 1 && v0 > 1.4 && want0 > 0.3 && (dvx * p.vx + dvy * p.vy) / (want0 * v0) < -0.2;
 		const halt = accMax >= ACC_YOU && accMax < 1 && v0 > 0.6 && want0 < 0.3;   // letting go at speed: he pulls up over a couple of strides, not dead on the spot
 		if (halt) { ax *= 0.55; ay *= 0.55; }
+		// A computer player pulling up from a run plants too (weight back), as yours does when you let go.
+		if (accMax < ACC_YOU && v0 > 1.6 && want0 < 0.3 && !(p.plant > 0)) { p.plant = 8; }
 		const burst = accMax >= ACC_YOU && accMax < 1 && faster && v0 < 1.6;   // from a standstill he drives off over a few steps, not at full pace at once
 		// Quick men get going quicker too; on the ball a good dribbler is sharper off the mark.
 		const cap = accMax * (faster ? 1 : 1.7) * (cond.grip / 0.22) * (accMax < 1 ? build(p).agil * (1 + (A(p, "pac") - 68) * 0.005) * (ball && ball.owner === p ? 1 + 0.12 * driD(p) : 1) : 1) * (reverse ? 0.6 : halt ? 0.55 : burst ? 0.5 : 1), a = Math.hypot(ax, ay);
@@ -92,7 +94,7 @@
 			if (Math.abs(side) > latCap) { side = Math.sign(side) * latCap; }
 			ax = along * ux - side * uy; ay = along * uy + side * ux;
 			const want = Math.hypot(dvx, dvy);
-			if (want > 0.3 && v > 1.4 && (dvx * ux + dvy * uy) / want < -0.2) { p.plant = reverse ? 14 : 10; }
+			if (want > 0.3 && v > 1.4 && (dvx * ux + dvy * uy) / want < -0.2) { p.plant = 14; }   // everyone, yours or the computer's, brakes through the same full plant
 		}
 		p.vx += ax;
 		p.vy += ay;
@@ -379,7 +381,7 @@
 				const [ tx, ty ] = ball.z > 0 ? meetPoint() : interceptPoint(p);
 				const [ dvx, dvy ] = steer(p, tx, ty, BASE_SPD * 1.08);
 				movePlayer(p, dvx, dvy, cond.grip, ACC_YOU);
-				p.dir = Math.atan2(ball.y - p.y, ball.x - p.x);
+				p.dir = turnToward(p.dir, Math.atan2(ball.y - p.y, ball.x - p.x), 0.3);   // he turns to face the pass over a few frames, not in one
 				continue;
 			}
 
@@ -661,10 +663,12 @@
 		let ahead = 18;
 		if (!held && v > 0.6) {
 			const sprint = clamp(o.sprintAmt || 0, 0, 1);
+			// A computer dribbler has no sprint key: going near his top speed counts as flat out for the rhythm.
+			const flat = o.team === 0 && players.indexOf(o) === ctrl && !autoPilot ? sprint : clamp((v / BASE_SPD - 0.8) / 0.12, 0, 1);
 			const reach = 18 + Math.min(16, v * 3.2) + sprint * 7 + (cond.wet ? 3 : 0) - (build(o).agil - 1) * 20 - driD(o) * 5;   // close control: a good dribbler keeps it nearer
 			// The rhythm: a touch every other step at a jog (the same foot each time), every fourth flat out, so the
 			// ball is seen knocked on and run onto rather than nudged on every stride.
-			const per = sprint > 0.5 ? 4 * Math.PI : 2 * Math.PI;
+			const per = flat > 0.5 ? 4 * Math.PI : 2 * Math.PI;
 			const ph = (((o.stride || 0) % per) + per) % per / per;   // 0 as the touching foot comes through, 1 just before the next touch
 			ahead = reach - (reach - 18) * ph * 0.85;
 			o.touchPh = ph;
