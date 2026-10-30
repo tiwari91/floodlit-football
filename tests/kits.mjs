@@ -10,8 +10,9 @@ const page = await ctx.newPage(), errs = [];
 page.on("pageerror", e => errs.push("pageerror: " + e.message));
 const ready = async () => { await page.waitForSelector("#ovButton"); await page.waitForFunction(() => window.__ff && window.__ff.league && window.__ff.league.club && window.__ff.applyOptionFile && window.__ff.setOpponent, null, { timeout: 60000 }); };
 
-// Twenty distinctive kits, none of them near the amber default, each with a second colour well apart.
-const SHIRTS = [ "#7b2fbe", "#0f8f7a", "#c2185b", "#2a4dd0", "#5a3e1b", "#00838f", "#8e24aa", "#3949ab", "#ad1457", "#00695c", "#4527a0", "#1565c0", "#6d4c41", "#283593", "#00897b", "#880e4f", "#512da8", "#0277bd", "#4e342e", "#1a237e" ];
+// Twenty distinctive kits, none of them near the amber default (each ΔE 75+ from it, so the away side never
+// has to change on a clash), each with a second colour well apart.
+const SHIRTS = [ "#7b2fbe", "#0f8f7a", "#c2185b", "#2a4dd0", "#37474f", "#00838f", "#8e24aa", "#3949ab", "#ad1457", "#00695c", "#4527a0", "#1565c0", "#263238", "#283593", "#00897b", "#880e4f", "#512da8", "#0277bd", "#4e342e", "#1a237e" ];
 const SECONDS = [ "#e8f86a", "#ff9ec7", "#c6ff8a", "#ffd0a0", "#9ef0ff", "#fff4a8", "#b8ffd8", "#ffb3a7", "#d0ffb0", "#ffe08a", "#a8ffe8", "#ffc2f0", "#e0ffa0", "#ffd9b0", "#f0b0ff", "#b0f0ff", "#ffeab0", "#c0ffc0", "#b8d8ff", "#ffc0c0" ];
 const L = "abcdefghijklmnopqrstuvwxyz";
 const word = (n, k) => L[n % 26].toUpperCase() + L[(n * 7 + k) % 26] + L[(n * 3 + 5) % 26] + L[(n + k * 11) % 26] + "o";
