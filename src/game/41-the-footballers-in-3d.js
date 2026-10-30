@@ -731,7 +731,7 @@
 		r.neck.rotation.z = -r.spine.rotation.z * 0.85;   // the head stays near level, eyes up the pitch, whatever the lean
 		if (a < 0.2) { r.chest.rotation.y = Math.sin(idle * 0.5) * 0.05; r.sh[0].rotation.z += Math.sin(idle) * 0.03; r.sh[1].rotation.z -= Math.sin(idle) * 0.03; r.head.rotation.y = Math.sin(idle * 0.37) * 0.25; }
 		// Planting to stop or cut: knees bent, weight back, feet wide for a few frames.
-		const plant = !rm && p.plant > 0 && !down && jump <= 0 ? p.plant / 10 : 0;
+		const plant = !rm && p.plant > 0 && !down && jump <= 0 ? Math.min(1, p.plant / 10) : 0;   // a longer plant (turning back at speed) holds the full crouch, never deeper
 		if (plant > 0) {
 			r.spine.rotation.z += 0.28 * plant; go.crouch += 1.6 * plant; go.wide += 0.5 * plant;
 			for (let i = 0; i < 2; i++) { go.fwd[i] += 2.2 * plant; }   // the feet dug in ahead of him, weight back over them
