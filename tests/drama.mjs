@@ -86,7 +86,8 @@ check("backing yourself after a row steadies the room", choices.back.room > 60 &
 // Refusals: a contract, a move to a smaller club, a move far from home. Each says why and what to do.
 const refuse = await page.evaluate(() => {
 	const F = window.__ff, lg = F.league, c = lg.club, d = F.ensureDrama(lg), slots = F.slotsFor(lg.fmt);
-	d.issues = []; c.budget = 20;
+	// No outside bids: one from the live market (more likely on a slow run) marks a man as leaving, and he then refuses to talk.
+	d.issues = []; c.budget = 20; lg.bidsIn = []; for (const p of [ ...c.squad, ...c.bench ]) { p.leaving = ""; }
 	const out = c.bench.find(p => p.pos !== "gk"); out.wantsOut = true; out.contract = 1; out.morale = 60; out.age = 25;
 	const r1 = F.renewDeal(out, c);
 	const key = c.squad[slots[3]]; key.role = "key"; key.morale = 50; key.age = 26; key.contract = 1; key.wantsOut = false; delete key.askPaid;

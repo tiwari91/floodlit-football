@@ -17,7 +17,7 @@ const r = await page.evaluate(() => {
 	const F = window.__ff;
 	F.autoPilot = true;
 	const out = { roles: null, bend: 0, preRun: 0, delivered: 0, short: 0, n: 0, maxWait: 0, cleared: 0, stuck: 0 };
-	for (let i = 0; i < 40; i++) {
+	for (let i = 0; i < 120; i++) {   // 120 corners: with 40 the share of bending runs (about 58%) fell under half by chance about one run in six
 		if (F.state !== "play") { break; }
 		F.cornerTest(1, i % 2 === 0);
 		const cp = F.cornerPlan;

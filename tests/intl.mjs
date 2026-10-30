@@ -253,7 +253,8 @@ const sack = await page.evaluate(() => {
 	const nat = lg.intl.nat;
 	if (C.kind !== "q") { return { kind: C.kind }; }
 	lg.intl.missed = 1;
-	for (const g of C.games) { if (g.hg === undefined) { [ g.hg, g.ag ] = g.h === nat ? [ 0, 3 ] : g.a === nat ? [ 3, 0 ] : [ 1, 1 ]; } }
+	// Every one of their qualifiers lost, played or not: a win the live game already played would let them through.
+	for (const g of C.games) { if (g.h === nat || g.a === nat) { [ g.hg, g.ag ] = g.h === nat ? [ 0, 3 ] : [ 3, 0 ]; } else if (g.hg === undefined) { [ g.hg, g.ag ] = [ 1, 1 ]; } }
 	C.night = C.nights.length - 1; lg.round = 30; for (let i = 0; i < lg.round; i++) { lg.results[i] = lg.results[i] || []; } F.intlNight();
 	return { kind: C.kind, done: C.done, out: !C.qualified.includes(nat), nat: lg.intl.nat, news: /let you go/.test(lg.news) };
 });

@@ -11,7 +11,7 @@ await page.waitForFunction(() => window.__ff && window.__ff.league && window.__f
 
 // A happy final-year player renews; an unhappy one refuses, is marked and gets a notice.
 const r = await page.evaluate(() => {
-	const F = window.__ff, lg = F.league, c = lg.club, d = F.ensureDrama(lg); d.issues = []; c.budget = 30;
+	const F = window.__ff, lg = F.league, c = lg.club, d = F.ensureDrama(lg); d.issues = []; c.budget = 30; lg.bidsIn = [];   // no outside bid marks either man as leaving
 	const [ a, b ] = c.bench.filter(p => p.pos !== "gk");
 	for (const p of [ a, b ]) { p.contract = 1; p.age = 26; p.wantsOut = false; p.leaving = ""; p.benched = 0; }
 	a.morale = 80; b.morale = 30;
