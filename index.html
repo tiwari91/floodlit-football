@@ -17502,7 +17502,7 @@ td, th { font-variant-numeric: tabular-nums; }
 			const x = cx + sgn * 16;
 			// The eye, life-size rather than a cartoon's: a narrow almond of off-white mostly covered by the
 			// upper lid, a small iris and pupil half under it, a soft lid shadow, a faint lower lid, no big glint.
-			const eh = (open ? 4.2 : 3.3) * (narrow ? 0.82 : 1), ew = 6.6;
+			const eh = (open ? 4.5 : 3.7) * (narrow ? 0.82 : 1), ew = 7.3;
 			g.save(); g.beginPath(); g.ellipse(x, ey, ew, eh, 0, 0, Math.PI * 2); g.clip();
 			g.fillStyle = "#cbbfb1"; g.fillRect(x - ew, ey - eh, ew * 2, eh * 2);
 			g.fillStyle = v % 3 === 1 ? "#3d5a74" : v % 3 === 2 ? "#4f6340" : "#3b2414"; g.beginPath(); g.arc(x + sgn * 0.4, ey + 0.4, 3.9, 0, Math.PI * 2); g.fill();
@@ -17675,11 +17675,11 @@ td, th { font-variant-numeric: tabular-nums; }
 		// [ y, z, ry, rz, amount, front-only ]: a gaussian along the surface, centred on direction (y, z)
 		[ 0.36, 0.3, 0.12, 0.3, 0.14, 1 ], [ 0.36, -0.3, 0.12, 0.3, 0.14, 1 ],      // the brow ridge
 		[ 0.12, 0.37, 0.12, 0.15, -0.2, 1 ], [ 0.12, -0.37, 0.12, 0.15, -0.2, 1 ],   // eye sockets
-		[ -0.04, 0.62, 0.14, 0.16, 0.1, 1 ], [ -0.04, -0.62, 0.14, 0.16, 0.1, 1 ],   // cheekbones
-		[ -0.3, 0.55, 0.14, 0.16, -0.08, 1 ], [ -0.3, -0.55, 0.14, 0.16, -0.08, 1 ], // hollows under them
+		[ -0.04, 0.62, 0.14, 0.16, 0.16, 1 ], [ -0.04, -0.62, 0.14, 0.16, 0.16, 1 ], // cheekbones, high and clear
+		[ -0.3, 0.55, 0.14, 0.16, -0.11, 1 ], [ -0.3, -0.55, 0.14, 0.16, -0.11, 1 ], // hollows under them, an athlete's lean face
 		[ -0.55, 0, 0.18, 0.28, 0.1, 1 ],                                           // the muzzle and lips
-		[ -0.84, 0, 0.14, 0.4, 0.15, 1 ],                                           // the chin, broad and square rather than pointed
-		[ -0.55, 0.8, 0.2, 0.18, 0.13, 0 ], [ -0.55, -0.8, 0.2, 0.18, 0.13, 0 ],    // the angle of the jaw
+		[ -0.84, 0, 0.14, 0.4, 0.2, 1 ],                                            // the chin, broad and square rather than pointed
+		[ -0.55, 0.8, 0.2, 0.18, 0.2, 0 ], [ -0.55, -0.8, 0.2, 0.18, 0.2, 0 ],      // the angle of the jaw, a defined jawline
 		[ 0.6, 0.0, 0.25, 0.5, 0.05, 1 ],                                           // the forehead, rounded
 		[ 0.42, 0.8, 0.16, 0.14, -0.06, 1 ], [ 0.42, -0.8, 0.16, 0.14, -0.06, 1 ]   // temples
 	];
@@ -17728,7 +17728,7 @@ td, th { font-variant-numeric: tabular-nums; }
 		return g;
 	}
 	// The ear: on the side of the head, its top level with the brows and its lobe with the nose.
-	const EAR3 = (() => { const q = headPoint3(-0.12, -0.04, Math.sqrt(1 - 0.12 * 0.12 - 0.04 * 0.04)); return [ q[0], q[1], q[2] + 0.05 ]; })();
+	const EAR3 = (() => { const q = headPoint3(-0.12, 0.01, Math.sqrt(1 - 0.12 * 0.12 - 0.01 * 0.01)); return [ q[0], q[1], q[2] + 0.05 ]; })();
 	// Where the nose meets the brow: each man's nose is scaled from here, so it never leaves the face.
 	const NOSE_ROOT3 = headPoint3(Math.sqrt(1 - 0.24 * 0.24), 0.24, 0);
 	// The nose: a ridge lofted down the middle of the face from between the eyes to the tip, widening into
@@ -17789,7 +17789,7 @@ td, th { font-variant-numeric: tabular-nums; }
 			shortLeg: () => loft3D([ [ 1.1, 1.55, 1.8, 1.88 ], [ 0.2, 1.9, 2.08, 2.04 ], [ -0.9, 1.98, 2.2, 2.04 ], [ -2.2, 1.98, 2.24, 2.0, 0.08 ], [ -3.05, 2.0, 2.26, 2.02, 0.12 ], [ -3.15, 1.86, 2.08, 1.86, 0.12 ], [ -3.2, 1.45, 1.6, 1.45, 0.12 ] ], 16, 2.1),   // shorts to mid-thigh, hanging loose and straight off the quads to a light flare at the hem
 			neck: () => loft3D([ [ -0.8, 2.1, 1.5, 1.75 ], [ -0.2, 1.85, 1.42, 1.62 ], [ 0.5, 1.56, 1.32, 1.44, -0.05 ], [ 1.3, 1.42, 1.24, 1.32, 0.0 ], [ 2.0, 1.34, 1.16, 1.24, 0.08 ], [ 2.3, 0.8, 0.8, 0.8, 0.1 ] ], 12, 2),   // a footballer's neck: thick, flaring into the trapezius at the base, not a stalk
 			head: () => sculpt3D(new T.SphereGeometry(1, 48, 36)),
-		ear: () => { const g = new T.SphereGeometry(0.58, 10, 8); g.scale(0.5, 1.0, 0.32); g.rotateZ(0.18); return g; },
+		ear: () => { const g = new T.SphereGeometry(0.51, 10, 8); g.scale(0.5, 1.0, 0.32); g.rotateZ(0.18); return g; },
 		nose: () => noseGeo3(),
 		tail: () => new T.SphereGeometry(1, 9, 7),
 			hair: () => sculpt3D(new T.SphereGeometry(1, 48, 36)),   // the skull's own surface; the hair shader lifts it by style
