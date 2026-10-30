@@ -114,6 +114,9 @@ check("Hands off: an arrow held keeps him yours (he follows it, not the carrier)
 // 9. A: a tap is decided on release (a challenge or a slide); a hold of 8 frames or more is the press, at any distance.
 const tackleKey = (gap, holdFor) => page.evaluate(async ([ gap, holdFor ]) => {
 	const F = window.__ff, FW = F.FW, FH = F.FH;
+	// The live loop stands still and play is open: between checks a foul or restart left from the last one
+	// (more likely on a busy machine) would otherwise move the players back to a set piece mid-test.
+	F.hold = true; F.state = "play";
 	F.timeLeft = 1e9; F.freeze = 0; F.autoSwitchMode = "manual"; F.manualLock = 0; F.switchCd = 0; F.autoHold = 0;
 	const q = F.outfield(1)[3], mine = F.outfield(0), m = mine[2];
 	for (const p of F.players) { p.vx = p.vy = 0; p.lunge = 0; p.lungeCd = 0; p.kickCd = 0; }
@@ -130,7 +133,8 @@ const tackleKey = (gap, holdFor) => page.evaluate(async ([ gap, holdFor ]) => {
 	const lunge0 = m.lunge;
 	F.step(1);
 	slid = lunge0 > 0 || m.lunge > 0;
-	return { actedEarly, acted: m.lungeCd > 0, slid, closed };
+	const state = F.state; F.hold = false;
+	return { actedEarly, acted: m.lungeCd > 0, slid, closed, state };
 }, [ gap, holdFor ]);
 r = await tackleKey(30, 4);
 check("A tapped alongside the carrier: a shoulder challenge when you let go, not before", !r.actedEarly && r.acted && !r.slid, JSON.stringify(r));
