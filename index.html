@@ -19940,7 +19940,9 @@ td, th { font-variant-numeric: tabular-nums; }
 	// the picture). It glides along the touchline, never faster than about two thirds of the pitch a
 	// second, and barely tilts: the depth it looks at follows the ball across the pitch only a quarter
 	// of the way, slowly, which is what keeps it from making anyone queasy.
-	const TVC = { x: 0, z: 0, at: -1e9 };
+	// Near the far touchline it tilts up (the eye stays put), so the far stand, its roof and the floodlights come
+	// into the top of the picture; it tilts back as play comes away, at the same slow pace as its depth.
+	const TVC = { x: 0, z: 0, tilt: 0, at: -1e9 };
 	function tvShot3D (out, bx, by, WX) {
 		const asp = G3.cam.aspect, tall = asp < 1;
 		const fov = tall ? 46 : asp < 1.5 ? 36 : 30, tanX = Math.tan(fov * Math.PI / 360) * asp;
@@ -19951,19 +19953,22 @@ td, th { font-variant-numeric: tabular-nums; }
 		const half = cover, halfNear = Math.hypot(eyeH, back - FH / 2) * tanX;
 		const wantX = half * 2 >= FW ? FW / 2 : clamp(bx, Math.min(FW / 2, halfNear - MX * 0.55), Math.max(FW / 2, FW - halfNear + MX * 0.55));
 		const wantZ = FH * (tall ? 0.5 : 0.66) + (clamp(by, 0, FH) - FH / 2) * (tall ? 0.6 : k > 1.01 ? 0.25 : 0.45);   // centred a little toward the near side; on a desktop screen it is closer in (players big enough to read, the near touchline may leave the picture) and follows the ball's depth further, so play near either touchline stays in shot
+		const wantT = tall ? 0 : smooth3(clamp((FH * 0.32 - by) / (FH * 0.3), 0, 1));
 		const now = performance.now();
-		if (G3.shot !== "tv" || now - TVC.at > 1000 || reduceMotion) { TVC.x = wantX; TVC.z = wantZ; }   // a cut into the shot
+		if (G3.shot !== "tv" || now - TVC.at > 1000 || reduceMotion) { TVC.x = wantX; TVC.z = wantZ; TVC.tilt = wantT; }   // a cut into the shot
 		else {
 			const dt = Math.min(frameDt, 50), ex = 1 - Math.exp(-dt / 420), ez = 1 - Math.exp(-dt / 1100), cap = FW * 0.65 * dt / 1000;
 			TVC.x += clamp((wantX - TVC.x) * ex, -cap, cap);
 			TVC.z += (wantZ - TVC.z) * ez;
+			TVC.tilt += (wantT - TVC.tilt) * ez;
 		}
 		TVC.at = now;
 		out.kind = "tv"; out.fov = fov;
 		out.eye.set(WX(TVC.x), eyeH, TVC.z + back);
-		out.look.set(WX(TVC.x), 0, TVC.z);
+		out.look.set(WX(TVC.x), TVC.tilt * TV_TILT_H, TVC.z - TVC.tilt * TV_TILT_Z);
 		return out;
 	}
+	const TV_TILT_H = 60, TV_TILT_Z = 40;
 	const shotWant = { kind: "", eye: null, look: null };
 	function camera3D () {
 		if (!shotWant.eye) { shotWant.eye = new THREE.Vector3(); shotWant.look = new THREE.Vector3(); }
