@@ -581,7 +581,7 @@
 	// of the way, slowly, which is what keeps it from making anyone queasy.
 	// Near the far touchline it tilts up (the eye stays put), so the far stand, its roof and the floodlights come
 	// into the top of the picture; it tilts back as play comes away, at the same slow pace as its depth.
-	const TVC = { x: 0, z: 0, tilt: 0, at: -1e9 };
+	const TVC = { x: 0, z: 0, tilt: 0, at: -1e9, shot: false, punchAt: -1e9 };
 	function tvShot3D (out, bx, by, WX) {
 		const asp = G3.cam.aspect, tall = asp < 1;
 		const fov = tall ? 46 : asp < 1.5 ? 36 : 30, tanX = Math.tan(fov * Math.PI / 360) * asp;
@@ -602,7 +602,12 @@
 			TVC.tilt += (wantT - TVC.tilt) * ez;
 		}
 		TVC.at = now;
-		out.kind = "tv"; out.fov = fov;
+		// A shot: the lens punches in on it (about a seventh tighter in an eighth of a second), then eases back
+		// out over the next second, as a broadcast director does on a strike. Not with reduced motion.
+		if (ball.shot && !TVC.shot && !reduceMotion) { TVC.punchAt = now; }
+		TVC.shot = !!ball.shot;
+		const pt = now - (TVC.punchAt || -1e9), punch = pt < 0 ? 0 : pt < 130 ? smooth3(pt / 130) : Math.exp(-(pt - 130) / 520);
+		out.kind = "tv"; out.fov = fov * (1 - 0.14 * punch);
 		out.eye.set(WX(TVC.x), eyeH, TVC.z + back);
 		out.look.set(WX(TVC.x), TVC.tilt * TV_TILT_H, TVC.z - TVC.tilt * TV_TILT_Z);
 		return out;
