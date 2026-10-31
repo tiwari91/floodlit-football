@@ -19707,7 +19707,7 @@ td, th { font-variant-numeric: tabular-nums; }
 	// on poles waving over the middle rows, and ticker tape thrown when the home side scores.
 	function dressEnds3D (st, endRows, c1, c2) {
 		const T = THREE;
-		G3.endFlags = null; G3.tape = null; G3.endBanners = null; G3.flares = null;
+		G3.endFlags = null; G3.tape = null; G3.endBanners = null; G3.flares = null; G3.tifo = null;
 		const ends = endRows.map(rows => rows.filter(Boolean).filter(r => r.n > 4)).filter(rows => rows.length >= 2);
 		if (!ends.length) { return; }
 		const club = (leagueMatch ? (leagueMatch.home ? YOU : TEAMS[leagueMatch.opp]) : YOU) || {};
@@ -19787,6 +19787,44 @@ td, th { font-variant-numeric: tabular-nums; }
 		const flare = new T.Points(fgeo, new T.PointsMaterial({ map: G3.glowTex, color: 0xff6a3a, size: 90, sizeAttenuation: true, blending: T.AdditiveBlending, transparent: true, depthWrite: false, depthTest: false, toneMapped: false, fog: false }));   // drawn over the fans round it: a flare is held up above their heads
 		flare.userData.ownGeo = true; flare.userData.ownMat = true; flare.frustumCulled = false; flare.visible = false; st.add(flare);
 		G3.flares = { smoke, flare, fl, t: -1, seed: Array.from({ length: NP }, () => [ Math.random(), Math.random(), Math.random(), Math.random() ]) };
+		// The tifo: a giant banner passed up over the whole home end as the teams come out, the club's name
+		// on its colours, held over the fans' heads for the kick-off sweep and then pulled away.
+		const tr = ends[0], z0 = Math.max(...tr.map(r => r.zMin)), z1 = Math.min(...tr.map(r => r.zMax)), NC = 16;
+		if (tr.length >= 3 && z1 - z0 > 100) {
+			const tc = document.createElement("canvas"); tc.width = 1024; tc.height = 512;
+			const tg2 = tc.getContext && tc.getContext("2d");
+			if (tg2 && tg2.fillText) {
+				tg2.fillStyle = c1; tg2.fillRect(0, 0, 1024, 512);
+				tg2.fillStyle = c2; for (let x = -512; x < 1024; x += 128) { tg2.beginPath(); tg2.moveTo(x, 512); tg2.lineTo(x + 64, 512); tg2.lineTo(x + 576, 0); tg2.lineTo(x + 512, 0); tg2.fill(); }
+				tg2.fillStyle = c1; tg2.fillRect(60, 130, 904, 250);
+				tg2.fillStyle = c2; tg2.fillRect(60, 130, 904, 12); tg2.fillRect(60, 368, 904, 12);
+				tg2.fillStyle = ink; tg2.textAlign = "center"; tg2.textBaseline = "middle";
+				const nm = String(club.name || "HOME").toUpperCase();
+				tg2.font = `900 ${nm.length > 14 ? 120 : 150}px 'Big Shoulders Display', 'Arial Narrow', Arial, sans-serif`; tg2.fillText(nm, 512, 262, 860);
+			}
+			const geo = new T.PlaneGeometry(1, 1, NC, tr.length - 1), pa = geo.attributes.position;
+			for (let iy = 0; iy < tr.length; iy++) {
+				const r = tr[tr.length - 1 - iy];   // the top of the cloth over the back row
+				for (let ix = 0; ix <= NC; ix++) { pa.setXYZ(iy * (NC + 1) + ix, r.x / r.n + 1, r.y + 17, z1 - (z1 - z0) * ix / NC); }
+			}
+			geo.computeVertexNormals();
+			const cloth = new T.Mesh(geo, new T.MeshLambertMaterial({ map: canvasTex3D(tc), side: T.DoubleSide, transparent: true }));
+			cloth.userData.ownGeo = true; cloth.userData.ownMat = true; cloth.visible = false; st.add(cloth);
+			G3.tifo = { cloth, rest: Float32Array.from(pa.array), t: 0, up: false };
+		}
+	}
+	// The tifo is up while the kick-off sweep runs, rippling as the fans under it move; then pulled away in a second and a half.
+	function animateTifo3D (k) {
+		const tf = G3.tifo;
+		if (!tf) { return; }
+		const up = (G3.shot === "tifo" || G3.shot === "intro") && !reduceMotion;
+		if (up) { tf.t = 1.5; } else if (tf.t > 0) { tf.t -= k; }
+		tf.cloth.visible = tf.t > 0;
+		if (!tf.cloth.visible) { return; }
+		const now = performance.now() / 1000, a = tf.cloth.geometry.attributes.position.array, r = tf.rest, drop = 1 - clamp(tf.t / 1.5, 0, 1);
+		for (let v = 0; v < a.length; v += 3) { a[v + 1] = r[v + 1] + Math.sin(now * 2.3 + r[v + 2] * 0.03 + r[v + 1] * 0.08) * 1.6 - drop * 14; a[v] = r[v] + Math.sin(now * 1.7 + r[v + 2] * 0.05) * 0.8; }
+		tf.cloth.geometry.attributes.position.needsUpdate = true;
+		tf.cloth.material.opacity = 1 - drop;
 	}
 	const FLARE3_T = 11;
 	function lightFlares3D () { if (G3.flares && !reduceMotion && !bulkSim) { G3.flares.t = 0; G3.flares.smoke.visible = G3.flares.flare.visible = true; } }
@@ -19870,7 +19908,7 @@ td, th { font-variant-numeric: tabular-nums; }
 		CROWD_U.uOla.value = reduceMotion ? 0 : m.ola;
 		m.tense = (m.tense || 0) + (lateNerves() * (1 - Math.max(0, m.home)) - (m.tense || 0)) * Math.min(1, k * 0.8);   // eased in over a few seconds
 		CROWD_U.uTense.value = reduceMotion ? 0 : m.tense;
-		animateEnds3D(k); animateFlares3D(k);
+		animateEnds3D(k); animateFlares3D(k); animateTifo3D(k);
 		CROWD_U.uOlaA.value = m.olaA || 0;
 		// The LED boards roll on to the next sponsor every seven seconds, in a quick slide (held still with reduced motion).
 		if (G3.boardTex && !reduceMotion) { const t = now / 1000, f = t % 7, e = clamp((f - 6.4) / 0.6, 0, 1); G3.boardTex.offset.x = ((Math.floor(t / 7) + e * e * (3 - 2 * e)) % 8) / 8; }
@@ -19922,7 +19960,17 @@ td, th { font-variant-numeric: tabular-nums; }
 		if (introSweep && state === "play" && !reduceMotion) {
 			const T = 1 - freeze / KICKOFF_FREEZE;
 			if (freeze > 0 && freezeKind === "kickoff" && T >= 0 && T < 1) {
-				const e = smooth3(T), a = -1.05 * (1 - e), R = FH * (1.95 - 1.13 * e);
+				// First, where the home end holds up a tifo, a low shot from the pitch looking straight at it, easing in;
+				// then the sweep round the ground over the rest of the wait.
+				const TT = G3.tifo ? 0.4 : 0;
+				if (T < TT) {
+					const u = smooth3(T / TT);
+					out.kind = "tifo";
+					out.eye.set(FW * (0.62 - 0.08 * u), 70 + 20 * u, FH / 2 + 30);
+					out.look.set(-120, 60, FH / 2);
+					return out;
+				}
+				const e = smooth3((T - TT) / (1 - TT)), a = -1.05 * (1 - e), R = FH * (1.95 - 1.13 * e);
 				out.kind = "intro";
 				out.eye.set(FW / 2 + Math.sin(a) * R * 1.25, FH * (1.2 - 0.7 * e), FH / 2 + Math.cos(a) * R);
 				out.look.set(FW / 2, 0, FH / 2);
@@ -22618,7 +22666,7 @@ td, th { font-variant-numeric: tabular-nums; }
 	// Offside, the two commentators and the chants.
 	if (window.__ff) { Object.assign(window.__ff, { kickTest (p, x, y, sp, restart) { if (restart) { deadBall = { kind: restart, taker: p }; } ball.owner = null; kick(p, x, y, sp); }, aerialTest (t) { lastTouch = t; return aerial(); }, chantLogTest () { return chantLog.slice(); }, CALLERS, COLOUR, GOAL_SHOUT, goalShout }); }
 	if (window.__ff) { Object.assign(window.__ff, { trophyCeremony, ceremonySeek, ceremonyInfo, endCeremony, queueTrophy, trophyDue, lastCeremony: () => lastCeremony }); }
-	if (window.__ff) { Object.assign(window.__ff, { setOpponent, yourKit, matchGround, welcomeCall, openMatchCentre, closeMatchCentre, formOf, makeSub, subPool, startSubWalk, applause, subPerf, logGoalTest (t, n) { (t === 0 ? matchGoals : matchGoalsOpp).push(n); } }); Object.defineProperties(window.__ff, { subWalks: { get: () => subWalks }, lastApplause: { get: () => lastApplause } }); }
+	if (window.__ff) { Object.assign(window.__ff, { setOpponent, yourKit, matchGround, welcomeCall, openMatchCentre, closeMatchCentre, formOf, makeSub, subPool, startSubWalk, applause, subPerf, youStrTest (v) { YOU.str = v; }, logGoalTest (t, n) { (t === 0 ? matchGoals : matchGoalsOpp).push(n); } }); Object.defineProperties(window.__ff, { subWalks: { get: () => subWalks }, lastApplause: { get: () => lastApplause } }); }
 	if (window.__ff) { Object.assign(window.__ff, { ensureCont, contNight, contFixture, contSimAll, contQualify, contNext, contSeed, setCcStart, ccPath, ccGroups, ccTable, ccAgg, ccWinner, renderCont, CC_NIGHTS, currentFixture, simulateMine, restoreGuest, saveLeague, renderLeague }); }
 
 	const hot = window.claude && window.claude.hot;
