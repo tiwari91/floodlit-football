@@ -30,11 +30,14 @@
 	// open: the celebrating version of the same face, mouth wide open.
 	// Sixteen faces: four brows (flat, arched, heavy, angled) at two weights, three mouths, three eye
 	// colours, narrower eyes on half of them, and the facial hair below.
-	const FACES3 = 16;
+	const FACES3 = 16, EXPR3 = 4;   // sixteen faces, each in four expressions (calm, joy, effort, pain)
 	// Facial hair by face: none, stubble, a full beard, a short beard, a moustache, a goatee (with a
 	// moustache), a chin strap along the jaw, or a moustache over stubble. The 2D TV camera reads it too.
 	const FACE_HAIR3 = [ "", "", "stubble", "beard", "", "stubble", "", "beard", "moustache", "goatee", "", "stubble", "chin", "", "mstub", "short" ];
-	function paintFace3D (g, x0, y0, v, open) {
+	// ex: his expression. 0 calm, 1 joy (mouth wide open, brows up), 2 effort (brows down and drawn together,
+	// eyes narrowed, teeth gritted), 3 pain or dismay (the inner brows lifted, eyes screwed up, the mouth turned down).
+	function paintFace3D (g, x0, y0, v, ex) {
+		const open = ex === 1, eff = ex === 2, sad = ex === 3;
 		const cx = x0 + 128, ey = y0 + 60, brow = v % 4, mouth = (v >> 1) % 3, fh = FACE_HAIR3[v] || "", beard = fh === "beard", stubble = fh === "stubble" || fh === "mstub";
 		const bw = v >= 8 ? (v % 3 === 0 ? 0.8 : 1.25) : 1, narrow = v >= 8 && v % 2 === 1;   // brow weight; narrower eyes
 		const ink = "#22150e", dark = "rgba(20, 12, 8, 0.6)";
@@ -56,7 +59,7 @@
 			const x = cx + sgn * 16;
 			// The eye, life-size rather than a cartoon's: a narrow almond of off-white mostly covered by the
 			// upper lid, a small iris and pupil half under it, a soft lid shadow, a faint lower lid, no big glint.
-			const eh = (open ? 4.5 : 3.7) * (narrow ? 0.82 : 1), ew = 7.3;
+			const eh = (open ? 4.5 : eff ? 2.5 : sad ? 2.8 : 3.7) * (narrow ? 0.82 : 1), ew = 7.3;
 			g.save(); g.beginPath(); g.ellipse(x, ey, ew, eh, 0, 0, Math.PI * 2); g.clip();
 			g.fillStyle = "#cbbfb1"; g.fillRect(x - ew, ey - eh, ew * 2, eh * 2);
 			g.fillStyle = v % 3 === 1 ? "#3d5a74" : v % 3 === 2 ? "#4f6340" : "#3b2414"; g.beginPath(); g.arc(x + sgn * 0.4, ey + 0.4, 3.9, 0, Math.PI * 2); g.fill();
@@ -68,14 +71,20 @@
 			g.strokeStyle = "rgba(60, 30, 18, 0.22)"; g.lineWidth = 1.4; g.beginPath(); g.ellipse(x, ey - 1.5, ew + 1, eh + 2.5, 0, Math.PI * 1.15, Math.PI * 1.85); g.stroke();   // the lid crease
 			g.strokeStyle = "rgba(40, 20, 10, 0.22)"; g.lineWidth = 1; g.beginPath(); g.ellipse(x, ey, ew, eh, 0, Math.PI * 0.2, Math.PI * 0.8); g.stroke();
 			// the brow: flat, arched, heavy or angled; raised when celebrating
-			const by = open ? -4 : 0;
+			const by = open ? -4 : eff ? 1.5 : 0, bi = eff ? 4 : sad ? -5.5 : 0, bo = sad ? 1.5 : 0;   // the whole brow, its inner end, its outer end
 			g.strokeStyle = "rgba(34, 21, 14, 0.62)"; g.lineWidth = (brow === 2 ? 3.8 : 2.8) * bw; g.filter = "blur(0.6px)";
 			g.beginPath();
-			if (brow === 1) { g.moveTo(x - sgn * 10, ey - 10 + by); g.quadraticCurveTo(x, ey - 17 + by, x + sgn * 11, ey - 11 + by); }
-			else if (brow === 3) { g.moveTo(x - sgn * 10, ey - 11 + by); g.lineTo(x + sgn * 11, ey - 14 + by); }
-			else { g.moveTo(x - sgn * 10, ey - 12 + by); g.quadraticCurveTo(x, ey - 14 + by, x + sgn * 11, ey - 11.5 + by); }
+			if (brow === 1) { g.moveTo(x - sgn * 10, ey - 10 + by + bi); g.quadraticCurveTo(x, ey - 17 + by + (bi + bo) / 2, x + sgn * 11, ey - 11 + by + bo); }
+			else if (brow === 3) { g.moveTo(x - sgn * 10, ey - 11 + by + bi); g.lineTo(x + sgn * 11, ey - 14 + by + bo); }
+			else { g.moveTo(x - sgn * 10, ey - 12 + by + bi); g.quadraticCurveTo(x, ey - 14 + by + (bi + bo) / 2, x + sgn * 11, ey - 11.5 + by + bo); }
 			g.stroke(); g.filter = "none";
+			if (eff || sad) {   // the skin creasing under the eye as it screws up
+				g.strokeStyle = "rgba(50, 24, 14, 0.3)"; g.lineWidth = 1.3; g.beginPath(); g.ellipse(x, ey + 2, ew + 0.5, eh + 2.5, 0, Math.PI * 0.2, Math.PI * 0.8); g.stroke();
+			}
 		}
+		// effort draws two creases between the brows; dismay one line across the forehead under the lifted brows
+		if (eff) { g.strokeStyle = "rgba(40, 20, 12, 0.42)"; g.lineWidth = 1.5; for (const sgn of [ -1, 1 ]) { g.beginPath(); g.moveTo(cx + sgn * 2.5, ey - 13); g.lineTo(cx + sgn * 3.5, ey - 6); g.stroke(); } }
+		if (sad) { g.strokeStyle = "rgba(40, 20, 12, 0.3)"; g.lineWidth = 1.3; g.beginPath(); g.moveTo(cx - 9, ey - 21); g.quadraticCurveTo(cx, ey - 24, cx + 9, ey - 21); g.stroke(); }
 		// nostrils and the underside of the nose
 		g.fillStyle = "rgba(50, 20, 12, 0.3)"; g.filter = "blur(0.8px)";
 		for (const sgn of [ -1, 1 ]) { g.beginPath(); g.ellipse(cx + sgn * 3.8, ey + 20, 1.8, 1.1, 0, 0, Math.PI * 2); g.fill(); }
@@ -118,6 +127,17 @@
 			g.fillStyle = "#f2ece2"; g.fillRect(cx - 7, ey + 24, 14, 3);
 			g.fillStyle = "#b8524a"; g.beginPath(); g.ellipse(cx, ey + 36, 6, 2.4, 0, 0, Math.PI * 2); g.fill();
 			g.strokeStyle = "rgba(120, 40, 34, 0.9)"; g.lineWidth = 2; g.beginPath(); g.ellipse(cx, ey + 31, 10, 8, 0, 0, Math.PI * 2); g.stroke();
+		} else if (eff) {
+			// teeth gritted: the lips pulled back off a band of teeth, wide and flat
+			g.fillStyle = "#3a0e0c"; g.beginPath(); g.ellipse(cx, ey + 29.5, 12, 4.2, 0, 0, Math.PI * 2); g.fill();
+			g.fillStyle = "#e9e1d4"; g.fillRect(cx - 10, ey + 27.4, 20, 4.2);
+			g.strokeStyle = "rgba(90, 60, 50, 0.5)"; g.lineWidth = 0.8; g.beginPath(); g.moveTo(cx - 10, ey + 29.5); g.lineTo(cx + 10, ey + 29.5); g.stroke();
+			g.strokeStyle = "rgba(110, 40, 32, 0.85)"; g.lineWidth = 2; g.beginPath(); g.ellipse(cx, ey + 29.5, 12, 4.2, 0, 0, Math.PI * 2); g.stroke();
+		} else if (sad) {
+			// the mouth turned down at the corners, a little open
+			g.fillStyle = "#3a0e0c"; g.beginPath(); g.ellipse(cx, ey + 30, 5.5, 2.2, 0, 0, Math.PI * 2); g.fill();
+			g.strokeStyle = "rgba(70, 26, 20, 0.75)"; g.lineWidth = 2.2; g.beginPath(); g.moveTo(cx - 11, ey + 34); g.quadraticCurveTo(cx, ey + 26, cx + 11, ey + 34); g.stroke();
+			g.fillStyle = "rgba(70, 30, 24, 0.18)"; g.beginPath(); g.ellipse(cx, ey + 34, 7, 2, 0, 0, Math.PI * 2); g.fill();
 		} else {
 			g.fillStyle = "rgba(105, 42, 34, 0.2)"; g.filter = "blur(0.8px)"; g.beginPath(); g.ellipse(cx, ey + 27.2, 9.5, 2.2, 0, 0, Math.PI * 2); g.fill(); g.filter = "none";
 			g.strokeStyle = "rgba(70, 26, 20, 0.6)"; g.lineWidth = 2; g.beginPath();
@@ -336,8 +356,8 @@
 	// The smooth limbs' sections (as loft3D), in the hip's or shoulder's frame. LEG_BEND3/ARM_BEND3: the
 	// joint below it, and where the skin starts and finishes handing over to the lower bone. LEG_SOCK3: the sock top.
 	const LIMB_LEG3 = [
-		[ 0.9, 1.5, 1.5, 1.6 ], [ -0.6, 1.88, 1.98, 1.86 ], [ -2.6, 1.84, 2.12, 1.8 ], [ -4.6, 1.6, 1.9, 1.52 ], [ -6.0, 1.3, 1.5, 1.2 ],
-		[ -6.6, 1.18, 1.32, 1.1 ], [ -7.0, 1.08, 1.18, 1.02 ], [ -7.35, 1.04, 1.14, 1.0 ], [ -7.65, 1.02, 1.12, 1.0 ],   // the knee, the cap a little proud in front
+		[ 0.9, 1.34, 1.34, 1.42 ], [ -0.6, 1.62, 1.72, 1.62 ], [ -2.6, 1.58, 1.84, 1.56 ], [ -4.6, 1.4, 1.66, 1.32 ], [ -6.0, 1.17, 1.34, 1.08 ],   // the thigh: the quads full in front, tapering to the knee
+		[ -6.6, 1.1, 1.24, 1.03 ], [ -7.0, 1.05, 1.16, 1.0 ], [ -7.35, 1.04, 1.14, 1.0 ], [ -7.65, 1.02, 1.12, 1.0 ],   // the knee, the cap a little proud in front
 		[ -7.95, 1.06, 1.08, 1.08 ], [ -8.3, 1.12, 1.2, 1.3 ], [ -8.6, 1.16, 1.3, 1.48 ], [ -9.9, 1.1, 1.34, 1.46 ], [ -11.1, 0.94, 1.24, 1.06 ],   // the sock over the calf and the shin pad
 		[ -11.7, 0.8, 0.86, 0.84 ], [ -12.9, 0.7, 0.7, 0.72 ], [ -13.8, 0.68, 0.66, 0.7 ], [ -14.2, 0.45, 0.45, 0.45 ]
 	];
@@ -357,8 +377,8 @@
 			// The shorts: a waistband and seat on the hips, and a leg for each thigh (shortLeg) so they move with the stride.
 			// The seat ends at the top of the thighs and closes up into the crotch, so the legs carry the shorts
 			// below it (no box hanging between the legs); the hips are as wide as the legs' outsides, so no step.
-			shorts: () => loft3D([ [ 1.6, 3.0, 2.0, 2.02 ], [ 1.75, 3.06, 2.06, 2.06 ], [ 0.6, 3.42, 2.12, 2.22 ], [ -0.5, 3.72, 2.12, 2.26 ], [ -1.25, 3.45, 2.0, 2.12 ], [ -1.75, 2.4, 1.52, 1.64 ], [ -2.0, 0.9, 0.8, 0.9 ] ], 22, 2.2),
-			shortLeg: () => loft3D([ [ 1.1, 1.55, 1.8, 1.88 ], [ 0.2, 1.9, 2.08, 2.04 ], [ -0.9, 1.98, 2.2, 2.04 ], [ -2.2, 1.98, 2.24, 2.0, 0.08 ], [ -3.05, 2.0, 2.26, 2.02, 0.12 ], [ -3.15, 1.86, 2.08, 1.86, 0.12 ], [ -3.2, 1.45, 1.6, 1.45, 0.12 ] ], 22, 2.1),   // shorts to mid-thigh, hanging loose and straight off the quads to a light flare at the hem
+			shorts: () => loft3D([ [ 1.6, 3.0, 2.0, 2.02 ], [ 1.75, 3.06, 2.06, 2.06 ], [ 0.6, 3.2, 2.06, 2.14 ], [ -0.5, 3.38, 2.04, 2.16 ], [ -1.25, 3.16, 1.92, 2.04 ], [ -1.75, 2.2, 1.46, 1.58 ], [ -2.0, 0.9, 0.8, 0.9 ] ], 22, 2.2),   // an athlete's hips, narrower than his shoulders
+			shortLeg: () => loft3D([ [ 1.1, 1.4, 1.62, 1.68 ], [ 0.2, 1.7, 1.86, 1.82 ], [ -0.9, 1.76, 1.96, 1.82 ], [ -2.2, 1.76, 2.0, 1.78, 0.08 ], [ -3.05, 1.78, 2.02, 1.8, 0.12 ], [ -3.15, 1.66, 1.86, 1.66, 0.12 ], [ -3.2, 1.3, 1.42, 1.3, 0.12 ] ], 22, 2.1),   // shorts to mid-thigh, hanging loose and straight off the quads to a light flare at the hem
 			neck: () => loft3D([ [ -0.8, 2.1, 1.5, 1.75 ], [ -0.2, 1.85, 1.42, 1.62 ], [ 0.5, 1.56, 1.32, 1.44, -0.05 ], [ 1.3, 1.42, 1.24, 1.32, 0.0 ], [ 2.0, 1.34, 1.16, 1.24, 0.08 ], [ 2.3, 0.8, 0.8, 0.8, 0.1 ] ], 18, 2),   // a footballer's neck: thick, flaring into the trapezius at the base, not a stalk
 			head: () => sculpt3D(new T.SphereGeometry(1, 48, 36)),
 		ear: () => { const g = new T.SphereGeometry(0.51, 10, 8); g.scale(0.5, 1.0, 0.32); g.rotateZ(0.18); return g; },
@@ -376,17 +396,17 @@
 			hand: () => {
 				const palm = loft3D([ [ 0.3, 0.4, 0.32, 0.32 ], [ -0.1, 0.48, 0.32, 0.33 ], [ -0.8, 0.56, 0.32, 0.3 ], [ -1.35, 0.58, 0.29, 0.26 ], [ -1.55, 0.52, 0.22, 0.2 ] ], 10, 2.4);
 				const parts = [ palm ];
-				[ [ 0.36, 1.0 ], [ 0.12, 1.06 ], [ -0.12, 1.0 ], [ -0.36, 0.86 ] ].forEach(([ z, k ]) => {
-					const f1 = loft3D([ [ 0, 0.13, 0.15, 0.14 ], [ -0.55 * k, 0.12, 0.14, 0.13 ], [ -0.62 * k, 0.1, 0.12, 0.1 ] ], 6, 2);
-					f1.rotateZ(-0.4); f1.translate(0, -1.45, z);
-					const f2 = loft3D([ [ 0, 0.12, 0.13, 0.12 ], [ -0.5 * k, 0.1, 0.11, 0.1 ], [ -0.58 * k, 0.05, 0.06, 0.05 ] ], 6, 2);
-					f2.rotateZ(-0.95); f2.translate(-0.21 * k, -1.86 - 0.17 * k, z);
-					parts.push(f1, f2);
-				});
-				const th = loft3D([ [ 0.1, 0.17, 0.18, 0.18 ], [ -0.35, 0.18, 0.2, 0.2 ], [ -0.85, 0.14, 0.16, 0.15 ], [ -0.98, 0.06, 0.07, 0.07 ] ], 6, 2);
+				// the four fingers held together and loosely curled, as a player's hand is when he runs: in two bends,
+				// narrowing toward the tips
+				const f1 = loft3D([ [ 0, 0.55, 0.17, 0.16 ], [ -0.3, 0.56, 0.17, 0.16 ], [ -0.62, 0.52, 0.16, 0.15 ], [ -0.72, 0.47, 0.13, 0.12 ] ], 16, 2.6);
+				f1.rotateZ(-0.38); f1.translate(0, -1.45, 0.02);
+				const f2 = loft3D([ [ 0, 0.5, 0.15, 0.14 ], [ -0.45, 0.46, 0.13, 0.12 ], [ -0.6, 0.38, 0.09, 0.08 ], [ -0.66, 0.22, 0.05, 0.05 ] ], 16, 2.4);
+				f2.rotateZ(-0.95); f2.translate(-0.25, -2.07, 0.02);
+				parts.push(f1, f2);
+				const th = loft3D([ [ 0.1, 0.19, 0.2, 0.2 ], [ -0.35, 0.2, 0.22, 0.22 ], [ -0.85, 0.16, 0.18, 0.17 ], [ -0.98, 0.07, 0.08, 0.08 ] ], 8, 2);
 				th.rotateZ(-0.35); th.rotateX(-0.35); th.translate(-0.18, -0.55, 0.46);
 				parts.push(th);
-				return merge3D(parts);
+				const g = merge3D(parts); g.scale(1.12, 1.12, 1.12); return g;   // a man's hand: about a tenth of his height
 			},
 			// One leg from the hip to the ankle: the thigh, the knee and the sock over the calf in one skin. Rings
 			// are in the hip's frame (the knee 7.3 below it); the shader bends the lower part with the knee.
@@ -441,10 +461,10 @@
 		// Faces: an atlas of sixteen, each also open-mouthed, painted once (eyes, brows, a nose, a mouth,
 		// facial hair on some), wrapped round the head sphere with the face at the front. Each figure picks its cell
 		// with an instanced attribute; the painted parts are laid over the skin colour, the rest is skin.
-		const fc = document.createElement("canvas"); fc.width = 1024; fc.height = 1024;
+		const fc = document.createElement("canvas"); fc.width = 1024; fc.height = 2048;
 		const fg = fc.getContext && fc.getContext("2d");
 		if (fg) {
-			for (let v = 0; v < FACES3 * 2; v++) { paintFace3D(fg, (v % 4) * 256, Math.floor(v / 4) * 128, v % FACES3, v >= FACES3); }
+			for (let v = 0; v < FACES3 * EXPR3; v++) { paintFace3D(fg, (v % 4) * 256, Math.floor(v / 4) * 128, v % FACES3, Math.floor(v / FACES3)); }
 		}
 		const faceTex = tex3D(fc);
 		faceTex.minFilter = T.LinearMipmapLinearFilter; faceTex.magFilter = T.LinearFilter; faceTex.generateMipmaps = true;   // mipmaps: at mid distance the eyes and brows blur to dark marks rather than flicker out
@@ -452,7 +472,7 @@
 		headMat.onBeforeCompile = sh => {
 			sh.vertexShader = sh.vertexShader
 				.replace("#include <common>", "#include <common>\nattribute float aFace; attribute float aJaw; varying float vFaceD; varying float vFaceI;")
-				.replace("#include <uv_vertex>", "#include <uv_vertex>\nvMapUv = (uv + vec2(mod(max(aFace, 0.0), 4.0), 7.0 - floor(max(aFace, 0.0) / 4.0))) / vec2(4.0, 8.0); vFaceI = aFace;")
+				.replace("#include <uv_vertex>", "#include <uv_vertex>\nvMapUv = (uv + vec2(mod(max(aFace, 0.0), 4.0), 15.0 - floor(max(aFace, 0.0) / 4.0))) / vec2(4.0, 16.0); vFaceI = aFace;")
 				.replace("#include <begin_vertex>", "#include <begin_vertex>\ntransformed.z *= mix(1.0, aJaw, pow(clamp((2.25 - transformed.y) / 2.4, 0.0, 1.0), 2.0));")
 				.replace("#include <project_vertex>", "#include <project_vertex>\nvFaceD = -mvPosition.z;");
 			sh.fragmentShader = sh.fragmentShader
@@ -686,7 +706,7 @@
 	const POKE_N3 = 15;   // frames of a standing tackle's leg stab
 	// Reset a rig to standing.
 	function resetRig3D (r) {
-		r.hips.position.set(0, 15.6, 0); r.hips.rotation.set(0, 0, 0);
+		r.hips.position.set(0, 15.6, 0); r.hips.rotation.set(0, 0, 0); r.expr = 0;
 		r.spine.rotation.set(0, 0, 0); r.chest.rotation.set(0, 0, 0); r.neck.rotation.set(0, 0, 0); r.head.rotation.set(0, 0, 0);
 		for (let i = 0; i < 2; i++) { r.sh[i].rotation.set(0, 0, 0); r.el[i].rotation.set(0, 0, 0); r.ha[i].rotation.set(0, 0, 0); r.hip[i].rotation.set(0, 0, 0); r.kn[i].rotation.set(0, 0, 0); r.an[i].rotation.set(0, 0, 0); }
 		r.root.rotation.set(0, 0, 0); r.root.position.set(0, 0, 0); r.root.scale.setScalar(1);
@@ -747,6 +767,7 @@
 		const rm = reduceMotion;
 		const spd = Math.hypot(p.vx || 0, p.vy || 0);
 		const a = clamp(p.runAmt || 0, 0, 1), ph = rm ? 0 : p.stride || 0, jump = rm ? 0 : jumpAmt(p);
+		r.expr = p.team >= 0 ? expr3D(p) : 0;
 		const shuf = clamp(p.shuf || 0, 0, 1), cel = r.cel = clamp(p.celebA || 0, 0, 1), kneel = clamp(p.kneel || 0, 0, 1), sulk = clamp(p.sulk || 0, 0, 1);
 		const down = (p.lunge > 0 && players.indexOf(p) === ctrl) || p.slideAI > 0;
 		const fall = p.fall > 0 ? 1 - p.fall / FALL_T : -1, dive = p.dive > 0 ? 1 - p.dive / DIVE_T : -1, thr = p.throwA > 0 ? 1 - p.throwA / THROW_T : -1;
@@ -1228,7 +1249,21 @@
 	const trim3D = kit => (kit.second && kit.second !== kit.shirt ? kit.second : kit.ink || kit.shirt);
 	// Commit one posed rig to the instanced parts.
 	// Which cell of the face atlas: his own face, open-mouthed when celebrating; -1 (none) with his shirt over his head.
-	const faceCell3D = (lk, rig) => (rig.shirtHead ? -1 : ((lk.face || 0) % FACES3 + FACES3) % FACES3 + ((rig.cel || 0) > 0.3 ? FACES3 : 0));
+	const faceCell3D = (lk, rig) => (rig.shirtHead ? -1 : ((lk.face || 0) % FACES3 + FACES3) % FACES3 + FACES3 * ((rig.cel || 0) > 0.3 ? 1 : rig.expr || 0));
+	// What his face shows this moment, from what he is doing: joy celebrating; pain or dismay when he is brought
+	// down, sulking after a goal against or holding his head at a miss; effort as he strikes the ball, tackles,
+	// slides, shields it, squares up in a flare-up or sprints flat out. It holds a moment after the cause has
+	// gone, so the face never flickers between expressions.
+	const EXPR_RANK3 = [ 0, 3, 1, 2 ];   // which expression wins while another is still held: joy, then pain, then effort
+	function expr3D (p) {
+		const raw = (p.celebA || 0) > 0.3 || (p.fistPump || 0) > 0 || (p.hug || 0) > 0 ? 1
+			: (p.fall || 0) > 0 || (p.sulk || 0) > 0.2 || (p.headHands || 0) > 0 ? 3
+			: (p.kickA || 0) > 0 || (p.windUp || 0) > 0 || (p.lunge || 0) > 0 || (p.slideAI || 0) > 0 || (p.pokeA || 0) > 0 || (p.shieldW || 0) > 0.3 || (p.flare || 0) > 0 || (p.dive || 0) > 0 || (p.sprintAmt || 0) > 0.7 ? 2 : 0;
+		const now = performance.now();
+		if (raw) { if (EXPR_RANK3[raw] >= EXPR_RANK3[p.exprNow || 0] || now > (p.exprTill || 0)) { p.exprNow = raw; } p.exprTill = now + 450; }
+		else if (now > (p.exprTill || 0)) { p.exprNow = 0; }
+		return p.exprNow || 0;
+	}
 	function commitFigure3D (rig, lk, kit, num) {
 		const F = G3.fig, M = F.M, C = F.C;
 		if (F.n >= MAXF3) { return; }

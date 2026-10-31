@@ -660,6 +660,21 @@ const shadows = await page.evaluate(async () => {
 	return { high, low };
 });
 check("real shadows: on High the players cast them into the picture; Low goes back to painted ones", shadows.high.cast && shadows.high.catcher && shadows.high.map === 2048 && shadows.high.longs === 0 && shadows.high.aimDist < 3000 && !shadows.low.none && !shadows.low.cast && !shadows.low.catcher, JSON.stringify(shadows));
+// Faces in play: effort as he strikes the ball, pain when he is brought down, joy celebrating (it wins over
+// the others at once), and back to calm a moment after.
+const faces = await page.evaluate(async () => {
+	const F = window.__ff, p = F.outfield(0)[3], keep = { kickA: p.kickA, fall: p.fall, celebA: p.celebA }, out = {};
+	const calm = () => Object.assign(p, { kickA: 0, fall: 0, celebA: 0, lunge: 0, slideAI: 0, sulk: 0, headHands: 0, fistPump: 0, hug: 0, flare: 0, windUp: 0, pokeA: 0, shieldW: 0, dive: 0, sprintAmt: 0 });
+	const cell = () => F.faceCell({ face: 3 }, F.poseProbe(p, 1));
+	calm(); p.exprNow = 0; p.exprTill = 0; out.calm = cell();
+	p.kickA = 6; out.effort = cell();
+	calm(); p.fall = 10; out.pain = cell();
+	calm(); p.celebA = 0.8; out.joy = cell();
+	calm(); p.exprTill = 0; out.after = cell();
+	Object.assign(p, keep);
+	return out;
+});
+check("faces in play: calm, effort on a strike, pain when fouled, joy celebrating, calm again after", faces.calm === 3 && faces.effort === 35 && faces.pain === 51 && faces.joy === 19 && faces.after === 3, JSON.stringify(faces));
 // Faces: a modelled head (a chin below and ahead of the ear line, a skull longer than it is wide), the
 // hair on the skull's own surface, and only the dark painted marks left at the gantry camera's distance.
 const face = await page.evaluate(() => {
