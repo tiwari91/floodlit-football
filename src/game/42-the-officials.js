@@ -223,6 +223,7 @@
 			const m = F.parts[k];
 			m.count = F.cnt[k]; m.instanceMatrix.needsUpdate = true;
 			if (m.instanceColor) { m.instanceColor.needsUpdate = true; }
+			if (m.geometry.attributes.aLo0) { const ga = m.geometry.attributes; for (const a of [ ga.aLo0, ga.aLo1, ga.aLo2, ga.aLo3, ga.aCol2 ]) { if (a) { a.needsUpdate = true; } } }
 		}
 		{ const ha = F.parts.head.geometry.attributes, hr = F.parts.hair.geometry.attributes; ha.aFace.needsUpdate = true; ha.aJaw.needsUpdate = true; hr.aHairA.needsUpdate = true; hr.aHairB.needsUpdate = true; hr.aJaw.needsUpdate = true; }
 		const tg = F.parts.torso.geometry;
