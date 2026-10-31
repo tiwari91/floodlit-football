@@ -1189,6 +1189,7 @@
 				const day = cond.ko === "day", tint = day ? "214, 222, 232" : "198, 214, 236";
 				const lean = (0.1 + 0.3 * clamp(cond.wind.s / 40, 0, 1)) * (Math.cos(cond.wind.a) * (endsSwapped() ? -1 : 1) < 0 ? -1 : 1);
 				const dt = clamp(frameDt / 16.7, 0.25, 3);
+				if (drops.length && !Array.isArray(drops[0])) { drops = []; }   // snowflakes left from a snowy match earlier: rain keeps a list per layer
 				RAIN_LAYERS.forEach((L, li) => {
 					const list = drops[li] || (drops[li] = []), want = Math.round(L.n * cond.wet * (gfx3().rain || 1) * (SW * SH) / (1072 * 648));
 					while (list.length < want) { list.push({ x: rainRnd() * (SW + 80) - 40, y: rainRnd() * SH, l: L.len[0] + rainRnd() * (L.len[1] - L.len[0]), v: L.v[0] + rainRnd() * (L.v[1] - L.v[0]) }); }
