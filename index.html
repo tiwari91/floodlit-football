@@ -16425,8 +16425,8 @@ td, th { font-variant-numeric: tabular-nums; }
 	const GFX3 = {
 		light: { seat: 18, fill: 0.5, hiRows: 0, nearHiRows: 0, liteRow: 1, lattice: false, shadows: 1, ratio: 1, aa: false, fps: 30, budget: 1.3e6, minRatio: 0.75, dyn: true, hud: 1.25, glare: 0.6, wetLamps: 4, rain: 0.45, benches: true },
 		low: { seat: 15, fill: 0.62, hiRows: 0, nearHiRows: 2, liteRow: 3, lattice: false, shadows: 1, ratio: 1, aa: false, benches: true },
-		medium: { seat: 12, fill: 0.9, hiRows: 0, nearHiRows: 4, liteRow: 6, lattice: true, shadows: 3, ratio: 1.5, aa: !coarse, dyn: true, feet: true, grass: true, bloom: true },
-		high: { seat: 10, fill: 1.15, hiRows: 2, nearHiRows: 5, liteRow: 8, lattice: true, shadows: 5, ratio: 2, aa: true, dyn: true, feet: true, grass: true, bloom: true }
+		medium: { seat: 12, fill: 0.9, hiRows: 0, nearHiRows: 4, liteRow: 6, lattice: true, shadows: 3, shadowMap: 1024, ratio: 1.5, aa: !coarse, dyn: true, feet: true, grass: true, bloom: true },
+		high: { seat: 10, fill: 1.15, hiRows: 2, nearHiRows: 5, liteRow: 8, lattice: true, shadows: 5, shadowMap: 2048, ratio: 2, aa: true, dyn: true, feet: true, grass: true, bloom: true }
 	};
 	const GFX_NAME = { light: "Light", low: "Low", medium: "Medium", high: "High" };
 	// The sponsors on the boards: invented names, none of them a real brand.
@@ -18080,6 +18080,17 @@ td, th { font-variant-numeric: tabular-nums; }
 			return m;
 		};
 		const legMat = limbMat(LEG_BEND3, LEG_SOCK3), armMat = limbMat(ARM_BEND3, 0);
+		// The limbs' shadows bend with them too: the shadow pass draws them through the same bend.
+		const limbDepth = (lim, key) => {
+			const m = new T.MeshDepthMaterial({ depthPacking: T.RGBADepthPacking });
+			m.onBeforeCompile = sh => {
+				sh.vertexShader = sh.vertexShader
+					.replace("#include <common>", "#include <common>\nattribute vec4 aLo0; attribute vec4 aLo1; attribute vec4 aLo2; attribute vec4 aLo3;")
+					.replace("#include <begin_vertex>", `#include <begin_vertex>\ntransformed = mix(position, (mat4(aLo0, aLo1, aLo2, aLo3) * vec4(position - vec3(0.0, ${lim[0].toFixed(2)}, 0.0), 1.0)).xyz, smoothstep(${lim[1].toFixed(2)}, ${lim[2].toFixed(2)}, position.y));`);
+			};
+			m.customProgramCacheKey = () => key;
+			return m;
+		};
 		const parts = {}, white = new T.Color(1, 1, 1);
 		for (const name of Object.keys(defs)) {
 			const geo = defs[name], cap = MAXF3 * PER_FIG3[name];
@@ -18097,6 +18108,8 @@ td, th { font-variant-numeric: tabular-nums; }
 			m.instanceMatrix.setUsage(T.DynamicDrawUsage);
 			m.setColorAt(0, white);   // so the colour buffer exists before the first frame
 			m.frustumCulled = false; m.count = 0;
+			m.castShadow = true;
+			if (name === "leg" || name === "arm") { m.customDepthMaterial = limbDepth(name === "leg" ? LEG_BEND3 : ARM_BEND3, `ff-${name}-depth`); }
 			parts[name] = m;
 			G3.scene.add(m);
 		}
@@ -18201,6 +18214,17 @@ td, th { font-variant-numeric: tabular-nums; }
 			const hip = [ node(hips, 0, -1.0, -2.45), node(hips, 0, -1.0, 2.45) ], kn = hip.map(h => node(h, 0, -7.3, 0)), an = kn.map(k => node(k, 0, -6.5, 0));
 			rigs.push({ root, hips, spine, chest, neck, head, sh, el, ha, hip, kn, an });
 		}
+		// Real shadows (Medium and High): one light that throws no light of its own, only the players' shadows,
+		// following the camera so its shadow map is spent on what is in the picture. The grass is painted and
+		// unlit, so the shadows land on a clear sheet just above it that shows nothing but shadow.
+		G3.renderer.shadowMap.enabled = true; G3.renderer.shadowMap.type = T.PCFShadowMap;
+		const sl = new T.DirectionalLight(0xffffff, 0);
+		sl.shadow.bias = -0.0006; sl.shadow.normalBias = 0.4; sl.shadow.radius = 2;
+		G3.scene.add(sl, sl.target);
+		const catcher = new T.Mesh(new T.PlaneGeometry(FW + 600, FH + 600), new T.ShadowMaterial({ color: 0x000000, opacity: 0.5, depthWrite: false }));
+		catcher.rotation.x = -Math.PI / 2; catcher.position.set(FW / 2, 0.32, FH / 2); catcher.receiveShadow = true; catcher.renderOrder = -1;
+		G3.scene.add(catcher);
+		G3.shadow = { light: sl, catcher, size: 0 };
 		G3.fig = { parts, nums, chest, chestCv: cc, chestTex, chestKey: '', names, nameCv: nmc, nameTex, nameKeys: [], rings, blobs, longs, flags, rigs, cnt: {}, n: 0, M: new T.Matrix4(), M2: new T.Matrix4(), C: new T.Color(), V: new T.Vector3(), S: new T.Vector3(), Q: new T.Quaternion(), prevDir: new WeakMap(), yawSt: new WeakMap() };
 	}
 	// The arm axes, measured: +z on a shoulder swings the arm forward, and +x on the right shoulder
@@ -18237,6 +18261,27 @@ td, th { font-variant-numeric: tabular-nums; }
 	}
 	// Which way shadows fall on the grass: away from the main key light (high over the near stand,
 	// toward the far side of the pitch), as a unit (x, z).
+	// Real player shadows on this Graphics setting? (The map's size in texels, or 0 for the painted ones.)
+	const realShadow3D = () => (G3.shadow && gfx3().shadowMap) || 0;
+	// Aim the shadow light at the part of the pitch in the picture, along the same line as the painted shadows:
+	// the afternoon sun lower (longer shadows), the floodlights higher and fainter at night.
+	function shadowFollow3D () {
+		const S = G3.shadow;
+		if (!S) { return; }
+		const size = realShadow3D();
+		S.light.castShadow = !!size; S.catcher.visible = !!size;
+		if (!size) { return; }
+		if (S.size !== size) { S.size = size; S.light.shadow.mapSize.set(size, size); if (S.light.shadow.map) { S.light.shadow.map.dispose(); S.light.shadow.map = null; } }
+		const c = G3.cam, d = G3.v.set(0, 0, -1).applyQuaternion(c.quaternion), t = d.y < -0.05 ? -c.position.y / d.y : 900;
+		const gx = clamp(c.position.x + d.x * t, -200, FW + 200), gz = clamp(c.position.z + d.z * t, -200, FH + 200), span = clamp(Math.hypot(c.position.x - gx, c.position.y, c.position.z - gz) * 0.55, 220, 760);
+		const day = cond && cond.ko === "day", el = day ? 0.9 : 1.15, [ ux, uz ] = sunDir3D(), L = 1500;
+		S.light.target.position.set(gx, 0, gz);
+		S.light.position.set(gx - ux * Math.cos(el) * L, Math.sin(el) * L, gz - uz * Math.cos(el) * L);
+		const sc = S.light.shadow.camera;
+		sc.left = -span; sc.right = span; sc.top = span; sc.bottom = -span; sc.near = 10; sc.far = 3200; sc.updateProjectionMatrix();
+		S.light.target.updateMatrixWorld(); S.light.updateMatrixWorld();
+		S.catcher.material.opacity = day ? 0.5 : 0.44;
+	}
 	const sunDir3D = () => { const dx = FW * 0.7, dz = -FH * 1.1, l = Math.hypot(dx, dz) || 1; return [ dx / l, dz / l ]; };
 	const smooth3 = t => t * t * (3 - 2 * t);
 	const lerp3 = (a, b, t) => a + (b - a) * t;
@@ -18795,7 +18840,7 @@ td, th { font-variant-numeric: tabular-nums; }
 			}
 			V.setFromMatrixPosition(rig.root.matrixWorld);
 		}
-		const ns = gfx3().shadows - 1;
+		const ns = realShadow3D() ? 0 : gfx3().shadows - 1;   // real shadows replace the painted ones
 		if (ns > 0 && air < 20 && cond && cond.ko === "day") {
 			// An afternoon game: one sun shadow, the same way for everyone, longer than his blob.
 			const len = 26, [ ux, uz ] = sunDir3D(); F.longs.material.opacity = 0.2;
@@ -18858,7 +18903,19 @@ td, th { font-variant-numeric: tabular-nums; }
 	const LEG_A3 = 7.3, LEG_B3 = 6.5, ANK3 = 0.8, HIP_W3 = 2.45, LEG3 = LEG_A3 + LEG_B3;
 	const GRAV_FIG3 = 0.07;   // a man in the air: rig units a frame, a frame (a touch over real gravity, for snap)
 	// A figure's size against the rig (drawFigures3D scales each player: taller and broader men).
-	const figScale3 = p => (p.team >= 0 && p.role !== "staff" && p.build ? 0.95 + 0.1 * p.build.seed + (p.role === "gk" ? 0.03 : 0) : 1);
+	// His body type: [ height, breadth ], read from what he is. Keepers, centre-backs and target men are tall,
+	// ball-winners stocky, pace merchants and poachers shorter and slighter; his own seed and frame spread the
+	// rest, so a side has big men and small men you can tell apart on the broadcast camera.
+	const BODY_ROLE3 = { gk: [ 0.06, 0.02 ], def: [ 0.03, 0.03 ], mid: [ -0.01, -0.01 ], fwd: [ 0, 0 ] };
+	const BODY_TRAIT3 = { target: [ 0.07, 0.06 ], winner: [ 0.01, 0.07 ], pace: [ -0.06, -0.06 ], poacher: [ -0.03, -0.02 ], playmaker: [ -0.02, -0.04 ], sweeper: [ 0, 0 ] };
+	function bodyType3 (p) {
+		if (!(p.team >= 0) || p.role === "staff" || !p.build) { return [ 1, 1 ]; }
+		const r = BODY_ROLE3[p.role] || [ 0, 0 ], t = BODY_TRAIT3[p.trait] || [ 0, 0 ];
+		const ht = clamp(0.93 + 0.12 * p.build.seed + r[0] + t[0], 0.86, 1.14);
+		const br = clamp(1 + 1.7 * ((p.build.girth || 1) - 1) + r[1] + t[1] + 0.35 * (ht - 1), 0.86, 1.16);   // tall men a little broader
+		return [ ht, br ];
+	}
+	const figScale3 = p => bodyType3(p)[0];
 	// One leg to a point: the ankle at (Dx, Dy, Dz) from the hip joint, in his own frame (x forward, y up,
 	// z to his right). The thigh swings forward on hip z and out on hip x, the knee folds the shin back,
 	// and the ankle lays the foot flat (plus toe: + lifts the toes, - points them).
@@ -18888,7 +18945,7 @@ td, th { font-variant-numeric: tabular-nums; }
 	// is split against it, so a man still turning runs on his feet, not sideways across them).
 	// o: crouch (lower the hips), wide (feet apart), fwd/lift/toe per leg (a foot eased forward, a heel up).
 	function gait3 (p, ph, face, mir, o = {}) {
-		const sc = figScale3(p) * (p.team >= 0 && p.build && p.build.girth ? p.build.girth : 1);
+		const bt = bodyType3(p), sc = bt[0] * bt[1];
 		const vxw = mir * (p.vx || 0), vzw = p.vy || 0, c = Math.cos(face), s = Math.sin(face);
 		let vf = (vxw * c + vzw * s) / sc, vl = (-vxw * s + vzw * c) / sc;
 		const spd = Math.hypot(p.vx || 0, p.vy || 0), g = p.build || { stride: 1 }, shuf = clamp(p.shuf || 0, 0, 1);
@@ -19472,7 +19529,7 @@ td, th { font-variant-numeric: tabular-nums; }
 			else { const ho = huddleOff3(p); pose3D(rig, p, WX(p.x + (ho ? ho[0] : 0)), p.y + (ho ? ho[1] : 0), WD(face), mir * turn, near, mir * yaw, mir * lead); }   // (ho: drawn apart in the goal huddle)
 			if (p.stageY) { rig.root.position.y += p.stageY; }   // up on the trophy stage or the bus (44a)
 			blendUpper3D(rig, ys, !!ride || acting || p.windUp > 0 || reduceMotion || replayOn() || frameDt > 100);
-			{ const bd = build(p), ht = 0.95 + 0.1 * bd.seed + (p.role === "gk" ? 0.03 : 0), gth = p.team >= 0 ? bd.girth : 1; rig.root.scale.set(ht * gth, ht, ht * gth); }   // tall and short, broad and slight
+			{ build(p); const [ ht, br ] = bodyType3(p); rig.root.scale.set(ht * br, ht, ht * br); }   // tall and short, broad and slight
 			F.rigOf.set(p, rig);
 			commitFigure3D(rig, look(p), kit3D(p), p.num);
 		}
@@ -20097,12 +20154,15 @@ td, th { font-variant-numeric: tabular-nums; }
 	// Near the far touchline it tilts up (the eye stays put), so the far stand, its roof and the floodlights come
 	// into the top of the picture; it tilts back as play comes away, at the same slow pace as its depth.
 	const TVC = { x: 0, z: 0, tilt: 0, at: -1e9, shot: false, punchAt: -1e9 };
+	// The desktop broadcast camera: how much of the pitch's width it shows either side of the ball (as a share
+	// of the pitch), and how steeply it looks down. Closer and lower makes the players bigger and more side-on.
+	const TV_COVER3 = 0.24, TV_ELEV3 = 24;
 	function tvShot3D (out, bx, by, WX) {
 		const asp = G3.cam.aspect, tall = asp < 1;
 		const fov = tall ? 46 : asp < 1.5 ? 36 : 30, tanX = Math.tan(fov * Math.PI / 360) * asp;
 		// Wider than 16:9 (a phone on its side) the picture is shallower: a touch more pitch across and a
 		// lower angle, so both touchlines still fit.
-		const k = Math.sqrt(Math.max(1, asp / 1.78)), cover = FW * (tall ? 0.13 : k > 1.01 ? 0.36 * k : 0.27), elev = tall ? 42 * Math.PI / 180 : Math.asin(Math.sin(28 * Math.PI / 180) / k);
+		const k = Math.sqrt(Math.max(1, asp / 1.78)), cover = FW * (tall ? 0.13 : k > 1.01 ? 0.36 * k : TV_COVER3), elev = tall ? 42 * Math.PI / 180 : Math.asin(Math.sin((k > 1.01 ? 28 : TV_ELEV3) * Math.PI / 180) / k);
 		const dist = cover / tanX, eyeH = dist * Math.sin(elev), back = dist * Math.cos(elev);
 		const half = cover, halfNear = Math.hypot(eyeH, back - FH / 2) * tanX;
 		const wantX = half * 2 >= FW ? FW / 2 : clamp(bx, Math.min(FW / 2, halfNear - MX * 0.55), Math.max(FW / 2, FW - halfNear + MX * 0.55));
@@ -20586,7 +20646,7 @@ td, th { font-variant-numeric: tabular-nums; }
 		try {
 			if (typeof ceremony3D === "function" && ceremony3D()) { return true; }   // a trophy presentation draws its own frame (44a)
 			if (replayOn()) { restore = applyReplay(); }
-			try { sync3D(); if (window.__ffCam3D) { window.__ffCam3D(G3, THREE); } const q = gpuBegin3D(); G3.renderer.render(G3.scene, G3.cam); gpuEnd3D(q); } finally { if (restore) { restore(); } }
+			try { sync3D(); if (window.__ffCam3D) { window.__ffCam3D(G3, THREE); } shadowFollow3D(); const q = gpuBegin3D(); G3.renderer.render(G3.scene, G3.cam); gpuEnd3D(q); } finally { if (restore) { restore(); } }
 			hud3D();
 			if (threeToldLoading) { threeToldLoading = false; fx = fx.filter(f => !(f.toast && f.label === "Loading 3D view")); }
 		} catch (e) {

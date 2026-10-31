@@ -582,12 +582,15 @@
 	// Near the far touchline it tilts up (the eye stays put), so the far stand, its roof and the floodlights come
 	// into the top of the picture; it tilts back as play comes away, at the same slow pace as its depth.
 	const TVC = { x: 0, z: 0, tilt: 0, at: -1e9, shot: false, punchAt: -1e9 };
+	// The desktop broadcast camera: how much of the pitch's width it shows either side of the ball (as a share
+	// of the pitch), and how steeply it looks down. Closer and lower makes the players bigger and more side-on.
+	const TV_COVER3 = 0.24, TV_ELEV3 = 24;
 	function tvShot3D (out, bx, by, WX) {
 		const asp = G3.cam.aspect, tall = asp < 1;
 		const fov = tall ? 46 : asp < 1.5 ? 36 : 30, tanX = Math.tan(fov * Math.PI / 360) * asp;
 		// Wider than 16:9 (a phone on its side) the picture is shallower: a touch more pitch across and a
 		// lower angle, so both touchlines still fit.
-		const k = Math.sqrt(Math.max(1, asp / 1.78)), cover = FW * (tall ? 0.13 : k > 1.01 ? 0.36 * k : 0.27), elev = tall ? 42 * Math.PI / 180 : Math.asin(Math.sin(28 * Math.PI / 180) / k);
+		const k = Math.sqrt(Math.max(1, asp / 1.78)), cover = FW * (tall ? 0.13 : k > 1.01 ? 0.36 * k : TV_COVER3), elev = tall ? 42 * Math.PI / 180 : Math.asin(Math.sin((k > 1.01 ? 28 : TV_ELEV3) * Math.PI / 180) / k);
 		const dist = cover / tanX, eyeH = dist * Math.sin(elev), back = dist * Math.cos(elev);
 		const half = cover, halfNear = Math.hypot(eyeH, back - FH / 2) * tanX;
 		const wantX = half * 2 >= FW ? FW / 2 : clamp(bx, Math.min(FW / 2, halfNear - MX * 0.55), Math.max(FW / 2, FW - halfNear + MX * 0.55));
@@ -1071,7 +1074,7 @@
 		try {
 			if (typeof ceremony3D === "function" && ceremony3D()) { return true; }   // a trophy presentation draws its own frame (44a)
 			if (replayOn()) { restore = applyReplay(); }
-			try { sync3D(); if (window.__ffCam3D) { window.__ffCam3D(G3, THREE); } const q = gpuBegin3D(); G3.renderer.render(G3.scene, G3.cam); gpuEnd3D(q); } finally { if (restore) { restore(); } }
+			try { sync3D(); if (window.__ffCam3D) { window.__ffCam3D(G3, THREE); } shadowFollow3D(); const q = gpuBegin3D(); G3.renderer.render(G3.scene, G3.cam); gpuEnd3D(q); } finally { if (restore) { restore(); } }
 			hud3D();
 			if (threeToldLoading) { threeToldLoading = false; fx = fx.filter(f => !(f.toast && f.label === "Loading 3D view")); }
 		} catch (e) {

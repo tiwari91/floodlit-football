@@ -38,8 +38,8 @@
 	const GFX3 = {
 		light: { seat: 18, fill: 0.5, hiRows: 0, nearHiRows: 0, liteRow: 1, lattice: false, shadows: 1, ratio: 1, aa: false, fps: 30, budget: 1.3e6, minRatio: 0.75, dyn: true, hud: 1.25, glare: 0.6, wetLamps: 4, rain: 0.45, benches: true },
 		low: { seat: 15, fill: 0.62, hiRows: 0, nearHiRows: 2, liteRow: 3, lattice: false, shadows: 1, ratio: 1, aa: false, benches: true },
-		medium: { seat: 12, fill: 0.9, hiRows: 0, nearHiRows: 4, liteRow: 6, lattice: true, shadows: 3, ratio: 1.5, aa: !coarse, dyn: true, feet: true, grass: true, bloom: true },
-		high: { seat: 10, fill: 1.15, hiRows: 2, nearHiRows: 5, liteRow: 8, lattice: true, shadows: 5, ratio: 2, aa: true, dyn: true, feet: true, grass: true, bloom: true }
+		medium: { seat: 12, fill: 0.9, hiRows: 0, nearHiRows: 4, liteRow: 6, lattice: true, shadows: 3, shadowMap: 1024, ratio: 1.5, aa: !coarse, dyn: true, feet: true, grass: true, bloom: true },
+		high: { seat: 10, fill: 1.15, hiRows: 2, nearHiRows: 5, liteRow: 8, lattice: true, shadows: 5, shadowMap: 2048, ratio: 2, aa: true, dyn: true, feet: true, grass: true, bloom: true }
 	};
 	const GFX_NAME = { light: "Light", low: "Low", medium: "Medium", high: "High" };
 	// The sponsors on the boards: invented names, none of them a real brand.

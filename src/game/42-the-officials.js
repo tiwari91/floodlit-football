@@ -192,7 +192,7 @@
 			else { const ho = huddleOff3(p); pose3D(rig, p, WX(p.x + (ho ? ho[0] : 0)), p.y + (ho ? ho[1] : 0), WD(face), mir * turn, near, mir * yaw, mir * lead); }   // (ho: drawn apart in the goal huddle)
 			if (p.stageY) { rig.root.position.y += p.stageY; }   // up on the trophy stage or the bus (44a)
 			blendUpper3D(rig, ys, !!ride || acting || p.windUp > 0 || reduceMotion || replayOn() || frameDt > 100);
-			{ const bd = build(p), ht = 0.95 + 0.1 * bd.seed + (p.role === "gk" ? 0.03 : 0), gth = p.team >= 0 ? bd.girth : 1; rig.root.scale.set(ht * gth, ht, ht * gth); }   // tall and short, broad and slight
+			{ build(p); const [ ht, br ] = bodyType3(p); rig.root.scale.set(ht * br, ht, ht * br); }   // tall and short, broad and slight
 			F.rigOf.set(p, rig);
 			commitFigure3D(rig, look(p), kit3D(p), p.num);
 		}

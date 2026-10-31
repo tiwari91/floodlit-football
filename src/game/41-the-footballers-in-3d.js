@@ -533,6 +533,17 @@
 			return m;
 		};
 		const legMat = limbMat(LEG_BEND3, LEG_SOCK3), armMat = limbMat(ARM_BEND3, 0);
+		// The limbs' shadows bend with them too: the shadow pass draws them through the same bend.
+		const limbDepth = (lim, key) => {
+			const m = new T.MeshDepthMaterial({ depthPacking: T.RGBADepthPacking });
+			m.onBeforeCompile = sh => {
+				sh.vertexShader = sh.vertexShader
+					.replace("#include <common>", "#include <common>\nattribute vec4 aLo0; attribute vec4 aLo1; attribute vec4 aLo2; attribute vec4 aLo3;")
+					.replace("#include <begin_vertex>", `#include <begin_vertex>\ntransformed = mix(position, (mat4(aLo0, aLo1, aLo2, aLo3) * vec4(position - vec3(0.0, ${lim[0].toFixed(2)}, 0.0), 1.0)).xyz, smoothstep(${lim[1].toFixed(2)}, ${lim[2].toFixed(2)}, position.y));`);
+			};
+			m.customProgramCacheKey = () => key;
+			return m;
+		};
 		const parts = {}, white = new T.Color(1, 1, 1);
 		for (const name of Object.keys(defs)) {
 			const geo = defs[name], cap = MAXF3 * PER_FIG3[name];
@@ -550,6 +561,8 @@
 			m.instanceMatrix.setUsage(T.DynamicDrawUsage);
 			m.setColorAt(0, white);   // so the colour buffer exists before the first frame
 			m.frustumCulled = false; m.count = 0;
+			m.castShadow = true;
+			if (name === "leg" || name === "arm") { m.customDepthMaterial = limbDepth(name === "leg" ? LEG_BEND3 : ARM_BEND3, `ff-${name}-depth`); }
 			parts[name] = m;
 			G3.scene.add(m);
 		}
@@ -654,6 +667,17 @@
 			const hip = [ node(hips, 0, -1.0, -2.45), node(hips, 0, -1.0, 2.45) ], kn = hip.map(h => node(h, 0, -7.3, 0)), an = kn.map(k => node(k, 0, -6.5, 0));
 			rigs.push({ root, hips, spine, chest, neck, head, sh, el, ha, hip, kn, an });
 		}
+		// Real shadows (Medium and High): one light that throws no light of its own, only the players' shadows,
+		// following the camera so its shadow map is spent on what is in the picture. The grass is painted and
+		// unlit, so the shadows land on a clear sheet just above it that shows nothing but shadow.
+		G3.renderer.shadowMap.enabled = true; G3.renderer.shadowMap.type = T.PCFShadowMap;
+		const sl = new T.DirectionalLight(0xffffff, 0);
+		sl.shadow.bias = -0.0006; sl.shadow.normalBias = 0.4; sl.shadow.radius = 2;
+		G3.scene.add(sl, sl.target);
+		const catcher = new T.Mesh(new T.PlaneGeometry(FW + 600, FH + 600), new T.ShadowMaterial({ color: 0x000000, opacity: 0.5, depthWrite: false }));
+		catcher.rotation.x = -Math.PI / 2; catcher.position.set(FW / 2, 0.32, FH / 2); catcher.receiveShadow = true; catcher.renderOrder = -1;
+		G3.scene.add(catcher);
+		G3.shadow = { light: sl, catcher, size: 0 };
 		G3.fig = { parts, nums, chest, chestCv: cc, chestTex, chestKey: '', names, nameCv: nmc, nameTex, nameKeys: [], rings, blobs, longs, flags, rigs, cnt: {}, n: 0, M: new T.Matrix4(), M2: new T.Matrix4(), C: new T.Color(), V: new T.Vector3(), S: new T.Vector3(), Q: new T.Quaternion(), prevDir: new WeakMap(), yawSt: new WeakMap() };
 	}
 	// The arm axes, measured: +z on a shoulder swings the arm forward, and +x on the right shoulder
@@ -690,6 +714,27 @@
 	}
 	// Which way shadows fall on the grass: away from the main key light (high over the near stand,
 	// toward the far side of the pitch), as a unit (x, z).
+	// Real player shadows on this Graphics setting? (The map's size in texels, or 0 for the painted ones.)
+	const realShadow3D = () => (G3.shadow && gfx3().shadowMap) || 0;
+	// Aim the shadow light at the part of the pitch in the picture, along the same line as the painted shadows:
+	// the afternoon sun lower (longer shadows), the floodlights higher and fainter at night.
+	function shadowFollow3D () {
+		const S = G3.shadow;
+		if (!S) { return; }
+		const size = realShadow3D();
+		S.light.castShadow = !!size; S.catcher.visible = !!size;
+		if (!size) { return; }
+		if (S.size !== size) { S.size = size; S.light.shadow.mapSize.set(size, size); if (S.light.shadow.map) { S.light.shadow.map.dispose(); S.light.shadow.map = null; } }
+		const c = G3.cam, d = G3.v.set(0, 0, -1).applyQuaternion(c.quaternion), t = d.y < -0.05 ? -c.position.y / d.y : 900;
+		const gx = clamp(c.position.x + d.x * t, -200, FW + 200), gz = clamp(c.position.z + d.z * t, -200, FH + 200), span = clamp(Math.hypot(c.position.x - gx, c.position.y, c.position.z - gz) * 0.55, 220, 760);
+		const day = cond && cond.ko === "day", el = day ? 0.9 : 1.15, [ ux, uz ] = sunDir3D(), L = 1500;
+		S.light.target.position.set(gx, 0, gz);
+		S.light.position.set(gx - ux * Math.cos(el) * L, Math.sin(el) * L, gz - uz * Math.cos(el) * L);
+		const sc = S.light.shadow.camera;
+		sc.left = -span; sc.right = span; sc.top = span; sc.bottom = -span; sc.near = 10; sc.far = 3200; sc.updateProjectionMatrix();
+		S.light.target.updateMatrixWorld(); S.light.updateMatrixWorld();
+		S.catcher.material.opacity = day ? 0.5 : 0.44;
+	}
 	const sunDir3D = () => { const dx = FW * 0.7, dz = -FH * 1.1, l = Math.hypot(dx, dz) || 1; return [ dx / l, dz / l ]; };
 	const smooth3 = t => t * t * (3 - 2 * t);
 	const lerp3 = (a, b, t) => a + (b - a) * t;
@@ -1248,7 +1293,7 @@
 			}
 			V.setFromMatrixPosition(rig.root.matrixWorld);
 		}
-		const ns = gfx3().shadows - 1;
+		const ns = realShadow3D() ? 0 : gfx3().shadows - 1;   // real shadows replace the painted ones
 		if (ns > 0 && air < 20 && cond && cond.ko === "day") {
 			// An afternoon game: one sun shadow, the same way for everyone, longer than his blob.
 			const len = 26, [ ux, uz ] = sunDir3D(); F.longs.material.opacity = 0.2;

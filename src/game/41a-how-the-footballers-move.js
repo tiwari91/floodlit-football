@@ -12,7 +12,19 @@
 	const LEG_A3 = 7.3, LEG_B3 = 6.5, ANK3 = 0.8, HIP_W3 = 2.45, LEG3 = LEG_A3 + LEG_B3;
 	const GRAV_FIG3 = 0.07;   // a man in the air: rig units a frame, a frame (a touch over real gravity, for snap)
 	// A figure's size against the rig (drawFigures3D scales each player: taller and broader men).
-	const figScale3 = p => (p.team >= 0 && p.role !== "staff" && p.build ? 0.95 + 0.1 * p.build.seed + (p.role === "gk" ? 0.03 : 0) : 1);
+	// His body type: [ height, breadth ], read from what he is. Keepers, centre-backs and target men are tall,
+	// ball-winners stocky, pace merchants and poachers shorter and slighter; his own seed and frame spread the
+	// rest, so a side has big men and small men you can tell apart on the broadcast camera.
+	const BODY_ROLE3 = { gk: [ 0.06, 0.02 ], def: [ 0.03, 0.03 ], mid: [ -0.01, -0.01 ], fwd: [ 0, 0 ] };
+	const BODY_TRAIT3 = { target: [ 0.07, 0.06 ], winner: [ 0.01, 0.07 ], pace: [ -0.06, -0.06 ], poacher: [ -0.03, -0.02 ], playmaker: [ -0.02, -0.04 ], sweeper: [ 0, 0 ] };
+	function bodyType3 (p) {
+		if (!(p.team >= 0) || p.role === "staff" || !p.build) { return [ 1, 1 ]; }
+		const r = BODY_ROLE3[p.role] || [ 0, 0 ], t = BODY_TRAIT3[p.trait] || [ 0, 0 ];
+		const ht = clamp(0.93 + 0.12 * p.build.seed + r[0] + t[0], 0.86, 1.14);
+		const br = clamp(1 + 1.7 * ((p.build.girth || 1) - 1) + r[1] + t[1] + 0.35 * (ht - 1), 0.86, 1.16);   // tall men a little broader
+		return [ ht, br ];
+	}
+	const figScale3 = p => bodyType3(p)[0];
 	// One leg to a point: the ankle at (Dx, Dy, Dz) from the hip joint, in his own frame (x forward, y up,
 	// z to his right). The thigh swings forward on hip z and out on hip x, the knee folds the shin back,
 	// and the ankle lays the foot flat (plus toe: + lifts the toes, - points them).
@@ -42,7 +54,7 @@
 	// is split against it, so a man still turning runs on his feet, not sideways across them).
 	// o: crouch (lower the hips), wide (feet apart), fwd/lift/toe per leg (a foot eased forward, a heel up).
 	function gait3 (p, ph, face, mir, o = {}) {
-		const sc = figScale3(p) * (p.team >= 0 && p.build && p.build.girth ? p.build.girth : 1);
+		const bt = bodyType3(p), sc = bt[0] * bt[1];
 		const vxw = mir * (p.vx || 0), vzw = p.vy || 0, c = Math.cos(face), s = Math.sin(face);
 		let vf = (vxw * c + vzw * s) / sc, vl = (-vxw * s + vzw * c) / sc;
 		const spd = Math.hypot(p.vx || 0, p.vy || 0), g = p.build || { stride: 1 }, shuf = clamp(p.shuf || 0, 0, 1);
