@@ -20323,6 +20323,38 @@ td, th { font-variant-numeric: tabular-nums; }
 		return { x: (G3.v.x + 1) / 2 * VW, y: (1 - G3.v.y) / 2 * VH, k: VH / (2 * d * Math.tan(G3.cam.fov * Math.PI / 360)) };
 	}
 	const plate3 = { ctrl: -1, at: 0 }, PLATE_FULL3 = 90;
+	// Who's who from the TV camera: a small shirt number over each of your other players, and over whoever
+	// gets the ball (either side, not the man you control: he has his plate) his number and surname for a
+	// second and a half, as the broadcast puts up the name of the man on the ball.
+	const onBall3 = { p: null, at: 0 };
+	function tags3D (me) {
+		const o = ball.owner;
+		if (o && o !== onBall3.p) { onBall3.p = o; onBall3.at = frame; }
+		const card = onBall3.p && onBall3.p !== me && frame - onBall3.at < 90 && players.includes(onBall3.p) ? onBall3.p : null;
+		const sm = !receiver && !(o && o.team === 0) && !inHands(o) ? nextSwitchTarget() : null;   // he has the S marker over him already
+		ctx.lineJoin = "round";
+		ctx.font = "800 11px Barlow, Arial, sans-serif";
+		for (const p of players) {
+			if (p.team !== 0 || p === me || p === card || p === sm || !p.num) { continue; }
+			const q = proj3D(p.x, p.y, 42);
+			if (!q) { continue; }
+			ctx.globalAlpha = 0.85; ctx.lineWidth = 3; ctx.strokeStyle = "rgba(8, 12, 10, 0.85)"; ctx.fillStyle = "#ffffff";
+			ctx.strokeText(String(p.num), q.x, q.y); ctx.fillText(String(p.num), q.x, q.y);
+		}
+		ctx.globalAlpha = 1;
+		if (!card) { return; }
+		const q = proj3D(card.x, card.y, 46);
+		if (!q) { return; }
+		const age = frame - onBall3.at, a = Math.min(1, age / 6, (90 - age) / 12), sur = String(card.name || "").split(" ").pop().toUpperCase();
+		const txt = `${card.num || ""} ${sur}`.trim();
+		ctx.font = "800 12px 'Big Shoulders Display', 'Arial Narrow', Arial, sans-serif";
+		const w = Math.max(30, (Number(ctx.measureText ? ctx.measureText(txt).width : 0) || txt.length * 7) + 14), h = 17;
+		ctx.globalAlpha = a;
+		ctx.fillStyle = "rgba(10, 16, 13, 0.88)"; ctx.fillRect(q.x - w / 2, q.y - h, w, h);
+		ctx.fillStyle = (KITS[card.team] || KITS[0]).outfield; ctx.fillRect(q.x - w / 2, q.y - 2, w, 2);
+		ctx.fillStyle = "#eef2ec"; ctx.fillText(txt, q.x, q.y - h / 2 - 1);
+		ctx.globalAlpha = 1;
+	}
 	// The HUD over the 3D picture: everything the 2D cameras write in words and marks.
 	// Shots that are not about your man: the kick-off sweep, a goal and its celebration, the manager's run, the stretcher. His
 	// ring, cone, plate and the off-screen arrow stay off them (close in, they were drawn huge over the scene).
@@ -20346,6 +20378,7 @@ td, th { font-variant-numeric: tabular-nums; }
 			}
 			if (p.injured) { ctx.fillStyle = "#ffffff"; ctx.fillRect(q.x - 13, q.y - 10, 7, 7); ctx.fillStyle = "#d8343f"; ctx.fillRect(q.x - 10.5, q.y - 9, 2, 5); ctx.fillRect(q.x - 12, q.y - 7.5, 5, 2); }
 		}
+		if (playing && !cutaway3D()) { tags3D(me); ctx.textAlign = "center"; ctx.textBaseline = "middle"; }
 		if (me && !cutaway3D()) {
 			const foot = proj3D(me.x, me.y, 0), top = proj3D(me.x, me.y, 56);
 			if (foot) {
