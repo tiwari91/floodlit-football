@@ -162,7 +162,7 @@
 	// The kicking leg's shape at the top of the backswing and at the end of the follow-through, per kind:
 	// thigh angle (forward +), knee fold, toe (+ up), the leg turned out (side-foot), the body's lean (+ back).
 	const KICK_SHAPE3 = {
-		pass: { bh: -0.32, bk: 1.0, ft: [ 0.6, 0.25, 0.05 ], out: 1.05, lean: -0.1, n: 0.8 },
+		pass: { bh: -0.42, bk: 1.1, ft: [ 0.88, 0.22, 0.08 ], out: 1.05, lean: -0.12, n: 0.8 },   // swung through far enough to read from the TV camera
 		drive: { bh: -0.62, bk: 1.75, ft: [ 1.35, 0.12, -0.75 ], out: 0.12, lean: -0.3, n: 1 },
 		chip: { bh: -0.45, bk: 1.35, ft: [ 0.95, 0.4, 0.2 ], out: 0.2, lean: 0.18, n: 0.9 },
 		loft: { bh: -0.6, bk: 1.6, ft: [ 1.4, 0.15, -0.35 ], out: 0.3, lean: 0.12, n: 1 },

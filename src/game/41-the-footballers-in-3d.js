@@ -621,6 +621,7 @@
 	// The arm axes, measured: +z on a shoulder swings the arm forward, and +x on the right shoulder
 	// (i = 1) or -x on the left (i = 0) brings it IN across the body. So "out to the side" is OUT3(i).
 	const OUT3 = i => (i ? -1 : 1);
+	const POKE_N3 = 15;   // frames of a standing tackle's leg stab
 	// Reset a rig to standing.
 	function resetRig3D (r) {
 		r.hips.position.set(0, 15.6, 0); r.hips.rotation.set(0, 0, 0);
@@ -1018,6 +1019,16 @@
 			}
 		}
 		// A shot blocked (block3): he flinches into it, turning a shoulder, arms tucked in to his sides, knees giving.
+		// A standing tackle won (pokeA): the leg nearest the ball stabs out at it, the knee nearly straight and the
+		// toe up, the standing knee giving and the body dropping and leaning in behind it, then back.
+		if (p.pokeA > 0 && !gk && !down && fall < 0) {
+			const t = 1 - p.pokeA / POKE_N3, e = rm ? 0.6 : Math.pow(Math.sin(Math.PI * clamp(t * 1.15, 0, 1)), 0.7), kf = p.build && p.build.left ? 0 : 1, pl = 1 - kf;
+			r.hip[kf].rotation.z = lerp3(r.hip[kf].rotation.z, 1.05, e); r.hip[kf].rotation.x = lerp3(r.hip[kf].rotation.x, OUT3(kf) * 0.3, e);
+			r.kn[kf].rotation.z = lerp3(r.kn[kf].rotation.z, -0.12, e); r.an[kf].rotation.z = lerp3(r.an[kf].rotation.z, 0.35, e);
+			r.hip[pl].rotation.z = lerp3(r.hip[pl].rotation.z, -0.25, e); r.kn[pl].rotation.z = lerp3(r.kn[pl].rotation.z, -0.75, e);
+			r.hips.position.y -= 2.6 * e; r.spine.rotation.z -= 0.22 * e; r.chest.rotation.y += (kf ? 1 : -1) * 0.2 * e;
+			r.sh[pl].rotation.x = lerp3(r.sh[pl].rotation.x, OUT3(pl) * 0.8, e); r.sh[kf].rotation.z = lerp3(r.sh[kf].rotation.z, -0.5, e);
+		}
 		const blk = !gk && !down && fall < 0 && !rm ? block3(p) : 0;
 		if (blk > 0) {
 			const b = blk < 0.2 ? smooth3(blk / 0.2) : 1 - smooth3((blk - 0.2) / 0.8);

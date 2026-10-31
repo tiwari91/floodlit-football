@@ -591,6 +591,7 @@
 			if (!won) { break; }   // one challenger a step, whoever has it
 			{
 				o.kickCd = 40;
+				if (!sliding) { q.pokeA = POKE_N3; }   // the leg goes in for it (drawn, see poke3 in pose3D)
 				gainBall(q);
 				tallyBy(q, "tackle");
 				swing(q.team, 0.08);
