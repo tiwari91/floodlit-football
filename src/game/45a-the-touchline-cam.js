@@ -232,6 +232,31 @@
 			});
 		}
 	}
+	// Ball boys and girls: three along the far touchline in front of the boards and one by each corner
+	// behind the goals, in the home club's training tops. They stand turned to the ball, and when it goes
+	// out near one of them (a throw, a corner, a goal kick) that one puts a hand up with the spare.
+	const KID_AT3 = [ [ 0.3, -10 ], [ 0.5, -10 ], [ 0.7, -10 ], [ -0.02, 0.1 ], [ -0.02, 0.9 ], [ 1.02, 0.1 ], [ 1.02, 0.9 ] ];
+	const kids3 = KID_AT3.map((a, i) => ({ x: 0, y: 0, vx: 0, vy: 0, dir: 0, stride: 0, runAmt: 0, idlePh: i * 1.3, role: "staff", team: -1, at: a,
+		look: { skin: [ "#f1c9a5", "#9c6a44", "#e0ac86", "#6e4a30", "#c68a5e", "#f1c9a5", "#9c6a44" ][i], hair: [ "#3a2416", "#0e0b09", "#c89b5a", "#0e0b09", "#6a4a2a", "#1b1410", "#3a2416" ][i], style: [ "short", "buzz", "long", "short", "buzz", "long", "short" ][i], face: (i * 3) % 10 } }));
+	function ballKids3D () {
+		const F = G3.fig;
+		if (!F || !ball || bulkSim || !(state === "play" || state === "paused" || state === "goal")) { return; }
+		const kit = KITS[homeSide] || KITS[0], c = kit.second && kit.second !== kit.outfield ? kit.second : "#1f2a36";
+		const top = { shirt: c, shorts: c, socks: c, second: kit.outfield, pattern: 0, ink: kit.outfield, gloves: null, sleeves: true, boots: "#15181a", ring: null };
+		const out = setPiece && (setPiece.kind === "throw" || setPiece.kind === "corner" || setPiece.kind === "goalkick") ? ball : null, sw = endsSwapped();
+		for (const q of kids3) {
+			const [ u, v ] = q.at, side = v < 0;
+			q.x = side ? FW * u : u < 0 ? -22 : FW + 22; q.y = side ? v : FH * v;
+			const bx = sw ? FW - ball.x : ball.x;   // the stadium does not mirror; the ball's drawn spot does
+			q.dir = Math.atan2(ball.y - q.y, bx - q.x); q.idlePh += 0.02 * frameDt / 16.7;
+			if (F.n >= MAXF3) { return; }
+			const r = F.rigs[F.n];
+			pose3D(r, q, q.x, q.y, q.dir, 0, 0);
+			r.root.scale.set(0.72, 0.72, 0.72);   // twelve or thirteen years old
+			if (out && Math.hypot((sw ? FW - out.x : out.x) - q.x, out.y - q.y) < 260) { r.sh[1].rotation.set(0, 0, -2.9); r.el[1].rotation.z = 0.2; }   // the spare ball held up
+			commitFigure3D(r, q.look, top, null);
+		}
+	}
 	// The manager mid-run, for the broadcast to cut to: his spot, while the run is on.
 	function bossRun3D () {
 		for (const sf of staff3) { if (sf.sprint) { const se = (performance.now() - sf.sprint.t0) / 1000; if (se > 0.4 && se < 4.6) { return sf.mgr; } } }
