@@ -16880,7 +16880,7 @@ td, th { font-variant-numeric: tabular-nums; }
 		const main = acc3(), near = acc3(), lamp = acc3(), nearLamp = acc3(), hills = acc3(), glow = [], nearGlow = [];
 		const shade = (c, k) => { const v = col3(c); return [ v[0] * k, v[1] * k, v[2] * k ]; };
 		const conc = col3(gs.concrete), step = shade(gs.steps, 1.35), riser = shade(gs.concrete, 0.8);
-		const club = col3(KITS[homeSide].outfield);
+		const club = col3(KITS[homeSide].outfield), steel3 = [ 0.5, 0.53, 0.57 ];
 		// The country's dress: its lamps (and the wet grass mirrors them), its roof's sheeting, its flags.
 		const lampC = gs.lamp || [ 1.3, 1.22, 1.02 ], lampM = Math.max(...lampC);
 		lampC.forEach((v, i) => { wetLampCol3[i] = 0.25 + 0.75 * v / lampM; });
@@ -16910,6 +16910,10 @@ td, th { font-variant-numeric: tabular-nums; }
 			// The front wall, with a painted band in the club's colour.
 			strip(T, j, 0, 0, 0, P.rows[0].h, shade(conc, 0.7));
 			strip(T, j, 0, P.rows[0].h - 1.6, 0, P.rows[0].h - 0.4, shade(club, 0.75));
+			// A steel rail along the top of the front wall, on posts.
+			const h0 = P.rows[0].h, L0 = segLen(j, 0), nPost = Math.max(1, Math.floor(L0 / 14)), pw = 0.35 / Math.max(1, L0);
+			strip(T, j, 0, h0 + 3.3, 0, h0 + 4, steel3);
+			for (let k = 0; k <= nPost; k++) { strip(T, j, 0, h0, 0, h0 + 3.3, steel3, k / nPost - pw, k / nPost + pw); }
 			for (const [ ri, r ] of P.rows.entries()) {
 				strip(T, j, r.d, r.h, r.d + r.rd, r.h, step);                                   // the tread
 				if (!seatEach && seatsMode !== "terrace") {   // the seats as a bench along the row (Low graphics); otherwise one by one, with the crowd
@@ -16922,6 +16926,13 @@ td, th { font-variant-numeric: tabular-nums; }
 				for (const u of ai) {   // the aisle's steps, lighter, over the seats
 					const w = 3.2 / Math.max(1, L);
 					strip(T, j, r.d, r.h + 2.5, r.d + r.rd, r.h + 2.5, shade(conc, 1.9), u - w, u + w);
+				}
+			}
+			// A handrail up the middle of every aisle, one run per tier, so the stairs read as stairs from the TV camera.
+			for (const u of ai) {
+				for (const t of new Set(P.rows.map(r => r.tier))) {
+					const tr = P.rows.filter(r => r.tier === t), f = tr[0], l = tr[tr.length - 1];
+					accBeam3(T, at(j, f.d + 1, u, f.h + 6), at(j, l.d + l.rd * 0.5, u, l.h + 6), 0.5, steel3);
 				}
 			}
 			// The private boxes between the tiers: dark glass with the lights on in most of them,
@@ -17192,6 +17203,41 @@ td, th { font-variant-numeric: tabular-nums; }
 				st.add(own(sign, true));
 			}
 			buildCrowd3D(st, { ring, N, nxt, isNear, aisles: aislesOf, rows: P.rows, segLen, seats: seatEach ? { main, near, at } : null });
+		}
+		// The people round the pitch, merged into the far stand's mesh (they never move, and at TV distance a
+		// box reads as a body): stewards in hi-vis behind the far and end boards, facing the crowd, and
+		// photographers kneeling beside each goal in orange bibs, long lenses on the pitch.
+		const hsh3 = n => { const v = Math.sin(n * 12.9898) * 43758.5453; return v - Math.floor(v); };
+		const skins3 = [ [ 0.86, 0.66, 0.52 ], [ 0.62, 0.44, 0.33 ], [ 0.36, 0.24, 0.17 ], [ 0.74, 0.55, 0.42 ] ];
+		const part3 = (x, z, fx, fz) => (ox, oy, oz, sx, sy, sz, c) => accBox3(main, x + fz * ox + fx * oz, oy, z - fx * ox + fz * oz, sx, sy, sz, c, Math.atan2(fx, fz));
+		// Hi-vis yellow, or orange in front of a home crowd in yellow, where yellow would vanish into the stand.
+		const vest3 = club[0] > 0.35 && club[1] > club[0] * 0.45 && club[2] < club[1] * 0.4 ? [ 1, 0.36, 0.04 ] : [ 0.78, 0.92, 0.08 ];
+		const steward3 = (x, z, fx, fz, n) => {
+			const p = part3(x, z, fx, fz), skin = skins3[Math.floor(hsh3(n) * 4)], vest = vest3, dark = [ 0.07, 0.08, 0.1 ];
+			p(-1.1, 7, 0, 2, 14, 2.4, dark); p(1.1, 7, 0, 2, 14, 2.4, dark);                    // the legs
+			p(0, 19.5, 0, 6.4, 11, 3.4, vest);                                                   // the vest
+			p(0, 17, 0, 6.6, 1, 3.6, [ 0.8, 0.82, 0.84 ]);                                       // its reflective band
+			p(-3.8, 19, 0, 1.6, 10, 1.8, dark); p(3.8, 19, 0, 1.6, 10, 1.8, dark);                // the arms
+			p(0, 27.8, 0, 3.2, 3.8, 3.2, skin);                                                  // the head
+		};
+		const photographer3 = (x, z, fx, fz, n) => {
+			const p = part3(x, z, fx, fz), skin = skins3[Math.floor(hsh3(n) * 4)], dark = [ 0.1, 0.11, 0.13 ];
+			p(0, 2.5, -1, 5, 5, 8, dark);                                                        // kneeling: shins on the grass, thighs up
+			p(0, 11, -0.5, 6, 10, 3.6, dark); p(0, 11, -0.4, 6.3, 7, 3.8, [ 0.95, 0.45, 0.1 ]);  // the body and the bib
+			p(0, 18.5, 0, 3, 3.4, 3, skin);                                                      // the head, behind the camera
+			p(0, 18, 2.6, 3, 2.8, 2.4, dark);                                                    // the camera
+			p(0, 18, 7, 2.2, 2.2, 7, hsh3(n + 7) < 0.6 ? [ 0.86, 0.86, 0.82 ] : dark);           // the long lens
+			p(4.5, 1.5, -2, 4, 3, 3, [ 0.15, 0.17, 0.2 ]);                                       // the kit bag
+		};
+		{
+			const nS = Math.max(4, Math.round(FW / 120));
+			for (let k = 0; k < nS; k++) { steward3(40 + (FW - 80) * (k + 0.2 + 0.6 * hsh3(k + 1)) / nS, -19, 0, -1, k); }
+			for (const [ ex, fx ] of [ [ -NET - 19, -1 ], [ FW + NET + 19, 1 ] ]) {
+				for (let k = 0; k < 4; k++) { steward3(ex, FH * (k + 0.5) / 4, fx, 0, k + 40 + fx); }
+				for (const sd of [ -1, 1 ]) {
+					for (let k = 0; k < 4; k++) { photographer3((fx < 0 ? 0 : FW) + fx * (10 + 22 * hsh3(k * 3 + fx)),FH / 2 + sd * (80 + k * 46 + 12 * hsh3(k + sd)), -fx, 0, k * 5 + sd + fx * 20); }
+				}
+			}
 		}
 		// The four merged meshes: the stands and roof (lit), the lamps and lit windows (unlit), each
 		// in a far and a near part, plus the stays and the floodlights' glow.
