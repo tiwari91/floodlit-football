@@ -612,6 +612,30 @@ check("staff 'point': the arm points out ahead of him", staff.point.a[1].hx > 9 
 check("staff idle: hands behind his back, together", both("idle", a => a.hx < -1) && staff.idle.hd < 3, JSON.stringify(staff.idle));
 check("staff sprint: fists pumping in front, leaning into the run; on his knees arms up and out, arched back", both("sprint", a => a.hx > 4) && staff.sprint.lean > 5 && both("knees", a => a.hy > 2 && a.hout > 2) && staff.knees.lean < -5, JSON.stringify({ s: staff.sprint, k: staff.knees }));
 check("bench: sitting leans forward, hands on his thighs; standing, arms up and out", staff.sit.lean > 5 && both("sit", a => a.hx > 3) && both("stand", a => a.hy > 2 && a.hout > 2), JSON.stringify({ s: staff.sit, u: staff.stand }));
+// Smooth limbs: each leg and arm is one skin that bends with the knee or elbow. After a real frame, the
+// bottom of every drawn leg must reach that man's ankle and every arm his wrist, through the same bend the
+// shader applies (the upper bone's matrix, then the lower joint's), with some knees well bent.
+const limbs = await page.evaluate(() => {
+	const T = window.THREE, F = window.__ff.G3.fig, out = { n: F.n, worstLeg: 0, worstArm: 0, bent: 0 };
+	const at = (mesh, k, y, off) => {
+		const ga = mesh.geometry.attributes, lo = new T.Matrix4(), im = new T.Matrix4();
+		lo.set(...[ 0, 1, 2, 3 ].flatMap(r => [ 0, 1, 2, 3 ].map(c => ga[`aLo${c}`].array[k * 4 + r])));
+		mesh.getMatrixAt(k, im);
+		return new T.Vector3(0, y - off, 0).applyMatrix4(lo).applyMatrix4(im);
+	};
+	for (let f = 0; f < F.n; f++) {
+		const r = F.rigs[f];
+		for (let s = 0; s < 2; s++) {
+			const k = f * 2 + s, W = n => n.getWorldPosition(new T.Vector3());
+			out.worstLeg = Math.max(out.worstLeg, at(F.parts.leg, k, -14.2, -7.3).distanceTo(W(r.an[s])));
+			out.worstArm = Math.max(out.worstArm, at(F.parts.arm, k, -10.75, -5.6).distanceTo(W(r.ha[s])));
+			if (Math.abs(r.kn[s].rotation.z) + Math.abs(r.kn[s].rotation.x) > 0.5) { out.bent++; }
+		}
+	}
+	out.worstLeg = +out.worstLeg.toFixed(2); out.worstArm = +out.worstArm.toFixed(2);
+	return out;
+});
+check("smooth limbs: every leg ends at its ankle and every arm at its wrist, knees bent or not", limbs.n > 20 && limbs.bent > 0 && limbs.worstLeg < 1 && limbs.worstArm < 1, JSON.stringify(limbs));
 // Faces: a modelled head (a chin below and ahead of the ear line, a skull longer than it is wide), the
 // hair on the skull's own surface, and only the dark painted marks left at the gantry camera's distance.
 const face = await page.evaluate(() => {
