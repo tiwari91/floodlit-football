@@ -204,6 +204,34 @@
 		const bib = t === 0 ? "#d6f03c" : "#ff7a1f";   // the substitutes' bibs over the kit
 		return { shirt: bib, shorts: kit.second || "#1f2a36", socks: kit.outfield, second: bib, pattern: 0, ink: bib, gloves: null, sleeves: true, boots: BOOTS3[t % BOOTS3.length], ring: null };
 	}
+	// Substitutes warming up: three a side in bibs on the strip between the far touchline and the boards, the
+	// home side's by the left-hand corner and the visitors' by the right, where the TV camera sees them. They jog
+	// up and down the strip, stop at each end for a moment facing the play, and go back.
+	const warm3 = [ 0, 1 ].map(t => [ 0, 1, 2 ].map(i => ({ x: 0, y: 0, vx: 0, vy: 0, dir: 0, stride: 0, runAmt: 0, idlePh: i * 2.3 + t, role: "staff", team: t, to: i % 2, wait: i * 0.9, on: false })));
+	function warmups3D () {
+		const F = G3.fig;
+		if (!F || !ball || bulkSim || !(state === "play" || state === "paused" || state === "goal")) { return; }
+		const dt = state === "paused" ? 0 : frameDt / 16.7;
+		for (let t = 0; t < 2; t++) {
+			const left = t === homeSide, xA = left ? 50 : FW - 230, xB = left ? 230 : FW - 50, sf = staff3[t];
+			warm3[t].forEach((q, i) => {
+				if (!q.on) { q.on = true; q.x = xA + (xB - xA) * (0.2 + 0.3 * i); q.y = -9; }
+				const tx = q.to ? xB - i * 14 : xA + i * 14, d = tx - q.x;
+				if (q.wait > 0) { q.wait -= dt / 60; q.vx *= Math.pow(0.85, dt); }
+				else if (Math.abs(d) < 3) { q.to = 1 - q.to; q.wait = 1.4 + Math.random() * 1.6; }
+				else { q.vx += (Math.sign(d) * Math.min(1.25, Math.abs(d) / 12) - q.vx) * Math.min(1, 0.08 * dt); }
+				q.x += q.vx * dt;
+				const spd = Math.abs(q.vx);
+				q.runAmt += (Math.min(1, spd / 2.6) - q.runAmt) * Math.min(1, 0.1 * dt);
+				q.stride += Math.PI * 2 * (0.95 + 0.5 * spd) / 60 * clamp(spd / 0.4, 0, 1) * dt; q.idlePh += 0.028 * dt;
+				q.dir = spd > 0.3 ? (q.vx > 0 ? 0 : Math.PI) : Math.PI / 2;   // stopped, he watches the game
+				if (F.n >= MAXF3) { return; }
+				const r = F.rigs[F.n];
+				pose3D(r, q, q.x, q.y, q.dir, 0, 0);
+				commitFigure3D(r, sf.look[(i + 2) % 5], staffKit(t, "sub"), null);
+			});
+		}
+	}
 	// The manager mid-run, for the broadcast to cut to: his spot, while the run is on.
 	function bossRun3D () {
 		for (const sf of staff3) { if (sf.sprint) { const se = (performance.now() - sf.sprint.t0) / 1000; if (se > 0.4 && se < 4.6) { return sf.mgr; } } }

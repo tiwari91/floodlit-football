@@ -217,6 +217,7 @@
 		F.flags.instanceMatrix.needsUpdate = true;
 		medics3D(WX, WD, st3, dt);
 		staff3D(WX);
+		warmups3D();
 		for (const k in F.parts) {
 			const m = F.parts[k];
 			m.count = F.cnt[k]; m.instanceMatrix.needsUpdate = true;
