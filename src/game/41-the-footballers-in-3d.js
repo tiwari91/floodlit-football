@@ -335,29 +335,29 @@
 	function initFigures3D () {
 		const T = THREE;
 		const defs = {
-			torso: () => loft3D(TORSO3, 16, TORSO_EX3),
+			torso: () => loft3D(TORSO3, 24, TORSO_EX3),
 			// A ribbed collar round the base of the neck, in the trim colour.
 			collar: () => loft3D([ [ 9.2, 2.03, 1.66, 1.78 ], [ 9.55, 2.08, 1.7, 1.83 ], [ 10.05, 1.78, 1.52, 1.62 ], [ 10.25, 1.56, 1.34, 1.44 ] ], 12, 2.2),
 			// The shorts: a waistband and seat on the hips, and a leg for each thigh (shortLeg) so they move with the stride.
 			// The seat ends at the top of the thighs and closes up into the crotch, so the legs carry the shorts
 			// below it (no box hanging between the legs); the hips are as wide as the legs' outsides, so no step.
-			shorts: () => loft3D([ [ 1.6, 3.0, 2.0, 2.02 ], [ 1.75, 3.06, 2.06, 2.06 ], [ 0.6, 3.42, 2.12, 2.22 ], [ -0.5, 3.72, 2.12, 2.26 ], [ -1.25, 3.45, 2.0, 2.12 ], [ -1.75, 2.4, 1.52, 1.64 ], [ -2.0, 0.9, 0.8, 0.9 ] ], 14, 2.2),
-			shortLeg: () => loft3D([ [ 1.1, 1.55, 1.8, 1.88 ], [ 0.2, 1.9, 2.08, 2.04 ], [ -0.9, 1.98, 2.2, 2.04 ], [ -2.2, 1.98, 2.24, 2.0, 0.08 ], [ -3.05, 2.0, 2.26, 2.02, 0.12 ], [ -3.15, 1.86, 2.08, 1.86, 0.12 ], [ -3.2, 1.45, 1.6, 1.45, 0.12 ] ], 16, 2.1),   // shorts to mid-thigh, hanging loose and straight off the quads to a light flare at the hem
-			neck: () => loft3D([ [ -0.8, 2.1, 1.5, 1.75 ], [ -0.2, 1.85, 1.42, 1.62 ], [ 0.5, 1.56, 1.32, 1.44, -0.05 ], [ 1.3, 1.42, 1.24, 1.32, 0.0 ], [ 2.0, 1.34, 1.16, 1.24, 0.08 ], [ 2.3, 0.8, 0.8, 0.8, 0.1 ] ], 12, 2),   // a footballer's neck: thick, flaring into the trapezius at the base, not a stalk
+			shorts: () => loft3D([ [ 1.6, 3.0, 2.0, 2.02 ], [ 1.75, 3.06, 2.06, 2.06 ], [ 0.6, 3.42, 2.12, 2.22 ], [ -0.5, 3.72, 2.12, 2.26 ], [ -1.25, 3.45, 2.0, 2.12 ], [ -1.75, 2.4, 1.52, 1.64 ], [ -2.0, 0.9, 0.8, 0.9 ] ], 22, 2.2),
+			shortLeg: () => loft3D([ [ 1.1, 1.55, 1.8, 1.88 ], [ 0.2, 1.9, 2.08, 2.04 ], [ -0.9, 1.98, 2.2, 2.04 ], [ -2.2, 1.98, 2.24, 2.0, 0.08 ], [ -3.05, 2.0, 2.26, 2.02, 0.12 ], [ -3.15, 1.86, 2.08, 1.86, 0.12 ], [ -3.2, 1.45, 1.6, 1.45, 0.12 ] ], 22, 2.1),   // shorts to mid-thigh, hanging loose and straight off the quads to a light flare at the hem
+			neck: () => loft3D([ [ -0.8, 2.1, 1.5, 1.75 ], [ -0.2, 1.85, 1.42, 1.62 ], [ 0.5, 1.56, 1.32, 1.44, -0.05 ], [ 1.3, 1.42, 1.24, 1.32, 0.0 ], [ 2.0, 1.34, 1.16, 1.24, 0.08 ], [ 2.3, 0.8, 0.8, 0.8, 0.1 ] ], 18, 2),   // a footballer's neck: thick, flaring into the trapezius at the base, not a stalk
 			head: () => sculpt3D(new T.SphereGeometry(1, 48, 36)),
 		ear: () => { const g = new T.SphereGeometry(0.51, 10, 8); g.scale(0.5, 1.0, 0.32); g.rotateZ(0.18); return g; },
 		nose: () => noseGeo3(),
 		tail: () => new T.SphereGeometry(1, 9, 7),
 			hair: () => sculpt3D(new T.SphereGeometry(1, 48, 36)),   // the skull's own surface; the hair shader lifts it by style
 			// Short sleeves over the shoulder (a rounded cap, the deltoid under it) ending in a cuff.
-			sleeve: () => loft3D([ [ 0.5, 0.3, 0.3, 0.3 ], [ 0.42, 0.72, 0.74, 0.74 ], [ 0.24, 1.08, 1.1, 1.1 ], [ 0.0, 1.27, 1.29, 1.29 ], [ -0.5, 1.36, 1.38, 1.36 ], [ -1.9, 1.32, 1.36, 1.3 ], [ -2.35, 1.28, 1.32, 1.26 ], [ -2.4, 0.9, 0.9, 0.9 ] ], 12, 2.0),   // a fitted sleeve: the cap rounded and no higher than the shoulder line, so no pads or square corners
+			sleeve: () => loft3D([ [ 0.5, 0.3, 0.3, 0.3 ], [ 0.42, 0.72, 0.74, 0.74 ], [ 0.24, 1.08, 1.1, 1.1 ], [ 0.0, 1.27, 1.29, 1.29 ], [ -0.5, 1.36, 1.38, 1.36 ], [ -1.9, 1.32, 1.36, 1.3 ], [ -2.35, 1.28, 1.32, 1.26 ], [ -2.4, 0.9, 0.9, 0.9 ] ], 20, 2.0),   // a fitted sleeve: the cap rounded and no higher than the shoulder line, so no pads or square corners
 			// The captain's armband on the left upper arm, just below the sleeve.
-			armband: () => loft3D([ [ -2.75, 1.18, 1.36, 1.2 ], [ -2.8, 1.23, 1.41, 1.25 ], [ -3.65, 1.16, 1.3, 1.17 ], [ -3.7, 1.1, 1.24, 1.1 ] ], 12, 2.0),
-			cuff: () => loft3D([ [ -2.05, 1.33, 1.37, 1.31 ], [ -2.4, 1.33, 1.37, 1.31 ], [ -2.45, 0.98, 0.98, 0.98 ] ], 12, 2.0),
+			armband: () => loft3D([ [ -2.75, 1.18, 1.36, 1.2 ], [ -2.8, 1.23, 1.41, 1.25 ], [ -3.65, 1.16, 1.3, 1.17 ], [ -3.7, 1.1, 1.24, 1.1 ] ], 18, 2.0),
+			cuff: () => loft3D([ [ -2.05, 1.33, 1.37, 1.31 ], [ -2.4, 1.33, 1.37, 1.31 ], [ -2.45, 0.98, 0.98, 0.98 ] ], 20, 2.0),
 			// An athlete's arm: the biceps and triceps fuller, rounded into the elbow, which is capped (the forearm's
 			// top is a dome round the joint), so a bent arm never shows a gap or a crease at the elbow.
-			upperArm: () => loft3D([ [ 0.25, 0.75, 0.75, 0.75 ], [ -0.1, 1.12, 1.1, 1.12 ], [ -1.6, 1.15, 1.26, 1.2 ], [ -2.9, 1.1, 1.3, 1.14 ], [ -3.8, 1.0, 1.16, 1.06 ], [ -4.8, 0.86, 0.86, 0.92 ], [ -5.5, 0.76, 0.72, 0.82 ], [ -5.95, 0.64, 0.58, 0.7 ], [ -6.2, 0.34, 0.3, 0.38 ] ], 14, 2.0),
-			foreArm: () => loft3D([ [ 0.85, 0.3, 0.26, 0.34 ], [ 0.6, 0.62, 0.56, 0.68 ], [ 0.2, 0.74, 0.7, 0.8 ], [ -0.5, 0.9, 0.88, 0.9 ], [ -1.3, 1.04, 1.0, 0.98 ], [ -2.6, 0.9, 0.82, 0.82 ], [ -4.0, 0.66, 0.52, 0.54 ], [ -4.8, 0.58, 0.46, 0.46 ], [ -5.15, 0.34, 0.3, 0.3 ] ], 14, 2.0),   // narrow at the elbow (its point behind), muscle swelling below it, a slimmer wrist
+			upperArm: () => loft3D([ [ 0.25, 0.75, 0.75, 0.75 ], [ -0.1, 1.12, 1.1, 1.12 ], [ -1.6, 1.15, 1.26, 1.2 ], [ -2.9, 1.1, 1.3, 1.14 ], [ -3.8, 1.0, 1.16, 1.06 ], [ -4.8, 0.86, 0.86, 0.92 ], [ -5.5, 0.76, 0.72, 0.82 ], [ -5.95, 0.64, 0.58, 0.7 ], [ -6.2, 0.34, 0.3, 0.38 ] ], 20, 2.0),
+			foreArm: () => loft3D([ [ 0.85, 0.3, 0.26, 0.34 ], [ 0.6, 0.62, 0.56, 0.68 ], [ 0.2, 0.74, 0.7, 0.8 ], [ -0.5, 0.9, 0.88, 0.9 ], [ -1.3, 1.04, 1.0, 0.98 ], [ -2.6, 0.9, 0.82, 0.82 ], [ -4.0, 0.66, 0.52, 0.54 ], [ -4.8, 0.58, 0.46, 0.46 ], [ -5.15, 0.34, 0.3, 0.3 ] ], 20, 2.0),   // narrow at the elbow (its point behind), muscle swelling below it, a slimmer wrist
 			// A flat hand with the fingers together and a thumb in front.
 			// A relaxed hand, half closed: the palm with a wrist and knuckles, four fingers curled forward in
 			// two bends (shorter at the little finger), and a thumb along the side of the index finger.
@@ -376,12 +376,12 @@
 				parts.push(th);
 				return merge3D(parts);
 			},
-			thigh: () => loft3D([ [ 0.9, 1.5, 1.5, 1.6 ], [ -0.6, 1.88, 1.98, 1.86 ], [ -2.6, 1.84, 2.12, 1.8 ], [ -4.6, 1.6, 1.9, 1.52 ], [ -6.0, 1.3, 1.5, 1.2 ], [ -6.9, 1.12, 1.24, 1.04 ], [ -7.5, 1.04, 1.08, 0.98 ], [ -7.95, 0.84, 0.86, 0.8 ], [ -8.2, 0.4, 0.4, 0.4 ] ], 14, 2.0),   // a footballer's quads: full above the knee, the front bulging; the end runs past the joint, so a bent knee keeps its shape
-			knee: () => loft3D([ [ 0.85, 0.36, 0.36, 0.36 ], [ 0.55, 0.88, 0.9, 0.86 ], [ 0.1, 1.04, 1.1, 0.98 ], [ -0.35, 1.02, 1.12, 1.0 ], [ -0.75, 0.98, 1.02, 1.04 ], [ -1.0, 0.5, 0.5, 0.5 ] ], 12, 2.1),   // skin over the joint, the kneecap a little proud in front, running down inside the sock
+			thigh: () => loft3D([ [ 0.9, 1.5, 1.5, 1.6 ], [ -0.6, 1.88, 1.98, 1.86 ], [ -2.6, 1.84, 2.12, 1.8 ], [ -4.6, 1.6, 1.9, 1.52 ], [ -6.0, 1.3, 1.5, 1.2 ], [ -6.9, 1.12, 1.24, 1.04 ], [ -7.5, 1.04, 1.08, 0.98 ], [ -7.95, 0.84, 0.86, 0.8 ], [ -8.2, 0.4, 0.4, 0.4 ] ], 22, 2.0),   // a footballer's quads: full above the knee, the front bulging; the end runs past the joint, so a bent knee keeps its shape
+			knee: () => loft3D([ [ 0.85, 0.36, 0.36, 0.36 ], [ 0.55, 0.88, 0.9, 0.86 ], [ 0.1, 1.04, 1.1, 0.98 ], [ -0.35, 1.02, 1.12, 1.0 ], [ -0.75, 0.98, 1.02, 1.04 ], [ -1.0, 0.5, 0.5, 0.5 ] ], 18, 2.1),   // skin over the joint, the kneecap a little proud in front, running down inside the sock
 			// The sock over the calf and the shin pad: the calf bulges behind, the pad stands proud in front.
-			shin: () => loft3D([ [ -0.6, 1.08, 1.05, 1.1 ], [ -1.3, 1.16, 1.3, 1.48 ], [ -2.6, 1.1, 1.34, 1.46 ], [ -3.8, 0.94, 1.24, 1.06 ], [ -4.4, 0.8, 0.86, 0.84 ], [ -5.6, 0.7, 0.7, 0.72 ], [ -6.5, 0.68, 0.66, 0.7 ], [ -6.9, 0.45, 0.45, 0.45 ] ], 10, 2.1),   // the calf full behind, tapering to the ankle
+			shin: () => loft3D([ [ -0.6, 1.08, 1.05, 1.1 ], [ -1.3, 1.16, 1.3, 1.48 ], [ -2.6, 1.1, 1.34, 1.46 ], [ -3.8, 0.94, 1.24, 1.06 ], [ -4.4, 0.8, 0.86, 0.84 ], [ -5.6, 0.7, 0.7, 0.72 ], [ -6.5, 0.68, 0.66, 0.7 ], [ -6.9, 0.45, 0.45, 0.45 ] ], 20, 2.1),   // the calf full behind, tapering to the ankle
 			// A stripe in the trim colour round the top of the sock.
-			band: () => loft3D([ [ -0.58, 1.1, 1.08, 1.13 ], [ -0.63, 1.13, 1.12, 1.17 ], [ -0.93, 1.16, 1.2, 1.3 ], [ -0.98, 1.12, 1.15, 1.25 ] ], 12, 2.1),   // a thin stripe just outside the sock's top, never a dark collar
+			band: () => loft3D([ [ -0.58, 1.1, 1.08, 1.13 ], [ -0.63, 1.13, 1.12, 1.17 ], [ -0.93, 1.16, 1.2, 1.3 ], [ -0.98, 1.12, 1.15, 1.25 ] ], 16, 2.1),   // a thin stripe just outside the sock's top, never a dark collar
 			// The boot: lofted heel to toe (built along y, then laid along x with the sole underneath).
 			boot: () => {
 				const g = loft3D([ [ -1.3, 0.5, 0.46, 0.5, 0.22 ], [ -1.05, 0.76, 0.54, 1.0, 0.16 ], [ 0, 0.82, 0.52, 0.96, 0.18 ], [ 1.2, 0.86, 0.36, 0.56, 0.34 ], [ 2.4, 0.8, 0.28, 0.38, 0.42 ], [ 3.1, 0.62, 0.24, 0.26, 0.46 ], [ 3.5, 0.28, 0.2, 0.12, 0.5 ] ], 10, 2.3);
