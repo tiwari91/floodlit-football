@@ -13375,10 +13375,10 @@ td, th { font-variant-numeric: tabular-nums; }
 		drawGoal(MX + FW, false);
 	}
 
-	// The stands: fans in the home club's colours, a corner of away supporters, and
+	// The stands: fans in the home club's colours, an end of away supporters, and
 	// neutrals; they bob when the game gets exciting.
 	let crowdDots = [];
-	// The stadium: stands on all four sides full of fans (the home club's colours, a corner of
+	// The stadium: stands on all four sides full of fans (the home club's colours, an end of
 	// away supporters), advertising boards along the front and the ground's name on the main
 	// stand. It's painted once per match into four strips and then just drawn each frame.
 	let stands = null;
@@ -13512,8 +13512,10 @@ td, th { font-variant-numeric: tabular-nums; }
 		const skins = [ "#f1c9a5", "#e0ac86", "#c68a5e", "#9c6a44", "#6e4a30" ];
 		let h = 11;
 		const rnd = () => { h = (h * 16807) % 2147483647; return h / 2147483647; };
+		// The visitors fill the end behind the right-hand goal, as in the 3D stands: a big club brings a full end.
+		const vis = (leagueMatch ? (leagueMatch.home ? TEAMS[leagueMatch.opp] : YOU) : null) || {}, awayFill = clamp(0.45 + (vis.str || 3) * 0.1, 0.5, 0.95);
 		const fan = (g, x, y, away) => {
-			if (!away && rnd() > st.fill) {   // an empty seat (none on a bare terrace)
+			if (rnd() > (away ? awayFill : st.fill)) {   // an empty seat (none on a bare terrace)
 				const sc = seatColOf(st, (y % MY) / MY, x * 7.1 + y * 3.3);
 				if (sc) { g.fillStyle = sc; g.globalAlpha = 0.55; g.fillRect(x - 2.4, y - 1.5, 4.8, 4.5); g.globalAlpha = 1; }
 				return;
@@ -13536,13 +13538,13 @@ td, th { font-variant-numeric: tabular-nums; }
 		const [ top, gt ] = mk(WW, MY), [ bottom, gb ] = mk(WW, MY), [ left, gl ] = mk(MX, FH), [ right, gr ] = mk(MX, FH);
 		if (gt && gt.fillRect) {
 			concrete(gt, WW, MY); concrete(gb, WW, MY); concrete(gl, MX, FH); concrete(gr, MX, FH);
-			for (let x = 5; x < WW - 3; x += 7) { for (let y = 6; y < MY - 10; y += 7) { fan(gt, x, y, x > WW * 0.82); } }
+			for (let x = 5; x < WW - 3; x += 7) { for (let y = 6; y < MY - 10; y += 7) { fan(gt, x, y, false); } }
 			for (let x = 5; x < WW - 3; x += 7) { for (let y = 14; y < MY - 2; y += 7) { fan(gb, x, y, false); } }
 			const goalBand = y => y > GOAL_T - 14 && y < GOAL_B + 14;
 			for (let y = 5; y < FH - 3; y += 7) {
 				for (let x = 4; x < MX - 4; x += 7) {
 					if (goalBand(y) && x > MX - NET - 6) { continue; }   // the goals sit here
-					fan(gl, x, y, false); fan(gr, MX - x, y, false);
+					fan(gl, x, y, false); fan(gr, MX - x, y, true);
 				}
 			}
 			boards(gt, WW, MY - 8); boards(gb, WW, 1);
@@ -13591,8 +13593,8 @@ td, th { font-variant-numeric: tabular-nums; }
 		ctx.drawImage(stands.bottom, 0, MY + FH, WW, MY);
 		ctx.drawImage(stands.left, 0, MY, MX, FH);
 		ctx.drawImage(stands.right, MX + FW, MY, MX, FH);
-		// A home cheer runs through the stands as a wave of the home colours; the away corner flickers
-		// in theirs when their side does something; a groan dims the home stands.
+		// A home cheer runs through the stands as a wave of the home colours; the away end flickers
+		// end in theirs when their side does something; a groan dims the home stands.
 		if (!quiet && !reduceMotion) {
 			const m = crowdMood, tt = performance.now() / 1000;
 			const hk = KITS[homeSide] ? KITS[homeSide].outfield : "#f2b52e", ak = KITS[1 - homeSide] ? KITS[1 - homeSide].outfield : "#de4f5a";
@@ -13608,7 +13610,7 @@ td, th { font-variant-numeric: tabular-nums; }
 			}
 			if (m.away > 0.08) {
 				ctx.fillStyle = ak; ctx.globalAlpha = m.away * 0.45 * (0.6 + 0.4 * Math.sin(tt * 11));
-				ctx.fillRect(WW * 0.8, 0, WW * 0.2, MY);
+				ctx.fillRect(MX + FW, MY, MX, FH);
 			}
 			ctx.globalAlpha = 1;
 		}
