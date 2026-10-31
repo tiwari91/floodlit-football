@@ -19707,7 +19707,7 @@ td, th { font-variant-numeric: tabular-nums; }
 	// on poles waving over the middle rows, and ticker tape thrown when the home side scores.
 	function dressEnds3D (st, endRows, c1, c2) {
 		const T = THREE;
-		G3.endFlags = null; G3.tape = null; G3.endBanners = null;
+		G3.endFlags = null; G3.tape = null; G3.endBanners = null; G3.flares = null;
 		const ends = endRows.map(rows => rows.filter(Boolean).filter(r => r.n > 4)).filter(rows => rows.length >= 2);
 		if (!ends.length) { return; }
 		const club = (leagueMatch ? (leagueMatch.home ? YOU : TEAMS[leagueMatch.opp]) : YOU) || {};
@@ -19764,6 +19764,53 @@ td, th { font-variant-numeric: tabular-nums; }
 		tape.userData.ownGeo = true; tape.userData.ownMat = true; tape.frustumCulled = false; tape.visible = false;
 		st.add(tape);
 		G3.tape = { pts: tape, vel: new Float32Array(NT * 3), t: 0, ends: ends.map(rows => { const r = rows[Math.floor(rows.length * 0.4)]; return { x: r.x / r.n, y: r.y, z0: r.zMin, z1: r.zMax, dir: r.x / r.n < FW / 2 ? 1 : -1 }; }) };
+		// Flares and smoke: lit along the front of the home ends when the home side scores. Bright flickering
+		// flares, and smoke in the club's colours that billows up and drifts out over the pitch for about ten
+		// seconds. One points cloud each, drawn by a small shader so every puff can grow and fade on its own.
+		const fl = G3.tape.ends.flatMap(e => [ 0.18, 0.34, 0.5, 0.66, 0.82 ].map((u, i) => ({ x: e.x + e.dir * 6, y: e.y + 12, z: e.z0 + (e.z1 - e.z0) * (u + (Math.random() - 0.5) * 0.06), dir: e.dir, i })));
+		const NP = fl.length * 26, sp = new Float32Array(NP * 3), sc = new Float32Array(NP * 3), sa = new Float32Array(NP * 2);
+		const tint = [ C1, C2, new T.Color("#d9d4cc") ];
+		for (let i = 0; i < NP; i++) { const c = tint[(i % fl.length + Math.floor(i / fl.length)) % 3]; sc.set([ c.r, c.g, c.b ], i * 3); sp[i * 3 + 1] = -500; }
+		const sg = new T.BufferGeometry(); sg.setAttribute("position", new T.BufferAttribute(sp, 3)); sg.setAttribute("color", new T.BufferAttribute(sc, 3)); sg.setAttribute("aLife", new T.BufferAttribute(sa, 2));
+		const pc = document.createElement("canvas"); pc.width = pc.height = 64;
+		const pg = pc.getContext && pc.getContext("2d");
+		if (pg && pg.createRadialGradient) { const gr = pg.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, "rgba(255,255,255,0.9)"); gr.addColorStop(0.55, "rgba(255,255,255,0.45)"); gr.addColorStop(1, "rgba(255,255,255,0)"); pg.fillStyle = gr; pg.fillRect(0, 0, 64, 64); }
+		const smokeMat = new T.ShaderMaterial({
+			uniforms: { map: { value: canvasTex3D(pc) }, uScale: { value: 400 } },
+			vertexShader: "attribute vec3 color; attribute vec2 aLife; varying vec3 vC; varying float vA; uniform float uScale;\nvoid main () { vec4 mv = modelViewMatrix * vec4(position, 1.0); vC = color; vA = aLife.y; gl_PointSize = clamp(aLife.x * uScale / -mv.z, 0.0, 260.0); gl_Position = -mv.z < 40.0 ? vec4(2.0, 2.0, 2.0, 1.0) : projectionMatrix * mv; }",
+			fragmentShader: "uniform sampler2D map; varying vec3 vC; varying float vA;\nvoid main () { vec4 t = texture2D(map, gl_PointCoord); gl_FragColor = vec4(pow(vC, vec3(0.4545)), t.a * vA); }",
+			transparent: true, depthWrite: false
+		});
+		const smoke = new T.Points(sg, smokeMat); smoke.userData.ownGeo = true; smoke.userData.ownMat = true; smoke.frustumCulled = false; smoke.visible = false; st.add(smoke);
+		const fp = new Float32Array(fl.length * 3); fl.forEach((f, i) => fp.set([ f.x, f.y, f.z ], i * 3));
+		const fgeo = new T.BufferGeometry(); fgeo.setAttribute("position", new T.BufferAttribute(fp, 3));
+		const flare = new T.Points(fgeo, new T.PointsMaterial({ map: G3.glowTex, color: 0xff6a3a, size: 90, sizeAttenuation: true, blending: T.AdditiveBlending, transparent: true, depthWrite: false, depthTest: false, toneMapped: false, fog: false }));   // drawn over the fans round it: a flare is held up above their heads
+		flare.userData.ownGeo = true; flare.userData.ownMat = true; flare.frustumCulled = false; flare.visible = false; st.add(flare);
+		G3.flares = { smoke, flare, fl, t: -1, seed: Array.from({ length: NP }, () => [ Math.random(), Math.random(), Math.random(), Math.random() ]) };
+	}
+	const FLARE3_T = 11;
+	function lightFlares3D () { if (G3.flares && !reduceMotion && !bulkSim) { G3.flares.t = 0; G3.flares.smoke.visible = G3.flares.flare.visible = true; } }
+	// Each frame: the flares flicker and burn down; each puff rises from its flare, swells and drifts out over the pitch, then thins away.
+	function animateFlares3D (k) {
+		const F = G3.flares;
+		if (!F || F.t < 0) { return; }
+		F.t += k;
+		const t = F.t, fl = F.fl, n = fl.length, g = F.smoke.geometry, a = g.attributes.position.array, L = g.attributes.aLife.array;
+		if (G3.cam) { F.smoke.material.uniforms.uScale.value = (G3.renderer ? G3.renderer.domElement.height : 800) / (2 * Math.tan(G3.cam.fov * Math.PI / 360)); }
+		F.flare.material.opacity = t < 8 ? 0.75 + 0.25 * Math.sin(t * 37) * Math.sin(t * 23) : clamp((9 - t) / 1, 0, 1);
+		F.flare.material.size = 84 + 18 * Math.sin(t * 29);
+		for (let i = 0; i < F.seed.length; i++) {
+			const f = fl[i % n], s = F.seed[i], born = (Math.floor(i / n) / (F.seed.length / n)) * 8 + s[0] * 0.3, age = t - born, life = 5 + 2 * s[1];
+			if (age < 0 || age > life) { a[i * 3 + 1] = -500; L[i * 2 + 1] = 0; continue; }
+			const u = age / life;
+			a[i * 3] = f.x + f.dir * (4 + 9 * age + 2.5 * age * age) * (0.6 + 0.6 * s[2]);
+			a[i * 3 + 1] = f.y + 3 + 14 * age - 0.6 * age * age * s[3];
+			a[i * 3 + 2] = f.z + (s[3] - 0.5) * 14 * age + 3 * age;   // and a little wind along the end
+			L[i * 2] = 16 + 72 * Math.sqrt(u);
+			L[i * 2 + 1] = 0.9 * Math.min(1, age / 0.4) * (1 - u * u);
+		}
+		g.attributes.position.needsUpdate = true; g.attributes.aLife.needsUpdate = true;
+		if (t > FLARE3_T) { F.t = -1; F.smoke.visible = F.flare.visible = false; }
 	}
 	// Each frame: the flags wave (harder when the home end is up), the ticker tape flutters down.
 	function animateEnds3D (k) {
@@ -19823,7 +19870,7 @@ td, th { font-variant-numeric: tabular-nums; }
 		CROWD_U.uOla.value = reduceMotion ? 0 : m.ola;
 		m.tense = (m.tense || 0) + (lateNerves() * (1 - Math.max(0, m.home)) - (m.tense || 0)) * Math.min(1, k * 0.8);   // eased in over a few seconds
 		CROWD_U.uTense.value = reduceMotion ? 0 : m.tense;
-		animateEnds3D(k);
+		animateEnds3D(k); animateFlares3D(k);
 		CROWD_U.uOlaA.value = m.olaA || 0;
 		// The LED boards roll on to the next sponsor every seven seconds, in a quick slide (held still with reduced motion).
 		if (G3.boardTex && !reduceMotion) { const t = now / 1000, f = t % 7, e = clamp((f - 6.4) / 0.6, 0, 1); G3.boardTex.offset.x = ((Math.floor(t / 7) + e * e * (3 - 2 * e)) % 8) / 8; }
@@ -19840,7 +19887,7 @@ td, th { font-variant-numeric: tabular-nums; }
 		const m = crowdMood, homeFans = homeSide;
 		if (kind === "goal") {
 			if (data) { staffReact("goal", { team: data.scorer, wild: data.wild, muted: data.muted, mgr: data.mgr }); }
-			if (data && data.scorer === homeFans) { m.home = 1; m.away = -1; m.wave = 1; throwTape3D(); } else { m.away = 1; m.home = -1; }
+			if (data && data.scorer === homeFans) { m.home = 1; m.away = -1; m.wave = 1; throwTape3D(); lightFlares3D(); } else { m.away = 1; m.home = -1; }
 			m.ooh = 0;
 		} else if (kind === "near" || kind === "ooh") { m.ooh = 1; m.excite = Math.min(1, m.excite + 0.35); }
 		else if (kind === "roar") { if (!(data > 0.8)) { m.home = Math.max(m.home, 0.5 * (data || 0.5)); } }
