@@ -111,6 +111,7 @@
 			young: line(young[0], young[0] ? `${young[0].age}, average rating ${seasonAvgOf(young[0]).toFixed(2)}` : ""),
 			manager: { id: mgr, name: mgr === 0 ? "You" : `the ${TEAMS[mgr].name} manager`, what: mgr === rows[0].id ? `champions with ${rows[0].pts} points` : `${ordinal(rows.findIndex(r => r.id === mgr) + 1)}, well above where they were expected to finish` },
 			finish: pos,
+			...(typeof raceWinners === "function" ? raceWinners(lg) : {}),   // the Golden Boot and Glove (18p)
 			cup: lg.cup && lg.cup.winner !== null && lg.cup.winner !== undefined ? lg.cup.winner : null
 		};
 		const a = lg.awards, bits = [ a.player && `player of the season ${a.player.name}`, a.scorer && `top scorer ${a.scorer.name} (${a.scorer.what})`, a.young && `young player ${a.young.name}`, `manager of the season: ${a.manager.name}` ].filter(Boolean);
@@ -209,6 +210,7 @@
 		}
 		box.append(cupBox);
 		if (typeof renderChallenge === "function") { renderChallenge(box); }   // the Challenge Cup (18m)
+		if (typeof renderRace === "function") { renderRace(box); }   // the awards race (18p)
 		if (typeof renderCont === "function") { renderCont(box); }   // the continental cup (18f)
 		if (typeof renderIntl === "function") { renderIntl(box); }   // the international breaks (18j)
 		if (typeof renderNations === "function") { renderNations(box); }   // national squads (18j)
@@ -221,6 +223,8 @@
 			const ul = el("ul", "awards");
 			const row = (title, x) => { if (!x) { return; } const li = el("li"); li.append(el("b", "", title), el("span", "", ` ${x.name}${x.pos ? ` (${x.pos})` : ""}, ${x.what}`)); ul.append(li); };
 			row("Player of the season", aw.player); row("Top scorer", aw.scorer); row("Young player", aw.young); row("Manager of the season", aw.manager);
+			if (aw.boot) { row("Golden Boot", { name: aw.boot.name, what: `${aw.boot.club === "You" ? "yours" : aw.boot.club}, ${aw.boot.goals} goals` }); }
+			if (aw.glove) { row("Golden Glove", { name: aw.glove.name, what: `${aw.glove.club === "You" ? "yours" : aw.glove.club}, ${aw.glove.cs} clean sheets` }); }
 			if (aw.cup !== null && aw.cup !== undefined) { const li = el("li"); li.append(el("b", "", "Cup winners"), el("span", "", ` ${aw.cup === 0 ? "You" : TEAMS[aw.cup].name}`)); ul.append(li); }
 			a.append(ul);
 			box.append(a);

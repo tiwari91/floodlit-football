@@ -141,8 +141,10 @@
 		}
 		// Played: the harder the match ran him into the ground, the more it takes out of him.
 		const spent = (pl, dflt) => (Number.isFinite(matchSta[pl.name]) ? -(4 + (1 - matchSta[pl.name]) * 20) : dflt);
-		c.squad.forEach((pl, i) => { pl.fit = clamp(fitOf(pl) + (used.has(i) ? spent(pl, -10) : 22), 40, 100); });
-		c.bench.forEach(pl => { pl.fit = clamp(fitOf(pl) + (cameOn.includes(pl.name) ? spent(pl, 10) + 14 : 22), 40, 100); });
+		// Over Christmas and New Year (18p) the games come two or three days apart: less time to recover.
+		const rest = typeof isFestive === "function" && league && isFestive(league.round) ? 0.55 : 1;
+		c.squad.forEach((pl, i) => { pl.fit = clamp(fitOf(pl) + (used.has(i) ? spent(pl, -10) - (rest < 1 ? 4 : 0) : Math.round(22 * rest)), 40, 100); });
+		c.bench.forEach(pl => { pl.fit = clamp(fitOf(pl) + (cameOn.includes(pl.name) ? Math.round((spent(pl, 10) + 14) * rest) : Math.round(22 * rest)), 40, 100); });
 		matchSta = {};
 	}
 
@@ -676,7 +678,8 @@
 			const o = TEAMS[leagueMatch.opp], derby = isDerby();
 			// One fact per line, so the card reads at a glance instead of as a paragraph.
 			const k = keyMenParts(), b = coachBrief(), first = firstVisit(), tired = leagueMatch.intl ? [] : tiredStarters();
-			showOverlay(`${leagueMatch.label || `Matchday ${leagueMatch.round + 1}`}${derby ? " · Derby" : ""}`, "", "Kick off");
+			const fest = !leagueMatch.cont && !leagueMatch.intl && typeof isFestive === "function" && isFestive(leagueMatch.round) ? FESTIVE[leagueMatch.round] : "";
+			showOverlay(`${leagueMatch.label || `Matchday ${leagueMatch.round + 1}`}${fest === "Boxing Day" || fest === "New Year's Day" ? ` · ${fest}` : ""}${derby ? " · Derby" : ""}`, "", "Kick off");
 			cardLines([
 				tired.length ? `Fitness: ⚠ ${tiredText(tired)} Tired players are slower and less sharp. Rest them: press "Rest tired players", or swap them yourself in the squad panel.` : "",
 				first ? "Welcome to Floodlit Football. You manage the club and play its matches. New to the controls? \"Learn the controls\" is a two-minute walk-through, then you're back here." : "",
@@ -684,6 +687,7 @@
 				leagueMatch.cont && typeof ccStandLine === "function" ? ccStandLine() : "",   // where the night stands in the cup (18f)
 				o.manager ? `Their manager: ${o.manager}${NATIONS[o.managerNat] ? ` (${NATIONS[o.managerNat][0]})` : ""}.` : "",   // from an option file (18g, 18h)
 				derby ? "Derby day: the local rivals, and the loudest crowd of the season." : "",
+				fest ? festiveLine(leagueMatch.round) : "",
 				!leagueMatch.cont && !leagueMatch.intl && !leagueMatch.cup && typeof tvPick === "function" && tvPick(leagueMatch.round, leagueMatch.opp) ? `Live on TV: the facility fee is ${money(TV_FACILITY)} on top of the matchday's TV share.` : "",
 				k.watch ? `Watch: ${k.watch}.` : "",
 				k.how ? `They play: ${k.how}.` : "",

@@ -172,8 +172,10 @@
 				if (id === 0 || !TEAMS[id]) { continue; }
 				const sq = cpuSquad(id, getStr(id)), xi = sl.map(i => sq[i]).filter(Boolean), avg = xi.reduce((t, pl) => t + ovrOf(pl), 0) / Math.max(1, xi.length);
 				const rec = league.cpuForm.clubs[id] || (league.cpuForm.clubs[id] = {});
+				const scorers = id === lm.opp ? matchGoalsOpp.reduce((m, n) => ((m[n] = (m[n] || 0) + 1), m), {}) : typeof cpuScorers === "function" ? cpuScorers(xi, gf) : {};
+				if (typeof raceClub === "function") { raceClub(id, xi, scorers, ga); }   // the Golden Boot and Glove (18p)
 				for (const pl of xi) {
-					const goals = id === lm.opp ? matchGoalsOpp.filter(n => n === pl.name).length : 0;
+					const goals = scorers[pl.name] || 0;
 					let r = 6.6 + (gf > ga ? 0.6 : gf < ga ? -0.6 : 0) + (Math.random() * 2 - 1) * 0.45 + 0.03 * (ovrOf(pl) - avg) + 1.1 * goals;
 					if ((pl.pos === "gk" || pl.pos === "def") && ga === 0) { r += 0.6; }
 					rec[pl.name] = [ ...(rec[pl.name] || []), Math.round(clamp(r, 3.5, 9.8) * 10) / 10 ].slice(-5);
@@ -200,6 +202,7 @@
 		league.round = lm.round + 1;
 		updateFitness();
 		weeklyClub(lm, h, a);
+		if (typeof raceAfterRound === "function") { raceAfterRound(lm, lm.home ? h : a, lm.home ? a : h); }   // Team of the Week, Player of the Month (18p)
 		if (!windowOpen()) { league.bidsIn = []; }
 		if (league.round === JANUARY) { league.club.market = genMarket(); league.club.scoutLeft = 2 + staffLvl(league.club, "scout"); if (typeof windowEvents === "function") { windowEvents("January"); } if (typeof agentApproaches === "function") { agentApproaches("January"); } }
 		if (typeof assistRun === "function") { assistRun(league.round === JANUARY ? "January window" : "this week"); }
