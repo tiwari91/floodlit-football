@@ -9,7 +9,8 @@ async function open (query) {
 	const page = await ctx.newPage();
 	page.on("pageerror", e => errs.push("pageerror: " + e.message));
 	page.on("console", m => { if (m.type() === "error" && !/GL Driver|ERR_NETWORK/.test(m.text())) { errs.push(m.text().slice(0, 160)); } });
-	await page.goto(URL + (query ? "&" + query : ""));   // URL already carries ?test await page.waitForSelector("#ovButton");
+	await page.goto(URL + (query ? "&" + query : ""));   // URL already carries ?test
+	await page.waitForSelector("#ovButton");
 	return { ctx, page };
 }
 const state = page => page.evaluate(() => ({ intro: !!document.getElementById("intro"), card: !!document.querySelector("#intro.card-on"), title: document.getElementById("ovTitle").textContent }));
@@ -26,7 +27,7 @@ await page.waitForSelector("#intro.card-on", { timeout: 8000 }).catch(() => {});
 check("the title card comes up within a few seconds", (await state(page)).card);
 const before = (await state(page)).title;
 // The key that closes it is not a game input: Space and Enter must not press the matchday card's button.
-await page.keyboard.press("Space"); await page.waitForTimeout(600);
+await page.keyboard.press("Space"); await page.waitForSelector("#intro", { state: "detached", timeout: 3000 }).catch(() => {});
 const after = await state(page);
 check("any key closes the intro and it leaves the page", !after.intro, JSON.stringify(after));
 check("the closing key does not reach the game (the matchday card is still there)", after.title === before, JSON.stringify({ before, after: after.title }));
@@ -34,7 +35,7 @@ await ctx.close();
 
 // A click on Skip closes it too.
 ({ ctx, page } = await open("intro"));
-await page.click("#intro .intro-skip"); await page.waitForTimeout(600);
+await page.click("#intro .intro-skip"); await page.waitForSelector("#intro", { state: "detached", timeout: 3000 }).catch(() => {});
 check("Skip closes it", !(await state(page)).intro);
 await ctx.close();
 
