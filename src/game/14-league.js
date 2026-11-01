@@ -46,6 +46,7 @@
 		const club = prev && prev.club ? prev.club : carryClub ? sanitizeClub(carryClub) : newClub();
 		// Auto-rotate carries on from season to season (and from your last choice for a new club).
 		if (club.autoRotate === undefined) { club.autoRotate = store.get("ff-autorot") === "1"; }
+		const psrPts = prev && typeof psrClose === "function" ? psrClose(club) : 0;   // the spending rules (18l)
 		if (youDown) { club.budget = round1(club.budget * 0.5); }
 		if (prev) { for (const pl of [ ...club.squad, ...club.bench ]) { pl.fit = 100; pl.goals = 0; pl.apps = 0; pl.ycount = 0; pl.rsum = 0; pl.rn = 0; } }   // a summer's rest, and a clean sheet of stats
 		let gone = [];
@@ -68,6 +69,7 @@
 			ko: genKickoff(fixtures.length, prev && prev.ident && prev.ident.country),
 			news: [
 				youDown ? "You finished in the relegation zone. The board kept you up but halved the budget." : "",
+				psrPts ? `The league has taken ${psrPts} points off you for breaking the spending rules: losses over three seasons went past ${money(PSR_LIMIT)}.` : "",
 				promoted.length ? `Promoted: ${promoted.map(i => TEAMS[i].name).join(", ")}.` : "",
 				relegated.length ? `Relegated: ${relegated.map(i => TEAMS[i].name).join(", ")}.` : "",
 				up.length ? `Stronger this season: ${up.join(", ")}.` : "",
@@ -75,6 +77,8 @@
 			].filter(Boolean).join(" ")
 		};
 		league.cpuIn = {};
+		if (psrPts) { league.deduct = psrPts; }
+		if (typeof psrOpen === "function") { psrOpen(club); }
 		if (typeof seasonEdits === "function") { seasonEdits(prev); }   // option-file edits carry on (18g)
 		windowEvents("Summer");
 		if (prev) {
@@ -150,6 +154,8 @@
 				else { H.d++; A.d++; H.pts++; A.pts++; H.form.push("D"); A.form.push("D"); }
 			}
 		}
+		const me = byId.get(0);
+		if (me && league.deduct) { me.pts -= league.deduct; me.ded = league.deduct; }   // the spending rules (18l)
 		return rows.sort((x, y) => y.pts - x.pts || (y.gf - y.ga) - (x.gf - x.ga) || y.gf - x.gf ||
 			TEAMS[x.id].name.localeCompare(TEAMS[y.id].name));
 	}

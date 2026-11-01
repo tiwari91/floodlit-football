@@ -1524,3 +1524,6 @@ td, th { font-variant-numeric: tabular-nums; }
 .apply-list li { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; }
 .apply-list li.locked { opacity: 0.5; }
 .apply-list li button { padding: 3px 10px; font-size: 12px; }
+	/* Owner investment and the spending rules (18l-owner-and-psr.js) */
+	.owner-box { margin: var(--sp-2) 0; }
+	.owner-acts { display: flex; gap: var(--sp-2); flex-wrap: wrap; margin-top: var(--sp-1); }

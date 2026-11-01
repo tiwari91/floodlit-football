@@ -325,6 +325,7 @@
 		notes.push(`Wage bill ${money(squadWages(c))} a season. TV money ${money(TV_EQUAL / SEASON_ROUNDS)} a matchday (${money(TV_FACILITY)} more when you are on TV); home gates about ${money((0.05 + 0.015 * yourStr()) * GATE_SHARE)} each.`);
 		if (c.budget < 0) { notes.push("You're in the red: the board has frozen signings until the budget is back above zero."); }
 		$("winNote").textContent = notes.join(" ");
+		if (typeof renderOwnerBox === "function") { renderOwnerBox(c, open); }
 
 		const mk = $("winMarket");
 		mk.replaceChildren();
