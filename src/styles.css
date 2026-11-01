@@ -1495,3 +1495,14 @@ td, th { font-variant-numeric: tabular-nums; }
 	.intl-squad ol.nat-xi li button { min-width: 0; }
 	.intl-squad ol.nat-xi li .swap:last-child { margin-right: 0; }
 }
+	/* Welcome intro (00-intro.js): a full-screen layer over the page until any key, click or tap */
+	#intro { position: fixed; inset: 0; z-index: 1000; background: var(--night); cursor: pointer; transition: opacity .38s ease; }
+	#intro canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+	#intro .intro-card { position: absolute; left: 0; right: 0; bottom: 12vh; text-align: center; opacity: 0; transform: translateY(8px); transition: opacity .6s ease, transform .6s ease; pointer-events: none; }
+	#intro.card-on .intro-card { opacity: 1; transform: none; }
+	#intro .intro-card h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(40px, 7vw, 88px); letter-spacing: .02em; text-transform: uppercase; color: var(--amber); text-shadow: 0 2px 24px rgba(0, 0, 0, .45); }
+	#intro .intro-card p { margin: var(--sp-2) 0 0; font-family: var(--body); font-weight: 600; font-size: var(--fs-lg); color: var(--chalk); letter-spacing: .06em; text-transform: uppercase; text-shadow: 0 1px 12px rgba(0, 0, 0, .6); animation: introPulse 1.6s ease-in-out infinite; }
+	#intro .intro-skip { position: absolute; top: var(--sp-4); right: var(--sp-4); background: rgba(13, 22, 18, .55); color: var(--chalk); border: 1px solid var(--rule); border-radius: var(--r-pill); padding: var(--sp-1) var(--sp-4); font: 600 var(--fs-md) var(--body); cursor: pointer; }
+	#intro.out { opacity: 0; pointer-events: none; }
+	@keyframes introPulse { 50% { opacity: .55; } }
+	@media (prefers-reduced-motion: reduce) { #intro .intro-card p { animation: none; } }
