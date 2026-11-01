@@ -321,8 +321,8 @@
 	const SEARCH_SHOW = 25;
 	function searchAnyClub (q) {
 		const out = [], name = (q.name || "").trim().toLowerCase();
-		for (const id of league.members) {
-			if (id === 0 || !TEAMS[id] || (q.club !== "" && String(id) !== String(q.club))) { continue; }
+		for (let id = 1; id < TEAMS.length; id++) {   // every club in the game: your division and the one below
+			if (!TEAMS[id] || (q.club !== "" && String(id) !== String(q.club))) { continue; }
 			cpuSquad(id, getStr(id)).forEach((pl, slot) => {
 				if (!pl || (name && !pl.name.toLowerCase().includes(name)) || (q.pos && pl.pos !== q.pos) || ovrOf(pl) < (q.min || 0)) { return; }
 				const held = league.club.market.find(m => m.name === pl.name && m.cpuClub === id), ask = held ? askOf(held) : round1(priceOf(pl) * 1.2);
@@ -435,7 +435,8 @@
 		diffSel.disabled = weatherSel.disabled = groundSel.disabled = mode === "league";
 		diffSel.title = mode === "league" ? "In the league, each club plays at its own rating" : "";
 		weatherSel.title = groundSel.title = mode === "league" ? "In the league, the fixture sets the ground and the forecast" : "";
-		if (mode === "league" && !league) { newSeason(fmtSel.value); }
+		const fresh = mode === "league" && !league;
+		if (fresh) { store.set("ff-pick-due", "1"); newSeason(fmtSel.value); }   // a brand-new career: choose your club first (18b)
 		// Switching ends any match in progress without a result.
 		clearLive();
 		state = "intro";
@@ -444,6 +445,7 @@
 		showIntro();
 		renderLeague();
 		renderShapes();
+		if (fresh && typeof openFirstPick === "function") { openFirstPick(); }
 	}
 
 	// Skip a fixture: play it out from the two sides' ratings.

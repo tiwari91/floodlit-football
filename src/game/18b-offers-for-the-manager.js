@@ -302,3 +302,74 @@
 		}
 		box.append(el("p", "win-note", `Your reputation (${managerRep()}/100) reaches clubs up to ${"★".repeat(Math.max(1, Math.round(repStr())))}. Win more, and finish above what your squad was expected to, to reach the biggest.`), ul);
 	}
+
+	// Choose your club: on a brand-new career (first visit, or after the saved data is cleared) a full-screen
+	// picker lists every club in the game before the first matchday. One click and the career starts there,
+	// with no reputation needed (it is a new career, not a move); "Keep Floodlit FC" keeps the default club.
+	// It shows once: the choice clears the ff-pick-due key that a fresh start sets. Automated test runs skip it
+	// unless the URL asks for it with &pick (Floodlit Champions has its own picker, so it never shows there).
+	// Keys pressed while it is open stop at the box, so the game (49-input, on window) never sees them.
+	const PICK_KEY = "ff-pick-due";
+	function firstPickWanted () {
+		if (typeof champOn === "function" && champOn()) { return false; }
+		if (/[?&]test\b/.test(location.search) && !/[?&]pick\b/.test(location.search)) { return false; }
+		return store.get(PICK_KEY) === "1" && mode === "league" && !!league && league.season === 1 && league.round === 0 && !(league.career && (league.career.history || []).length);
+	}
+	function pickFirstClub (id) {
+		const lg = league;
+		if (!lg || !TEAMS[id] || id === 0) { return false; }
+		lg.jobOffers = [ { id, kind: "home", str: getStr(id), budget: round1(1 + getStr(id) * 0.9), below: !lg.members.includes(id), season: lg.season } ];
+		if (!takeOffer(offerKey({ id }))) { return false; }
+		// A first club, not a move: no old club in the record.
+		lg.career = { ...(lg.career || {}), clubs: [ YOU.name ] };
+		lg.club.log = [ `You took charge of ${YOU.name} (budget ${money(lg.club.budget)})` ];
+		lg.news = String(lg.news || "").replace(`You are the new manager of ${YOU.name}.`, "").trim();
+		lastDeal = `Welcome to ${YOU.name}: ${money(lg.club.budget)} to spend while the window is open.`;
+		saveLeague();
+		state = "intro"; banner.hidden = true; newMatch(); showIntro(); renderLeague();   // the matchday card in your new colours
+		return true;
+	}
+	function closeFirstPick () {
+		store.del(PICK_KEY);
+		const box = $("firstPick");
+		if (box) { box.remove(); }
+	}
+	function openFirstPick () {
+		if (!firstPickWanted() || $("firstPick")) { return; }
+		const box = el("div", "fp-wrap"); box.id = "firstPick";
+		box.setAttribute("role", "dialog"); box.setAttribute("aria-modal", "true"); box.setAttribute("aria-labelledby", "fpTitle");
+		const card = el("div", "fp-card"), head = el("div", "fp-head"), words = el("div");
+		const title = el("h2", "", "Choose your club"); title.id = "fpTitle";
+		words.append(el("p", "fp-kicker", "A new career"), title, el("p", "fp-lede", "Any club, any size: no reputation needed for your first job. You can move on later from the Club tab."));
+		const keep = el("button", "fp-keep", `Keep ${YOU.name}`); keep.type = "button"; keep.id = "fpKeep";
+		keep.addEventListener("click", () => { closeFirstPick(); saveLeague(); });
+		head.append(words, keep);
+		card.append(head);
+		const group = (label, note, ids) => {
+			if (!ids.length) { return; }
+			const sec = el("section", "fp-group"), h = el("h3", "");
+			h.append(document.createTextNode(label), el("span", "fp-note", note));
+			const grid = el("div", "fp-grid");
+			for (const id of ids) {
+				const t = TEAMS[id], b = el("button", "fp-club"); b.type = "button"; b.dataset.id = String(id);
+				const kit = dotFor(t); kit.classList.add("fp-kit");
+				const txt = el("span", "fp-txt");
+				txt.append(el("span", "fp-name", t.name), el("span", "fp-stars", stars(getStr(id))), el("span", "fp-ground", `${t.ground}${SURFACES[t.surface] ? ` · ${SURFACES[t.surface].label.toLowerCase()}` : ""}`));
+				b.append(kit, txt);
+				b.setAttribute("aria-label", `${t.name}, ${Math.round(getStr(id))} stars, ${t.ground}`);
+				b.addEventListener("click", () => { if (pickFirstClub(id)) { closeFirstPick(); } });
+				grid.append(b);
+			}
+			sec.append(h, grid); card.append(sec);
+		};
+		const byStr = (a, b) => getStr(b) - getStr(a) || TEAMS[a].name.localeCompare(TEAMS[b].name);
+		const all = TEAMS.map((t, i) => i).filter(i => i !== 0);
+		group("In the division", "Strongest first", all.filter(i => league.members.includes(i)).sort(byStr));
+		group("From the division below", "Take one and you bring it up with you", all.filter(i => !league.members.includes(i)).sort(byStr));
+		box.append(card);
+		// Keys stay in the picker, so Space or Enter never kicks off the match behind it.
+		box.tabIndex = -1;
+		box.addEventListener("keydown", e => { e.stopPropagation(); if (e.target === box && [ "Space", "ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End" ].includes(e.code)) { e.preventDefault(); } });
+		document.body.append(box);
+		box.focus({ preventScroll: true });
+	}

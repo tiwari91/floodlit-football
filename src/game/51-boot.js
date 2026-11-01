@@ -34,7 +34,7 @@
 		$("modeLeague").setAttribute("aria-pressed", String(mode === "league"));
 		$("modeFriendly").setAttribute("aria-pressed", String(mode === "friendly"));
 		diffSel.disabled = weatherSel.disabled = groundSel.disabled = mode === "league";
-		if (mode === "league" && !league) { newSeason(fmtSel.value); }
+		if (mode === "league" && !league) { store.set("ff-pick-due", "1"); newSeason(fmtSel.value); }   // a brand-new career: choose your club first (18b)
 		if (league && typeof honourAgreed === "function") { honourAgreed(); }
 
 		newMatch();
@@ -57,6 +57,7 @@
 		renderModeBadge();
 		renderShapes();
 		connectLeagueStore();
+		if (typeof openFirstPick === "function") { openFirstPick(); }   // a new career: choose your club (18b)
 	}
 
 	// Test hook (only with ?test in the URL): lets a headless harness step the sim and read it.
@@ -127,6 +128,8 @@
 	if (window.__ff) { Object.assign(window.__ff, { trophyCeremony, ceremonySeek, ceremonyInfo, endCeremony, queueTrophy, trophyDue, lastCeremony: () => lastCeremony }); }
 	if (window.__ff) { Object.assign(window.__ff, { setOpponent, yourKit, matchGround, welcomeCall, openMatchCentre, closeMatchCentre, formOf, makeSub, subPool, startSubWalk, applause, subPerf, youStrTest (v) { YOU.str = v; }, logGoalTest (t, n) { (t === 0 ? matchGoals : matchGoalsOpp).push(n); } }); Object.defineProperties(window.__ff, { subWalks: { get: () => subWalks }, lastApplause: { get: () => lastApplause } }); }
 	if (window.__ff) { Object.assign(window.__ff, { ensureCont, contNight, contFixture, contSimAll, contQualify, contNext, contSeed, setCcStart, ccPath, ccGroups, ccTable, ccAgg, ccWinner, renderCont, CC_NIGHTS, currentFixture, simulateMine, restoreGuest, saveLeague, renderLeague }); }
+
+	if (window.__ff) { Object.assign(window.__ff, { openFirstPick, pickFirstClub, firstPickWanted, searchAnyClub }); }
 
 	const hot = window.claude && window.claude.hot;
 	if (hot && typeof hot.snapshot === "function") {

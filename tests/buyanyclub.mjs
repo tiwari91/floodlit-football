@@ -11,7 +11,7 @@ await showTab(page, "transfers");
 const rows = () => page.evaluate(() => [ ...document.querySelectorAll("#winMarket li") ].map(li => li.textContent));
 await page.evaluate(() => { const lg = window.__ff.league; lg.round = 0; lg.club.budget = 60; window.__ff.renderLeagueTest(); });
 await page.click("#mkTabs button:last-child");
-check("the transfers screen has an Any club search with its five filters", await page.evaluate(() => [ "mkqName", "mkqPos", "mkqMin", "mkqClub", "mkqMax", "mkqGo" ].every(id => !!document.getElementById(id))));
+check("the transfers screen has an any-club search with its five filters", await page.evaluate(() => [ "mkqName", "mkqPos", "mkqMin", "mkqClub", "mkqMax", "mkqGo" ].every(id => !!document.getElementById(id))));
 const all = await rows();
 check("with no filter it lists players from other clubs, best first, with their club and a price", all.length > 5 && /£\d/.test(all[0]) && /OVR \d+/.test(all[0]), all[0]);
 
@@ -24,6 +24,14 @@ const club = await page.evaluate(() => { const o = [ ...document.querySelectorAl
 await page.selectOption("#mkqClub", club.v); await page.click("#mkqGo");
 const cl = await rows();
 check("the club filter shows only that club's players", cl.length > 5 && cl.slice(0, -1).every(t => t.includes(club.t)), club.t);
+// Every club in the game, the division below too, not just this division's.
+const lower = await page.evaluate(() => { const g = [ ...document.querySelectorAll("#mkqClub optgroup") ].find(x => /below/.test(x.label)); const o = g && g.querySelector("option"); return o ? { v: o.value, t: o.textContent } : null; });
+check("the club filter also lists the clubs in the division below", !!lower, JSON.stringify(lower));
+if (lower) {
+	await page.selectOption("#mkqClub", lower.v); await page.click("#mkqGo");
+	const lo = await rows();
+	check("and you can see and bid for their players", lo.length > 5 && lo[0].includes(lower.t) && /division below/.test(lo[0]) && /Bid £/.test(lo[0]), lo[0]);
+}
 await page.selectOption("#mkqClub", ""); await page.fill("#mkqMax", "10"); await page.click("#mkqGo");
 const cheap = await page.evaluate(() => [ ...document.querySelectorAll("#winMarket .bids button:first-child") ].map(b => Number(b.textContent.replace(/[^0-9.]/g, "")) || 0));
 check("the maximum price (in £m as shown) hides dearer players", cheap.every(p => p <= 10), JSON.stringify(cheap.slice(0, 5)));

@@ -1551,6 +1551,41 @@ td, th { font-variant-numeric: tabular-nums; }
 	.owner-acts { display: flex; gap: var(--sp-2); flex-wrap: wrap; margin-top: var(--sp-1); }
 	/* the Challenge Cup (18m-challenge-cup.js): giant-killings stand out in the round's list */
 	.cup-ties li.shock { color: var(--amber); }
+
+/* Choose your club: a new career's first screen (18b) */
+.fp-wrap { position: fixed; inset: 0; z-index: 900; display: flex; align-items: center; justify-content: center; padding: var(--sp-4);
+	background: radial-gradient(120% 90% at 50% 0%, rgba(242, 181, 46, 0.10), rgba(13, 22, 18, 0) 55%), rgba(7, 12, 10, 0.94); outline: none; }
+.fp-card { width: min(1080px, 100%); max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); overflow: auto; padding: var(--sp-5) var(--sp-6) var(--sp-6);
+	background: var(--panel); border: 1px solid var(--rule); border-top: 3px solid var(--amber); border-radius: var(--r-lg); box-shadow: var(--elev-2), 0 24px 80px rgba(0, 0, 0, 0.55); }
+.fp-head { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--sp-4); flex-wrap: wrap; margin-bottom: var(--sp-4); }
+.fp-kicker { margin: 0; font-size: var(--fs-sm); font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--amber); }
+.fp-head h2 { margin: 2px 0 4px; font-family: var(--display); font-weight: 800; font-size: clamp(34px, 4.4vw, 52px); line-height: 1; letter-spacing: 0.02em; text-transform: uppercase; color: var(--chalk); }
+.fp-lede { margin: 0; color: var(--muted); font-size: var(--fs-base); max-width: 56ch; }
+button.fp-keep { flex: none; background: transparent; border: 1px solid var(--rule-strong); border-radius: var(--r-pill); color: var(--text); padding: 8px 18px; font-size: var(--fs-md); }
+.fp-group { margin-top: var(--sp-4); }
+.fp-group h3 { display: flex; align-items: baseline; gap: var(--sp-3); margin: 0 0 var(--sp-2); padding-bottom: 6px; border-bottom: 1px solid var(--rule);
+	font-size: var(--fs-sm); font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text); }
+.fp-note { font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--muted); font-size: var(--fs-sm); }
+.fp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--sp-2); }
+button.fp-club { display: flex; align-items: center; gap: var(--sp-3); width: 100%; min-height: 64px; padding: 10px 12px; text-align: left; text-transform: none; letter-spacing: 0;
+	background: var(--panel-2); border: 1px solid var(--rule); border-radius: var(--r-md); color: var(--text); }
+button.fp-club:not(:disabled):hover { border-color: var(--amber); background-color: #1e3329; }
+.fp-club .fp-kit { width: 30px; height: 30px; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.18), 0 2px 6px rgba(0, 0, 0, 0.4); }
+.fp-txt { display: grid; min-width: 0; line-height: 1.25; }
+.fp-name { font-weight: 700; font-size: var(--fs-base); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fp-stars { color: var(--amber); font-size: var(--fs-sm); letter-spacing: 0.1em; }
+.fp-ground { color: var(--muted); font-size: var(--fs-sm); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 560px) {
+	.fp-card { padding: var(--sp-4); }
+	.fp-grid { grid-template-columns: 1fr; }
+	button.fp-club { min-height: 56px; padding: 8px 10px; }
+}
+/* Transfers: the search of every club stands out among the market tabs (16) */
+.mk-tabs button.mk-any { border-color: var(--amber); color: var(--amber); font-weight: 700; }
+.mk-tabs button.mk-any[aria-pressed="true"] { color: var(--amber-ink); }
+/* Transfers: the search of every club stands out among the market tabs (16) */
+.mk-tabs button.mk-any { border-color: var(--amber); color: var(--amber); font-weight: 700; }
+.mk-tabs button.mk-any[aria-pressed="true"] { color: var(--amber-ink); }
 </style>
 
 <main class="wrap">
@@ -3943,7 +3978,18 @@ td, th { font-variant-numeric: tabular-nums; }
 		const name = el("input"); name.type = "search"; name.placeholder = "Any name"; name.value = mkQ.name; name.setAttribute("aria-label", "Player name"); name.id = "mkqName";
 		const pos = el("select"); pos.id = "mkqPos"; for (const [ v, t ] of [ [ "", "Any" ], ...Object.entries(POS_LABEL) ]) { const o = el("option", "", t); o.value = v; pos.append(o); } pos.value = mkQ.pos;
 		const min = el("input"); min.type = "number"; min.min = "0"; min.max = "99"; min.value = mkQ.min || ""; min.placeholder = "0"; min.id = "mkqMin";
-		const club = el("select"); club.id = "mkqClub"; { const o = el("option", "", "Any club"); o.value = ""; club.append(o); for (const id of league.members) { if (id !== 0 && TEAMS[id]) { const x = el("option", "", TEAMS[id].name); x.value = String(id); club.append(x); } } } club.value = String(mkQ.club);
+		const club = el("select"); club.id = "mkqClub";
+		{
+			const o = el("option", "", "Every club"); o.value = ""; club.append(o);
+			const ids = TEAMS.map((t, i) => i).filter(i => i !== 0 && TEAMS[i]).sort((a, b) => TEAMS[a].name.localeCompare(TEAMS[b].name));
+			for (const [ label, list ] of [ [ "This division", ids.filter(i => league.members.includes(i)) ], [ "The division below", ids.filter(i => !league.members.includes(i)) ] ]) {
+				if (!list.length) { continue; }
+				const g = el("optgroup"); g.label = label;
+				for (const id of list) { const x = el("option", "", TEAMS[id].name); x.value = String(id); g.append(x); }
+				club.append(g);
+			}
+		}
+		club.value = String(mkQ.club);
 		const max = el("input"); max.type = "number"; max.min = "0"; max.step = "1"; max.value = mkQ.max || ""; max.placeholder = "No limit"; max.id = "mkqMax";
 		const go = el("button", "", "Search"); go.type = "button"; go.id = "mkqGo";
 		const apply = () => { mkQ.name = name.value; mkQ.pos = pos.value; mkQ.min = Number(min.value) || 0; mkQ.club = club.value; mkQ.max = Number(max.value) || 0; renderClub(); };
@@ -4061,8 +4107,8 @@ td, th { font-variant-numeric: tabular-nums; }
 		const tabs = $("mkTabs");
 		tabs.replaceChildren();
 		tabs.hidden = !open;
-		for (const [ key, m ] of [ [ "foryou", { label: "For you" } ], [ "all", { label: "All" } ], ...Object.entries(MARKETS), [ "search", { label: "Any club" } ] ]) {
-			const b = el("button", "", m.label); b.type = "button"; b.setAttribute("aria-pressed", String(mkTab === key));
+		for (const [ key, m ] of [ [ "foryou", { label: "For you" } ], [ "all", { label: "All" } ], ...Object.entries(MARKETS), [ "search", { label: "Any player, any club" } ] ]) {
+			const b = el("button", key === "search" ? "mk-any" : "", m.label); b.type = "button"; b.setAttribute("aria-pressed", String(mkTab === key));
 			b.addEventListener("click", () => { mkTab = key; renderClub(); });
 			tabs.append(b);
 		}
@@ -4094,6 +4140,7 @@ td, th { font-variant-numeric: tabular-nums; }
 				btns.append(b, b2); li.append(btns);
 				li.append(el("span", "ratings", `OVR ${ovrOf(pl)} · PAC ${pl.pac} SHO ${pl.sho} PAS ${pl.pas} DEF ${pl.def}`));
 				li.append(el("span", "swap", `${TEAMS[r.id].name}${ok ? "" : " · talks broken off"}`));
+				if (!league.members.includes(r.id)) { li.append(el("span", "swap", "Plays in the division below")); }
 				li.append(el("span", "swap", out ? `Replaces ${out.name} (${ovrNow(out)}), sold for ${money(round1(priceOf(out) * 0.5))}` : "Joins your bench"));
 				mk.append(li);
 			});
@@ -4590,8 +4637,8 @@ td, th { font-variant-numeric: tabular-nums; }
 	const SEARCH_SHOW = 25;
 	function searchAnyClub (q) {
 		const out = [], name = (q.name || "").trim().toLowerCase();
-		for (const id of league.members) {
-			if (id === 0 || !TEAMS[id] || (q.club !== "" && String(id) !== String(q.club))) { continue; }
+		for (let id = 1; id < TEAMS.length; id++) {   // every club in the game: your division and the one below
+			if (!TEAMS[id] || (q.club !== "" && String(id) !== String(q.club))) { continue; }
 			cpuSquad(id, getStr(id)).forEach((pl, slot) => {
 				if (!pl || (name && !pl.name.toLowerCase().includes(name)) || (q.pos && pl.pos !== q.pos) || ovrOf(pl) < (q.min || 0)) { return; }
 				const held = league.club.market.find(m => m.name === pl.name && m.cpuClub === id), ask = held ? askOf(held) : round1(priceOf(pl) * 1.2);
@@ -4704,7 +4751,8 @@ td, th { font-variant-numeric: tabular-nums; }
 		diffSel.disabled = weatherSel.disabled = groundSel.disabled = mode === "league";
 		diffSel.title = mode === "league" ? "In the league, each club plays at its own rating" : "";
 		weatherSel.title = groundSel.title = mode === "league" ? "In the league, the fixture sets the ground and the forecast" : "";
-		if (mode === "league" && !league) { newSeason(fmtSel.value); }
+		const fresh = mode === "league" && !league;
+		if (fresh) { store.set("ff-pick-due", "1"); newSeason(fmtSel.value); }   // a brand-new career: choose your club first (18b)
 		// Switching ends any match in progress without a result.
 		clearLive();
 		state = "intro";
@@ -4713,6 +4761,7 @@ td, th { font-variant-numeric: tabular-nums; }
 		showIntro();
 		renderLeague();
 		renderShapes();
+		if (fresh && typeof openFirstPick === "function") { openFirstPick(); }
 	}
 
 	// Skip a fixture: play it out from the two sides' ratings.
@@ -5933,6 +5982,77 @@ td, th { font-variant-numeric: tabular-nums; }
 			li.append(who, b); ul.append(li);
 		}
 		box.append(el("p", "win-note", `Your reputation (${managerRep()}/100) reaches clubs up to ${"★".repeat(Math.max(1, Math.round(repStr())))}. Win more, and finish above what your squad was expected to, to reach the biggest.`), ul);
+	}
+
+	// Choose your club: on a brand-new career (first visit, or after the saved data is cleared) a full-screen
+	// picker lists every club in the game before the first matchday. One click and the career starts there,
+	// with no reputation needed (it is a new career, not a move); "Keep Floodlit FC" keeps the default club.
+	// It shows once: the choice clears the ff-pick-due key that a fresh start sets. Automated test runs skip it
+	// unless the URL asks for it with &pick (Floodlit Champions has its own picker, so it never shows there).
+	// Keys pressed while it is open stop at the box, so the game (49-input, on window) never sees them.
+	const PICK_KEY = "ff-pick-due";
+	function firstPickWanted () {
+		if (typeof champOn === "function" && champOn()) { return false; }
+		if (/[?&]test\b/.test(location.search) && !/[?&]pick\b/.test(location.search)) { return false; }
+		return store.get(PICK_KEY) === "1" && mode === "league" && !!league && league.season === 1 && league.round === 0 && !(league.career && (league.career.history || []).length);
+	}
+	function pickFirstClub (id) {
+		const lg = league;
+		if (!lg || !TEAMS[id] || id === 0) { return false; }
+		lg.jobOffers = [ { id, kind: "home", str: getStr(id), budget: round1(1 + getStr(id) * 0.9), below: !lg.members.includes(id), season: lg.season } ];
+		if (!takeOffer(offerKey({ id }))) { return false; }
+		// A first club, not a move: no old club in the record.
+		lg.career = { ...(lg.career || {}), clubs: [ YOU.name ] };
+		lg.club.log = [ `You took charge of ${YOU.name} (budget ${money(lg.club.budget)})` ];
+		lg.news = String(lg.news || "").replace(`You are the new manager of ${YOU.name}.`, "").trim();
+		lastDeal = `Welcome to ${YOU.name}: ${money(lg.club.budget)} to spend while the window is open.`;
+		saveLeague();
+		state = "intro"; banner.hidden = true; newMatch(); showIntro(); renderLeague();   // the matchday card in your new colours
+		return true;
+	}
+	function closeFirstPick () {
+		store.del(PICK_KEY);
+		const box = $("firstPick");
+		if (box) { box.remove(); }
+	}
+	function openFirstPick () {
+		if (!firstPickWanted() || $("firstPick")) { return; }
+		const box = el("div", "fp-wrap"); box.id = "firstPick";
+		box.setAttribute("role", "dialog"); box.setAttribute("aria-modal", "true"); box.setAttribute("aria-labelledby", "fpTitle");
+		const card = el("div", "fp-card"), head = el("div", "fp-head"), words = el("div");
+		const title = el("h2", "", "Choose your club"); title.id = "fpTitle";
+		words.append(el("p", "fp-kicker", "A new career"), title, el("p", "fp-lede", "Any club, any size: no reputation needed for your first job. You can move on later from the Club tab."));
+		const keep = el("button", "fp-keep", `Keep ${YOU.name}`); keep.type = "button"; keep.id = "fpKeep";
+		keep.addEventListener("click", () => { closeFirstPick(); saveLeague(); });
+		head.append(words, keep);
+		card.append(head);
+		const group = (label, note, ids) => {
+			if (!ids.length) { return; }
+			const sec = el("section", "fp-group"), h = el("h3", "");
+			h.append(document.createTextNode(label), el("span", "fp-note", note));
+			const grid = el("div", "fp-grid");
+			for (const id of ids) {
+				const t = TEAMS[id], b = el("button", "fp-club"); b.type = "button"; b.dataset.id = String(id);
+				const kit = dotFor(t); kit.classList.add("fp-kit");
+				const txt = el("span", "fp-txt");
+				txt.append(el("span", "fp-name", t.name), el("span", "fp-stars", stars(getStr(id))), el("span", "fp-ground", `${t.ground}${SURFACES[t.surface] ? ` · ${SURFACES[t.surface].label.toLowerCase()}` : ""}`));
+				b.append(kit, txt);
+				b.setAttribute("aria-label", `${t.name}, ${Math.round(getStr(id))} stars, ${t.ground}`);
+				b.addEventListener("click", () => { if (pickFirstClub(id)) { closeFirstPick(); } });
+				grid.append(b);
+			}
+			sec.append(h, grid); card.append(sec);
+		};
+		const byStr = (a, b) => getStr(b) - getStr(a) || TEAMS[a].name.localeCompare(TEAMS[b].name);
+		const all = TEAMS.map((t, i) => i).filter(i => i !== 0);
+		group("In the division", "Strongest first", all.filter(i => league.members.includes(i)).sort(byStr));
+		group("From the division below", "Take one and you bring it up with you", all.filter(i => !league.members.includes(i)).sort(byStr));
+		box.append(card);
+		// Keys stay in the picker, so Space or Enter never kicks off the match behind it.
+		box.tabIndex = -1;
+		box.addEventListener("keydown", e => { e.stopPropagation(); if (e.target === box && [ "Space", "ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End" ].includes(e.code)) { e.preventDefault(); } });
+		document.body.append(box);
+		box.focus({ preventScroll: true });
 	}
 	/* ---------- foreign leagues ----------
 	   Move abroad and the whole division changes with you: every other club is renamed for that
@@ -24321,7 +24441,7 @@ td, th { font-variant-numeric: tabular-nums; }
 		$("modeLeague").setAttribute("aria-pressed", String(mode === "league"));
 		$("modeFriendly").setAttribute("aria-pressed", String(mode === "friendly"));
 		diffSel.disabled = weatherSel.disabled = groundSel.disabled = mode === "league";
-		if (mode === "league" && !league) { newSeason(fmtSel.value); }
+		if (mode === "league" && !league) { store.set("ff-pick-due", "1"); newSeason(fmtSel.value); }   // a brand-new career: choose your club first (18b)
 		if (league && typeof honourAgreed === "function") { honourAgreed(); }
 
 		newMatch();
@@ -24344,6 +24464,7 @@ td, th { font-variant-numeric: tabular-nums; }
 		renderModeBadge();
 		renderShapes();
 		connectLeagueStore();
+		if (typeof openFirstPick === "function") { openFirstPick(); }   // a new career: choose your club (18b)
 	}
 
 	// Test hook (only with ?test in the URL): lets a headless harness step the sim and read it.
@@ -24414,6 +24535,8 @@ td, th { font-variant-numeric: tabular-nums; }
 	if (window.__ff) { Object.assign(window.__ff, { trophyCeremony, ceremonySeek, ceremonyInfo, endCeremony, queueTrophy, trophyDue, lastCeremony: () => lastCeremony }); }
 	if (window.__ff) { Object.assign(window.__ff, { setOpponent, yourKit, matchGround, welcomeCall, openMatchCentre, closeMatchCentre, formOf, makeSub, subPool, startSubWalk, applause, subPerf, youStrTest (v) { YOU.str = v; }, logGoalTest (t, n) { (t === 0 ? matchGoals : matchGoalsOpp).push(n); } }); Object.defineProperties(window.__ff, { subWalks: { get: () => subWalks }, lastApplause: { get: () => lastApplause } }); }
 	if (window.__ff) { Object.assign(window.__ff, { ensureCont, contNight, contFixture, contSimAll, contQualify, contNext, contSeed, setCcStart, ccPath, ccGroups, ccTable, ccAgg, ccWinner, renderCont, CC_NIGHTS, currentFixture, simulateMine, restoreGuest, saveLeague, renderLeague }); }
+
+	if (window.__ff) { Object.assign(window.__ff, { openFirstPick, pickFirstClub, firstPickWanted, searchAnyClub }); }
 
 	const hot = window.claude && window.claude.hot;
 	if (hot && typeof hot.snapshot === "function") {

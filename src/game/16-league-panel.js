@@ -215,7 +215,18 @@
 		const name = el("input"); name.type = "search"; name.placeholder = "Any name"; name.value = mkQ.name; name.setAttribute("aria-label", "Player name"); name.id = "mkqName";
 		const pos = el("select"); pos.id = "mkqPos"; for (const [ v, t ] of [ [ "", "Any" ], ...Object.entries(POS_LABEL) ]) { const o = el("option", "", t); o.value = v; pos.append(o); } pos.value = mkQ.pos;
 		const min = el("input"); min.type = "number"; min.min = "0"; min.max = "99"; min.value = mkQ.min || ""; min.placeholder = "0"; min.id = "mkqMin";
-		const club = el("select"); club.id = "mkqClub"; { const o = el("option", "", "Any club"); o.value = ""; club.append(o); for (const id of league.members) { if (id !== 0 && TEAMS[id]) { const x = el("option", "", TEAMS[id].name); x.value = String(id); club.append(x); } } } club.value = String(mkQ.club);
+		const club = el("select"); club.id = "mkqClub";
+		{
+			const o = el("option", "", "Every club"); o.value = ""; club.append(o);
+			const ids = TEAMS.map((t, i) => i).filter(i => i !== 0 && TEAMS[i]).sort((a, b) => TEAMS[a].name.localeCompare(TEAMS[b].name));
+			for (const [ label, list ] of [ [ "This division", ids.filter(i => league.members.includes(i)) ], [ "The division below", ids.filter(i => !league.members.includes(i)) ] ]) {
+				if (!list.length) { continue; }
+				const g = el("optgroup"); g.label = label;
+				for (const id of list) { const x = el("option", "", TEAMS[id].name); x.value = String(id); g.append(x); }
+				club.append(g);
+			}
+		}
+		club.value = String(mkQ.club);
 		const max = el("input"); max.type = "number"; max.min = "0"; max.step = "1"; max.value = mkQ.max || ""; max.placeholder = "No limit"; max.id = "mkqMax";
 		const go = el("button", "", "Search"); go.type = "button"; go.id = "mkqGo";
 		const apply = () => { mkQ.name = name.value; mkQ.pos = pos.value; mkQ.min = Number(min.value) || 0; mkQ.club = club.value; mkQ.max = Number(max.value) || 0; renderClub(); };
@@ -333,8 +344,8 @@
 		const tabs = $("mkTabs");
 		tabs.replaceChildren();
 		tabs.hidden = !open;
-		for (const [ key, m ] of [ [ "foryou", { label: "For you" } ], [ "all", { label: "All" } ], ...Object.entries(MARKETS), [ "search", { label: "Any club" } ] ]) {
-			const b = el("button", "", m.label); b.type = "button"; b.setAttribute("aria-pressed", String(mkTab === key));
+		for (const [ key, m ] of [ [ "foryou", { label: "For you" } ], [ "all", { label: "All" } ], ...Object.entries(MARKETS), [ "search", { label: "Any player, any club" } ] ]) {
+			const b = el("button", key === "search" ? "mk-any" : "", m.label); b.type = "button"; b.setAttribute("aria-pressed", String(mkTab === key));
 			b.addEventListener("click", () => { mkTab = key; renderClub(); });
 			tabs.append(b);
 		}
@@ -366,6 +377,7 @@
 				btns.append(b, b2); li.append(btns);
 				li.append(el("span", "ratings", `OVR ${ovrOf(pl)} · PAC ${pl.pac} SHO ${pl.sho} PAS ${pl.pas} DEF ${pl.def}`));
 				li.append(el("span", "swap", `${TEAMS[r.id].name}${ok ? "" : " · talks broken off"}`));
+				if (!league.members.includes(r.id)) { li.append(el("span", "swap", "Plays in the division below")); }
 				li.append(el("span", "swap", out ? `Replaces ${out.name} (${ovrNow(out)}), sold for ${money(round1(priceOf(out) * 0.5))}` : "Joins your bench"));
 				mk.append(li);
 			});
