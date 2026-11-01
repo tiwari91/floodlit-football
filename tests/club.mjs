@@ -362,7 +362,7 @@ const ask = await page.evaluate(async () => {
 	const yes = [ ...p.querySelectorAll("button") ].find(b => /Spend the wage money/.test(b.textContent)); if (yes) { yes.click(); } await new Promise(r => setTimeout(r, 300));
 	return { done, short, btns, after: { contracts: three.map(x => x.contract), budget: c.budget, note: lg.assistNote, cleared: !lg.assistShort, btnsLeft: [ ...p.querySelectorAll("button") ].map(b => b.textContent) } };
 });
-check("short of money, the note asks the manager with the sums and two choices", ask.short && ask.short.names.length >= 1 && /Spend the wage money \(£0\.[1-4]m\)/.test(ask.btns[0][0]) && ask.btns.some(b => /Show in the squad list/.test(b[0])) && /Leave them/.test(ask.btns[ask.btns.length - 1][0]), JSON.stringify({ short: ask.short, btns: ask.btns }));
+check("short of money, the note asks the manager with the sums and two choices", ask.short && ask.short.names.length >= 1 && /Spend the wage money \(£[2-8](\.\d)?m\)/.test(ask.btns[0][0]) && ask.btns.some(b => /Show in the squad list/.test(b[0])) && /Leave them/.test(ask.btns[ask.btns.length - 1][0]), JSON.stringify({ short: ask.short, btns: ask.btns }));
 check("Renew anyway spends the reserve on the deals it reaches and clears the question", ask.after.contracts.filter(x => x >= 2).length > ask.done.filter(d => /^renewed /.test(d)).length && ask.after.budget >= 0 && /^Assistant \(using the wage money\): Renewed /.test(ask.after.note) && !/£0\.0m|your call|reserve spent/.test(ask.after.note) && ask.after.cleared && !ask.after.btnsLeft.some(b => /Spend the wage money|Leave them/.test(b)), JSON.stringify(ask.after));
 // A question left unanswered at season's end is settled by the summer, not left hanging.
 const summer = await page.evaluate(() => {

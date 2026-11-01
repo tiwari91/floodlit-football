@@ -63,7 +63,7 @@
 	const valueOf = p => Math.max(0.1, round1(Math.pow(Math.max(0, ovrOf(p) - 50), 2) * 0.004 * ageFactor(p.age) * (1 + Math.max(0, (p.pot || 0) - ovrOf(p)) * 0.02) * (p.contract === 1 ? 0.8 : 1)));
 	// Wages per season (£m), paid a matchday at a time; shown as £k a week.
 	const wageOf = p => (Number.isFinite(p.wage) ? p.wage : Math.round((0.02 + valueOf(p) * 0.05) * 1000) / 1000);
-	const wageWeek = w => `£${(w * 1000 / 52).toFixed(1)}k/wk`;
+	const wageWeek = w => `£${Math.round(w * MONEY_SCALE * 1000 / 52)}k/wk`;   // MONEY_SCALE: 04
 	const squadWages = c => [ ...c.squad, ...c.bench ].reduce((t, p) => t + wageOf(p), 0) + Object.values(c.staff || {}).reduce((t, st) => t + (st ? st.wage : 0), 0);
 
 	function ovrOf (p) {

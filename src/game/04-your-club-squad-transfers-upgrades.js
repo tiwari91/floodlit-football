@@ -12,7 +12,15 @@
 		{ key: "coaching", name: "Finishing school", effect: "+3 shooting and passing", costs: [ 1, 2, 3.5 ] },
 		{ key: "defence", name: "Defensive drills pitch", effect: "+3 defending and goalkeeping", costs: [ 1, 2, 3.5 ] }
 	];
-	const money = m => (Math.abs(m) < 0.095 && m !== 0 ? `${m < 0 ? "-" : ""}£${Math.round(Math.abs(m) * 1000)}k` : `${m < 0 ? "-" : ""}£${Math.abs(m).toFixed(1)}m`);
+	// Money is kept in the game's own unit and shown at Premier League size: one unit is £20m on screen,
+	// so a club's budget, fees, wages and income keep their balance and older saves read the same.
+	const MONEY_SCALE = 20;
+	const money = m => {
+		const v = Math.abs(m) * MONEY_SCALE, sign = m < 0 ? "-" : "";
+		if (v === 0) { return "£0"; }
+		if (v < 1) { return `${sign}£${Math.round(v * 1000)}k`; }
+		return `${sign}£${v >= 100 ? Math.round(v) : v.toFixed(1)}m`;
+	};
 	const round1 = v => Math.round(v * 10) / 10;
 
 	// A stable id for each player, so edits can follow him (see 18g). Not from the seeded rnd: that would shift the computer's squads.

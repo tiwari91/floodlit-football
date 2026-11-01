@@ -228,9 +228,10 @@
 		// Auto-rotate: rest tired starters straight away, ready for the next match.
 		league.rotated = league.club.autoRotate ? rotateTired(true) : null;
 		if (seasonDone() && !league.paid) {
-			// Prize money by final position and points, and a fresh transfer list.
+			// The merit payment by final position and points (the flat part comes as TV money each matchday: 16), and a fresh transfer list.
 			const rows = standings(), pos = rows.findIndex(r => r.id === 0) + 1;
-			league.prize = round1(1 + (DIVISION - pos) * 0.2 + rows[pos - 1].pts * 0.02);
+			league.prize = round1((DIVISION - pos) * 0.2 + rows[pos - 1].pts * 0.02);
+			league.club.tvSeason = 0;
 			league.club.budget = round1(league.club.budget + league.prize);
 			league.club.market = genMarket();
 			league.club.scoutLeft = 2 + staffLvl(league.club, "scout");

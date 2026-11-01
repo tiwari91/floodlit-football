@@ -24,9 +24,9 @@ const club = await page.evaluate(() => { const o = [ ...document.querySelectorAl
 await page.selectOption("#mkqClub", club.v); await page.click("#mkqGo");
 const cl = await rows();
 check("the club filter shows only that club's players", cl.length > 5 && cl.slice(0, -1).every(t => t.includes(club.t)), club.t);
-await page.selectOption("#mkqClub", ""); await page.fill("#mkqMax", "0.5"); await page.click("#mkqGo");
+await page.selectOption("#mkqClub", ""); await page.fill("#mkqMax", "10"); await page.click("#mkqGo");
 const cheap = await page.evaluate(() => [ ...document.querySelectorAll("#winMarket .bids button:first-child") ].map(b => Number(b.textContent.replace(/[^0-9.]/g, "")) || 0));
-check("the maximum price hides dearer players", cheap.every(p => p <= 0.5), JSON.stringify(cheap.slice(0, 5)));
+check("the maximum price (in £m as shown) hides dearer players", cheap.every(p => p <= 10), JSON.stringify(cheap.slice(0, 5)));
 await page.fill("#mkqMax", ""); await page.fill("#mkqName", "zzzzqq"); await page.click("#mkqGo");
 check("a name that matches nobody says so", /Nobody matches/.test((await rows()).join("")));
 await page.fill("#mkqName", "");

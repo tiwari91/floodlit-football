@@ -326,7 +326,7 @@
 			cpuSquad(id, getStr(id)).forEach((pl, slot) => {
 				if (!pl || (name && !pl.name.toLowerCase().includes(name)) || (q.pos && pl.pos !== q.pos) || ovrOf(pl) < (q.min || 0)) { return; }
 				const held = league.club.market.find(m => m.name === pl.name && m.cpuClub === id), ask = held ? askOf(held) : round1(priceOf(pl) * 1.2);
-				if (q.max > 0 && ask > q.max + 1e-9) { return; }
+				if (q.max > 0 && ask * MONEY_SCALE > q.max + 1e-9) { return; }   // the box is in £m as shown (04)
 				out.push({ id, slot, pl, ask, held });
 			});
 		}
@@ -506,7 +506,7 @@
 			const jan = whole && start < JANUARY ? (assistMode === "off" ? " The January window went by without business: switch the Assistant on to have it handled next time." : " The Assistant handled the January window.") : "";
 			// The summer's international finals come before the next season (18j): say so, on the same button the bar shows.
 			const finals = typeof intlSummerBlocked === "function" && intlSummerBlocked();
-			showOverlay(`Season ${league.season} simulated`, `${line} ${champ}${scorers}${disc} Prize money: ${money(league.prize || 0)}.${jan} The transfer window is open below the pitch.${typeof intlSummerNote === "function" ? intlSummerNote() : ""}${finals ? " First, the international finals: play them before the new season." : ""}`, finals ? "Next international" : `Start season ${league.season + 1}`);
+			showOverlay(`Season ${league.season} simulated`, `${line} ${champ}${scorers}${disc} Merit payment (TV money by final position): ${money(league.prize || 0)}.${jan} The transfer window is open below the pitch.${typeof intlSummerNote === "function" ? intlSummerNote() : ""}${finals ? " First, the international finals: play them before the new season." : ""}`, finals ? "Next international" : `Start season ${league.season + 1}`);
 			if (rows[0].id === 0) { celebrateTrophy("league trophy"); }
 		} else {
 			showOverlay(stoppedJan ? "January window" : "Simulated", `${line} You're ${ordinal(pos)} on ${pts} points.${scorers}${disc}${stoppedJan ? " The January transfer window is open: sign players below the pitch, then carry on." : ""}`, "Kick off");
@@ -680,6 +680,7 @@
 				leagueMatch.cont && typeof ccStandLine === "function" ? ccStandLine() : "",   // where the night stands in the cup (18f)
 				o.manager ? `Their manager: ${o.manager}${NATIONS[o.managerNat] ? ` (${NATIONS[o.managerNat][0]})` : ""}.` : "",   // from an option file (18g, 18h)
 				derby ? "Derby day: the local rivals, and the loudest crowd of the season." : "",
+				!leagueMatch.cont && !leagueMatch.intl && !leagueMatch.cup && typeof tvPick === "function" && tvPick(leagueMatch.round, leagueMatch.opp) ? `Live on TV: the facility fee is ${money(TV_FACILITY)} on top of the matchday's TV share.` : "",
 				k.watch ? `Watch: ${k.watch}.` : "",
 				k.how ? `They play: ${k.how}.` : "",
 				b.coach ? `Coach: ${b.coach[0].toUpperCase()}${b.coach.slice(1)}.` : "",

@@ -2683,7 +2683,15 @@ td, th { font-variant-numeric: tabular-nums; }
 		{ key: "coaching", name: "Finishing school", effect: "+3 shooting and passing", costs: [ 1, 2, 3.5 ] },
 		{ key: "defence", name: "Defensive drills pitch", effect: "+3 defending and goalkeeping", costs: [ 1, 2, 3.5 ] }
 	];
-	const money = m => (Math.abs(m) < 0.095 && m !== 0 ? `${m < 0 ? "-" : ""}£${Math.round(Math.abs(m) * 1000)}k` : `${m < 0 ? "-" : ""}£${Math.abs(m).toFixed(1)}m`);
+	// Money is kept in the game's own unit and shown at Premier League size: one unit is £20m on screen,
+	// so a club's budget, fees, wages and income keep their balance and older saves read the same.
+	const MONEY_SCALE = 20;
+	const money = m => {
+		const v = Math.abs(m) * MONEY_SCALE, sign = m < 0 ? "-" : "";
+		if (v === 0) { return "£0"; }
+		if (v < 1) { return `${sign}£${Math.round(v * 1000)}k`; }
+		return `${sign}£${v >= 100 ? Math.round(v) : v.toFixed(1)}m`;
+	};
 	const round1 = v => Math.round(v * 10) / 10;
 
 	// A stable id for each player, so edits can follow him (see 18g). Not from the seeded rnd: that would shift the computer's squads.
@@ -2913,7 +2921,7 @@ td, th { font-variant-numeric: tabular-nums; }
 	const valueOf = p => Math.max(0.1, round1(Math.pow(Math.max(0, ovrOf(p) - 50), 2) * 0.004 * ageFactor(p.age) * (1 + Math.max(0, (p.pot || 0) - ovrOf(p)) * 0.02) * (p.contract === 1 ? 0.8 : 1)));
 	// Wages per season (£m), paid a matchday at a time; shown as £k a week.
 	const wageOf = p => (Number.isFinite(p.wage) ? p.wage : Math.round((0.02 + valueOf(p) * 0.05) * 1000) / 1000);
-	const wageWeek = w => `£${(w * 1000 / 52).toFixed(1)}k/wk`;
+	const wageWeek = w => `£${Math.round(w * MONEY_SCALE * 1000 / 52)}k/wk`;   // MONEY_SCALE: 04
 	const squadWages = c => [ ...c.squad, ...c.bench ].reduce((t, p) => t + wageOf(p), 0) + Object.values(c.staff || {}).reduce((t, st) => t + (st ? st.wage : 0), 0);
 
 	function ovrOf (p) {
@@ -3644,9 +3652,10 @@ td, th { font-variant-numeric: tabular-nums; }
 		// Auto-rotate: rest tired starters straight away, ready for the next match.
 		league.rotated = league.club.autoRotate ? rotateTired(true) : null;
 		if (seasonDone() && !league.paid) {
-			// Prize money by final position and points, and a fresh transfer list.
+			// The merit payment by final position and points (the flat part comes as TV money each matchday: 16), and a fresh transfer list.
 			const rows = standings(), pos = rows.findIndex(r => r.id === 0) + 1;
-			league.prize = round1(1 + (DIVISION - pos) * 0.2 + rows[pos - 1].pts * 0.02);
+			league.prize = round1((DIVISION - pos) * 0.2 + rows[pos - 1].pts * 0.02);
+			league.club.tvSeason = 0;
 			league.club.budget = round1(league.club.budget + league.prize);
 			league.club.market = genMarket();
 			league.club.scoutLeft = 2 + staffLvl(league.club, "scout");
@@ -3923,13 +3932,13 @@ td, th { font-variant-numeric: tabular-nums; }
 		const pos = el("select"); pos.id = "mkqPos"; for (const [ v, t ] of [ [ "", "Any" ], ...Object.entries(POS_LABEL) ]) { const o = el("option", "", t); o.value = v; pos.append(o); } pos.value = mkQ.pos;
 		const min = el("input"); min.type = "number"; min.min = "0"; min.max = "99"; min.value = mkQ.min || ""; min.placeholder = "0"; min.id = "mkqMin";
 		const club = el("select"); club.id = "mkqClub"; { const o = el("option", "", "Any club"); o.value = ""; club.append(o); for (const id of league.members) { if (id !== 0 && TEAMS[id]) { const x = el("option", "", TEAMS[id].name); x.value = String(id); club.append(x); } } } club.value = String(mkQ.club);
-		const max = el("input"); max.type = "number"; max.min = "0"; max.step = "0.1"; max.value = mkQ.max || ""; max.placeholder = "No limit"; max.id = "mkqMax";
+		const max = el("input"); max.type = "number"; max.min = "0"; max.step = "1"; max.value = mkQ.max || ""; max.placeholder = "No limit"; max.id = "mkqMax";
 		const go = el("button", "", "Search"); go.type = "button"; go.id = "mkqGo";
 		const apply = () => { mkQ.name = name.value; mkQ.pos = pos.value; mkQ.min = Number(min.value) || 0; mkQ.club = club.value; mkQ.max = Number(max.value) || 0; renderClub(); };
 		go.addEventListener("click", apply);
 		for (const x of [ name, min, max ]) { x.addEventListener("keydown", e => { if (e.key === "Enter") { apply(); } }); }
 		for (const x of [ pos, club ]) { x.addEventListener("change", apply); }
-		return [ mk("Name", name), mk("Position", pos), mk("Min rating", min), mk("Club", club), mk("Max price (M)", max), go ];
+		return [ mk("Name", name), mk("Position", pos), mk("Min rating", min), mk("Club", club), mk("Max price (£m)", max), go ];
 	}
 	function renderClub () {
 		const c = league.club;
@@ -4017,7 +4026,7 @@ td, th { font-variant-numeric: tabular-nums; }
 		$("sqMeta").textContent = picked ? "Now tap who to swap with" : `Match strength ${Math.round(sum / Math.max(1, n))}${tiredN ? ` · ⚠ ${tiredN} starter${tiredN === 1 ? "" : "s"} tired` : ""}`;
 
 		$("winBudget").textContent = money(c.budget);
-		$("winBudget").title = `Wage bill ${money(squadWages(c))} a season${c.week ? `; last matchday wages ${money(c.week.wages)}, gate ${money(c.week.gate)}` : ""}`;
+		$("winBudget").title = `Wage bill ${money(squadWages(c))} a season${c.week ? `; last matchday wages ${money(c.week.wages)}, TV ${money(c.week.tv || 0)}, gate ${money(c.week.gate)}` : ""}${c.tvSeason ? `; TV money this season ${money(c.tvSeason)}` : ""}`;
 		$("winTitle").textContent = open ? "Transfer window: open" : "Transfer window: closed";
 		if (typeof renderAssistNote === "function") { renderAssistNote(); }
 		const notes = [];
@@ -4027,9 +4036,9 @@ td, th { font-variant-numeric: tabular-nums; }
 				: league.round === JANUARY ? "January window: open until matchday 20 kicks off." : "Open until your first match of the season.");
 			if (league.news && league.round === 0) { notes.push(league.news); }
 		} else {
-			notes.push(league.round < JANUARY ? "It opens again in January, before matchday 20." : "It opens again when the season ends. Prize money depends on where you finish.");
+			notes.push(league.round < JANUARY ? "It opens again in January, before matchday 20." : "It opens again when the season ends. TV money comes in every matchday, more when you are on TV, and a merit payment at the end depends on where you finish.");
 		}
-		notes.push(`Wage bill ${money(squadWages(c))} a season; home gates bring in about ${money(0.05 + 0.015 * yourStr())} each.`);
+		notes.push(`Wage bill ${money(squadWages(c))} a season. TV money ${money(TV_EQUAL / SEASON_ROUNDS)} a matchday (${money(TV_FACILITY)} more when you are on TV); home gates about ${money((0.05 + 0.015 * yourStr()) * GATE_SHARE)} each.`);
 		if (c.budget < 0) { notes.push("You're in the red: the board has frozen signings until the budget is back above zero."); }
 		$("winNote").textContent = notes.join(" ");
 
@@ -4120,8 +4129,14 @@ td, th { font-variant-numeric: tabular-nums; }
 		}
 	}
 
+	// TV money, as in the Premier League the biggest income: an equal share paid every matchday and a
+	// facility fee when your match is picked for TV (a derby, two strong sides, or every fourth round),
+	// with a merit payment by final position at the end of the season (14-league). Gates are 60% of what
+	// they were, and the rest of that money is in the equal share, so a season earns what it did before.
+	const TV_EQUAL = 1.0, TV_FACILITY = 0.05, GATE_SHARE = 0.6;   // with ~15 TV picks a season: the same season income as before (2.8 units)
+	const tvPick = (round, opp) => derbyOf(0, opp) || (getStr(opp) >= 4 && yourStr() >= 3) || round % 4 === 3;
 	// The week after a league match: morale follows results and minutes, new signings settle in,
-	// wages go out and, after a home game, the gate money comes in.
+	// wages go out, the TV money comes in and, after a home game, the gate money.
 	function weeklyClub (lm, gf, ga) {
 		const c = league.club, played = new Set([ ...team(0).map(p => p.name), ...wentOff ]);
 		const res = gf > ga ? 3 : gf < ga ? -3 : 0;
@@ -4135,9 +4150,12 @@ td, th { font-variant-numeric: tabular-nums; }
 			if (Number.isFinite(lastRatings[pl.name])) { pl.form = [ ...(Array.isArray(pl.form) ? pl.form : []), lastRatings[pl.name] ].slice(-5); pl.rsum = (pl.rsum || 0) + lastRatings[pl.name]; pl.rn = (pl.rn || 0) + 1; }   // the season's ratings, for the armband
 			if (pl.adapt > 0) { pl.adapt = Math.max(0, pl.adapt - (on ? 1 : 0.5)); }
 		}
-		const wages = squadWages(c) / SEASON_ROUNDS, gate = lm.home ? 0.05 + 0.015 * yourStr() : 0;
-		c.budget = Math.round((c.budget - wages + gate) * 1000) / 1000;
-		c.week = { wages: Math.round(wages * 1000) / 1000, gate: Math.round(gate * 1000) / 1000 };
+		const wages = squadWages(c) / SEASON_ROUNDS, gate = lm.home ? (0.05 + 0.015 * yourStr()) * GATE_SHARE : 0;
+		const tv = TV_EQUAL / SEASON_ROUNDS + (tvPick(lm.round, lm.opp) ? TV_FACILITY : 0);
+		c.budget = Math.round((c.budget - wages + gate + tv) * 1000) / 1000;
+		const r3 = v => Math.round(v * 1000) / 1000;
+		c.week = { wages: r3(wages), gate: r3(gate), tv: r3(tv) };
+		c.tvSeason = r3((c.tvSeason || 0) + tv);
 		if (typeof weeklyCoaching === "function") { weeklyCoaching(lm, played); }
 		if (typeof dramaAfterMatch === "function") { dramaAfterMatch(played, gf, ga); }
 	}
@@ -4564,7 +4582,7 @@ td, th { font-variant-numeric: tabular-nums; }
 			cpuSquad(id, getStr(id)).forEach((pl, slot) => {
 				if (!pl || (name && !pl.name.toLowerCase().includes(name)) || (q.pos && pl.pos !== q.pos) || ovrOf(pl) < (q.min || 0)) { return; }
 				const held = league.club.market.find(m => m.name === pl.name && m.cpuClub === id), ask = held ? askOf(held) : round1(priceOf(pl) * 1.2);
-				if (q.max > 0 && ask > q.max + 1e-9) { return; }
+				if (q.max > 0 && ask * MONEY_SCALE > q.max + 1e-9) { return; }   // the box is in £m as shown (04)
 				out.push({ id, slot, pl, ask, held });
 			});
 		}
@@ -4744,7 +4762,7 @@ td, th { font-variant-numeric: tabular-nums; }
 			const jan = whole && start < JANUARY ? (assistMode === "off" ? " The January window went by without business: switch the Assistant on to have it handled next time." : " The Assistant handled the January window.") : "";
 			// The summer's international finals come before the next season (18j): say so, on the same button the bar shows.
 			const finals = typeof intlSummerBlocked === "function" && intlSummerBlocked();
-			showOverlay(`Season ${league.season} simulated`, `${line} ${champ}${scorers}${disc} Prize money: ${money(league.prize || 0)}.${jan} The transfer window is open below the pitch.${typeof intlSummerNote === "function" ? intlSummerNote() : ""}${finals ? " First, the international finals: play them before the new season." : ""}`, finals ? "Next international" : `Start season ${league.season + 1}`);
+			showOverlay(`Season ${league.season} simulated`, `${line} ${champ}${scorers}${disc} Merit payment (TV money by final position): ${money(league.prize || 0)}.${jan} The transfer window is open below the pitch.${typeof intlSummerNote === "function" ? intlSummerNote() : ""}${finals ? " First, the international finals: play them before the new season." : ""}`, finals ? "Next international" : `Start season ${league.season + 1}`);
 			if (rows[0].id === 0) { celebrateTrophy("league trophy"); }
 		} else {
 			showOverlay(stoppedJan ? "January window" : "Simulated", `${line} You're ${ordinal(pos)} on ${pts} points.${scorers}${disc}${stoppedJan ? " The January transfer window is open: sign players below the pitch, then carry on." : ""}`, "Kick off");
@@ -4918,6 +4936,7 @@ td, th { font-variant-numeric: tabular-nums; }
 				leagueMatch.cont && typeof ccStandLine === "function" ? ccStandLine() : "",   // where the night stands in the cup (18f)
 				o.manager ? `Their manager: ${o.manager}${NATIONS[o.managerNat] ? ` (${NATIONS[o.managerNat][0]})` : ""}.` : "",   // from an option file (18g, 18h)
 				derby ? "Derby day: the local rivals, and the loudest crowd of the season." : "",
+				!leagueMatch.cont && !leagueMatch.intl && !leagueMatch.cup && typeof tvPick === "function" && tvPick(leagueMatch.round, leagueMatch.opp) ? `Live on TV: the facility fee is ${money(TV_FACILITY)} on top of the matchday's TV share.` : "",
 				k.watch ? `Watch: ${k.watch}.` : "",
 				k.how ? `They play: ${k.how}.` : "",
 				b.coach ? `Coach: ${b.coach[0].toUpperCase()}${b.coach.slice(1)}.` : "",
@@ -13684,7 +13703,7 @@ td, th { font-variant-numeric: tabular-nums; }
 			const rows = standings(), pos = rows.findIndex(r => r.id === 0) + 1, pts = rows[pos - 1].pts;
 			if (seasonDone() && !leagueMatch.intl) {
 				nudge = (rows[0].id === 0 ? `You are champions with ${pts} points!` : `Season over: ${TEAMS[rows[0].id].name} are champions. You finished ${ordinal(pos)}.`) +
-					`${league.sacked === league.season ? " The board have sacked you: pick one of the clubs who will have you, below the pitch." : ""} Prize money: ${money(league.prize || 0)}. The transfer window is open below the pitch.${typeof intlSummerNote === "function" ? intlSummerNote() : ""}`;
+					`${league.sacked === league.season ? " The board have sacked you: pick one of the clubs who will have you, below the pitch." : ""} Merit payment (TV money by final position): ${money(league.prize || 0)}. The transfer window is open below the pitch.${typeof intlSummerNote === "function" ? intlSummerNote() : ""}`;
 				btn = `Start season ${league.season + 1}`;
 			} else {
 				nudge = `You are ${ordinal(pos)} on ${pts} point${pts === 1 ? "" : "s"}.`;

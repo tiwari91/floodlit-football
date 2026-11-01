@@ -216,13 +216,13 @@
 		const pos = el("select"); pos.id = "mkqPos"; for (const [ v, t ] of [ [ "", "Any" ], ...Object.entries(POS_LABEL) ]) { const o = el("option", "", t); o.value = v; pos.append(o); } pos.value = mkQ.pos;
 		const min = el("input"); min.type = "number"; min.min = "0"; min.max = "99"; min.value = mkQ.min || ""; min.placeholder = "0"; min.id = "mkqMin";
 		const club = el("select"); club.id = "mkqClub"; { const o = el("option", "", "Any club"); o.value = ""; club.append(o); for (const id of league.members) { if (id !== 0 && TEAMS[id]) { const x = el("option", "", TEAMS[id].name); x.value = String(id); club.append(x); } } } club.value = String(mkQ.club);
-		const max = el("input"); max.type = "number"; max.min = "0"; max.step = "0.1"; max.value = mkQ.max || ""; max.placeholder = "No limit"; max.id = "mkqMax";
+		const max = el("input"); max.type = "number"; max.min = "0"; max.step = "1"; max.value = mkQ.max || ""; max.placeholder = "No limit"; max.id = "mkqMax";
 		const go = el("button", "", "Search"); go.type = "button"; go.id = "mkqGo";
 		const apply = () => { mkQ.name = name.value; mkQ.pos = pos.value; mkQ.min = Number(min.value) || 0; mkQ.club = club.value; mkQ.max = Number(max.value) || 0; renderClub(); };
 		go.addEventListener("click", apply);
 		for (const x of [ name, min, max ]) { x.addEventListener("keydown", e => { if (e.key === "Enter") { apply(); } }); }
 		for (const x of [ pos, club ]) { x.addEventListener("change", apply); }
-		return [ mk("Name", name), mk("Position", pos), mk("Min rating", min), mk("Club", club), mk("Max price (M)", max), go ];
+		return [ mk("Name", name), mk("Position", pos), mk("Min rating", min), mk("Club", club), mk("Max price (£m)", max), go ];
 	}
 	function renderClub () {
 		const c = league.club;
@@ -310,7 +310,7 @@
 		$("sqMeta").textContent = picked ? "Now tap who to swap with" : `Match strength ${Math.round(sum / Math.max(1, n))}${tiredN ? ` · ⚠ ${tiredN} starter${tiredN === 1 ? "" : "s"} tired` : ""}`;
 
 		$("winBudget").textContent = money(c.budget);
-		$("winBudget").title = `Wage bill ${money(squadWages(c))} a season${c.week ? `; last matchday wages ${money(c.week.wages)}, gate ${money(c.week.gate)}` : ""}`;
+		$("winBudget").title = `Wage bill ${money(squadWages(c))} a season${c.week ? `; last matchday wages ${money(c.week.wages)}, TV ${money(c.week.tv || 0)}, gate ${money(c.week.gate)}` : ""}${c.tvSeason ? `; TV money this season ${money(c.tvSeason)}` : ""}`;
 		$("winTitle").textContent = open ? "Transfer window: open" : "Transfer window: closed";
 		if (typeof renderAssistNote === "function") { renderAssistNote(); }
 		const notes = [];
@@ -320,9 +320,9 @@
 				: league.round === JANUARY ? "January window: open until matchday 20 kicks off." : "Open until your first match of the season.");
 			if (league.news && league.round === 0) { notes.push(league.news); }
 		} else {
-			notes.push(league.round < JANUARY ? "It opens again in January, before matchday 20." : "It opens again when the season ends. Prize money depends on where you finish.");
+			notes.push(league.round < JANUARY ? "It opens again in January, before matchday 20." : "It opens again when the season ends. TV money comes in every matchday, more when you are on TV, and a merit payment at the end depends on where you finish.");
 		}
-		notes.push(`Wage bill ${money(squadWages(c))} a season; home gates bring in about ${money(0.05 + 0.015 * yourStr())} each.`);
+		notes.push(`Wage bill ${money(squadWages(c))} a season. TV money ${money(TV_EQUAL / SEASON_ROUNDS)} a matchday (${money(TV_FACILITY)} more when you are on TV); home gates about ${money((0.05 + 0.015 * yourStr()) * GATE_SHARE)} each.`);
 		if (c.budget < 0) { notes.push("You're in the red: the board has frozen signings until the budget is back above zero."); }
 		$("winNote").textContent = notes.join(" ");
 
@@ -413,8 +413,14 @@
 		}
 	}
 
+	// TV money, as in the Premier League the biggest income: an equal share paid every matchday and a
+	// facility fee when your match is picked for TV (a derby, two strong sides, or every fourth round),
+	// with a merit payment by final position at the end of the season (14-league). Gates are 60% of what
+	// they were, and the rest of that money is in the equal share, so a season earns what it did before.
+	const TV_EQUAL = 1.0, TV_FACILITY = 0.05, GATE_SHARE = 0.6;   // with ~15 TV picks a season: the same season income as before (2.8 units)
+	const tvPick = (round, opp) => derbyOf(0, opp) || (getStr(opp) >= 4 && yourStr() >= 3) || round % 4 === 3;
 	// The week after a league match: morale follows results and minutes, new signings settle in,
-	// wages go out and, after a home game, the gate money comes in.
+	// wages go out, the TV money comes in and, after a home game, the gate money.
 	function weeklyClub (lm, gf, ga) {
 		const c = league.club, played = new Set([ ...team(0).map(p => p.name), ...wentOff ]);
 		const res = gf > ga ? 3 : gf < ga ? -3 : 0;
@@ -428,9 +434,12 @@
 			if (Number.isFinite(lastRatings[pl.name])) { pl.form = [ ...(Array.isArray(pl.form) ? pl.form : []), lastRatings[pl.name] ].slice(-5); pl.rsum = (pl.rsum || 0) + lastRatings[pl.name]; pl.rn = (pl.rn || 0) + 1; }   // the season's ratings, for the armband
 			if (pl.adapt > 0) { pl.adapt = Math.max(0, pl.adapt - (on ? 1 : 0.5)); }
 		}
-		const wages = squadWages(c) / SEASON_ROUNDS, gate = lm.home ? 0.05 + 0.015 * yourStr() : 0;
-		c.budget = Math.round((c.budget - wages + gate) * 1000) / 1000;
-		c.week = { wages: Math.round(wages * 1000) / 1000, gate: Math.round(gate * 1000) / 1000 };
+		const wages = squadWages(c) / SEASON_ROUNDS, gate = lm.home ? (0.05 + 0.015 * yourStr()) * GATE_SHARE : 0;
+		const tv = TV_EQUAL / SEASON_ROUNDS + (tvPick(lm.round, lm.opp) ? TV_FACILITY : 0);
+		c.budget = Math.round((c.budget - wages + gate + tv) * 1000) / 1000;
+		const r3 = v => Math.round(v * 1000) / 1000;
+		c.week = { wages: r3(wages), gate: r3(gate), tv: r3(tv) };
+		c.tvSeason = r3((c.tvSeason || 0) + tv);
 		if (typeof weeklyCoaching === "function") { weeklyCoaching(lm, played); }
 		if (typeof dramaAfterMatch === "function") { dramaAfterMatch(played, gf, ga); }
 	}
