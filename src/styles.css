@@ -857,6 +857,10 @@
 	.staff .who small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; }
 	.staff .cands { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; }
 	.staff .cands button { grid-row: auto; font-size: 12px; padding: 3px 8px; }
+	.staff .who .hired, .staff .who .vacant { display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: 3px; font-size: 10px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; vertical-align: 1px; }
+	.staff .who .hired { background: #3fae5a; color: #0d1a10; }
+	.staff .who .vacant { border: 1px solid var(--rule); color: var(--muted); }
+	.staff .cands .lbl { align-self: center; color: var(--muted); font-size: 12px; }
 	.win {
 		padding: 14px 16px;
 		background: var(--panel);

@@ -109,12 +109,15 @@
 		for (const [ job, [ title, what ] ] of Object.entries(STAFF)) {
 			const st = c.staff[job], li = el("li");
 			li.append(el("span", "pos", st ? "★".repeat(st.lvl) : "–"));
-			const who = el("span", "who", st ? `${st.name} (${st.nat})` : "Vacant");
+			const who = el("span", "who", st ? `${st.name} (${st.nat}) ` : "");
+			who.prepend(el("b", st ? "hired" : "vacant", st ? "Hired" : "Vacant"));
+			if (!st) { who.append(" no one in this job"); }
 			who.append(el("small", "", `${title}: ${what}${st ? ` · ${wageWeek(st.wage)}` : ""}`));
 			li.append(who);
 			if (st) { const b = el("button", "", "Let go"); b.type = "button"; b.addEventListener("click", () => fireStaff(job)); li.append(b); }
 			else { li.append(el("span", "")); }
 			const cands = el("div", "cands");
+			cands.append(el("span", "lbl", st ? "Better candidates:" : "Candidates:"));
 			league.staffPool.forEach((cd, i) => {
 				if (cd.job !== job || (st && cd.lvl <= st.lvl)) { return; }
 				const b = el("button", "", `Hire ${cd.name} ${"★".repeat(cd.lvl)} · ${money(staffFee(cd.lvl))}`);
@@ -122,7 +125,7 @@
 				b.addEventListener("click", () => hireStaff(i));
 				cands.append(b);
 			});
-			if (cands.children.length) { li.append(cands); }
+			if (cands.children.length > 1) { li.append(cands); }
 			ul.append(li);
 		}
 	}
