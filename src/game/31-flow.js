@@ -31,7 +31,7 @@
 		matchInjuries = []; matchInjInfo = {};
 		matchCards = []; dismissed = [];
 		matchLog = []; matchGoals = []; matchGoalsOpp = [];
-		subsLeft = SUBS_MAX; cpuSubs = SUBS_MAX; subLog = []; cameOn = []; wentOff = []; subPick = {}; genericBench = null; subWin = [ 0, 0 ]; matchSta = {};
+		liftAt = -99999; subsLeft = SUBS_MAX; cpuSubs = SUBS_MAX; subLog = []; cameOn = []; wentOff = []; subPick = {}; genericBench = null; subWin = [ 0, 0 ]; matchSta = {};
 		updateSubsBtn();
 		possFrames = [ 0, 0 ];
 		tally = newTally(); cornerAt = [ -9999, -9999 ];

@@ -6,9 +6,11 @@
 	   - press: the press conference after a bad result asks the awkward question;
 	   - confront: a star you keep leaving out storms into your office and refuses to warm up;
 	   - training: two hot-heads come to blows on the training ground;
-	   - faith: the dressing room has been lost for weeks and the senior players go to the board.
+	   - faith: the dressing room has been lost for weeks and the senior players go to the board;
+	   - life: something away from football (a night out in the papers, an ill relative, a new baby, a rant
+	     on social media) that puts him off his game unless you handle it.
 	   In matches, a hostile crowd boos at full time and when a favourite is taken off. */
-	const PRESSURE_KINDS = { fans: 1, press: 1, confront: 1, training: 1, faith: 1 };
+	const PRESSURE_KINDS = { fans: 1, press: 1, confront: 1, training: 1, faith: 1, life: 1 };
 	const PRESSURE_NOBODY = { fans: 1, press: 1, faith: 1 };   // not about one player: they stay when anyone leaves
 	Object.assign(DRAMA_KINDS, PRESSURE_KINDS);
 	const fansWord = f => (f >= 75 ? "Adoring" : f >= 55 ? "Behind you" : f >= 35 ? "Restless" : "Hostile");
@@ -74,6 +76,22 @@
 		if (d.lowRoom >= 2) {
 			if (add("faith", { name: "The squad" }, "The players have stopped listening to you. Senior players have been to see the board, and the board want to know what you'll do about it.")) { d.board = clamp(d.board - 6, 0, 100); d.lowRoom = 0; }
 		}
+		// Life away from football: now and then one of the squad has something going on.
+		const squad = [ ...c.squad, ...c.bench ].filter(p => p && !p.injured);
+		if (squad.length && rnd() < 0.14) {
+			const r = rnd(), pl = squad[Math.floor(rnd() * squad.length) % squad.length], hot = temperOf(pl) >= 60;
+			const ev = r < 0.3 ? "night" : r < 0.55 ? "family" : r < 0.75 ? "baby" : "social";
+			if (ev === "social" && !hot && rnd() < 0.5) { /* the calm ones rarely post */ }
+			else {
+				const text = {
+					night: `${pl.name} was photographed leaving a nightclub at 3am, two days before the match. The papers have the pictures.`,
+					family: `${pl.name}'s mother has been taken into hospital. He's struggling to concentrate in training.`,
+					baby: `${pl.name} has become a father. He's over the moon, but hasn't slept in days.`,
+					social: `${pl.name} posted a long rant on social media about his playing time and the club. The fans are taking sides.`
+				}[ev];
+				if (add("life", pl, text, { ev })) { pl.morale = clamp(pl.morale + (ev === "baby" ? 4 : -4), 5, 100); nudgeForm(pl, ev === "baby" ? -0.1 : -0.2); }
+			}
+		}
 		if (d.board < 25 && !d.warned) { d.warned = true; dramaLog("The board have warned you: results must improve, and soon."); }
 		if (d.board >= 40) { d.warned = false; }
 		return made;
@@ -84,6 +102,12 @@
 		press: () => [ [ "defend", "Defend the players" ], [ "blame", "Blame the players" ], [ "self", "Take the blame" ], [ "deflect", "Say nothing new" ] ],
 		confront: () => [ [ "peace", "Make peace" ], [ "fine", "Fine him" ], [ "drop", "Drop him" ], [ "sell", "Put him up for sale" ] ],
 		training: i => [ [ "a", `Punish ${i.name}` ], [ "b", `Punish ${i.other}` ], [ "both", "Punish both" ], [ "talk", "Talk to both" ] ],
+		life: i => ({
+			night: [ [ "fine", "Fine him" ], [ "talk", "Have a word" ], [ "ignore", "Let it go" ] ],
+			family: [ [ "leave", "Give him time off" ], [ "play", "Ask him to keep playing" ] ],
+			baby: [ [ "leave", "Give him a few days off" ], [ "congrats", "Congratulate him" ] ],
+			social: [ [ "fine", "Fine him" ], [ "talk", "Talk to him" ], [ "backhim", "Say he has a point" ] ]
+		}[i.ev] || [ [ "talk", "Talk to him" ] ]),
 		faith: () => [ [ "meeting", "Clear-the-air meeting" ], [ "leaders", "Come down on the ringleaders" ], [ "board", "Ask the board for time" ] ]
 	};
 	// What each choice does (from 18e's resolveIssue). Returns the line for the log.
@@ -112,6 +136,19 @@
 			mood("board", -8); mood("room", 5); return "The board have given you time, but their patience is running out.";
 		}
 		if (!pl) { return `${issue.name} has gone, so that's the end of it.`; }
+		if (issue.kind === "life") {
+			const m = v => { pl.morale = clamp(pl.morale + v, 5, 100); };
+			const k = `${issue.ev}:${choice}`;
+			if (k === "night:fine") { m(-6); mood("room", 2); mood("fans", 1); const f = Math.max(0.001, wageOf(pl) / 52); c.budget = Math.round((c.budget + f) * 1000) / 1000; return `${pl.name} has been fined for the night out. He's sulking (morale ${pl.morale}), but he'll be in bed early this week.`; }
+			if (k === "night:talk") { m(1); nudgeForm(pl, -0.1); return `You had a word with ${pl.name} about the night out. He says it won't happen again.`; }
+			if (k === "night:ignore") { mood("room", -2); mood("fans", -2); nudgeForm(pl, -0.3); return `You let ${pl.name}'s night out go. Some of the squad wonder why the rules don't apply to him, and his form is slipping.`; }
+			if (k === "family:leave" || k === "baby:leave") { m(10); mood("room", 2); dropToBench(pl); nudgeForm(pl, 0.2); return `${pl.name} has a few days at home and is grateful (morale ${pl.morale}). He'll miss the next game, but come back with a clear head.`; }
+			if (k === "family:play") { m(-10); nudgeForm(pl, -0.5); mood("room", -2); return `${pl.name} keeps playing, but his mind is elsewhere (morale ${pl.morale}). The squad think you were hard on him.`; }
+			if (k === "baby:congrats") { m(4); nudgeForm(pl, -0.2); return `You congratulated ${pl.name}. He's happy, if a little tired for the next few games.`; }
+			if (k === "social:fine") { m(-8); mood("room", 2); mood("board", 1); return `${pl.name} has been fined and the post is deleted. He's not happy (morale ${pl.morale}).`; }
+			if (k === "social:backhim") { m(6); mood("board", -3); mood("room", -2); return `You said ${pl.name} has a point. He's happier (morale ${pl.morale}); the board are not.`; }
+			m(2); return `You talked to ${pl.name} and he took the post down.`;
+		}
 		if (issue.kind === "confront") {
 			if (choice === "peace") { pl.morale = clamp(pl.morale + 8, 5, 100); pl.promised = 2; mood("room", -2); return `You made peace with ${pl.name} and promised him games. Some of the squad think he got his way.`; }
 			if (choice === "fine") { pl.morale = clamp(pl.morale - 10, 5, 100); mood("room", 3); const f = Math.max(0.001, wageOf(pl) / 52); c.budget = Math.round((c.budget + f) * 1000) / 1000; nudgeForm(pl, -0.3); return `${pl.name} has been fined a week's wages for refusing to warm up. Morale ${pl.morale}.`; }

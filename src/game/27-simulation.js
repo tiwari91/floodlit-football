@@ -247,6 +247,7 @@
 			if (moodZone === -1) { toast("Nerves settling", "#7fd49b"); } else if (moodZone === 1) { toast(`${opp.short} settling`, "#f2b52e"); }
 			moodZone = 0;
 		}
+		crowdLift();
 		if (timeLeft <= 0 && !shoot) { if (!addedDone[1] && !tut) { startAdded(1); } else if (stall <= 0) { endMatch(); return; } }
 
 		if (frame % 120 === 0) { saveLive(); }

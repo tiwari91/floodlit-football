@@ -37,6 +37,23 @@
 			if (typeof chant === "function" && (homeSide === t || n >= 15)) { try { chant(0.9); } catch (e) { /* audio is optional */ } }
 		}
 	}
+	// The home crowd lifts its side: late in a game it isn't winning comfortably, a home attack into the final
+	// third brings a roar and a chant, and the players feed off it (momentum swings their way, so they play a
+	// little quicker and sharper, and the visitors a little more nervous). Your own fans give more when they
+	// love you and little when they have turned on you (league.drama.fans, 18k); never in the tutorial.
+	let liftAt = -99999;
+	function crowdLift () {
+		if (tut || shoot || state !== "play" || !ball.owner || ball.owner.team !== homeSide || frame - liftAt < 60 * 22) { return; }
+		const t = homeSide, lead = score[t] - score[1 - t], late = timeLeft < matchLen * 0.3;
+		const deep = Math.abs(ball.x - attackX(t)) < FW * 0.33;
+		if (!deep || lead >= 2 || (!late && lead >= 0)) { return; }
+		const fans = t === 0 && league && league.drama && Number.isFinite(league.drama.fans) ? league.drama.fans : 65;
+		const k = clamp(0.3 + (fans - 30) / 50, 0.3, 1.3);
+		liftAt = frame;
+		swing(t, 0.08 * k);
+		if (typeof chant === "function") { try { chant(0.7 + 0.3 * k); } catch (e) { /* audio is optional */ } }
+		toast(k < 0.5 ? "A nervous crowd, a few voices try to lift them" : t === 0 ? "The crowd roars you on" : `The home crowd roars ${opp.short} on`, t === 0 ? "#7fd49b" : "#f2b52e");
+	}
 	// Winning it back breaks the spell, and the more rattled you were the more it settles you.
 	function breakStreak (loser, winner) {
 		if (passStreak[loser] >= 5 || edge(loser) > 0.3) { swing(winner, 0.03 + 0.08 * edge(loser)); }

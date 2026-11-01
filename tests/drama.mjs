@@ -243,13 +243,15 @@ const pr = await page.evaluate(() => {
 	const fans0 = d.fans, board0 = d.board;
 	const out = { made, fansFell: fans0 < 38, boardFell: board0 < 60, panel: !!document.querySelector("#lgDrama") };
 	const pick = (kind, ch) => { const i = d.issues.find(x => x.kind === kind); if (!i) { return null; } const r0 = d.room, f0 = d.fans, b0 = d.board; const note = F.resolveIssue(i.id, ch); return { note: !!note, room: d.room - r0, fans: d.fans - f0, board: d.board - b0, gone: !d.issues.includes(i) }; };
+	const life = d.issues.find(x => x.kind === "life"), lp = life && F.league.club.squad.concat(F.league.club.bench).find(p => p.name === life.name), lm0 = lp && lp.morale;
+	out.life = life ? { ev: life.ev, fined: (F.resolveIssue(life.id, life.ev === "night" ? "fine" : life.ev === "family" || life.ev === "baby" ? "leave" : "talk"), lp.morale !== lm0), gone: !d.issues.includes(life) } : null;
 	out.press = pick("press", "blame"); out.fans = pick("fans", "apologise"); out.conf = pick("confront", "fine"); out.train = pick("training", "both"); out.faith = pick("faith", "meeting");
 	return out;
 });
-check("pressure: a hammering after a bad run brings the fans' boos, the press, a star's confrontation, a training fight and the squad going to the board",
-	[ "fans", "press", "confront", "training", "faith" ].every(k => pr.made.includes(k)) && pr.fansFell && pr.boardFell, JSON.stringify(pr.made));
+check("pressure: a hammering after a bad run brings the fans' boos, the press, a star's confrontation, a training fight, the squad going to the board and something off the pitch",
+	[ "fans", "press", "confront", "training", "faith", "life" ].every(k => pr.made.includes(k)) && pr.fansFell && pr.boardFell, JSON.stringify(pr.made));
 check("pressure: each choice settles the problem and moves the moods (blaming the players hurts the room, apologising wins the fans back)",
-	pr.press && pr.press.gone && pr.press.room < 0 && pr.fans && pr.fans.fans > 0 && pr.conf && pr.conf.gone && pr.train && pr.train.gone && pr.faith && pr.faith.room > 0, JSON.stringify(pr));
+	pr.press && pr.press.gone && pr.press.room < 0 && pr.fans && pr.fans.fans > 0 && pr.conf && pr.conf.gone && pr.train && pr.train.gone && pr.faith && pr.faith.room > 0 && pr.life && pr.life.fined && pr.life.gone, JSON.stringify(pr));
 
 check("no page errors", errs.length === 0, errs.slice(0, 3).join(" | "));
 await browser.close(); server.stop();
