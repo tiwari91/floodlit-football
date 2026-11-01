@@ -270,6 +270,22 @@ const sk = await page.evaluate(() => {
 check("sacked: a board out of patience at the season's end sacks you, only weaker clubs offer, no Decline, and the new job starts afresh",
 	sk.sacked && sk.n > 0 && /Sacked/.test(sk.title) && !sk.decline && sk.weaker && sk.took && sk.board === 65 && sk.fans === 65 && sk.cleared, JSON.stringify(sk));
 
+// Reputation (18b): a fresh manager is unproven and only smaller clubs talk to him; a run of titles with a weak
+// squad makes him elite, the biggest club calls at the season's end, and he can take over a big club himself.
+const rep = await page.evaluate(() => {
+	const F = window.__ff, lg = F.league, keep = JSON.stringify(lg.career || null);
+	lg.career = { clubs: [ F.YOU.name ], history: [] };
+	const fresh = { rep: F.managerRep(), str: F.repStr() };
+	const ids = F.TEAMS.map((t, i) => i).filter(i => i !== 0), big = ids.reduce((a, b) => (F.getStr(b) > F.getStr(a) ? b : a));
+	const refused = !F.applyFor(big);
+	lg.career.history = [ 1, 2, 3, 4 ].map(k => ({ season: k, club: F.YOU.name, pos: 1, n: 20, str: 2.5 }));
+	const elite = { rep: F.managerRep(), str: F.repStr() };
+	const offers = F.offerJobs(1).filter(o => !o.abroad).map(o => o.id), bigOffered = offers.includes(big);
+	lg.career = JSON.parse(keep) || lg.career;
+	return { fresh, elite, big, bigStr: F.getStr(big), refused, offers: offers.length, bigOffered };
+});
+check("reputation: unproven at first (the biggest club says no), elite after titles with a weak squad (the biggest club offers)", rep.fresh.rep < 40 && rep.refused && rep.elite.rep >= 70 && rep.elite.str >= rep.bigStr - 0.3 && rep.offers >= 2 && rep.bigOffered, JSON.stringify(rep));
+
 // Watch another fixture (18l): the home side takes your seat with the computer on both, nothing is recorded,
 // and your club is yours again afterwards (and never saved under the lent name).
 const wt = await page.evaluate(() => {

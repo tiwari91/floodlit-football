@@ -14,7 +14,16 @@
 		return d;
 	}
 
+	// The panels always show your club as your club: while an international lends your seat to your country
+	// (18j), the table, results and club cards are drawn with your club's own name and colours.
 	function renderLeague () {
+		const lent = typeof intlYou !== "undefined" && intlYou ? intlYou : null;
+		if (!lent) { renderLeague0(); return; }
+		const keep = {};
+		for (const k of INTL_YOU_KEYS) { keep[k] = YOU[k]; if (lent[k] === undefined) { delete YOU[k]; } else { YOU[k] = lent[k]; } }
+		try { renderLeague0(); } finally { for (const k of INTL_YOU_KEYS) { if (keep[k] === undefined) { delete YOU[k]; } else { YOU[k] = keep[k]; } } }
+	}
+	function renderLeague0 () {
 		const sec = $("league");
 		sec.hidden = mode !== "league";
 		if (!league || sec.hidden) { return; }

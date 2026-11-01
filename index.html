@@ -1538,6 +1538,14 @@ td, th { font-variant-numeric: tabular-nums; }
 .watch-list { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 4px; }
 .watch-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; }
 .watch-list li button { padding: 3px 10px; font-size: 12px; }
+
+/* Manage another club (18b) */
+.apply-box { margin-top: 10px; }
+.apply-box summary { cursor: pointer; font-weight: 700; }
+.apply-list { list-style: none; padding: 0; margin: 6px 0 0; display: grid; gap: 4px; max-height: 320px; overflow: auto; }
+.apply-list li { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; }
+.apply-list li.locked { opacity: 0.5; }
+.apply-list li button { padding: 3px 10px; font-size: 12px; }
 </style>
 
 <main class="wrap">
@@ -3713,7 +3721,16 @@ td, th { font-variant-numeric: tabular-nums; }
 		return d;
 	}
 
+	// The panels always show your club as your club: while an international lends your seat to your country
+	// (18j), the table, results and club cards are drawn with your club's own name and colours.
 	function renderLeague () {
+		const lent = typeof intlYou !== "undefined" && intlYou ? intlYou : null;
+		if (!lent) { renderLeague0(); return; }
+		const keep = {};
+		for (const k of INTL_YOU_KEYS) { keep[k] = YOU[k]; if (lent[k] === undefined) { delete YOU[k]; } else { YOU[k] = lent[k]; } }
+		try { renderLeague0(); } finally { for (const k of INTL_YOU_KEYS) { if (keep[k] === undefined) { delete YOU[k]; } else { YOU[k] = keep[k]; } } }
+	}
+	function renderLeague0 () {
 		const sec = $("league");
 		sec.hidden = mode !== "league";
 		if (!league || sec.hidden) { return; }
@@ -5610,20 +5627,45 @@ td, th { font-variant-numeric: tabular-nums; }
 		}
 		if (typeof applyEditsOnLoad === "function") { applyEditsOnLoad(lg); }   // option-file edits on top (18g)
 	}
+	// Your reputation as a manager (0-100), from your record: each season's finish against what your squad
+	// was expected to do (a weak side finishing high counts for more), titles, and how recent it is. It sets
+	// how big a club will take you (repStr: the strongest club, in stars, that will talk to you).
+	function managerRep (lg = league) {
+		const h = (lg && lg.career && lg.career.history) || [];
+		if (!h.length) { return 30; }
+		let sum = 0, wsum = 0, titles = 0;
+		h.slice(-6).forEach((x, i, arr) => {
+			const n = x.n || 20, str = Number.isFinite(x.str) ? x.str : 3, rank = (n - x.pos) / Math.max(1, n - 1);   // 1 = top, 0 = bottom
+			const exp = clamp((str - 1) / 4, 0, 1), over = rank - exp;   // above or below what the squad promised
+			const s = clamp(25 + rank * 45 + over * 40 + (x.pos === 1 ? 15 : 0), 0, 100), w = 1 + i / arr.length * 1.5;   // recent seasons count most
+			sum += s * w; wsum += w;
+			if (x.pos === 1) { titles++; }
+		});
+		return Math.round(clamp(sum / wsum + Math.min(15, titles * 5) + Math.min(6, h.length), 0, 100));
+	}
+	const repStr = (lg = league) => clamp(1.2 + managerRep(lg) / 22, 1.2, 5);
+	const repWord = r => (r >= 85 ? "World class" : r >= 70 ? "Elite" : r >= 55 ? "Highly rated" : r >= 40 ? "Respected" : r >= 25 ? "Promising" : "Unproven");
+	// Clubs at home that will talk to you: as big as your reputation allows (a little above it now and then),
+	// the biggest first, never a step down unless you ask.
+	function repPool (lg, me) {
+		const top = repStr(lg) + 0.3;
+		return TEAMS.map((t, i) => i).filter(i => i !== 0 && getStr(i) <= top && getStr(i) >= Math.min(me, top) - 0.6).sort((a, b) => getStr(b) - getStr(a));
+	}
 	function offerJobs (pos) {
 		const lg = league;
 		if (!lg || !lg.club || !Array.isArray(lg.members)) { return []; }
 		if (!Number.isInteger(pos)) { pos = standings().findIndex(r => r.id === 0) + 1; }
 		const me = yourStr(), n = lg.members.length;
 		const inDiv = lg.members.filter(id => id !== 0), below = TEAMS.map((t, i) => i).filter(i => i !== 0 && !lg.members.includes(i));
-		let pool;
-		if (pos <= 4) { pool = inDiv.filter(id => getStr(id) >= Math.max(3, Math.ceil(me - 0.5))); }
-		else if (pos <= Math.floor(n / 2)) { pool = inDiv.filter(id => Math.abs(getStr(id) - me) <= 1); }
-		else if (pos <= n - 3) { pool = [ ...inDiv.filter(id => getStr(id) <= me), ...below.slice(0, 3) ]; }
-		else { pool = below; }
-		lg.jobOffers = shuffle(pool).slice(0, pos <= 4 ? 2 : 1).map(id => ({ id, kind: "home", str: getStr(id), budget: round1(1 + getStr(id) * 0.9), below: !lg.members.includes(id), season: lg.season }));
+		// This season goes on your record first, so it counts towards your reputation.
+		lg.career = { ...(lg.career || { clubs: [ YOU.name ] }), history: [ ...((lg.career && lg.career.history) || []), { season: lg.season, club: YOU.name, pos, n, str: round1(me) } ] };
+		// Offers by reputation: the biggest clubs that will talk to you (two or three for a good record).
+		const rp = repPool(lg, me), rep = managerRep(lg);
+		let pool = rp.length ? shuffle(rp.slice(0, 5)) : pos <= n - 3 ? inDiv.filter(id => Math.abs(getStr(id) - me) <= 1) : below;
+		if (rp.length && rep >= 70 && !pool.slice(0, 3).includes(rp[0])) { pool = [ rp[0], ...pool ]; }   // an elite record: the biggest club that will have you always calls
+		lg.jobOffers = pool.slice(0, rep >= 55 ? 3 : rep >= 35 ? 2 : 1).map(id => ({ id, kind: "home", str: getStr(id), budget: round1(1 + getStr(id) * 0.9), below: !lg.members.includes(id), season: lg.season }));
 		// A good season draws a club from abroad too.
-		if (pos <= Math.max(6, Math.floor(n / 3))) { lg.jobOffers.push(abroadOffer(pos)); }
+		if (pos <= Math.max(6, Math.floor(n / 3)) || rep >= 60) { lg.jobOffers.push(abroadOffer(pos)); }
 		// Sacked (the board had lost patience, 18k): only weaker clubs will have you, and you must take one.
 		if (typeof sackCheck === "function" && sackCheck(lg)) {
 			const weak = below.length ? below : inDiv.filter(id => getStr(id) <= me).sort((a, b) => getStr(a) - getStr(b));
@@ -5631,7 +5673,6 @@ td, th { font-variant-numeric: tabular-nums; }
 		}
 		// What you agreed with your agent in January comes first.
 		if (lg.agreed) { lg.jobOffers.unshift({ ...lg.agreed, agreed: true }); lg.agreed = null; }
-		lg.career = { ...(lg.career || { clubs: [ YOU.name ] }), history: [ ...((lg.career && lg.career.history) || []), { season: lg.season, club: YOU.name, pos } ] };
 		if (typeof intlOffers === "function") { intlOffers(pos); }   // and perhaps a country (18j)
 		honourAgreed();
 		return (league && league.jobOffers) || [];
@@ -5651,7 +5692,7 @@ td, th { font-variant-numeric: tabular-nums; }
 		const regions = Object.keys(MARKETS).filter(r => r !== "home"), region = regions[Math.floor(Math.random() * regions.length)], m = MARKETS[region];
 		const name = m.clubs[Math.floor(Math.random() * m.clubs.length)], nats = natsOf(region);
 		const nat = MARKET_CLUB_NAT[name] || nats[Math.floor(Math.random() * nats.length)];   // the club's own country, so the league fits it
-		const str = clamp(Math.round(pos <= 4 ? 3 + Math.random() * 2 : 2 + Math.random() * 2), 1, 5);
+		const str = clamp(Math.round(Math.min(repStr() + 0.3, pos <= 4 ? 3 + Math.random() * 2 : 2 + Math.random() * 2)), 1, 5);   // no bigger than your reputation
 		return { abroad: region, kind: "abroad", nat, name, str, budget: round1((1 + str * 0.9) * m.mult * 1.3), season: league.season };
 	}
 	const offerKey = o => (o.abroad ? `abroad:${o.name}` : `club:${o.id}`);
@@ -5687,7 +5728,7 @@ td, th { font-variant-numeric: tabular-nums; }
 		const rows = standings(), pos = rows.length && rows.some(r => r.p > 0) ? rows.findIndex(r => r.id === 0) + 1 : Math.ceil(lg.members.length / 2);
 		const me = yourStr(), n = lg.members.length;
 		const inDiv = lg.members.filter(id => id !== 0), below = TEAMS.map((t, i) => i).filter(i => i !== 0 && !lg.members.includes(i));
-		const pool = pos <= 4 ? inDiv.filter(id => getStr(id) >= 3) : pos <= Math.floor(n / 2) ? inDiv.filter(id => Math.abs(getStr(id) - me) <= 1) : [ ...below.slice(0, 3), ...inDiv.filter(id => getStr(id) < me) ];
+		const rp = repPool(lg, me), pool = rp.length ? rp.slice(0, 4) : pos <= Math.floor(n / 2) ? inDiv.filter(id => Math.abs(getStr(id) - me) <= 1) : [ ...below.slice(0, 3), ...inDiv.filter(id => getStr(id) < me) ];   // by your reputation
 		const offers = shuffle(pool).slice(0, 1).map(id => ({ id, kind: "home", str: getStr(id), budget: round1(1 + getStr(id) * 0.9), below: !lg.members.includes(id), season: lg.season }));
 		if (pos <= Math.max(6, Math.floor(n / 3)) || Math.random() < 0.3) { offers.push(abroadOffer(pos)); }
 		lg.agent = { when, pos, offers };
@@ -5787,7 +5828,7 @@ td, th { font-variant-numeric: tabular-nums; }
 		const h = league && league.career && league.career.history;
 		if (!h || !h.length) { return ""; }
 		const best = h.reduce((b, x) => (x.pos < b.pos ? x : b));
-		return `Career: ${h.length} season${h.length === 1 ? "" : "s"}, best finish ${best.pos}${[ "st", "nd", "rd" ][best.pos - 1] || "th"} with ${best.club}, clubs: ${(league.career.clubs || [ YOU.name ]).join(", ")}.`;
+		return `Reputation: ${managerRep()}/100 (${repWord(managerRep())}): clubs up to ${"★".repeat(Math.max(1, Math.round(repStr())))} will talk to you. Career: ${h.length} season${h.length === 1 ? "" : "s"}, best finish ${best.pos}${[ "st", "nd", "rd" ][best.pos - 1] || "th"} with ${best.club}, clubs: ${(league.career.clubs || [ YOU.name ]).join(", ")}.`;
 	};
 	const offerWho = o => (o.abroad
 		? `${o.name} (${NATIONS[o.nat] ? NATIONS[o.nat][0] : MARKETS[o.abroad].label}) want you as manager: a new country, strength ${"★".repeat(Math.round(o.str))}, ${money(o.budget)} to spend`
@@ -5831,7 +5872,35 @@ td, th { font-variant-numeric: tabular-nums; }
 			}
 		}
 		const cl = $("careerLine");
-		if (cl) { cl.textContent = careerLine(); }
+		if (cl) { cl.textContent = careerLine() || `Reputation: ${managerRep()}/100 (${repWord(managerRep())}): clubs up to ${"★".repeat(Math.max(1, Math.round(repStr())))} will talk to you.`; renderApply(cl); }
+	}
+	// Manage another club: between seasons (or before the first match), apply to any club your reputation
+	// reaches; the job is yours at once, as if they had offered it.
+	function applyFor (id) {
+		const lg = league;
+		if (!lg || !TEAMS[id] || id === 0 || !(lg.round === 0 || seasonDone()) || (lg.intl && lg.intl.only)) { return false; }
+		if (getStr(id) > repStr(lg) + 0.3) { toast(`${TEAMS[id].name} want a manager with a bigger reputation`, "#f2b52e"); return false; }
+		lg.jobOffers = [ ...(lg.jobOffers || []).filter(o => o.id !== id), { id, kind: "home", str: getStr(id), budget: round1(1 + getStr(id) * 0.9), below: !lg.members.includes(id), season: lg.season } ];
+		const ok = takeOffer(offerKey({ id }));
+		if (ok && typeof freshStart === "function") { freshStart(lg); }
+		return ok;
+	}
+	function renderApply (after) {
+		let box = $("applyBox");
+		const lg = league, open = lg && lg.club && (lg.round === 0 || seasonDone()) && !(lg.intl && lg.intl.only) && !(lg.sacked === lg.season);
+		if (!open) { if (box) { box.remove(); } return; }
+		if (!box) { box = el("details", "apply-box"); box.id = "applyBox"; after.after(box); }
+		box.replaceChildren(el("summary", "", "Manage another club"));
+		const top = repStr(lg) + 0.3, ul = el("ul", "apply-list");
+		const ids = TEAMS.map((t, i) => i).filter(i => i !== 0).sort((a, b) => getStr(b) - getStr(a));
+		for (const id of ids) {
+			const t = TEAMS[id], ok = getStr(id) <= top, li = el("li", ok ? "" : "locked");
+			const who = el("span", "who"); who.append(dotFor(t), document.createTextNode(` ${t.name} · ${"★".repeat(Math.max(1, Math.round(getStr(id))))}${lg.members.includes(id) ? "" : " · division below"}`));
+			const b = el("button", "", ok ? "Take over" : "Too big for now"); b.type = "button"; b.disabled = !ok;
+			b.addEventListener("click", () => applyFor(id));
+			li.append(who, b); ul.append(li);
+		}
+		box.append(el("p", "win-note", `Your reputation (${managerRep()}/100) reaches clubs up to ${"★".repeat(Math.max(1, Math.round(repStr())))}. Win more, and finish above what your squad was expected to, to reach the biggest.`), ul);
 	}
 	/* ---------- foreign leagues ----------
 	   Move abroad and the whole division changes with you: every other club is renamed for that
@@ -24072,7 +24141,7 @@ td, th { font-variant-numeric: tabular-nums; }
 			get manualLock () { return manualLock; }, get receiver () { return receiver; }, get cond () { return cond; }, get celeb () { return typeof celeb === "undefined" ? null : celeb; },
 			get autoSwitchMode () { return autoSwitchMode; }, set autoSwitchMode (v) { autoSwitchMode = v; autoSwitchSel.value = v; },
 			get assistMode () { return assistMode; }, setAssist, assistRun, get lastDeal () { return lastDeal; }, valueOf, ovrNow, windowOpen,
-			offerJobs, takeJob, yourStr, startWatch, endWatch, matchSquad, declineJob, get YOU () { return YOU; }, get TEAMS () { return TEAMS; },
+			offerJobs, takeJob, yourStr, managerRep, repStr, applyFor, startWatch, endWatch, matchSquad, declineJob, get YOU () { return YOU; }, get TEAMS () { return TEAMS; },
 			agentApproaches, agreeApproach, honourAgreed, renderSimChip, moveAbroad, takeOffer, assistShortlist, assistBuy, scoutShortlist, bestOffer, inheritSetup, keyContracts, contractAlerts, roleOf, slotsFor, renderAssistNote, assistRenewAnyway, retireVeterans, renewDeal, benchReact, get tlc () { return tlc; }, set tlcLast (v) { tlcLast = v; }, divisionName, applyForeignLeague, commitFoul, board, halfTime, toast, staffReact, get staff3 () { return staff3; }, get setPiece () { return setPiece; }, simulateMineTest () { simulateMine(); }, ensureClub, validLeague: typeof validLeague === "function" ? validLeague : null, get mode () { return mode; }, finishTutorialTest () { if (!tut) { return false; } tut.step = TUT.length - 1; nextTutStep(); return true; },
 			get autoHold () { return autoHold; }, set autoHold (v) { autoHold = v; },
 			get charging () { return charging; }, get passCharge () { return passCharge; }, get meterRect () { return meterRect; }, get drawMs () { return drawMs; }, get drawn () { return drawn; }, frameDue, get scale () { return scale; }, get kits () { return KITS; }, get stats () { return stats; }, get oppStats () { return oppStats; }, get steerAt () { return steerAt; }, set steerAt (v) { steerAt = v; }, set possTeam (v) { possTeam = v; },

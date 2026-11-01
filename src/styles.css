@@ -1516,3 +1516,11 @@ td, th { font-variant-numeric: tabular-nums; }
 .watch-list { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 4px; }
 .watch-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; }
 .watch-list li button { padding: 3px 10px; font-size: 12px; }
+
+/* Manage another club (18b) */
+.apply-box { margin-top: 10px; }
+.apply-box summary { cursor: pointer; font-weight: 700; }
+.apply-list { list-style: none; padding: 0; margin: 6px 0 0; display: grid; gap: 4px; max-height: 320px; overflow: auto; }
+.apply-list li { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; }
+.apply-list li.locked { opacity: 0.5; }
+.apply-list li button { padding: 3px 10px; font-size: 12px; }

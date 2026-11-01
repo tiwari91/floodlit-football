@@ -217,7 +217,7 @@ const oldNote = await (async () => {
 check("an old save's jargon note is not shown after the update", !/your call|reserve spent|£0\.0m/.test(oldNote), oldNote);
 check("an old save mid-season loads with no cup this season and an empty academy, no errors", oldSave.cup === "none" && /starts again next season/.test(oldSave.card) && /Academy/.test(oldSave.card), JSON.stringify(oldSave));
 
-// Offers for the manager: a title-winner hears from the big clubs, a bottom finisher only from below.
+// Offers for the manager, by reputation: a title-winner hears from bigger clubs than a bottom finisher.
 const offers = await page.evaluate(() => {
 	const F = window.__ff, lg = F.league;
 	const top = F.offerJobs(1).map(o => ({ id: o.id, str: o.str, below: o.below, kind: o.kind, abroad: o.abroad, name: o.name, member: lg.members.includes(o.id) }));
@@ -225,8 +225,10 @@ const offers = await page.evaluate(() => {
 	return { top, bottom, career: lg.career, title: document.getElementById("jobsTitle").hidden, items: document.querySelectorAll("#jobOffers li").length };
 });
 const topHome = offers.top.filter(o => o.kind !== "abroad"), topAbroad = offers.top.filter(o => o.kind === "abroad");
-check("a top-four finish brings one or two offers from strong clubs in the division, plus one from abroad", topHome.length >= 1 && topHome.length <= 2 && topHome.every(o => o.member && o.str >= 3) && topAbroad.length === 1 && topAbroad[0].abroad && topAbroad[0].name, JSON.stringify(offers.top));
-check("a bottom finish brings one offer, from the division below", offers.bottom.length === 1 && offers.bottom.every(o => o.below && !o.member), JSON.stringify(offers.bottom));
+// (By reputation, 18b: a better record brings bigger clubs; the title brings more offers and one from abroad.)
+const maxStr = l => Math.max(0, ...l.map(o => o.str || 0));
+check("a top-four finish brings offers from bigger clubs (by your reputation), plus one from abroad", topHome.length >= 1 && topHome.length <= 3 && topAbroad.length === 1 && topAbroad[0].abroad && topAbroad[0].name && maxStr(topHome) >= maxStr(offers.bottom), JSON.stringify(offers.top));
+check("a bottom finish brings fewer, smaller clubs", offers.bottom.length >= 1 && offers.bottom.length <= topHome.length && maxStr(offers.bottom) <= maxStr(topHome), JSON.stringify(offers.bottom));
 const taken = await page.evaluate(() => {
 	const F = window.__ff, lg = F.league;
 	const offer = F.offerJobs(1)[0], target = F.TEAMS[offer.id], targetName = target.name, oldName = F.YOU.name, oldSquad = lg.club.squad.slice();
