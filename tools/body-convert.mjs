@@ -118,8 +118,8 @@ for (let v = 0; v < nv; v++) {
 	// 4 boot, 5 arm below the sleeve (a long sleeve or skin), 6 hand (a keeper's glove or skin).
 	const top = list.length ? list[0][0] : "hips", y = p[1];
 	let R = 0;
-	if (top.startsWith("an")) { R = y < 0.115 ? 4 : 3; }
-	else if (top.startsWith("kn")) { R = y < 0.47 ? 3 : 0; }
+	if (top.startsWith("an")) { R = y < 0.14 ? 4 : 3; }   // the boot up to the ankle bone, the sock above
+	else if (top.startsWith("kn")) { R = y < 0.11 ? 4 : y < 0.47 ? 3 : 0; }
 	else if (top.startsWith("hip")) { R = y > 0.70 ? 2 : 0; }
 	else if (top === "hips" || top === "spine" || top === "chest") { R = y < 0.955 ? 2 : 1; }   // one clean line at the waist
 	else if (top.startsWith("sh")) { const i = +top[2], d = Math.abs(p[2] - jpos[sideName("upperarm", i)][2]); R = d < 0.13 ? 1 : 5; }
