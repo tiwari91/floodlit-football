@@ -504,7 +504,9 @@
 		if (seasonDone()) {
 			const champ = rows[0].id === 0 ? `You are champions with ${pts} points!` : `${TEAMS[rows[0].id].name} are champions. You finished ${ordinal(pos)} on ${pts} points.`;
 			const jan = whole && start < JANUARY ? (assistMode === "off" ? " The January window went by without business: switch the Assistant on to have it handled next time." : " The Assistant handled the January window.") : "";
-			showOverlay(`Season ${league.season} simulated`, `${line} ${champ}${scorers}${disc} Prize money: ${money(league.prize || 0)}.${jan} The transfer window is open below the pitch.${typeof intlSummerNote === "function" ? intlSummerNote() : ""}`, `Start season ${league.season + 1}`);
+			// The summer's international finals come before the next season (18j): say so, on the same button the bar shows.
+			const finals = typeof intlSummerBlocked === "function" && intlSummerBlocked();
+			showOverlay(`Season ${league.season} simulated`, `${line} ${champ}${scorers}${disc} Prize money: ${money(league.prize || 0)}.${jan} The transfer window is open below the pitch.${typeof intlSummerNote === "function" ? intlSummerNote() : ""}${finals ? " First, the international finals: play them before the new season." : ""}`, finals ? "Next international" : `Start season ${league.season + 1}`);
 			if (rows[0].id === 0) { celebrateTrophy("league trophy"); }
 		} else {
 			showOverlay(stoppedJan ? "January window" : "Simulated", `${line} You're ${ordinal(pos)} on ${pts} points.${scorers}${disc}${stoppedJan ? " The January transfer window is open: sign players below the pitch, then carry on." : ""}`, "Kick off");
