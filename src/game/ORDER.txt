@@ -27,6 +27,7 @@
 18l-owner-and-psr.js
 18m-challenge-cup.js
 18n-homegrown.js
+18o-loans.js
 18l-watch.js
 18f-continental-cup.js
 18g-edit-mode.js

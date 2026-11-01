@@ -93,6 +93,7 @@
 				league.assistNote = `${league.assistNote || "Assistant (summer):"}${kept.length ? ` The club kept ${kept.join(", ")} on standard terms anyway.` : ""}${lost.length ? ` Out of contract and gone: ${lost.join(", ")}.` : ""}`;
 			}
 			if (typeof seasonCoaching === "function") { seasonCoaching(club); }
+			if (typeof loansSummer === "function") { const ln = loansSummer(club); if (ln) { league.news = `${league.news} ${ln}`.trim(); } }   // 18o
 			if (typeof youthIntake === "function") { youthIntake(club); }   // the academy's new intake, and the others grow
 			if (club.retired && club.retired.length) { league.news = `${league.news} Retired: ${club.retired.join(", ")}.`.trim(); }
 			if (gone.length) { league.news = `${league.news} Out of contract and gone: ${gone.join(", ")}. Academy players fill the gaps.`.trim(); }

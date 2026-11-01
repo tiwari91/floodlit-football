@@ -305,6 +305,8 @@
 				rn.disabled = pl.contract >= 4; rn.addEventListener("click", () => renewPlayer(pl.name)); box.append(rn);
 				if (list === "bench") { const rl = el("button", "", `Release (pay-off ${money(Math.round(wageOf(pl) * pl.contract * 0.5 * 1000) / 1000)})`); rl.type = "button"; rl.addEventListener("click", () => releasePlayer(pl.name)); box.append(rl); }
 				if (typeof sellButton === "function") { const sb = sellButton(pl); if (sb) { box.append(sb); } }
+				if (typeof loanOutButton === "function") { const lb = loanOutButton(pl); if (lb) { box.append(lb); } }   // 18o
+				if (pl.loan) { box.append(el("span", "", `On loan from ${pl.loan.from} this season.`)); }
 				td.append(box); dr.append(td); sq.append(dr);
 			}
 		};
@@ -336,6 +338,7 @@
 		notes.push(`Wage bill ${money(squadWages(c))} a season. TV money ${money(TV_EQUAL / SEASON_ROUNDS)} a matchday (${money(TV_FACILITY)} more when you are on TV); home gates about ${money((0.05 + 0.015 * yourStr()) * GATE_SHARE)} each.`);
 		if (c.budget < 0) { notes.push("You're in the red: the board has frozen signings until the budget is back above zero."); }
 		if (typeof hgLine === "function") { notes.push(hgLine(c)); }
+		if (typeof loanLine === "function" && loanLine(c)) { notes.push(loanLine(c)); }
 		$("winNote").textContent = notes.join(" ");
 		if (typeof renderOwnerBox === "function") { renderOwnerBox(c, open); }
 
@@ -398,6 +401,7 @@
 			b2.type = "button"; b2.disabled = !ok || !talks || c.budget + 1e-9 < round1(ask * 0.8) || c.budget < 0; b2.title = "A cheeky bid: they may accept, or turn it down and raise the price";
 			b2.addEventListener("click", () => bidFor(i, true));
 			btns.append(b, b2);
+			if (typeof loanInButton === "function") { btns.append(loanInButton(pl, i)); }   // 18o
 			if (!pl.scouted && rr) { const b3 = el("button", "", "Scout"); b3.type = "button"; b3.disabled = !(c.scoutLeft > 0); b3.addEventListener("click", () => scoutPlayer(i)); btns.append(b3); }
 			li.append(btns);
 			li.append(el("span", "ratings", rr ? `OVR about ${rr[0]}–${rr[1]} · not scouted` : `OVR ${ovrOf(pl)} · PAC ${pl.pac} SHO ${pl.sho} PAS ${pl.pas} DRI ${driOf(pl)} DEF ${pl.def} PHY ${phyOf(pl)} · potential ${Math.round(pl.pot)}`));
