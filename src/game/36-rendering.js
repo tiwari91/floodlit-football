@@ -379,6 +379,16 @@
 		default: return st.seat;
 		}
 	}
+	// The big footballing countries' own grounds, on top of their region's: the shape, the roof, how close
+	// the stands are (gap: extra distance from the touchline and from the goal line) and an athletics track.
+	const NAT_GROUND = {
+		ENG: { arch: "monterrey", roof: true, gap: [ -9, -8 ] },                       // tight boxes right up against the touchline
+		GER: { arch: "monterrey", roof: true, lights: "roof", flags: true },           // steep two-tier boxes under full roofs
+		ESP: { arch: "azteca", roof: false, lights: "pylons", gap: [ 4, 4 ] },          // tall open concrete bowls, lattice pylons
+		ITA: { arch: "akron", roof: false, lights: "pylons", gap: [ 40, 40 ], track: true },   // the oval round an athletics track
+		FRA: { arch: "akron", roof: true, lights: "roof" },                           // sweeping modern bowls under white roofs
+		NED: { arch: "monterrey", roof: true, lights: "roof", gap: [ -4, -4 ], closed: true }   // compact, enclosed, a closed roof
+	};
 	function dressFor (nat, r) {
 		const D = DRESS_REGION[REGION_OF[nat]] || DRESS_REGION.home, cols = NAT_COLS[nat] || NAT_COLS.ENG;
 		const words = (BOARD_WORDS[LANG_OF[nat] || "en"]).slice();
@@ -389,6 +399,7 @@
 			natCols: cols, words, flags: r() < D.flags, bunting: r() < D.bunting
 		};
 		if (D.concrete) { out.concrete = D.concrete[0]; out.steps = D.concrete[1]; }
+		if (NAT_GROUND[nat]) { Object.assign(out, NAT_GROUND[nat]); }
 		if (!out.roof && out.lights === "roof") { out.lights = "pylons"; }
 		return out;
 	}

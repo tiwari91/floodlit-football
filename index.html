@@ -13719,6 +13719,16 @@ td, th { font-variant-numeric: tabular-nums; }
 		default: return st.seat;
 		}
 	}
+	// The big footballing countries' own grounds, on top of their region's: the shape, the roof, how close
+	// the stands are (gap: extra distance from the touchline and from the goal line) and an athletics track.
+	const NAT_GROUND = {
+		ENG: { arch: "monterrey", roof: true, gap: [ -9, -8 ] },                       // tight boxes right up against the touchline
+		GER: { arch: "monterrey", roof: true, lights: "roof", flags: true },           // steep two-tier boxes under full roofs
+		ESP: { arch: "azteca", roof: false, lights: "pylons", gap: [ 4, 4 ] },          // tall open concrete bowls, lattice pylons
+		ITA: { arch: "akron", roof: false, lights: "pylons", gap: [ 40, 40 ], track: true },   // the oval round an athletics track
+		FRA: { arch: "akron", roof: true, lights: "roof" },                           // sweeping modern bowls under white roofs
+		NED: { arch: "monterrey", roof: true, lights: "roof", gap: [ -4, -4 ], closed: true }   // compact, enclosed, a closed roof
+	};
 	function dressFor (nat, r) {
 		const D = DRESS_REGION[REGION_OF[nat]] || DRESS_REGION.home, cols = NAT_COLS[nat] || NAT_COLS.ENG;
 		const words = (BOARD_WORDS[LANG_OF[nat] || "en"]).slice();
@@ -13729,6 +13739,7 @@ td, th { font-variant-numeric: tabular-nums; }
 			natCols: cols, words, flags: r() < D.flags, bunting: r() < D.bunting
 		};
 		if (D.concrete) { out.concrete = D.concrete[0]; out.steps = D.concrete[1]; }
+		if (NAT_GROUND[nat]) { Object.assign(out, NAT_GROUND[nat]); }
 		if (!out.roof && out.lights === "roof") { out.lights = "pylons"; }
 		return out;
 	}
@@ -16956,7 +16967,9 @@ td, th { font-variant-numeric: tabular-nums; }
 		if (sz === "small") { const [ n, rd, rh ] = A.tiers[0]; return { ...A, tiers: [ [ Math.max(6, Math.round(n * 0.7)), rd, rh * 0.85 ] ], ring: false, rc: Math.min(A.rc, 60) }; }
 		return { ...A, tiers: A.tiers.map(([ n, rd, rh ], i) => [ Math.max(5, Math.round(n * (i ? 0.6 : 0.85))), rd, rh ]) };
 	}
-	const F_SIDE3 = 24, F_END3 = NET + 28;   // the stands' front: back from the touchlines, and from the goal lines
+	// The stands' front: back from the touchlines, and from the goal lines (a country's grounds can sit closer
+	// or further back: gs.gap, set when the stadium is built).
+	let F_SIDE3 = 24, F_END3 = NET + 28;   // eslint-disable-line prefer-const
 	// The bowl's plan d out from its front: a rounded rectangle round the pitch, as points with their
 	// outward normals. Every distance gives the same number of points, so the rows line up.
 	function bowlRing3 (d, rc) {
@@ -17090,6 +17103,7 @@ td, th { font-variant-numeric: tabular-nums; }
 			});
 		}
 		G3.stadiumKey = key; G3.standsRef = stands;
+		F_SIDE3 = 24 + ((gs.gap && gs.gap[0]) || 0); F_END3 = NET + 28 + ((gs.gap && gs.gap[1]) || 0);
 		const st = new THREE.Group(), Q = gfx3();
 		G3.nearRoof = [];   // the near side of the ground: hidden while the camera sits in it
 		const own = (o, mat = false) => { o.userData.ownGeo = true; o.userData.ownMat = mat; return o; };
@@ -17123,6 +17137,42 @@ td, th { font-variant-numeric: tabular-nums; }
 		const apron = new THREE.Mesh(new THREE.PlaneGeometry(WW * 14, WH * 14), mat3D(landCol, false));
 		apron.rotation.x = -Math.PI / 2; apron.position.set(FW / 2, -0.6, FH / 2);
 		st.add(own(apron));
+		// An athletics track between the pitch and the stands (Italy's ovals): the red running lanes with
+		// white lines, laid just under the pitch so only the ring outside it shows.
+		if (gs.track) {
+			const rr = (w, h, r) => { const s = new THREE.Shape(), x0 = FW / 2 - w / 2, z0 = FH / 2 - h / 2; s.moveTo(x0 + r, z0); s.lineTo(x0 + w - r, z0); s.absarc(x0 + w - r, z0 + r, r, -Math.PI / 2, 0); s.lineTo(x0 + w, z0 + h - r); s.absarc(x0 + w - r, z0 + h - r, r, 0, Math.PI / 2); s.lineTo(x0 + r, z0 + h); s.absarc(x0 + r, z0 + h - r, r, Math.PI / 2, Math.PI); s.lineTo(x0, z0 + r); s.absarc(x0 + r, z0 + r, r, Math.PI, Math.PI * 1.5); return s; };
+			const W0 = FW + 2 * (F_END3 - 6), H0 = FH + 2 * (F_SIDE3 - 6), R0 = H0 / 2 - 4;
+			const lay = (shape, col, y) => { const g = new THREE.ShapeGeometry(shape, 24); g.rotateX(Math.PI / 2); const mt = mat3D(col, false); mt.side = THREE.DoubleSide; const m = own(new THREE.Mesh(g, mt), true); m.position.y = y; st.add(m); };
+			// a ring from just outside the advertising boards out to the stands, built point by point between two
+			// rounded rectangles (the inner one nearly square, round the boards) and the lane lines the same way
+			// a point a fraction t round a rounded rectangle (w by h, corner radius r), starting at the middle of one end
+			const IW = FW + 2 * (NET + 24), IH = FH + 2 * 20, N = 240;
+			const se = (t, w, h, r) => {
+				const sx = w / 2 - r, sz = h / 2 - r, arc = Math.PI * r / 2, L = 4 * (sx + sz) + 4 * arc, segs = [ sz, arc, 2 * sx, arc, 2 * sz, arc, 2 * sx, arc, sz ];
+				let d = ((t % 1) + 1) % 1 * L, k = 0;
+				while (k < segs.length - 1 && d > segs[k]) { d -= segs[k]; k++; }
+				const u = segs[k] ? d / segs[k] : 0, cx = FW / 2, cz = FH / 2, ca = (ox, oz, a0) => { const a = a0 + u * Math.PI / 2; return [ cx + ox + r * Math.cos(a), cz + oz + r * Math.sin(a) ]; };
+				switch (k) {
+					case 0: return [ cx + w / 2, cz + u * sz ];
+					case 1: return ca(sx, sz, 0);
+					case 2: return [ cx + sx - u * 2 * sx, cz + h / 2 ];
+					case 3: return ca(-sx, sz, Math.PI / 2);
+					case 4: return [ cx - w / 2, cz + sz - u * 2 * sz ];
+					case 5: return ca(-sx, -sz, Math.PI);
+					case 6: return [ cx - sx + u * 2 * sx, cz - h / 2 ];
+					case 7: return ca(sx, -sz, Math.PI * 1.5);
+					default: return [ cx + w / 2, cz - sz + u * sz ];
+				}
+			};
+			const band = (w0, h0, e0, w1, h1, e1, col, y) => {
+				const pos = [], idx = [];
+				for (let k = 0; k < N; k++) { const a = k / N, p = se(a, w0, h0, e0), q = se(a, w1, h1, e1); pos.push(p[0], y, p[1], q[0], y, q[1]); const i = k * 2, j = ((k + 1) % N) * 2; idx.push(i, j, i + 1, i + 1, j, j + 1); }
+				const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
+				const mt = mat3D(col, false); mt.side = THREE.DoubleSide; const m = own(new THREE.Mesh(g, mt), true); st.add(m);
+			};
+			band(IW, IH, 2, W0, H0, Math.min(R0, W0 / 2 - 1), "#a8432d", 0.06);
+			for (let k = 1; k <= 3; k++) { const t = k / 4, w = IW + (W0 - IW) * t, h = IH + (H0 - IH) * t, r = 2 + (Math.min(R0, W0 / 2 - 1) - 2) * t; band(w, h, r, w + 1.6, h + 1.6, r + 0.8, "#e9e4dc", 0.1); }
+		}
 		// 2. The stadium.
 		const A = arch3(gs), P = bowlProfile3(A), rings = {}, ring = d => rings[d] || (rings[d] = bowlRing3(d, A.rc));
 		const N = ring(0).length, nxt = j => (j + 1) % N;
