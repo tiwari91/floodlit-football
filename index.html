@@ -17744,7 +17744,7 @@ td, th { font-variant-numeric: tabular-nums; }
 		[ 4.8, 3.66, 2.36, 2.1 ], [ 6.3, 4.02, 2.56, 2.24 ], [ 7.6, 4.26, 2.42, 2.36 ], [ 8.3, 4.24, 2.16, 2.24 ],
 		[ 8.9, 3.86, 1.94, 2.06 ], [ 9.45, 2.92, 1.7, 1.86 ], [ 9.85, 2.0, 1.46, 1.6 ], [ 10.05, 1.6, 1.3, 1.4 ]   // the trapezius slopes from the neck down to the shoulder
 	];
-	const TORSO_EX3 = 2.5;
+	const TORSO_EX3 = 2.2;   // rounded, not a box
 	// How far the back of the shirt is from the spine at height y, across at z.
 	function backDepth3D (y, z) {
 		let i = 0;
@@ -17903,16 +17903,16 @@ td, th { font-variant-numeric: tabular-nums; }
 	// The smooth limbs' sections (as loft3D), in the hip's or shoulder's frame. LEG_BEND3/ARM_BEND3: the
 	// joint below it, and where the skin starts and finishes handing over to the lower bone. LEG_SOCK3: the sock top.
 	const LIMB_LEG3 = [
-		[ 0.9, 1.34, 1.34, 1.42 ], [ -0.6, 1.62, 1.72, 1.62 ], [ -2.6, 1.58, 1.84, 1.56 ], [ -4.6, 1.4, 1.66, 1.32 ], [ -6.0, 1.17, 1.34, 1.08 ],   // the thigh: the quads full in front, tapering to the knee
-		[ -6.6, 1.1, 1.24, 1.03 ], [ -7.0, 1.05, 1.16, 1.0 ], [ -7.35, 1.04, 1.14, 1.0 ], [ -7.65, 1.02, 1.12, 1.0 ],   // the knee, the cap a little proud in front
-		[ -7.95, 1.06, 1.08, 1.08 ], [ -8.3, 1.12, 1.2, 1.3 ], [ -8.6, 1.16, 1.3, 1.48 ], [ -9.9, 1.1, 1.34, 1.46 ], [ -11.1, 0.94, 1.24, 1.06 ],   // the sock over the calf and the shin pad
-		[ -11.7, 0.8, 0.86, 0.84 ], [ -12.9, 0.7, 0.7, 0.72 ], [ -13.8, 0.68, 0.66, 0.7 ], [ -14.2, 0.45, 0.45, 0.45 ]
+		[ 0.9, 1.528, 1.528, 1.619 ], [ -0.6, 1.847, 1.961, 1.847 ], [ -2.6, 1.801, 2.098, 1.778 ], [ -4.6, 1.596, 1.892, 1.505 ], [ -6, 1.334, 1.528, 1.231 ],   // the thigh: the quads full in front, tapering to the knee
+		[ -6.6, 1.149, 1.296, 1.076 ], [ -7, 1.097, 1.212, 1.045 ], [ -7.35, 1.087, 1.191, 1.045 ], [ -7.65, 1.066, 1.17, 1.045 ],   // the knee, the cap a little proud in front
+		[ -7.95, 1.188, 1.21, 1.21 ], [ -8.3, 1.256, 1.345, 1.457 ], [ -8.6, 1.301, 1.457, 1.659 ], [ -9.9, 1.233, 1.502, 1.637 ], [ -11.1, 1.054, 1.39, 1.188 ],   // the sock over the calf and the shin pad
+		[ -11.7, 0.798, 0.858, 0.838 ], [ -12.9, 0.698, 0.698, 0.718 ], [ -13.8, 0.678, 0.658, 0.698 ], [ -14.2, 0.449, 0.449, 0.449 ]
 	];
 	const LEG_BEND3 = [ -7.3, -6.4, -8.1 ], LEG_SOCK3 = -7.95;
 	const LIMB_ARM3 = [
-		[ 0.25, 0.75, 0.75, 0.75 ], [ -0.1, 1.12, 1.1, 1.12 ], [ -1.6, 1.15, 1.26, 1.2 ], [ -2.9, 1.1, 1.3, 1.14 ], [ -3.8, 1.0, 1.16, 1.06 ],
-		[ -4.6, 0.88, 0.9, 0.94 ], [ -5.1, 0.8, 0.76, 0.86 ], [ -5.5, 0.74, 0.7, 0.82 ], [ -5.9, 0.78, 0.76, 0.86 ], [ -6.3, 0.88, 0.86, 0.9 ],   // the elbow, its point behind
-		[ -6.9, 1.04, 1.0, 0.98 ], [ -8.2, 0.9, 0.82, 0.82 ], [ -9.6, 0.66, 0.52, 0.54 ], [ -10.4, 0.58, 0.46, 0.46 ], [ -10.75, 0.34, 0.3, 0.3 ]
+		[ 0.25, 0.87, 0.87, 0.87 ], [ -0.1, 1.299, 1.276, 1.299 ], [ -1.6, 1.334, 1.462, 1.392 ], [ -2.9, 1.276, 1.508, 1.322 ], [ -3.8, 1.16, 1.346, 1.23 ],
+		[ -4.6, 0.95, 0.972, 1.015 ], [ -5.1, 0.864, 0.821, 0.929 ], [ -5.5, 0.799, 0.756, 0.886 ], [ -5.9, 0.842, 0.821, 0.929 ], [ -6.3, 0.95, 0.929, 0.972 ],   // the elbow, its point behind
+		[ -6.9, 1.186, 1.14, 1.117 ], [ -8.2, 1.026, 0.935, 0.935 ], [ -9.6, 0.686, 0.541, 0.562 ], [ -10.4, 0.603, 0.478, 0.478 ], [ -10.75, 0.354, 0.312, 0.312 ]
 	];
 	const ARM_BEND3 = [ -5.6, -4.8, -6.3 ];
 	function initFigures3D () {
@@ -17925,7 +17925,7 @@ td, th { font-variant-numeric: tabular-nums; }
 			// The seat ends at the top of the thighs and closes up into the crotch, so the legs carry the shorts
 			// below it (no box hanging between the legs); the hips are as wide as the legs' outsides, so no step.
 			shorts: () => loft3D([ [ 1.6, 3.0, 2.0, 2.02 ], [ 1.75, 3.06, 2.06, 2.06 ], [ 0.6, 3.2, 2.06, 2.14 ], [ -0.5, 3.38, 2.04, 2.16 ], [ -1.25, 3.16, 1.92, 2.04 ], [ -1.75, 2.2, 1.46, 1.58 ], [ -2.0, 0.9, 0.8, 0.9 ] ], 22, 2.2),   // an athlete's hips, narrower than his shoulders
-			shortLeg: () => loft3D([ [ 1.1, 1.4, 1.62, 1.68 ], [ 0.2, 1.7, 1.86, 1.82 ], [ -0.9, 1.76, 1.96, 1.82 ], [ -2.2, 1.76, 2.0, 1.78, 0.08 ], [ -3.05, 1.78, 2.02, 1.8, 0.12 ], [ -3.15, 1.66, 1.86, 1.66, 0.12 ], [ -3.2, 1.3, 1.42, 1.3, 0.12 ] ], 22, 2.1),   // shorts to mid-thigh, hanging loose and straight off the quads to a light flare at the hem
+			shortLeg: () => loft3D([ [ 1.1, 1.582, 1.831, 1.898 ], [ 0.2, 1.921, 2.102, 2.057 ], [ -0.9, 1.989, 2.215, 2.057 ], [ -2.2, 1.989, 2.26, 2.011, 0.08 ], [ -3.05, 2.011, 2.283, 2.034, 0.12 ], [ -3.15, 1.876, 2.102, 1.876, 0.12 ], [ -3.2, 1.469, 1.605, 1.469, 0.12 ] ], 22, 2.1),   // shorts to mid-thigh, hanging loose and straight off the quads to a light flare at the hem
 			neck: () => loft3D([ [ -0.8, 2.1, 1.5, 1.75 ], [ -0.2, 1.85, 1.42, 1.62 ], [ 0.5, 1.56, 1.32, 1.44, -0.05 ], [ 1.3, 1.42, 1.24, 1.32, 0.0 ], [ 2.0, 1.34, 1.16, 1.24, 0.08 ], [ 2.3, 0.8, 0.8, 0.8, 0.1 ] ], 18, 2),   // a footballer's neck: thick, flaring into the trapezius at the base, not a stalk
 			head: () => sculpt3D(new T.SphereGeometry(1, 48, 36)),
 		ear: () => { const g = new T.SphereGeometry(0.51, 10, 8); g.scale(0.5, 1.0, 0.32); g.rotateZ(0.18); return g; },
@@ -17933,10 +17933,10 @@ td, th { font-variant-numeric: tabular-nums; }
 		tail: () => new T.SphereGeometry(1, 9, 7),
 			hair: () => sculpt3D(new T.SphereGeometry(1, 48, 36)),   // the skull's own surface; the hair shader lifts it by style
 			// Short sleeves over the shoulder (a rounded cap, the deltoid under it) ending in a cuff.
-			sleeve: () => loft3D([ [ 0.5, 0.3, 0.3, 0.3 ], [ 0.42, 0.72, 0.74, 0.74 ], [ 0.24, 1.08, 1.1, 1.1 ], [ 0.0, 1.27, 1.29, 1.29 ], [ -0.5, 1.36, 1.38, 1.36 ], [ -1.9, 1.32, 1.36, 1.3 ], [ -2.35, 1.28, 1.32, 1.26 ], [ -2.4, 0.9, 0.9, 0.9 ] ], 20, 2.0),   // a fitted sleeve: the cap rounded and no higher than the shoulder line, so no pads or square corners
+			sleeve: () => loft3D([ [ 0.5, 0.336, 0.336, 0.336 ], [ 0.42, 0.806, 0.829, 0.829 ], [ 0.24, 1.21, 1.232, 1.232 ], [ 0, 1.422, 1.445, 1.445 ], [ -0.5, 1.523, 1.546, 1.523 ], [ -1.9, 1.478, 1.523, 1.456 ], [ -2.35, 1.434, 1.478, 1.411 ], [ -2.4, 1.008, 1.008, 1.008 ] ], 20, 2.0),   // a fitted sleeve: the cap rounded and no higher than the shoulder line, so no pads or square corners
 			// The captain's armband on the left upper arm, just below the sleeve.
-			armband: () => loft3D([ [ -2.75, 1.18, 1.36, 1.2 ], [ -2.8, 1.23, 1.41, 1.25 ], [ -3.65, 1.16, 1.3, 1.17 ], [ -3.7, 1.1, 1.24, 1.1 ] ], 18, 2.0),
-			cuff: () => loft3D([ [ -2.05, 1.33, 1.37, 1.31 ], [ -2.4, 1.33, 1.37, 1.31 ], [ -2.45, 0.98, 0.98, 0.98 ] ], 20, 2.0),
+			armband: () => loft3D([ [ -2.75, 1.322, 1.523, 1.344 ], [ -2.8, 1.378, 1.579, 1.4 ], [ -3.65, 1.299, 1.456, 1.31 ], [ -3.7, 1.232, 1.389, 1.232 ] ], 18, 2.0),
+			cuff: () => loft3D([ [ -2.05, 1.49, 1.534, 1.467 ], [ -2.4, 1.49, 1.534, 1.467 ], [ -2.45, 1.098, 1.098, 1.098 ] ], 20, 2.0),
 			// A flat hand with the fingers together and a thumb in front.
 			// A relaxed hand, half closed: the palm with a wrist and knuckles, four fingers curled forward in
 			// two bends (shorter at the little finger), and a thumb along the side of the index finger.
@@ -17961,7 +17961,7 @@ td, th { font-variant-numeric: tabular-nums; }
 			// One arm from the shoulder to the wrist, bending at the elbow (5.6 below the shoulder).
 			arm: () => loft3D(LIMB_ARM3, 20, 2.0),
 			// A stripe in the trim colour round the top of the sock.
-			band: () => loft3D([ [ -0.58, 1.1, 1.08, 1.13 ], [ -0.63, 1.13, 1.12, 1.17 ], [ -0.93, 1.16, 1.2, 1.3 ], [ -0.98, 1.12, 1.15, 1.25 ] ], 16, 2.1),   // a thin stripe just outside the sock's top, never a dark collar
+			band: () => loft3D([ [ -0.58, 1.287, 1.264, 1.322 ], [ -0.63, 1.322, 1.31, 1.369 ], [ -0.93, 1.357, 1.404, 1.521 ], [ -0.98, 1.31, 1.345, 1.462 ] ], 16, 2.1),   // a thin stripe just outside the sock's top, never a dark collar
 			// The boot: lofted heel to toe (built along y, then laid along x with the sole underneath).
 			boot: () => {
 				const g = loft3D([ [ -1.3, 0.5, 0.46, 0.5, 0.22 ], [ -1.05, 0.76, 0.54, 1.0, 0.16 ], [ 0, 0.82, 0.52, 0.96, 0.18 ], [ 1.2, 0.86, 0.36, 0.56, 0.34 ], [ 2.4, 0.8, 0.28, 0.38, 0.42 ], [ 3.1, 0.62, 0.24, 0.26, 0.46 ], [ 3.5, 0.28, 0.2, 0.12, 0.5 ] ], 10, 2.3);
@@ -18229,7 +18229,7 @@ td, th { font-variant-numeric: tabular-nums; }
 			const root = new T.Object3D();
 			root.rotation.order = "YXZ";   // lean and roll in his own frame, then face the way he runs
 			const hips = node(root, 0, 15.6, 0), spine = node(hips, 0, 0.6, 0), chest = node(spine, 0, 5.4, 0), neck = node(chest, 0, 3.6, 0), head = node(neck, 0, 1.55, 0);
-			head.scale.setScalar(0.94);   // the head (and its hair, ears and nose) about 1/7.3 of his height, set down on a short neck
+			head.scale.setScalar(0.88);   // the head (and its hair, ears and nose) about 1/7.3 of his height, set down on a short neck
 			const sh = [ node(chest, 0, 2.75, -4.35), node(chest, 0, 2.75, 4.35) ], el = sh.map(s => node(s, 0, -5.6, 0)), ha = el.map(e => node(e, 0, -4.95, 0));
 			const hip = [ node(hips, 0, -1.0, -2.45), node(hips, 0, -1.0, 2.45) ], kn = hip.map(h => node(h, 0, -7.3, 0)), an = kn.map(k => node(k, 0, -6.5, 0));
 			rigs.push({ root, hips, spine, chest, neck, head, sh, el, ha, hip, kn, an });
@@ -18365,7 +18365,7 @@ td, th { font-variant-numeric: tabular-nums; }
 		if (still > 0 && !gk) {
 			const sd = p.build ? p.build.seed : 0.5, side = sd < 0.5 ? 0 : 1, sgn = side ? 1 : -1, free = 1 - side;
 			r.hips.position.z += sgn * 0.55 * still; r.hips.rotation.x -= sgn * 0.06 * still; r.chest.rotation.x += sgn * 0.05 * still;
-			go.fwd[free] += 1.3 * still; go.lift[free] += 0.25 * still; go.toe[free] -= 0.2 * still; go.crouch += 0.15 * still;   // the free foot eased forward, its knee soft and heel light
+			go.fwd[free] += 1.3 * still; go.lift[free] += 0.25 * still; go.toe[free] -= 0.2 * still; go.crouch += 0.15 * still; go.wide += 0.45 * still;   // the free foot eased forward, its knee soft and heel light; feet about hip width apart, not together
 			r.chest.rotation.y += (sd - 0.5) * 0.4 * still;
 			r.spine.rotation.z += Math.sin(idle * 1.3) * 0.015 * still;
 			// Arms hang loose: the elbow eased nearly straight (his own small bend), the palms turned in toward the thighs.
