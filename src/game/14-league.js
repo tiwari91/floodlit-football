@@ -203,6 +203,7 @@
 		if (league.round === JANUARY) { league.club.market = genMarket(); league.club.scoutLeft = 2 + staffLvl(league.club, "scout"); if (typeof windowEvents === "function") { windowEvents("January"); } if (typeof agentApproaches === "function") { agentApproaches("January"); } }
 		if (typeof assistRun === "function") { assistRun(league.round === JANUARY ? "January window" : "this week"); }
 		if (typeof cupNight === "function") { cupNight(); }   // a cup night between matchdays
+		if (typeof challengeNight === "function") { challengeNight(); }   // and the Challenge Cup's (18m)
 		if (typeof contNight === "function") { contNight(); }   // and a continental one
 		if (typeof intlNight === "function") { intlNight(); }   // and an international break (18j)
 		if (typeof contractAlerts === "function" && (league.round === JANUARY || league.round === league.fixtures.length - 10 || league.round === league.fixtures.length - 2)) { contractAlerts(); }

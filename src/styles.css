@@ -1527,3 +1527,5 @@ td, th { font-variant-numeric: tabular-nums; }
 	/* Owner investment and the spending rules (18l-owner-and-psr.js) */
 	.owner-box { margin: var(--sp-2) 0; }
 	.owner-acts { display: flex; gap: var(--sp-2); flex-wrap: wrap; margin-top: var(--sp-1); }
+	/* the Challenge Cup (18m-challenge-cup.js): giant-killings stand out in the round's list */
+	.cup-ties li.shock { color: var(--amber); }
