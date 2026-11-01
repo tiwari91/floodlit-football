@@ -180,6 +180,8 @@
 		}
 		if (state === "goal") {
 			celebrate();
+			varStep();
+			if (state !== "goal") { return; }   // VAR ruled it out: play goes on with the free kick
 			stepLimbs();
 			syncOwnedBall();
 			stepBall();
@@ -751,7 +753,7 @@
 		}
 		const kneeling = C.kneelAt >= 0 && T - C.kneelAt < 70;
 		if (C.kneelAt >= 0 && T === C.kneelAt + 1 && sc === homeSide) { roar(0.7); }   // the slide brings the fans up again
-		const home = T > (C.style === 7 ? 450 : 300) + (C.rp || 0);   // back for the restart (later when there is a replay first, or after the run to the bench)
+		const home = T > (C.style === 7 ? 450 : 300) + (C.rp || 0) + (varCheck ? VAR_LEN : 0);   // back for the restart (later when there is a replay first, or after the run to the bench)
 		for (const p of players) {
 			let tx = p.x, ty = p.y, spd = 0, acc = ACC_AI;
 			const scored = p.team === sc;
@@ -889,6 +891,7 @@
 			if (plan.mood !== "muted" && !own0 && !shoot && !tut && (window.__ffBenchCeleb || Math.random() < (plan.mood === "wild" ? 0.45 : 0.3)) && typeof benchSimX === "function") { style = 7; toBench = [ benchSimX(scorer), FH - 12 ]; }
 			celeb = { t: 0, hero, style, mood: plan.mood, comm: plan.comm, commDone: false, sulk: plan.sulk, mgr: plan.mgr, target: toBench || [ hero.x + dx / L * run, hero.y + dy / L * run ], kneelAt: -1, posedAt: -1, fetched: plan.mood === "muted", rp: goalTimer - GOAL_CELEB };
 			if (toBench) { goalTimer += 150; }   // two seconds more: the run to the bench is a long one
+			varOnGoal(scorer);   // perhaps a VAR check (21a)
 			tlc = null;   // no touchline cutaway over a goal
 			for (const p of players) { p.kneel = 0; p.sulk = 0; p.celebK = 0; p.hug = 0; }
 			if (plan.sulk === "costly") {

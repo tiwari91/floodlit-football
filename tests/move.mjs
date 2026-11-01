@@ -781,6 +781,21 @@ const rpBall = await page.evaluate(async () => {
 	return { n: out.length, bad: out.filter(o => !o.on || !o.near || !o.vis || o.pop < 60) };
 });
 check("replay (3D): the ball is drawn where it was in the clip, on screen and standing out, in both angles and any weather", !rpBall.skip && rpBall.n >= 12 && rpBall.bad.length === 0, JSON.stringify(rpBall));
+// VAR (21a): a goal sent to the video referee stops for the check; ruled out, the score goes back and play
+// goes on with the defenders' free kick; standing, the goal counts and the celebration carries on.
+const varRes = {};
+for (const how of [ "out", "stand" ]) {
+	await page.evaluate(h => { const F = window.__ff; window.__ffVar = h; F.timeLeft = 1e9; F.freeze = 0; }, how);
+	await page.waitForFunction(() => window.__ff.state === "play", null, { timeout: 20000 }).catch(() => {});
+	const before = await page.evaluate(() => window.__ff.score[0]);
+	await page.evaluate(() => window.__ff.forceGoal(0));
+	const checked = await page.waitForFunction(() => /VAR check/.test(document.getElementById("banner").textContent), null, { timeout: 15000 }).then(() => true).catch(() => false);
+	await page.waitForFunction(() => /Goal stands|No goal/.test(document.getElementById("banner").textContent), null, { timeout: 20000 }).catch(() => {});
+	varRes[how] = await page.evaluate(b => ({ banner: document.getElementById("banner").textContent, state: window.__ff.state, goals: window.__ff.score[0] - b }), before);
+	varRes[how].checked = checked;
+	await page.evaluate(() => { window.__ffVar = null; });
+}
+check("VAR: a checked goal is ruled out (score back, play on with a free kick) or stands (it counts)", varRes.out.checked && varRes.out.banner === "No goal" && varRes.out.goals === 0 && varRes.out.state === "play" && varRes.stand.checked && varRes.stand.banner === "Goal stands" && varRes.stand.goals === 1, JSON.stringify(varRes));
 check("no errors after the woodwork checks (and no 3D failure)", errs.length === 0 && !errs.some(e => /3D view failed/.test(e)), errs.join(" | "));
 await browser.close(); server.stop();
 process.exit(done() ? 1 : 0);

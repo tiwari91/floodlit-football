@@ -18,6 +18,7 @@
 	const OFFSIDE_FREE = new Set([ "throw", "goalkick", "corner" ]);
 
 	function markOffside (kicker) {
+		lastPassOffside = offside;   // the picture at the pass before this kick: what VAR checks after a goal (21a)
 		offside = { team: kicker.team, set: new Set(), margin: new Map(), line: 0 };
 		// No offside from a throw-in, a goal kick or a corner (a free kick, though, can play a man offside).
 		if (!offsideOn() || (deadBall && deadBall.taker === kicker && OFFSIDE_FREE.has(deadBall.kind))) { return; }

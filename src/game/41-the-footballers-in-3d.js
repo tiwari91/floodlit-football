@@ -939,7 +939,7 @@
 		}
 		// Recorded movement over the coded run, for the players (not standing, where the coded stance and its
 		// gestures stay, nor in an action, a fall, a dive, a celebration or shielding the ball).
-		if (!rm && !acting && cel <= 0 && kneel <= 0 && fall < 0 && dive < 0 && !down && !gk && a > 0.06 && p.team >= 0 && p.role !== "staff" && !(p.shieldW > 0)) {
+		if (!rm && !acting && cel <= 0 && kneel <= 0 && fall < 0 && dive < 0 && !down && !gk && a > 0.06 && p.team >= 0 && p.role !== "staff" && !(p.shieldW > 0) && !(p.headHands > 0) && !(p.fistPump > 0) && !(p.hug > 0) && !(p.flare > 0)) {   // not over a gesture: hands on the head, a fist pump, a hug, a flare-up
 			const ms = (r.mir || 1) > 0 ? 0 : 1;
 			if (animLand3[ms] === null && G.feet && G.feet[0] && G.feet[0].st && a > 0.4 && r.wasSwing0) { animLand3[ms] = ph; }
 			r.wasSwing0 = G.feet && G.feet[0] && !G.feet[0].st;

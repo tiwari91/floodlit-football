@@ -8999,6 +8999,7 @@ td, th { font-variant-numeric: tabular-nums; }
 	const OFFSIDE_FREE = new Set([ "throw", "goalkick", "corner" ]);
 
 	function markOffside (kicker) {
+		lastPassOffside = offside;   // the picture at the pass before this kick: what VAR checks after a goal (21a)
 		offside = { team: kicker.team, set: new Set(), margin: new Map(), line: 0 };
 		// No offside from a throw-in, a goal kick or a corner (a free kick, though, can play a man offside).
 		if (!offsideOn() || (deadBall && deadBall.taker === kicker && OFFSIDE_FREE.has(deadBall.kind))) { return; }
@@ -9361,6 +9362,77 @@ td, th { font-variant-numeric: tabular-nums; }
 
 	const openness = m => Math.min(...players.filter(q => q.team !== m.team).map(q => dist(q, m)));
 
+	/* ---------- VAR ----------
+	   The video referee checks some goals. A goal by a man who was within a stride of the offside line when
+	   the ball was played to him is always checked; any other goal now and then (a possible foul in the
+	   build-up). The celebration stops, VAR CHECK goes up on the banner and the big screen and the crowd waits,
+	   then the decision: beyond the line by any margin (or the foul): the goal is ruled out, the score goes
+	   back and the defenders take a free kick from where it happened; otherwise the goal stands and the
+	   celebration carries on. Not in the tutorial or a shoot-out, and no offside check with offside off.
+	   Test hook: window.__ffVar = "out" or "stand" forces a build-up check with that outcome. */
+	let varCheck = null;   // { scorer, kind, off, d, at, by, spot, started, decided }
+	let lastPassOffside = null;   // the offside picture at the pass before the last kick (the shot)
+	const VAR_LEN = 240, VAR_AT = 130;   // frames of checking (4 s), from this far into the celebration
+	function varOnGoal (scorer) {
+		varCheck = null;
+		if (shoot || tut || bulkSim || mode === "tutorial") { return; }
+		const by = ball.lastBy;
+		if (!by || by.team !== scorer) { return; }   // own goals are not checked
+		const P = lastPassOffside, mg = P && P.team === scorer && P.margin ? P.margin.get(by) : null, force = window.__ffVar;
+		let kind = null, off = false, d = 0;
+		if (mg && offsideOn() && !force) { kind = "offside"; d = mg.d; off = d > 0.4; }
+		else if (force || Math.random() < 0.07) { kind = "foul"; off = force ? force === "out" : Math.random() < 0.3; }
+		if (!kind) { return; }
+		varCheck = { scorer, kind, off, d, at: VAR_AT, by, spot: { x: clamp(mg ? mg.x : by.x, 20, FW - 20), y: clamp(mg ? mg.y : by.y, 20, FH - 20) }, started: false, decided: false };
+		goalTimer += VAR_LEN + 60;
+	}
+	const varChecking = () => !!(varCheck && celeb && varCheck.started && !varCheck.decided);
+	// Each frame of a goal (after the celebration's step). Returns true while the check is on.
+	function varStep () {
+		const V = varCheck;
+		if (!V || !celeb || V.decided) { return false; }
+		const T = celeb.t, who = V.by.name || teamName(V.scorer);
+		if (!V.started && T >= V.at) {
+			V.started = true;
+			banner.textContent = "VAR check"; banner.className = "banner call " + (V.scorer === 0 ? "home" : "away"); banner.hidden = false;
+			caption("VAR", "review", V.kind === "offside" ? "Checking for offside" : "Checking the build-up", `${who} · ${minuteNow()}'`, V.scorer);
+			$("announce").textContent = "The video referee is checking the goal.";
+			if (typeof crowdHush !== "undefined") { crowdHush = Math.max(crowdHush, VAR_LEN); }
+		}
+		if (!V.started) { return false; }
+		if (T < V.at + VAR_LEN) {
+			for (const p of players) { p.vx *= 0.8; p.vy *= 0.8; p.celebA = (p.celebA || 0) * 0.95; p.hug = (p.hug || 0) * 0.9; p.kneel = (p.kneel || 0) * 0.9; }
+			return true;
+		}
+		V.decided = true;
+		if (!V.off) {
+			banner.textContent = "Goal stands"; banner.className = "banner goal " + (V.scorer === 0 ? "home" : "away"); banner.hidden = false;
+			caption("Goal stands", "review", V.kind === "offside" ? `Onside by ${cm(V.d)}` : "No foul", who, V.scorer);
+			if (typeof roar === "function") { roar(0.8); }
+			return false;
+		}
+		// Ruled out: the score, the log and the scorers go back, and the defenders take the free kick.
+		score[V.scorer] = Math.max(0, score[V.scorer] - 1);
+		tally.goals[V.scorer] = Math.max(0, tally.goals[V.scorer] - 1);
+		for (let i = matchLog.length - 1; i >= 0; i--) { if (matchLog[i].kind === "goal" && matchLog[i].team === V.scorer) { matchLog.splice(i, 1); break; } }
+		const list = V.scorer === 0 ? matchGoals : matchGoalsOpp, at = list.lastIndexOf(V.by.name);
+		if (at >= 0) { list.splice(at, 1); }
+		logEvent(V.scorer, "var", `${who}: goal ruled out by VAR (${V.kind === "offside" ? "offside" : "foul in the build-up"})`);
+		caption("Goal ruled out", "review", V.kind === "offside" ? `Offside by ${cm(V.d)}` : "Foul in the build-up", who, V.scorer);
+		banner.textContent = "No goal"; banner.className = "banner call " + (V.scorer === 0 ? "away" : "home"); banner.hidden = false;
+		setTimeout(() => { if (banner.textContent === "No goal") { banner.hidden = true; } }, 1800);
+		$("announce").textContent = `VAR: no goal. ${score[0]} to ${score[1]}.`;
+		if (V.scorer === homeSide && typeof crowdBoo === "function") { crowdBoo(1.1); }
+		for (const p of players) { p.celebA = 0; p.celebK = 0; p.hug = 0; p.kneel = 0; p.sulk = 0; p.jump = 0; p.headHands = 0; }
+		celeb = null; replay = null; goalTimer = 0; state = "play";
+		const defs = players.filter(q => q.team !== V.scorer && q.role !== "gk"), taker = defs.reduce((a, b) => (dist(a, V.spot) < dist(b, V.spot) ? a : b));
+		taker.dir = taker.team === 0 ? 0 : Math.PI;
+		if (V.kind === "offside") { tally.offsides[V.scorer]++; }
+		awardFreeKick(taker.team, taker, { taker, spot: V.spot, indirect: V.kind === "offside", quiet: true });
+		freeze = 60;
+		varCheck = null;
+		return false;
+	}
 	/* ---------- human actions ---------- */
 	// Opponents (of team `side`, red by default) standing in the line between two points.
 	function laneBlockers (a, b, side = 1) {
@@ -10636,6 +10708,8 @@ td, th { font-variant-numeric: tabular-nums; }
 		}
 		if (state === "goal") {
 			celebrate();
+			varStep();
+			if (state !== "goal") { return; }   // VAR ruled it out: play goes on with the free kick
 			stepLimbs();
 			syncOwnedBall();
 			stepBall();
@@ -11207,7 +11281,7 @@ td, th { font-variant-numeric: tabular-nums; }
 		}
 		const kneeling = C.kneelAt >= 0 && T - C.kneelAt < 70;
 		if (C.kneelAt >= 0 && T === C.kneelAt + 1 && sc === homeSide) { roar(0.7); }   // the slide brings the fans up again
-		const home = T > (C.style === 7 ? 450 : 300) + (C.rp || 0);   // back for the restart (later when there is a replay first, or after the run to the bench)
+		const home = T > (C.style === 7 ? 450 : 300) + (C.rp || 0) + (varCheck ? VAR_LEN : 0);   // back for the restart (later when there is a replay first, or after the run to the bench)
 		for (const p of players) {
 			let tx = p.x, ty = p.y, spd = 0, acc = ACC_AI;
 			const scored = p.team === sc;
@@ -11345,6 +11419,7 @@ td, th { font-variant-numeric: tabular-nums; }
 			if (plan.mood !== "muted" && !own0 && !shoot && !tut && (window.__ffBenchCeleb || Math.random() < (plan.mood === "wild" ? 0.45 : 0.3)) && typeof benchSimX === "function") { style = 7; toBench = [ benchSimX(scorer), FH - 12 ]; }
 			celeb = { t: 0, hero, style, mood: plan.mood, comm: plan.comm, commDone: false, sulk: plan.sulk, mgr: plan.mgr, target: toBench || [ hero.x + dx / L * run, hero.y + dy / L * run ], kneelAt: -1, posedAt: -1, fetched: plan.mood === "muted", rp: goalTimer - GOAL_CELEB };
 			if (toBench) { goalTimer += 150; }   // two seconds more: the run to the bench is a long one
+			varOnGoal(scorer);   // perhaps a VAR check (21a)
 			tlc = null;   // no touchline cutaway over a goal
 			for (const p of players) { p.kneel = 0; p.sulk = 0; p.celebK = 0; p.hug = 0; }
 			if (plan.sulk === "costly") {
@@ -17183,11 +17258,15 @@ td, th { font-variant-numeric: tabular-nums; }
 	function screen3D () {
 		const S = G3.screen, g = S && S.cv.getContext && S.cv.getContext("2d");
 		if (!g) { return; }
-		const goal = state === "goal" && Math.floor(performance.now() / 400) % 2 === 0, k = `${score[0]}-${score[1]}|${minuteNow()}|${goal}|${KITS[0].outfield}${KITS[1].outfield}`;
+		const vc = typeof varChecking === "function" && varChecking(), goal = !vc && state === "goal" && Math.floor(performance.now() / 400) % 2 === 0, k = `${score[0]}-${score[1]}|${minuteNow()}|${goal}|${vc}|${KITS[0].outfield}${KITS[1].outfield}`;
 		if (S.key === k) { return; }
 		S.key = k;
 		g.fillStyle = "#06090c"; g.fillRect(0, 0, 512, 160);
-		if (goal) {
+		if (vc) {
+			g.fillStyle = "#1b2d6b"; g.fillRect(0, 0, 512, 160);
+			g.fillStyle = "#ffffff"; g.font = "900 78px 'Big Shoulders Display', Impact, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("VAR CHECK", 256, 66);
+			g.font = "700 28px 'Big Shoulders Display', Impact, sans-serif"; g.fillStyle = "#b9c6ee"; g.fillText(varCheck.kind === "offside" ? "POSSIBLE OFFSIDE" : "CHECKING THE BUILD-UP", 256, 128);
+		} else if (goal) {
 			g.fillStyle = KITS[lastScorer === 1 ? 1 : 0].outfield; g.fillRect(0, 0, 512, 160);
 			g.fillStyle = lum(KITS[lastScorer === 1 ? 1 : 0].outfield) > 0.5 ? "#0b0d10" : "#ffffff"; g.font = "900 104px 'Big Shoulders Display', Impact, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("GOAL!", 256, 86);
 		} else {
@@ -18970,7 +19049,7 @@ td, th { font-variant-numeric: tabular-nums; }
 		}
 		// Recorded movement over the coded run, for the players (not standing, where the coded stance and its
 		// gestures stay, nor in an action, a fall, a dive, a celebration or shielding the ball).
-		if (!rm && !acting && cel <= 0 && kneel <= 0 && fall < 0 && dive < 0 && !down && !gk && a > 0.06 && p.team >= 0 && p.role !== "staff" && !(p.shieldW > 0)) {
+		if (!rm && !acting && cel <= 0 && kneel <= 0 && fall < 0 && dive < 0 && !down && !gk && a > 0.06 && p.team >= 0 && p.role !== "staff" && !(p.shieldW > 0) && !(p.headHands > 0) && !(p.fistPump > 0) && !(p.hug > 0) && !(p.flare > 0)) {   // not over a gesture: hands on the head, a fist pump, a hug, a flare-up
 			const ms = (r.mir || 1) > 0 ? 0 : 1;
 			if (animLand3[ms] === null && G.feet && G.feet[0] && G.feet[0].st && a > 0.4 && r.wasSwing0) { animLand3[ms] = ph; }
 			r.wasSwing0 = G.feet && G.feet[0] && !G.feet[0].st;
@@ -21391,7 +21470,7 @@ td, th { font-variant-numeric: tabular-nums; }
 		return REPLAY_FR;
 	}
 	// After a run to the bench (style 7) the replay waits until the celebration on the touchline has been seen.
-	const rpAt = () => REPLAY_AT + (celeb && celeb.style === 7 ? REPLAY_BENCH : 0);
+	const rpAt = () => REPLAY_AT + (celeb && celeb.style === 7 ? REPLAY_BENCH : 0) + (varCheck ? VAR_LEN + 40 : 0);   // and after a VAR check (21a)
 	const replayOn = () => !!(replay && replay.len > 0 && state === "goal" && celeb && celeb.t >= rpAt() && celeb.t < rpAt() + REPLAY_FR && goalTimer > 70 && view3D());
 	// Where the clip is: a fractional frame, 0 at the start. The build-up runs a little quicker, then the
 	// last second or so (the shot and the ball going in) slows right down for the angle from behind the goal;

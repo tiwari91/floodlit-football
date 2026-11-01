@@ -451,11 +451,15 @@
 	function screen3D () {
 		const S = G3.screen, g = S && S.cv.getContext && S.cv.getContext("2d");
 		if (!g) { return; }
-		const goal = state === "goal" && Math.floor(performance.now() / 400) % 2 === 0, k = `${score[0]}-${score[1]}|${minuteNow()}|${goal}|${KITS[0].outfield}${KITS[1].outfield}`;
+		const vc = typeof varChecking === "function" && varChecking(), goal = !vc && state === "goal" && Math.floor(performance.now() / 400) % 2 === 0, k = `${score[0]}-${score[1]}|${minuteNow()}|${goal}|${vc}|${KITS[0].outfield}${KITS[1].outfield}`;
 		if (S.key === k) { return; }
 		S.key = k;
 		g.fillStyle = "#06090c"; g.fillRect(0, 0, 512, 160);
-		if (goal) {
+		if (vc) {
+			g.fillStyle = "#1b2d6b"; g.fillRect(0, 0, 512, 160);
+			g.fillStyle = "#ffffff"; g.font = "900 78px 'Big Shoulders Display', Impact, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("VAR CHECK", 256, 66);
+			g.font = "700 28px 'Big Shoulders Display', Impact, sans-serif"; g.fillStyle = "#b9c6ee"; g.fillText(varCheck.kind === "offside" ? "POSSIBLE OFFSIDE" : "CHECKING THE BUILD-UP", 256, 128);
+		} else if (goal) {
 			g.fillStyle = KITS[lastScorer === 1 ? 1 : 0].outfield; g.fillRect(0, 0, 512, 160);
 			g.fillStyle = lum(KITS[lastScorer === 1 ? 1 : 0].outfield) > 0.5 ? "#0b0d10" : "#ffffff"; g.font = "900 104px 'Big Shoulders Display', Impact, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("GOAL!", 256, 86);
 		} else {

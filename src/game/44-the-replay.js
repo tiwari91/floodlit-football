@@ -43,7 +43,7 @@
 		return REPLAY_FR;
 	}
 	// After a run to the bench (style 7) the replay waits until the celebration on the touchline has been seen.
-	const rpAt = () => REPLAY_AT + (celeb && celeb.style === 7 ? REPLAY_BENCH : 0);
+	const rpAt = () => REPLAY_AT + (celeb && celeb.style === 7 ? REPLAY_BENCH : 0) + (varCheck ? VAR_LEN + 40 : 0);   // and after a VAR check (21a)
 	const replayOn = () => !!(replay && replay.len > 0 && state === "goal" && celeb && celeb.t >= rpAt() && celeb.t < rpAt() + REPLAY_FR && goalTimer > 70 && view3D());
 	// Where the clip is: a fractional frame, 0 at the start. The build-up runs a little quicker, then the
 	// last second or so (the shot and the ball going in) slows right down for the angle from behind the goal;
