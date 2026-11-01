@@ -125,6 +125,13 @@ for (let v = 0; v < nv; v++) {
 	else if (top.startsWith("sh")) { const i = +top[2], d = Math.abs(p[2] - jpos[sideName("upperarm", i)][2]); R = d < 0.13 ? 1 : 5; }
 	else if (top.startsWith("el")) { R = 5; }
 	else if (top.startsWith("ha")) { R = 6; }
+	// the kit's trim: the collar, the sleeve cuffs and a band round the sock tops (7); the captain's band on
+	// the left upper arm (8)
+	const armD = top.startsWith("sh") ? Math.abs(p[2] - jpos[sideName("upperarm", +top[2])][2]) : -1;
+	if (R === 1 && !top.startsWith("sh") && y > 1.455) { R = 7; }
+	else if (R === 1 && armD >= 0.105) { R = 7; }
+	else if (R === 3 && y > 0.43) { R = 7; }
+	if (top === "sh0" && armD >= 0.14 && armD <= 0.21) { R = 8; }
 	reg[v] = R;
 }
 // The kit sits off the skin: the shirt a little, the shorts more (loose, and wider toward the hem).
@@ -156,5 +163,5 @@ for (const v of order) { buf.writeUInt8(reg[v], o++); }
 for (const i of keep) { buf.writeUInt16LE(used[i], o); o += 2; }
 fs.mkdirSync(path.join(root, "assets"), { recursive: true });
 fs.writeFileSync(path.join(root, "assets", "body.bin"), buf);
-const counts = [ 0, 0, 0, 0, 0, 0, 0 ]; for (const v of order) { counts[reg[v]]++; }
-console.log(`assets/body.bin: ${m} vertices, ${keep.length / 3} triangles, ${buf.length} bytes; skin/shirt/shorts/sock/boot/arm/hand ${counts.join("/")}`);
+const counts = [ 0, 0, 0, 0, 0, 0, 0, 0, 0 ]; for (const v of order) { counts[reg[v]]++; }
+console.log(`assets/body.bin: ${m} vertices, ${keep.length / 3} triangles, ${buf.length} bytes; skin/shirt/shorts/sock/boot/arm/hand/trim/band ${counts.join("/")}`);

@@ -286,6 +286,7 @@
 		let box = $("lgDrama");
 		if (!box) { box = el("div", "lg-drama"); box.id = "lgDrama"; side.prepend(box); }
 		box.replaceChildren();
+		if (typeof renderPaper === "function") { renderPaper(box); }   // the papers' back page (18k)
 		box.append(el("h4", "", "Dressing room"), el("p", "detail", `Mood: ${roomWord(d.room)} (${d.room}) · Fans: ${fansWord(d.fans)} (${d.fans}) · Board: ${boardWord(d.board)} (${d.board})`));
 		const ul = el("ul", "drama-issues");
 		ul.style.cssText = "list-style:none;padding:0;margin:8px 0";

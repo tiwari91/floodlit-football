@@ -40,6 +40,11 @@
 		lg.jobOffers = shuffle(pool).slice(0, pos <= 4 ? 2 : 1).map(id => ({ id, kind: "home", str: getStr(id), budget: round1(1 + getStr(id) * 0.9), below: !lg.members.includes(id), season: lg.season }));
 		// A good season draws a club from abroad too.
 		if (pos <= Math.max(6, Math.floor(n / 3))) { lg.jobOffers.push(abroadOffer(pos)); }
+		// Sacked (the board had lost patience, 18k): only weaker clubs will have you, and you must take one.
+		if (typeof sackCheck === "function" && sackCheck(lg)) {
+			const weak = below.length ? below : inDiv.filter(id => getStr(id) <= me).sort((a, b) => getStr(a) - getStr(b));
+			lg.jobOffers = shuffle(weak.length ? weak : inDiv).slice(0, 2).map(id => ({ id, kind: "home", str: getStr(id), budget: round1(1 + getStr(id) * 0.9), below: !lg.members.includes(id), season: lg.season }));
+		}
 		// What you agreed with your agent in January comes first.
 		if (lg.agreed) { lg.jobOffers.unshift({ ...lg.agreed, agreed: true }); lg.agreed = null; }
 		lg.career = { ...(lg.career || { clubs: [ YOU.name ] }), history: [ ...((lg.career && lg.career.history) || []), { season: lg.season, club: YOU.name, pos } ] };
@@ -158,7 +163,9 @@
 			if (!o.agreed && typeof intlAsk === "function") { return intlAsk(key); }
 			if (typeof intlEndJob === "function") { intlEndJob(league, "club"); }
 		}
-		return o.abroad ? moveAbroad(o) : takeJob(o.id);
+		const ok = o.abroad ? moveAbroad(o) : takeJob(o.id);
+		if (ok && typeof freshStart === "function") { freshStart(league); }   // a new club: the fans, the board and the dressing room start again (18k)
+		return ok;
 	}
 	function declineJob (id) {
 		if (!league) { return; }
@@ -207,6 +214,7 @@
 		ul.replaceChildren();
 		const offers = league ? (league.jobOffers || []) : [], best = bestOffer(offers);
 		title.hidden = !offers.length;
+		title.textContent = league && league.sacked === league.season ? "Sacked: clubs who will have you" : "Job offers";
 		const intlN = typeof renderIntlOffers === "function" ? renderIntlOffers(ul) : 0;   // a country's offer, or the FA's question (18j)
 		if (intlN) { title.hidden = false; }
 		for (const o of offers) {
@@ -214,6 +222,7 @@
 			li.append(el("span", "pos", o.agreed ? "AGREED" : isBest ? "BEST MOVE" : "JOB"), el("span", "who", offerWho(o) + (o.agreed ? " (agreed in January)" : "")));
 			const btns = el("span", "bids");
 			const a = el("button", "", o.abroad ? "Move abroad" : "Take the job"); a.type = "button"; a.addEventListener("click", () => takeOffer(key));
+			if (league.sacked === league.season) { btns.append(a); li.append(btns); li.append(el("span", "ratings", "You were sacked: take one of these jobs before next season.")); ul.append(li); continue; }
 			const r = el("button", "", "Decline"); r.type = "button"; r.addEventListener("click", () => (o.abroad ? (league.jobOffers = league.jobOffers.filter(x => offerKey(x) !== key), afterClubChange()) : declineJob(o.id)));
 			btns.append(a, r); li.append(btns);
 			const carry = "Your coaching staff, training plan and facilities come with you.";

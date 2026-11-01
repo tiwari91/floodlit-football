@@ -88,6 +88,7 @@
 				showOverlay(`${tn(league.intl.comp)}: your squad`, `The ${tn(league.intl.comp)} finals start now. Pick your 23 in the Squad tab (auto-pick is on unless you choose) and set the formation, then play the first game.`, "Play the first game");
 				renderLeague(); renderIntlSquad(); return;
 			}
+			if (mode === "league" && seasonDone() && typeof sackedNow === "function" && sackedNow()) { toast("You were sacked: take one of the jobs on offer first", "#e05a4f"); renderLeague(); return; }   // (18k)
 			if (mode === "league" && seasonDone() && (typeof intlSummerSettle !== "function" || intlSummerSettle())) { newSeason(league.fmt); renderLeague(); renderShapes(); }
 			clearLive();
 			newMatch();
@@ -156,7 +157,7 @@
 			const rows = standings(), pos = rows.findIndex(r => r.id === 0) + 1, pts = rows[pos - 1].pts;
 			if (seasonDone() && !leagueMatch.intl) {
 				nudge = (rows[0].id === 0 ? `You are champions with ${pts} points!` : `Season over: ${TEAMS[rows[0].id].name} are champions. You finished ${ordinal(pos)}.`) +
-					` Prize money: ${money(league.prize || 0)}. The transfer window is open below the pitch.${typeof intlSummerNote === "function" ? intlSummerNote() : ""}`;
+					`${league.sacked === league.season ? " The board have sacked you: pick one of the clubs who will have you, below the pitch." : ""} Prize money: ${money(league.prize || 0)}. The transfer window is open below the pitch.${typeof intlSummerNote === "function" ? intlSummerNote() : ""}`;
 				btn = `Start season ${league.season + 1}`;
 			} else {
 				nudge = `You are ${ordinal(pos)} on ${pts} point${pts === 1 ? "" : "s"}.`;

@@ -676,6 +676,11 @@
 	.lg-drama h4 { margin: 0 0 6px; font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
 	.lg-drama .detail { margin: 0 0 6px; font-size: 13px; }
 	.lg-drama .fine { margin: 0; }
+	.lg-drama .paper { background: #f1ece0; color: #1b1a17; border-radius: 4px; padding: 10px 12px 8px; margin: 0 0 14px; font-family: Georgia, "Times New Roman", serif; }
+	.lg-drama .paper-mast { display: block; font: 700 10px/1 var(--font, sans-serif); letter-spacing: 0.18em; color: #8a1c1c; border-bottom: 2px solid #1b1a17; padding-bottom: 5px; margin-bottom: 6px; }
+	.lg-drama .paper-head { margin: 0 0 6px; font: 900 21px/1.08 Georgia, "Times New Roman", serif; letter-spacing: -0.01em; text-transform: uppercase; }
+	.lg-drama .paper-lines { list-style: none; margin: 0; padding: 0; font-size: 13px; line-height: 1.35; }
+	.lg-drama .paper-lines li + li { margin-top: 4px; padding-top: 4px; border-top: 1px solid #cfc7b6; }
 	.lg-drama ul { font-size: 13px; }
 	.lg-up h4 { margin: 0 0 6px; font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
 	.upcoming { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
@@ -5294,6 +5299,11 @@ td, th { font-variant-numeric: tabular-nums; }
 		lg.jobOffers = shuffle(pool).slice(0, pos <= 4 ? 2 : 1).map(id => ({ id, kind: "home", str: getStr(id), budget: round1(1 + getStr(id) * 0.9), below: !lg.members.includes(id), season: lg.season }));
 		// A good season draws a club from abroad too.
 		if (pos <= Math.max(6, Math.floor(n / 3))) { lg.jobOffers.push(abroadOffer(pos)); }
+		// Sacked (the board had lost patience, 18k): only weaker clubs will have you, and you must take one.
+		if (typeof sackCheck === "function" && sackCheck(lg)) {
+			const weak = below.length ? below : inDiv.filter(id => getStr(id) <= me).sort((a, b) => getStr(a) - getStr(b));
+			lg.jobOffers = shuffle(weak.length ? weak : inDiv).slice(0, 2).map(id => ({ id, kind: "home", str: getStr(id), budget: round1(1 + getStr(id) * 0.9), below: !lg.members.includes(id), season: lg.season }));
+		}
 		// What you agreed with your agent in January comes first.
 		if (lg.agreed) { lg.jobOffers.unshift({ ...lg.agreed, agreed: true }); lg.agreed = null; }
 		lg.career = { ...(lg.career || { clubs: [ YOU.name ] }), history: [ ...((lg.career && lg.career.history) || []), { season: lg.season, club: YOU.name, pos } ] };
@@ -5412,7 +5422,9 @@ td, th { font-variant-numeric: tabular-nums; }
 			if (!o.agreed && typeof intlAsk === "function") { return intlAsk(key); }
 			if (typeof intlEndJob === "function") { intlEndJob(league, "club"); }
 		}
-		return o.abroad ? moveAbroad(o) : takeJob(o.id);
+		const ok = o.abroad ? moveAbroad(o) : takeJob(o.id);
+		if (ok && typeof freshStart === "function") { freshStart(league); }   // a new club: the fans, the board and the dressing room start again (18k)
+		return ok;
 	}
 	function declineJob (id) {
 		if (!league) { return; }
@@ -5461,6 +5473,7 @@ td, th { font-variant-numeric: tabular-nums; }
 		ul.replaceChildren();
 		const offers = league ? (league.jobOffers || []) : [], best = bestOffer(offers);
 		title.hidden = !offers.length;
+		title.textContent = league && league.sacked === league.season ? "Sacked: clubs who will have you" : "Job offers";
 		const intlN = typeof renderIntlOffers === "function" ? renderIntlOffers(ul) : 0;   // a country's offer, or the FA's question (18j)
 		if (intlN) { title.hidden = false; }
 		for (const o of offers) {
@@ -5468,6 +5481,7 @@ td, th { font-variant-numeric: tabular-nums; }
 			li.append(el("span", "pos", o.agreed ? "AGREED" : isBest ? "BEST MOVE" : "JOB"), el("span", "who", offerWho(o) + (o.agreed ? " (agreed in January)" : "")));
 			const btns = el("span", "bids");
 			const a = el("button", "", o.abroad ? "Move abroad" : "Take the job"); a.type = "button"; a.addEventListener("click", () => takeOffer(key));
+			if (league.sacked === league.season) { btns.append(a); li.append(btns); li.append(el("span", "ratings", "You were sacked: take one of these jobs before next season.")); ul.append(li); continue; }
 			const r = el("button", "", "Decline"); r.type = "button"; r.addEventListener("click", () => (o.abroad ? (league.jobOffers = league.jobOffers.filter(x => offerKey(x) !== key), afterClubChange()) : declineJob(o.id)));
 			btns.append(a, r); li.append(btns);
 			const carry = "Your coaching staff, training plan and facilities come with you.";
@@ -6121,6 +6135,7 @@ td, th { font-variant-numeric: tabular-nums; }
 		let box = $("lgDrama");
 		if (!box) { box = el("div", "lg-drama"); box.id = "lgDrama"; side.prepend(box); }
 		box.replaceChildren();
+		if (typeof renderPaper === "function") { renderPaper(box); }   // the papers' back page (18k)
 		box.append(el("h4", "", "Dressing room"), el("p", "detail", `Mood: ${roomWord(d.room)} (${d.room}) · Fans: ${fansWord(d.fans)} (${d.fans}) · Board: ${boardWord(d.board)} (${d.board})`));
 		const ul = el("ul", "drama-issues");
 		ul.style.cssText = "list-style:none;padding:0;margin:8px 0";
@@ -6317,7 +6332,9 @@ td, th { font-variant-numeric: tabular-nums; }
 			}
 		}
 		if (d.board < 25 && !d.warned) { d.warned = true; dramaLog("The board have warned you: results must improve, and soon."); }
-		if (d.board >= 40) { d.warned = false; }
+		if (d.board < 20 && !d.voted) { d.voted = true; dramaLog("The chairman has given you a public vote of confidence. In football, that rarely ends well."); league.news = `${league.news || ""} The chairman says you have the board's full backing.`.trim(); }
+		if (d.board >= 40) { d.warned = false; d.voted = false; }
+		writePaper(d, made, gf, ga, home);
 		return made;
 	}
 	// The buttons for each kind (18e's choicesFor asks here first).
@@ -6401,6 +6418,62 @@ td, th { font-variant-numeric: tabular-nums; }
 		if (!pl || !d || !Number.isFinite(d.fans) || d.fans >= 55 || roleOf(pl, league.club) !== "key") { return; }
 		if (typeof crowdBoo === "function") { crowdBoo(0.8); }
 		toast(`Boos as ${outName} goes off`, "#e05a4f");
+	}
+	// ---------- the sack ----------
+	// At the end of the season, a board that has lost patience (under 25) sacks you: only weaker clubs offer
+	// jobs, and you must take one before the next season starts. During the season a board under 20 gives you
+	// the public vote of confidence first. A new club starts the moods again.
+	function sackCheck (lg) {
+		const d = lg && lg.drama;
+		if (!d || !Number.isFinite(d.board) || d.board >= 25 || (lg.intl && lg.intl.only)) { return false; }
+		lg.sacked = lg.season;
+		lg.news = `${lg.news || ""} The board have sacked you after ${d.form.filter(x => x === "L").length} defeats in your last ${d.form.length} games. Only smaller clubs will talk to you now.`.trim();
+		dramaLog("You have been sacked. Take one of the jobs on offer before next season.");
+		return true;
+	}
+	const sackedNow = () => !!(league && league.sacked === league.season && (league.jobOffers || []).length);
+	function freshStart (lg) {
+		const d = lg && ensureDrama(lg);
+		if (!d) { return; }
+		d.fans = 65; d.board = 65; d.room = 70; d.form = []; d.lowRoom = 0; d.warned = false; d.voted = false;
+		d.issues = d.issues.filter(i => i.kind === "contract" || i.kind === "signing");
+		lg.sacked = null;
+	}
+	// ---------- the back page ----------
+	// After each league match the papers have their say: one headline from the biggest story of the week (a
+	// sacking talk, a bust-up, a hammering, a hero) and the other stories under it. Shown in the League panel.
+	function writePaper (d, made, gf, ga, home) {
+		const lm = leagueMatch || {}, opp = TEAMS[lm.opp] ? TEAMS[lm.opp].name : "the visitors", me = YOU.short || YOU.name, kinds = new Set(made.map(i => i.kind));
+		const scorer = matchGoals.length ? matchGoals.slice().sort((a, b) => matchGoals.filter(n => n === b).length - matchGoals.filter(n => n === a).length)[0] : null;
+		const n = scorer ? matchGoals.filter(x => x === scorer).length : 0, sur = s => String(s || "").split(" ").pop().toUpperCase();
+		const life = made.find(i => i.kind === "life"), conf = made.find(i => i.kind === "confront"), fight = made.find(i => i.kind === "training");
+		let head;
+		if (d.voted && d.board < 20) { head = "CHAIRMAN BACKS UNDER-FIRE BOSS"; }
+		else if (kinds.has("faith")) { head = "PLAYERS GO TO THE BOARD"; }
+		else if (ga - gf >= 3) { head = `${me.toUpperCase()} HUMILIATED`; }
+		else if (conf) { head = `${sur(conf.name)} STORMS OUT`; }
+		else if (fight) { head = "TRAINING GROUND BUST-UP"; }
+		else if (kinds.has("fans")) { head = "FANS TURN ON THE BOSS"; }
+		else if (life && life.ev === "night") { head = `${sur(life.name)} NIGHT OUT SHAME`; }
+		else if (gf - ga >= 3) { head = `${me.toUpperCase()} RUN RIOT`; }
+		else if (gf > ga && n >= 2) { head = `${n === 2 ? "DOUBLE" : "HAT-TRICK"} FOR ${sur(scorer)}`; }
+		else if (gf > ga && scorer) { head = `${sur(scorer)} FIRES ${me.toUpperCase()} TO VICTORY`; }
+		else if (gf === ga) { head = gf ? "HONOURS EVEN" : "STALEMATE"; }
+		else { head = `MORE MISERY FOR ${me.toUpperCase()}`; }
+		const first = t => String(t).split(/(?<=\.)\s/)[0];
+		const lines = [ `${home ? `${YOU.name} ${gf}-${ga} ${opp}` : `${opp} ${ga}-${gf} ${YOU.name}`}.` ];
+		for (const i of made) { if (i.kind !== "contract" && i.kind !== "signing") { lines.push(first(i.text)); } }
+		lines.push(`Fans: ${fansWord(d.fans).toLowerCase()}. Board: ${boardWord(d.board).toLowerCase()}.`);
+		d.paper = { round: league.round, head, lines: lines.slice(0, 5) };
+	}
+	function renderPaper (box) {
+		const d = league && league.drama, p = d && d.paper;
+		if (!p || !p.head) { return; }
+		const pa = el("div", "paper");
+		pa.append(el("span", "paper-mast", "THE BACK PAGE"), el("h5", "paper-head", p.head));
+		const ul = el("ul", "paper-lines");
+		for (const l of p.lines) { ul.append(el("li", "", l)); }
+		pa.append(ul); box.append(pa);
 	}
 	/* ---------- the Continental Champions Cup ----------
 	   The top four of the league qualify for next season's continental cup (or you can start a career in it:
@@ -12988,6 +13061,7 @@ td, th { font-variant-numeric: tabular-nums; }
 				showOverlay(`${tn(league.intl.comp)}: your squad`, `The ${tn(league.intl.comp)} finals start now. Pick your 23 in the Squad tab (auto-pick is on unless you choose) and set the formation, then play the first game.`, "Play the first game");
 				renderLeague(); renderIntlSquad(); return;
 			}
+			if (mode === "league" && seasonDone() && typeof sackedNow === "function" && sackedNow()) { toast("You were sacked: take one of the jobs on offer first", "#e05a4f"); renderLeague(); return; }   // (18k)
 			if (mode === "league" && seasonDone() && (typeof intlSummerSettle !== "function" || intlSummerSettle())) { newSeason(league.fmt); renderLeague(); renderShapes(); }
 			clearLive();
 			newMatch();
@@ -13056,7 +13130,7 @@ td, th { font-variant-numeric: tabular-nums; }
 			const rows = standings(), pos = rows.findIndex(r => r.id === 0) + 1, pts = rows[pos - 1].pts;
 			if (seasonDone() && !leagueMatch.intl) {
 				nudge = (rows[0].id === 0 ? `You are champions with ${pts} points!` : `Season over: ${TEAMS[rows[0].id].name} are champions. You finished ${ordinal(pos)}.`) +
-					` Prize money: ${money(league.prize || 0)}. The transfer window is open below the pitch.${typeof intlSummerNote === "function" ? intlSummerNote() : ""}`;
+					`${league.sacked === league.season ? " The board have sacked you: pick one of the clubs who will have you, below the pitch." : ""} Prize money: ${money(league.prize || 0)}. The transfer window is open below the pitch.${typeof intlSummerNote === "function" ? intlSummerNote() : ""}`;
 				btn = `Start season ${league.season + 1}`;
 			} else {
 				nudge = `You are ${ordinal(pos)} on ${pts} point${pts === 1 ? "" : "s"}.`;
@@ -19190,7 +19264,7 @@ td, th { font-variant-numeric: tabular-nums; }
 	// rig's own joints, so every pose the game writes drives it. It replaces the code-built torso, shorts,
 	// limbs, hands and boots; the head, face, hair and the number stay as they are. Until it has loaded (or if
 	// it cannot be fetched), the old body is drawn.
-	const BODY_SKIP3 = new Set([ "torso", "collar", "shorts", "shortLeg", "sleeve", "cuff", "armband", "arm", "hand", "leg", "band", "boot", "sole" ]);
+	const BODY_SKIP3 = new Set([ "neck", "torso", "collar", "shorts", "shortLeg", "sleeve", "cuff", "armband", "arm", "hand", "leg", "band", "boot", "sole" ]);
 	function loadBody3D (rigs) {
 		if (typeof fetch !== "function") { return; }
 		fetch("assets/body.bin").then(r => (r.ok ? r.arrayBuffer() : null)).then(buf => {
@@ -19303,7 +19377,7 @@ td, th { font-variant-numeric: tabular-nums; }
 		// (no hip rise and fall from the recording: the coded gait sets the hips' height from the planted foot)
 	}
 	// Paint a body's kit by region (from the converter): 0 skin, 1 shirt, 2 shorts, 3 socks, 4 boots, 5 arm below
-	// the sleeve, 6 hand. The shirt takes its club's pattern from where each point sits on the body at rest,
+	// the sleeve, 6 hand, 7 the trim (collar, cuffs, sock tops), 8 the captain's band. The shirt takes its club's pattern from where each point sits on the body at rest,
 	// by the same rules as the old shirt's shader (pat: PATTERN3; second: its other colour).
 	function paintBody3D (rig, cols, pat, second) {
 		const key = `${cols.join("|")}|${pat}|${second}`;
@@ -19340,7 +19414,8 @@ td, th { font-variant-numeric: tabular-nums; }
 			body.visible = true;
 			// the shirt pulled up over his head: a bare chest and arms (the head parts draw the shirt round his head)
 			const sh = rig.shirtHead, top = sh ? skin : kit.shirt;
-			paintBody3D(rig, [ skin, top, kit.shorts, kit.socks || kit.shirt, kit.boots || "#1a1a1a", kit.sleeves && !sh ? kit.shirt : skin, kit.gloves || skin ], sh ? 0 : kit.pattern || 0, kit.second);
+			const arm = kit.sleeves && !sh ? kit.shirt : skin, band = kit.captain && !sh ? (deltaE(kit.shirt, "#f4f1e6") < 25 ? "#1d2330" : "#f4f1e6") : arm;   // the captain's band: white, or dark on a white shirt
+			paintBody3D(rig, [ skin, top, kit.shorts, kit.socks || kit.shirt, kit.boots || "#1a1a1a", arm, kit.gloves || skin, sh ? skin : trim3D(kit), band ], sh ? 0 : kit.pattern || 0, kit.second);
 		}
 		for (const [ name, joint, side ] of PART_PLAN3) {
 			if (body && BODY_SKIP3.has(name)) { continue; }
@@ -23380,7 +23455,7 @@ td, th { font-variant-numeric: tabular-nums; }
 			get manualLock () { return manualLock; }, get receiver () { return receiver; }, get cond () { return cond; }, get celeb () { return typeof celeb === "undefined" ? null : celeb; },
 			get autoSwitchMode () { return autoSwitchMode; }, set autoSwitchMode (v) { autoSwitchMode = v; autoSwitchSel.value = v; },
 			get assistMode () { return assistMode; }, setAssist, assistRun, get lastDeal () { return lastDeal; }, valueOf, ovrNow, windowOpen,
-			offerJobs, takeJob, declineJob, get YOU () { return YOU; }, get TEAMS () { return TEAMS; },
+			offerJobs, takeJob, yourStr, declineJob, get YOU () { return YOU; }, get TEAMS () { return TEAMS; },
 			agentApproaches, agreeApproach, honourAgreed, renderSimChip, moveAbroad, takeOffer, assistShortlist, assistBuy, scoutShortlist, bestOffer, inheritSetup, keyContracts, contractAlerts, roleOf, slotsFor, renderAssistNote, assistRenewAnyway, retireVeterans, renewDeal, benchReact, get tlc () { return tlc; }, set tlcLast (v) { tlcLast = v; }, divisionName, applyForeignLeague, commitFoul, board, halfTime, toast, staffReact, get staff3 () { return staff3; }, get setPiece () { return setPiece; }, simulateMineTest () { simulateMine(); }, ensureClub, validLeague: typeof validLeague === "function" ? validLeague : null, get mode () { return mode; }, finishTutorialTest () { if (!tut) { return false; } tut.step = TUT.length - 1; nextTutStep(); return true; },
 			get autoHold () { return autoHold; }, set autoHold (v) { autoHold = v; },
 			get charging () { return charging; }, get passCharge () { return passCharge; }, get meterRect () { return meterRect; }, get drawMs () { return drawMs; }, get drawn () { return drawn; }, frameDue, get scale () { return scale; }, get kits () { return KITS; }, get stats () { return stats; }, get oppStats () { return oppStats; }, get steerAt () { return steerAt; }, set steerAt (v) { steerAt = v; }, set possTeam (v) { possTeam = v; },

@@ -250,8 +250,25 @@ const pr = await page.evaluate(() => {
 });
 check("pressure: a hammering after a bad run brings the fans' boos, the press, a star's confrontation, a training fight, the squad going to the board and something off the pitch",
 	[ "fans", "press", "confront", "training", "faith", "life" ].every(k => pr.made.includes(k)) && pr.fansFell && pr.boardFell, JSON.stringify(pr.made));
+const paper = await page.evaluate(() => { const F = window.__ff; F.renderLeague(); const p = document.querySelector("#lgDrama .paper"); return { shown: !!p, head: p ? p.querySelector(".paper-head").textContent : "", lines: p ? p.querySelectorAll(".paper-lines li").length : 0 }; });
+check("the back page: after a match the papers run a headline from the week's biggest story, with the other stories under it", paper.shown && paper.head.length > 5 && paper.lines >= 2, JSON.stringify(paper));
 check("pressure: each choice settles the problem and moves the moods (blaming the players hurts the room, apologising wins the fans back)",
 	pr.press && pr.press.gone && pr.press.room < 0 && pr.fans && pr.fans.fans > 0 && pr.conf && pr.conf.gone && pr.train && pr.train.gone && pr.faith && pr.faith.room > 0 && pr.life && pr.life.fined && pr.life.gone, JSON.stringify(pr));
+
+// The sack (18k): a board under 25 at the season's end sacks you; only weaker clubs offer jobs, there is no
+// Decline, and the next season waits until you take one; the new job starts the moods again.
+const sk = await page.evaluate(() => {
+	const F = window.__ff, lg = F.league, d = F.ensureDrama(lg), me = F.yourStr();
+	d.board = 12; d.fans = 30; d.room = 40;
+	const offers = F.offerJobs(1), sacked = lg.sacked === lg.season;
+	F.renderLeague();
+	const title = (document.getElementById("jobsTitle") || {}).textContent || "", decline = [ ...document.querySelectorAll("#jobOffers li") ].filter(li => [ ...li.querySelectorAll("button") ].some(b => b.textContent === "Take the job")).some(li => [ ...li.querySelectorAll("button") ].some(b => b.textContent === "Decline"));   // the club jobs only (a country offer keeps its own Decline)
+	const weaker = offers.every(o => o.below || o.str <= me + 0.01);
+	const took = offers.length ? F.takeOffer(`club:${offers[0].id}`) : false;
+	return { n: offers.length, sacked, title, decline, weaker, took, board: d.board, fans: d.fans, cleared: lg.sacked === null };
+});
+check("sacked: a board out of patience at the season's end sacks you, only weaker clubs offer, no Decline, and the new job starts afresh",
+	sk.sacked && sk.n > 0 && /Sacked/.test(sk.title) && !sk.decline && sk.weaker && sk.took && sk.board === 65 && sk.fans === 65 && sk.cleared, JSON.stringify(sk));
 
 check("no page errors", errs.length === 0, errs.slice(0, 3).join(" | "));
 await browser.close(); server.stop();

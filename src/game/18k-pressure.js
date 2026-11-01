@@ -93,7 +93,9 @@
 			}
 		}
 		if (d.board < 25 && !d.warned) { d.warned = true; dramaLog("The board have warned you: results must improve, and soon."); }
-		if (d.board >= 40) { d.warned = false; }
+		if (d.board < 20 && !d.voted) { d.voted = true; dramaLog("The chairman has given you a public vote of confidence. In football, that rarely ends well."); league.news = `${league.news || ""} The chairman says you have the board's full backing.`.trim(); }
+		if (d.board >= 40) { d.warned = false; d.voted = false; }
+		writePaper(d, made, gf, ga, home);
 		return made;
 	}
 	// The buttons for each kind (18e's choicesFor asks here first).
@@ -177,4 +179,60 @@
 		if (!pl || !d || !Number.isFinite(d.fans) || d.fans >= 55 || roleOf(pl, league.club) !== "key") { return; }
 		if (typeof crowdBoo === "function") { crowdBoo(0.8); }
 		toast(`Boos as ${outName} goes off`, "#e05a4f");
+	}
+	// ---------- the sack ----------
+	// At the end of the season, a board that has lost patience (under 25) sacks you: only weaker clubs offer
+	// jobs, and you must take one before the next season starts. During the season a board under 20 gives you
+	// the public vote of confidence first. A new club starts the moods again.
+	function sackCheck (lg) {
+		const d = lg && lg.drama;
+		if (!d || !Number.isFinite(d.board) || d.board >= 25 || (lg.intl && lg.intl.only)) { return false; }
+		lg.sacked = lg.season;
+		lg.news = `${lg.news || ""} The board have sacked you after ${d.form.filter(x => x === "L").length} defeats in your last ${d.form.length} games. Only smaller clubs will talk to you now.`.trim();
+		dramaLog("You have been sacked. Take one of the jobs on offer before next season.");
+		return true;
+	}
+	const sackedNow = () => !!(league && league.sacked === league.season && (league.jobOffers || []).length);
+	function freshStart (lg) {
+		const d = lg && ensureDrama(lg);
+		if (!d) { return; }
+		d.fans = 65; d.board = 65; d.room = 70; d.form = []; d.lowRoom = 0; d.warned = false; d.voted = false;
+		d.issues = d.issues.filter(i => i.kind === "contract" || i.kind === "signing");
+		lg.sacked = null;
+	}
+	// ---------- the back page ----------
+	// After each league match the papers have their say: one headline from the biggest story of the week (a
+	// sacking talk, a bust-up, a hammering, a hero) and the other stories under it. Shown in the League panel.
+	function writePaper (d, made, gf, ga, home) {
+		const lm = leagueMatch || {}, opp = TEAMS[lm.opp] ? TEAMS[lm.opp].name : "the visitors", me = YOU.short || YOU.name, kinds = new Set(made.map(i => i.kind));
+		const scorer = matchGoals.length ? matchGoals.slice().sort((a, b) => matchGoals.filter(n => n === b).length - matchGoals.filter(n => n === a).length)[0] : null;
+		const n = scorer ? matchGoals.filter(x => x === scorer).length : 0, sur = s => String(s || "").split(" ").pop().toUpperCase();
+		const life = made.find(i => i.kind === "life"), conf = made.find(i => i.kind === "confront"), fight = made.find(i => i.kind === "training");
+		let head;
+		if (d.voted && d.board < 20) { head = "CHAIRMAN BACKS UNDER-FIRE BOSS"; }
+		else if (kinds.has("faith")) { head = "PLAYERS GO TO THE BOARD"; }
+		else if (ga - gf >= 3) { head = `${me.toUpperCase()} HUMILIATED`; }
+		else if (conf) { head = `${sur(conf.name)} STORMS OUT`; }
+		else if (fight) { head = "TRAINING GROUND BUST-UP"; }
+		else if (kinds.has("fans")) { head = "FANS TURN ON THE BOSS"; }
+		else if (life && life.ev === "night") { head = `${sur(life.name)} NIGHT OUT SHAME`; }
+		else if (gf - ga >= 3) { head = `${me.toUpperCase()} RUN RIOT`; }
+		else if (gf > ga && n >= 2) { head = `${n === 2 ? "DOUBLE" : "HAT-TRICK"} FOR ${sur(scorer)}`; }
+		else if (gf > ga && scorer) { head = `${sur(scorer)} FIRES ${me.toUpperCase()} TO VICTORY`; }
+		else if (gf === ga) { head = gf ? "HONOURS EVEN" : "STALEMATE"; }
+		else { head = `MORE MISERY FOR ${me.toUpperCase()}`; }
+		const first = t => String(t).split(/(?<=\.)\s/)[0];
+		const lines = [ `${home ? `${YOU.name} ${gf}-${ga} ${opp}` : `${opp} ${ga}-${gf} ${YOU.name}`}.` ];
+		for (const i of made) { if (i.kind !== "contract" && i.kind !== "signing") { lines.push(first(i.text)); } }
+		lines.push(`Fans: ${fansWord(d.fans).toLowerCase()}. Board: ${boardWord(d.board).toLowerCase()}.`);
+		d.paper = { round: league.round, head, lines: lines.slice(0, 5) };
+	}
+	function renderPaper (box) {
+		const d = league && league.drama, p = d && d.paper;
+		if (!p || !p.head) { return; }
+		const pa = el("div", "paper");
+		pa.append(el("span", "paper-mast", "THE BACK PAGE"), el("h5", "paper-head", p.head));
+		const ul = el("ul", "paper-lines");
+		for (const l of p.lines) { ul.append(el("li", "", l)); }
+		pa.append(ul); box.append(pa);
 	}

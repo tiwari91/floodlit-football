@@ -1278,7 +1278,7 @@
 	// rig's own joints, so every pose the game writes drives it. It replaces the code-built torso, shorts,
 	// limbs, hands and boots; the head, face, hair and the number stay as they are. Until it has loaded (or if
 	// it cannot be fetched), the old body is drawn.
-	const BODY_SKIP3 = new Set([ "torso", "collar", "shorts", "shortLeg", "sleeve", "cuff", "armband", "arm", "hand", "leg", "band", "boot", "sole" ]);
+	const BODY_SKIP3 = new Set([ "neck", "torso", "collar", "shorts", "shortLeg", "sleeve", "cuff", "armband", "arm", "hand", "leg", "band", "boot", "sole" ]);
 	function loadBody3D (rigs) {
 		if (typeof fetch !== "function") { return; }
 		fetch("assets/body.bin").then(r => (r.ok ? r.arrayBuffer() : null)).then(buf => {
@@ -1391,7 +1391,7 @@
 		// (no hip rise and fall from the recording: the coded gait sets the hips' height from the planted foot)
 	}
 	// Paint a body's kit by region (from the converter): 0 skin, 1 shirt, 2 shorts, 3 socks, 4 boots, 5 arm below
-	// the sleeve, 6 hand. The shirt takes its club's pattern from where each point sits on the body at rest,
+	// the sleeve, 6 hand, 7 the trim (collar, cuffs, sock tops), 8 the captain's band. The shirt takes its club's pattern from where each point sits on the body at rest,
 	// by the same rules as the old shirt's shader (pat: PATTERN3; second: its other colour).
 	function paintBody3D (rig, cols, pat, second) {
 		const key = `${cols.join("|")}|${pat}|${second}`;
@@ -1428,7 +1428,8 @@
 			body.visible = true;
 			// the shirt pulled up over his head: a bare chest and arms (the head parts draw the shirt round his head)
 			const sh = rig.shirtHead, top = sh ? skin : kit.shirt;
-			paintBody3D(rig, [ skin, top, kit.shorts, kit.socks || kit.shirt, kit.boots || "#1a1a1a", kit.sleeves && !sh ? kit.shirt : skin, kit.gloves || skin ], sh ? 0 : kit.pattern || 0, kit.second);
+			const arm = kit.sleeves && !sh ? kit.shirt : skin, band = kit.captain && !sh ? (deltaE(kit.shirt, "#f4f1e6") < 25 ? "#1d2330" : "#f4f1e6") : arm;   // the captain's band: white, or dark on a white shirt
+			paintBody3D(rig, [ skin, top, kit.shorts, kit.socks || kit.shirt, kit.boots || "#1a1a1a", arm, kit.gloves || skin, sh ? skin : trim3D(kit), band ], sh ? 0 : kit.pattern || 0, kit.second);
 		}
 		for (const [ name, joint, side ] of PART_PLAN3) {
 			if (body && BODY_SKIP3.has(name)) { continue; }
