@@ -322,7 +322,7 @@
 	// marks (brows, the shade of the eye sockets, the mouth, facial hair) grow bolder from the first pair of
 	// distances to the second, so the mipmapped face still reads as brows over eyes and a mouth at the
 	// celebration and broadcast cameras, and only fade out between the last pair (beyond the gantry camera).
-	const FACE_FADE3 = [ 150, 450, 1300, 1900 ], FACE_BOLD3 = 1.8, FACE_PALE3 = [ 70, 190 ];
+	const FACE_FADE3 = [ 150, 450, 1750, 2300 ], FACE_BOLD3 = 1.8, FACE_PALE3 = [ 70, 190 ];
 	// Close-up light on skin and hair, after three.js's Lambert lighting: the flat ambient fill eases off on
 	// surfaces facing down (under the brow, nose and chin), a warm band where the key light turns to shadow,
 	// a rim of floodlight on the edge turned to the light, and a faint sheen. All of it fades out by
@@ -687,7 +687,7 @@
 			const hip = [ node(hips, 0, -1.0, -2.45), node(hips, 0, -1.0, 2.45) ], kn = hip.map(h => node(h, 0, -7.3, 0)), an = kn.map(k => node(k, 0, -6.5, 0));
 			rigs.push({ root, hips, spine, chest, neck, head, sh, el, ha, hip, kn, an });
 		}
-		loadBody3D(rigs);
+		loadBody3D(rigs); loadAnims3D();
 		// Real shadows (Medium and High): one light that throws no light of its own, only the players' shadows,
 		// following the camera so its shadow map is spent on what is in the picture. The grass is painted and
 		// unlit, so the shadows land on a clear sheet just above it that shows nothing but shadow.
@@ -936,6 +936,15 @@
 		if (!rm && ball && ball.owner === p && !acting && p.touchPh !== undefined && a > 0.2) {
 			const tap = Math.max(0, 1 - p.touchPh / 0.22), i = G.feet[0].st ? 1 : 0, f = G.feet[i];
 			if (tap > 0 && !f.st) { footTo3(r, i, f.x + 2.4 * tap, Math.max(ANK3, f.y - 0.8 * tap), f.z, f.toe - 0.35 * tap); }
+		}
+		// Recorded movement over the coded run, for the players (not standing, where the coded stance and its
+		// gestures stay, nor in an action, a fall, a dive, a celebration or shielding the ball).
+		if (!rm && !acting && cel <= 0 && kneel <= 0 && fall < 0 && dive < 0 && !down && !gk && a > 0.06 && p.team >= 0 && p.role !== "staff" && !(p.shieldW > 0)) {
+			const ms = (r.mir || 1) > 0 ? 0 : 1;
+			if (animLand3[ms] === null && G.feet && G.feet[0] && G.feet[0].st && a > 0.4 && r.wasSwing0) { animLand3[ms] = ph; }
+			r.wasSwing0 = G.feet && G.feet[0] && !G.feet[0].st;
+			const fwd = spd > 0.05 ? ((p.vx || 0) * Math.cos(p.dir || 0) + (p.vy || 0) * Math.sin(p.dir || 0)) / spd : 1;   // (in the simulation's own frame) the loops run forward: none of it backpedalling or sidestepping
+			if (animLand3[ms] !== null) { animPose3D(r, a, ph, (1 - shuf) * (1 - 0.8 * clamp(plant, 0, 1)) * (1 - sulk) * clamp((fwd - 0.55) / 0.35, 0, 1) * clamp((a - 0.08) / 0.2, 0, 1), idle, G); }   // faded in as he gets going, so the coded stance and its arms hold while he barely moves
 		}
 		if (!rm && !acting && cel <= 0 && !down && p.team >= 0 && p.role !== "staff" && state === "play") {
 			const o = ball && ball.owner;
@@ -1323,6 +1332,63 @@
 			const F = G3.fig;
 			fit(F.nums && F.nums.geometry, true); fit(F.names && F.names.geometry, true); fit(F.chest && F.chest.geometry, false);
 		}).catch(() => {});
+	}
+	// Recorded movement (assets/anims.bin, from tools/anim-convert.mjs): idle, walk, jog and sprint loops as the
+	// rig's 17 joint turns, 30 frames a second, plus the hips' rise and fall. Each loop is one full stride (both feet).
+	let ANIM3 = null;
+	function loadAnims3D () {
+		if (ANIM3 !== null || typeof fetch !== "function") { return; }
+		ANIM3 = false;
+		fetch("assets/anims.bin").then(r => (r.ok ? r.arrayBuffer() : null)).then(buf => {
+			if (!buf) { return; }
+			const dv = new DataView(buf);
+			if (dv.getUint32(0, true) !== 0x31414646) { return; }   // "FFA1"
+			const out = {}, n = dv.getUint32(4, true);
+			let q = 8;
+			for (let c = 0; c < n; c++) {
+				const L = dv.getUint8(q); q += 1;
+				let name = ""; for (let k = 0; k < L; k++) { name += String.fromCharCode(dv.getUint8(q + k)); }
+				q += L;
+				const fr = dv.getUint32(q + 4, true); q += 8;
+				out[name.replace(/_.*$/, "").toLowerCase()] = { fr, d: new Float32Array(buf.slice(q, q + fr * 69 * 4)) };
+				q += fr * 69 * 4;
+			}
+			if (out.idle && out.jog && out.sprint && out.walk) { ANIM3 = out; }
+		}).catch(() => {});
+	}
+	let ANIM_Q3 = null;   // made on first use (three.js arrives after this script runs)
+	// One joint's turn in a loop at phase u (0..1), interpolated between frames, into q.
+	function animQ3 (A, u, j, q) {
+		const f = ((u % 1) + 1) % 1 * A.fr, f0 = Math.floor(f) % A.fr, f1 = (f0 + 1) % A.fr, t = f - Math.floor(f), d = A.d, a = f0 * 69 + j * 4, b = f1 * 69 + j * 4;
+		q.set(d[a], d[a + 1], d[a + 2], d[a + 3]);
+		return q.slerp(ANIM_Q3[2].set(d[b], d[b + 1], d[b + 2], d[b + 3]), t);
+	}
+	// Lay the recorded run (or the idle) over the coded pose: the whole upper body and the hips take it, the legs
+	// part of the way (the coded gait keeps the planted boot on the grass). a: how hard he runs (0..1), ph: his
+	// stride phase, w: how much of it (0 while kicking, tackling, celebrating...).
+	const ANIM_LEG3 = 0.45;
+	// How much of the recording each joint takes: the hips none (they carry the planted foot), the spine a third, the
+	// head and neck none (he looks where the game says), the arms most of it, and only the leg swinging through
+	// (the planted one stays where the coded gait set it, so the boot does not slide).
+	const ANIM_W3 = [ 0, 0.3, 0.3, 0, 0, 0.75, 0.75, 0.75, 0.75, 0.75, 0.75, ANIM_LEG3, ANIM_LEG3, ANIM_LEG3, ANIM_LEG3, ANIM_LEG3, ANIM_LEG3 ];
+	const animLand3 = [ null, null ];   // the stride phase at which the coded gait puts his first foot down, per side of the mirror (measured once)
+	function animPose3D (r, a, ph, w, idlePh, G) {
+		if (!ANIM3 || w <= 0) { return; }
+		const A = ANIM3, bones = r.animBones || (r.animBones = [ r.hips, r.spine, r.chest, r.neck, r.head, r.sh[0], r.el[0], r.ha[0], r.sh[1], r.el[1], r.ha[1], r.hip[0], r.kn[0], r.an[0], r.hip[1], r.kn[1], r.an[1] ]);
+		// which loops, and how much of the second: idle -> walk -> jog -> sprint
+		const k = a < 0.06 ? [ A.idle, A.idle, 0 ] : a < 0.3 ? [ A.walk, A.jog, clamp((a - 0.12) / 0.18, 0, 1) ] : [ A.jog, A.sprint, clamp((a - 0.55) / 0.35, 0, 1) ];
+		const idle = a < 0.06, u = idle ? (idlePh || 0) * 0.16 : (ph - (animLand3[(r.mir || 1) > 0 ? 0 : 1] || 0)) / (Math.PI * 2);
+		if (!ANIM_Q3) { ANIM_Q3 = [ new THREE.Quaternion(), new THREE.Quaternion(), new THREE.Quaternion() ]; }
+		const q0 = ANIM_Q3[0], q1 = ANIM_Q3[1];
+		const lean0 = r.spine.rotation.z + r.chest.rotation.z;
+		for (let j = 0; j < 17; j++) {
+			animQ3(k[0], u, j, q0);
+			if (k[2] > 0) { q0.slerp(animQ3(k[1], u, j, q1), k[2]); }
+			const side = j >= 14 ? 1 : 0, wj = w * ANIM_W3[j] * (j >= 11 && G && G.feet && G.feet[side] && G.feet[side].st ? 0 : 1);
+			bones[j].quaternion.slerp(q0, wj);
+		}
+		r.neck.rotation.z -= (r.spine.rotation.z + r.chest.rotation.z - lean0) * 0.85;   // the head stays up: the neck takes back most of any extra lean
+		// (no hip rise and fall from the recording: the coded gait sets the hips' height from the planted foot)
 	}
 	// Paint a body's kit by region (from the converter): 0 skin, 1 shirt, 2 shorts, 3 socks, 4 boots, 5 arm below
 	// the sleeve, 6 hand. The shirt takes its club's pattern from where each point sits on the body at rest,
