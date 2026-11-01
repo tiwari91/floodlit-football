@@ -1,5 +1,5 @@
 	/* ---------- input ---------- */
-	const GAME_KEYS = new Set([ "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Space", "KeyA", "KeyS", "KeyD", "KeyW", "KeyQ", "KeyE", "KeyT", "Digit1", "Digit2", "Digit3", "Digit4", "Tab" ]);
+	const GAME_KEYS = new Set([ "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Space", "KeyA", "KeyS", "KeyD", "KeyW", "KeyQ", "KeyE", "KeyT", "KeyX", "Digit1", "Digit2", "Digit3", "Digit4", "Tab" ]);
 
 	window.addEventListener("keydown", e => {
 		if (e.target instanceof HTMLSelectElement) { return; }
@@ -29,6 +29,7 @@
 		if (e.code === "KeyS" || e.code === "Space") { passPress("pass"); }
 		if (e.code === "KeyD") { humanShootPress(); }
 		if (e.code === "KeyA") { pressHeld = true; tackleDown(); }
+		if (e.code === "KeyX" && !e.repeat) { humanSlide(); }   // a slide tackle on its own key
 		if (e.code === "KeyW") { passPress("through"); }
 		if (e.code === "KeyQ") { passPress("long"); }
 		if (e.code === "Tab" && ball.owner !== human()) { switchToNearest(true); }   // switch player: cycles to the next best placed

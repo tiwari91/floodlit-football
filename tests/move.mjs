@@ -796,6 +796,17 @@ for (const how of [ "out", "stand" ]) {
 	await page.evaluate(() => { window.__ffVar = null; });
 }
 check("VAR: a checked goal is ruled out (score back, play on with a free kick) or stands (it counts)", varRes.out.checked && varRes.out.banner === "No goal" && varRes.out.goals === 0 && varRes.out.state === "play" && varRes.stand.checked && varRes.stand.banner === "Goal stands" && varRes.stand.goals === 1, JSON.stringify(varRes));
+// X: a slide tackle on its own key, from further out than a tap of A slides (110 units from the carrier).
+await page.waitForFunction(() => window.__ff.state === "play", null, { timeout: 20000 }).catch(() => {});
+const slideX = await page.evaluate(() => {
+	const F = window.__ff, me = F.human(), o = F.outfield(1)[2];
+	F.freeze = 0; F.ball.owner = o; me.lunge = 0; me.lungeCd = 0;
+	me.x = F.FW / 2; me.y = F.FH / 2; o.x = me.x + 110; o.y = me.y; o.vx = o.vy = 0;
+	window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyX", key: "x" }));
+	window.dispatchEvent(new KeyboardEvent("keyup", { code: "KeyX", key: "x" }));
+	return { lunge: me.lunge, aim: +Math.cos(me.dir).toFixed(2), hint: [ ...document.querySelectorAll("kbd") ].some(k => k.textContent === "X") };
+});
+check("X slides in at the carrier from further out than A allows", slideX.lunge > 0 && slideX.aim > 0.9, JSON.stringify(slideX));
 check("no errors after the woodwork checks (and no 3D failure)", errs.length === 0 && !errs.some(e => /3D view failed/.test(e)), errs.join(" | "));
 await browser.close(); server.stop();
 process.exit(done() ? 1 : 0);

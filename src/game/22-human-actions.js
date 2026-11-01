@@ -289,6 +289,20 @@
 	function tackleDown () { if (odr) { endOdr(); return; } tackleDownAt = frame; }
 	function tackleUp () { const tap = tackleDownAt >= 0 && frame - tackleDownAt < TAP_FRAMES; tackleDownAt = -1; if (tap) { humanTackle(); } }
 	const pressOn = () => pressHeld || touchPress || padPressBtn;
+	// X: a slide tackle, always. Within reach of the carrier (a little further than a tap of A allows) he goes
+	// in at where the carrier is heading; otherwise at the loose ball if it is near, or straight ahead.
+	function humanSlide () {
+		if (odr) { endOdr(); return; }
+		const p = human();
+		if (state !== "play" || freeze > 0 || ball.owner === p || p === receiver || p.lunge > 0 || p.lungeCd > 0) { return; }
+		const o = ball.owner, target = o && o.team === 1 && !inHands(o) && dist(p, o) < 125 ? o : null;
+		if (target) { p.dir = Math.atan2(target.y + target.vy * 6 - p.y, target.x + target.vx * 6 - p.x); }
+		else if (!o && dist(p, ball) < 110) { p.dir = Math.atan2(ball.y - p.y, ball.x - p.x); }
+		else if (Math.hypot(p.vx, p.vy) > 0.2) { p.dir = Math.atan2(p.vy, p.vx); }
+		p.lunge = 14;
+		p.lungeCd = LUNGE_CD;
+		p.slideHit = false;
+	}
 	function humanTackle () {
 		if (odr) { endOdr(); return; }
 		const p = human();

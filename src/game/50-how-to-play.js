@@ -2,7 +2,7 @@
 	   One screen with every control, for the keyboard, touch or a controller, and what the
 	   markers on the pitch mean. H opens it any time (and pauses the match). */
 	const HOWTO = {
-		keys: { move: "← ↑ → ↓", sprint: "E", pass: "S", through: "W", long: "Q", shoot: "D", tackle: "A", switch: "S / Tab", tactic: "1 – 4", pause: "P", cam: "C", big: "F", help: "H" },
+		keys: { move: "← ↑ → ↓", sprint: "E", pass: "S", through: "W", long: "Q", shoot: "D", tackle: "A", slide: "X", switch: "S / Tab", tactic: "1 – 4", pause: "P", cam: "C", big: "F", help: "H" },
 		touch: { move: "Joystick", sprint: "Sprint", pass: "Pass", through: "Through", long: "Long", shoot: "Shoot", tackle: "Tackle", switch: "Pass", tactic: "Tactic", pause: "Pause", cam: "Camera", big: "Big pitch", help: "How to play" },
 		pad: { move: "Left stick", sprint: "RT / LT", pass: "A / ✕", through: "Y / △", long: "RB / R1", shoot: "B / ○", tackle: "X / □", switch: "A / ✕", tactic: "D-pad ↑ ↓", pause: "Start", cam: "Camera", big: "F", help: "H" }
 	};
@@ -23,6 +23,7 @@
 			]),
 			sec("Without the ball", [
 				row(K.tackle, "Tackle", `Tap it: alongside the carrier a shoulder challenge, from further out a slide. ${cap(hold)} it and your man closes him down and jockeys him for you, from any distance, until you let go.`),
+				K.slide ? row(K.slide, "Slide tackle", "Always a slide: at where the carrier is heading if he is in reach, otherwise straight ahead. Mistime it from behind and it's a foul.") : "",
 				row(K.switch, "Switch player", `To the teammate under the S marker (the defender best placed to win it). Press again for the next best.${howScheme === "keys" ? " Tab does the same at any moment; with the ball in the air it picks whoever is nearest where it will land." : ""}`),
 				row(K.sprint, "Sprint", "Close the carrier down faster; the same bar drains."),
 				row(`${K.shoot} / ${K.pass} / ${K.long}`, "A ball in the air", "Coming down to your man: head it at goal, nod it on to a teammate, or head it clear.")
@@ -96,7 +97,7 @@
 			? [ [ "Stick", "Move" ], [ "A", "Pass" ], [ "Y", "Through" ], [ "B", "Shoot, hold" ], [ "RB", "Long" ], [ "X", "Tackle" ], [ "RT", "Sprint" ] ]
 			: coarse
 				? [ [ "Joystick", "Move" ], [ "Pass", "to the ringed teammate" ], [ "Shoot", "hold for power" ], [ "Tackle", "tap or hold" ], [ "Through", "runner" ], [ "Long", "striker" ], [ "Sprint", "hold" ] ]
-				: [ [ "← ↑ → ↓", "Move" ], [ "S", "Pass" ], [ "W", "Through" ], [ "D", "Shoot, hold" ], [ "Q", "Long" ], [ "A", "Tackle" ], [ "Tab", "Switch" ], [ "E", "Sprint" ], [ "H", "How to play" ] ];
+				: [ [ "← ↑ → ↓", "Move" ], [ "S", "Pass" ], [ "W", "Through" ], [ "D", "Shoot, hold" ], [ "Q", "Long" ], [ "A", "Tackle" ], [ "X", "Slide" ], [ "Tab", "Switch" ], [ "E", "Sprint" ], [ "H", "How to play" ] ];
 		el.replaceChildren(...items.map(([ key, label ]) => {
 			const s = document.createElement("span"), kb = document.createElement("kbd");
 			kb.textContent = key; s.append(kb, document.createTextNode(label));
