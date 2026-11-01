@@ -13,6 +13,17 @@
 	   for as long as your game with it is next, and gives it back afterwards. A cup drawn by the older
 	   league-phase format (v1) is dropped on load: that season has no cup, and the next is drawn afresh. */
 	const CC_NAME = "Continental Champions Cup", CC_SHORT = "Continental Cup";
+	// Three tiers, as the Premier League's clubs go into three European competitions. The season draws the
+	// one your club qualified for (the Champions Cup when you're in none): the same format, weaker clubs from
+	// abroad (off: taken off their strength) and smaller prize money (prize: a share of the Champions Cup's).
+	//   1: the top four.  2: fifth and the Challenge Cup winners (18m).  3: the next club and the League Cup winners (18d).
+	// A cup winner already in a higher tier passes its place down the table.
+	const CC_TIERS = {
+		1: { name: CC_NAME, short: CC_SHORT, off: 0, prize: 1 },
+		2: { name: "Continental League", short: "Continental League", off: 0.8, prize: 0.5 },
+		3: { name: "Continental Conference", short: "Conference", off: 1.4, prize: 0.3 }
+	};
+	const ccTier = C => CC_TIERS[(C && C.tier) || 1];
 	// Played after these league matchdays (none on a League Cup night).
 	const CC_NIGHTS = [
 		...[ 2, 4, 6, 8, 10, 13 ].map((r, i) => ({ r, stage: "lp", md: i + 1 })),
@@ -35,7 +46,8 @@
 		return past + (Array.isArray(h) && h.length >= 5 ? 0 : (c.id !== undefined ? getStr(c.id) : c.str) * 6 * (5 - (Array.isArray(h) ? h.length : 0)));
 	}
 	// The thirty-two from abroad: each country's clubs, named as 18c names them, the best first.
-	function ccForeign (lg, n) {
+	function ccForeign (lg, n, tier = 1) {
+		const off = (CC_TIERS[tier] || CC_TIERS[1]).off;
 		const home = lg.ident && lg.ident.country, out = [];
 		// Abroad, England takes your country's seats. A league file's clubs (18h) fill a country's seats first.
 		const engTop = CLUBS.slice().sort((a, b) => b.str - a.str);
@@ -47,7 +59,7 @@
 			const fc = (typeof fileCupClubs === "function" ? fileCupClubs(nat) : []).filter(free);
 			const F = FOREIGN[nat], towns = F ? F[3].split(",") : [], h = hashStr(nat + "cc"), eng = engTop.filter(free);
 			for (let j = 0; j < k; j++) {
-				const str = round1(clamp(top - j * 0.45 + (Math.random() - 0.5) * 0.4, 1.5, 5)), f = fc[j];
+				const str = round1(clamp(top - off - j * 0.45 + (Math.random() - 0.5) * 0.4, 1.2, 5)), f = fc[j];
 				let c;
 				if (F) { const town = towns[j], color = FOREIGN_SHIRTS[(j * 5 + h) % FOREIGN_SHIRTS.length]; c = { name: F[2][(j + h) % F[2].length].replace("{t}", town), short: town, color, color2: foreignSecond(color), ground: F[1].replace("{t}", town) }; }
 				else { const e = eng[j]; if (!e && !f) { continue; } c = e ? { name: e.name, short: e.short, color: e.color, color2: e.color2, ground: e.ground } : {}; }
@@ -62,7 +74,7 @@
 				const [ , groundPat, pats, townList ] = FOREIGN[nat], towns = townList.split(","), k = out.filter(c => c.nat === nat).length, town = towns[k + 4];
 				if (!town) { continue; }
 				const color = FOREIGN_SHIRTS[(k * 3 + j) % FOREIGN_SHIRTS.length];
-				out.push({ name: pats[(k + j) % pats.length].replace("{t}", town), short: town, color, color2: foreignSecond(color), ground: groundPat.replace("{t}", town), nat, str: round1(clamp(3.4 - k * 0.3, 1.5, 5)) });
+				out.push({ name: pats[(k + j) % pats.length].replace("{t}", town), short: town, color, color2: foreignSecond(color), ground: groundPat.replace("{t}", town), nat, str: round1(clamp(3.4 - off - k * 0.3, 1.5, 5)) });
 			}
 		}
 		return out.slice(0, n);
@@ -94,15 +106,15 @@
 		C.groups = groups;
 		return games.sort((a, b) => a.n - b.n);
 	}
-	function drawCont (lg, ids) {
+	function drawCont (lg, ids, tier = 1) {
 		const own = ids.filter(id => TEAMS[id]).map(id => ({ id, name: TEAMS[id].name, nat: "_league" }));
-		const clubs = [ ...own, ...ccForeign(lg, 32 - own.length) ];
-		const C = { v: 2, season: lg.season, clubs, games: [], groups: [], ties: { r16: [], qf: [], sf: [], f: [] }, night: 0, winner: null, out: null, earned: 0, paid: {} };
+		const clubs = [ ...own, ...ccForeign(lg, 32 - own.length, tier) ];
+		const C = { v: 2, tier, season: lg.season, clubs, games: [], groups: [], ties: { r16: [], qf: [], sf: [], f: [] }, night: 0, winner: null, out: null, earned: 0, paid: {} };
 		C.pots = clubs.map((c, i) => [ i, ccCoef(lg, c) ]).sort((a, b) => b[1] - a[1]).map(x => x[0]);
 		C.games = ccGroups(C) || [];
 		if (!C.games.length) { return { v: 2, season: lg.season, none: true }; }
 		const me = ccMe(C);
-				lg.news = `${lg.news || ""} ${CC_NAME} draw: ${me >= 0 ? `your group: ${C.groups[C.groups.findIndex(g => g.includes(me))].filter(i => i !== me).map(i => ccName(C, i)).join(", ")}.` : `${own.map(c => c.name).join(", ")} go into the group stage.`}`.trim();
+				lg.news = `${lg.news || ""} ${ccTier(C).name} draw: ${me >= 0 ? `your group: ${C.groups[C.groups.findIndex(g => g.includes(me))].filter(i => i !== me).map(i => ccName(C, i)).join(", ")}.` : `${own.map(c => c.name).join(", ")} go into the group stage.`}`.trim();
 		return C;
 	}
 	// Ready for this season: drawn if the club qualified and the first night is still to come; none otherwise.
@@ -111,7 +123,7 @@
 		const c = lg.cont;
 		if (c && c.v === 2 && c.season === lg.season && (c.none || (Array.isArray(c.clubs) && Array.isArray(c.games) && Array.isArray(c.groups) && c.ties))) { return c; }
 		const q = lg.club.contQual;
-		lg.cont = q && q.season === lg.season && Array.isArray(q.ids) && q.ids.length && lg.round <= CC_NIGHTS[0].r ? drawCont(lg, q.ids) : { v: 2, season: lg.season, none: true };
+		lg.cont = q && q.season === lg.season && Array.isArray(q.ids) && q.ids.length && lg.round <= CC_NIGHTS[0].r ? drawCont(lg, q.ids, q.tier || 1) : { v: 2, season: lg.season, none: true };
 		return lg.cont;
 	}
 	const ccAgg = (C, t) => {
@@ -173,7 +185,7 @@
 			if (me >= 0) {
 				if (pos <= 2) { ccPay(lg, C, "r16"); news.push(`Group stage over: you finished ${ordinal(pos)} in your group and go through to the round of 16.`); }
 				else { C.out = { stage: "lp", pos }; news.push(`Group stage over: you finished ${ordinal(pos)} in your group and are out.`); }
-			} else { news.push(`${CC_SHORT} group stage over: ${ccName(C, C.rank[0])} had the best group record.`); }
+			} else { news.push(`${ccTier(C).short} group stage over: ${ccName(C, C.rank[0])} had the best group record.`); }
 		} else if (night.stage !== "lp" && night.leg !== 1) {
 			const stage = night.stage, ties = C.ties[stage], wins = ties.map(t => ccWinner(C, t));
 			const mine = ties.find(t => t.a === me || t.b === me);
@@ -195,8 +207,8 @@
 				C.winner = wins[0];
 				const fin = ties[0], [ a, b ] = ccAgg(C, fin), last = C.games[fin.g[0]];
 				const line = `${ccName(C, fin.b)} ${b}–${a} ${ccName(C, fin.a)}${last.pens ? ` (after extra time, ${last.pens[0]}–${last.pens[1]} on penalties)` : last.et ? " (after extra time)" : ""}`;
-				if (C.winner === me) { ccPay(lg, C, "winner"); news.push(`You've won the ${CC_NAME}! ${line}.`); if (typeof queueTrophy === "function") { queueTrophy(CC_NAME); } }
-				else { news.push(`${CC_NAME} final: ${line}. ${ccName(C, C.winner)} are the winners.`); }
+				if (C.winner === me) { ccPay(lg, C, "winner"); news.push(`You've won the ${ccTier(C).name}! ${line}.`); if (typeof queueTrophy === "function") { queueTrophy(ccTier(C).name); } }
+				else { news.push(`${ccTier(C).name} final: ${line}. ${ccName(C, C.winner)} are the winners.`); }
 				ccCoefUpdate(lg, C);
 			}
 		}
@@ -205,7 +217,7 @@
 	function ccPay (lg, C, what) {
 		if (C.paid[what]) { return; }
 		C.paid[what] = true;
-		const m = CC_PRIZE[what] || 0;
+		const m = round1((CC_PRIZE[what] || 0) * ccTier(C).prize);
 		if (m) { lg.club.budget = round1(lg.club.budget + m); C.earned = round1((C.earned || 0) + m); }
 	}
 	// Each club's points for the season go into its coefficient: two a win, one a draw, one for each knockout round reached.
@@ -246,11 +258,18 @@
 	function contQualify () {
 		const lg = league;
 		if (!lg || !lg.club || !seasonDone()) { return; }
-		const q = standings().slice(0, 4).map(r => r.id);
 		if (lg.club.contQual && lg.club.contQual.season === lg.season + 1) { return; }
-		lg.club.contQual = { season: lg.season + 1, ids: q };
-		const you = q.indexOf(0);
-		lg.news = `${lg.news || ""} ${you >= 0 ? `You finished in the top four: you're in the ${CC_NAME} next season.` : `Into next season's ${CC_NAME}: ${q.map(id => TEAMS[id].name).join(", ")}.`}`.trim();
+		const order = standings().map(r => r.id), used = new Set();
+		const take = () => { const id = order.find(i => !used.has(i)); used.add(id); return id; };
+		const cupWin = (cup, fallback) => (cup && Number.isInteger(cup.winner) && cup.winner >= 0 && lg.members.includes(cup.winner) && !used.has(cup.winner) ? (used.add(cup.winner), cup.winner) : fallback());
+		const t1 = [ take(), take(), take(), take() ];
+		const t2 = [ take(), cupWin(lg.chall, take) ];
+		const t3 = [ take(), cupWin(lg.cup, take) ];
+		const tier = t2.includes(0) ? 2 : t3.includes(0) ? 3 : 1, ids = { 1: t1, 2: t2, 3: t3 }[tier];
+		lg.club.contQual = { season: lg.season + 1, ids, tier };
+		const why = id => (lg.chall && lg.chall.winner === id && t2.includes(id) && order.indexOf(id) > 4 ? " (Challenge Cup winners)" : lg.cup && lg.cup.winner === id && t3.includes(id) && order.indexOf(id) > 5 ? " (League Cup winners)" : "");
+		const list = (t, ids2) => `${CC_TIERS[t].name}: ${ids2.map(id => TEAMS[id].name + why(id)).join(", ")}`;
+		lg.news = `${lg.news || ""} ${tier > 1 || t1.includes(0) ? `You're in the ${CC_TIERS[tier].name} next season.` : ""} Into Europe next season: ${list(1, t1)}; ${list(2, t2)}; ${list(3, t3)}.`.trim();
 	}
 	// The guest: the last club below the division lends its seat to a club from abroad while your game with it is next.
 	function guestSlot (lg) {
@@ -286,7 +305,7 @@
 		const g = C.games[gi], me = ccMe(C), o = g.h === me ? g.a : g.h, oc = C.clubs[o], night = CC_NIGHTS[g.n];
 		const opp = oc.id !== undefined ? (restoreGuest(lg), oc.id) : applyGuest(lg, oc);
 		if (opp < 0) { return null; }
-		const label = `${CC_SHORT} · ${night.stage === "lp" ? `Group stage, matchday ${night.md}` : `${CC_STAGE[night.stage]}${night.leg ? `, ${night.leg === 1 ? "first" : "second"} leg` : ""}`}`;
+		const label = `${ccTier(C).short} · ${night.stage === "lp" ? `Group stage, matchday ${night.md}` : `${CC_STAGE[night.stage]}${night.leg ? `, ${night.leg === 1 ? "first" : "second"} leg` : ""}`}`;
 		return { round: lg.round, home: g.h === me, opp, cont: { gi, season: C.season }, label, neutral: !!g.neutral };
 	}
 	// Your result, from a played or simulated match: the rest of the night follows.
@@ -302,7 +321,7 @@
 		const opp = g.h === me ? g.a : g.h, mine = g.h === me ? [ g.hg, g.ag ] : [ g.ag, g.hg ];
 		const extra = g.pens ? ` After extra time it went to penalties: ${g.h === me ? g.pens[0] : g.pens[1]}–${g.h === me ? g.pens[1] : g.pens[0]}.` : g.et ? " It went to extra time." : "";
 		const night = CC_NIGHTS[g.n];
-		const note = `${CC_SHORT}, ${night.stage === "lp" ? `group stage matchday ${night.md}` : `${CC_STAGE[night.stage].toLowerCase()}${night.leg ? `, ${night.leg === 1 ? "first" : "second"} leg` : ""}`}: ${g.h === me ? `you ${mine[0]}–${mine[1]} ${ccName(C, opp)}` : `${ccName(C, opp)} ${mine[1]}–${mine[0]} you`}.${extra}`;
+		const note = `${ccTier(C).short}, ${night.stage === "lp" ? `group stage matchday ${night.md}` : `${CC_STAGE[night.stage].toLowerCase()}${night.leg ? `, ${night.leg === 1 ? "first" : "second"} leg` : ""}`}: ${g.h === me ? `you ${mine[0]}–${mine[1]} ${ccName(C, opp)}` : `${ccName(C, opp)} ${mine[1]}–${mine[0]} you`}.${extra}`;
 		lg.news = `${lg.news || ""} ${note}`.trim();
 		restoreGuest(lg);
 		contNight();
@@ -314,9 +333,9 @@
 	function ccPath (lg) {
 		if (!lg || !lg.club) { return ""; }
 		const rows = standings(), pos = rows.findIndex(r => r.id === 0) + 1, me = rows[pos - 1];
-		if (seasonDone()) { return pos <= 4 ? "" : `You finished ${ordinal(pos)}: the top four qualify for the ${CC_NAME}.`; }
+		if (seasonDone()) { return pos <= 4 ? "" : `You finished ${ordinal(pos)}: the top four go into the ${CC_NAME}, fifth and the Challenge Cup winners into the ${CC_TIERS[2].name}, sixth and the League Cup winners into the ${CC_TIERS[3].name}.`; }
 		const gap = rows[3].pts - me.pts;
-		return `Finish top 4 to qualify for next season's ${CC_NAME}. You are ${ordinal(pos)}${pos <= 4 ? ", inside the places" : `, ${gap} point${gap === 1 ? "" : "s"} behind 4th`}.`;
+		return `Finish top 4 to qualify for next season's ${CC_NAME} (5th or the Challenge Cup: ${CC_TIERS[2].name}; 6th or the League Cup: ${CC_TIERS[3].name}). You are ${ordinal(pos)}${pos <= 4 ? ", inside the places" : `, ${gap} point${gap === 1 ? "" : "s"} behind 4th`}.`;
 	}
 	// "Start in the Continental Champions Cup": season one begins with your club already in the cup.
 	const ccStartOn = () => { try { return store.get("ff-cc-start") === "1"; } catch (e) { return false; } };
@@ -371,7 +390,7 @@
 		const lg = league, C = ensureCont(lg);
 		if (!C) { return; }
 		const card = el("div", "lg-cup lg-cont");
-		card.append(el("h4", "", CC_NAME), el("p", "detail", contNext()));
+		card.append(el("h4", "", C.none ? "Continental cups" : ccTier(C).name), el("p", "detail", contNext()));
 		if (!C.none) {
 			const me = ccMe(C), cell = (tag, txt, st) => { const e = el(tag, "", txt); if (st) { e.style.cssText = st; } return e; };
 			if (me >= 0) {

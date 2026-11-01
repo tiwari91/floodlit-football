@@ -97,7 +97,7 @@ const q = await page.evaluate(() => {
 	const top = (() => { const s = window.__ff.league; return null; })();
 	return { q: lg.club.contQual, season: lg.season };
 });
-check("at the end of the season the top four qualify for next season", q.q && q.q.season === q.season + 1 && q.q.ids.length === 4, JSON.stringify(q));
+check("at the end of the season the qualifiers for next season are set: the top four, or the two in your lower-tier competition (europe.mjs has the rules)", q.q && q.q.season === q.season + 1 && ((q.q.tier || 1) === 1 ? q.q.ids.length === 4 : q.q.ids.length === 2 && q.q.ids.includes(0)), JSON.stringify(q));
 // It survives a save and a reload.
 const saved = await page.evaluate(() => { const F = window.__ff, lg = F.league; lg.round = 0; delete lg.cont; lg.club.contQual = { season: lg.season, ids: [ 0, ...lg.members.filter(i => i !== 0).slice(0, 3) ] }; F.ensureCont(lg); F.saveLeague(); return lg.cont.games.length; });
 await page.reload(); await page.waitForFunction(() => window.__ff && window.__ff.league && window.__ff.league.club, null, { timeout: 60000 });
