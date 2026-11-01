@@ -1328,13 +1328,16 @@
 			}
 			V.setFromMatrixPosition(rig.root.matrixWorld);
 		}
-		const ns = realShadow3D() ? 0 : gfx3().shadows - 1;   // real shadows replace the painted ones
-		if (ns > 0 && air < 20 && cond && cond.ko === "day") {
+		// Real shadows replace the painted sun shadow; at night the faint star from the four floodlight
+		// pylons stays painted round them (one real light is enough; four would cost four shadow passes).
+		const real = realShadow3D(), night = !(cond && cond.ko === "day");
+		const ns = real && !night ? 0 : gfx3().shadows - 1;
+		if (ns > 0 && air < 20 && !night) {
 			// An afternoon game: one sun shadow, the same way for everyone, longer than his blob.
 			const len = 26, [ ux, uz ] = sunDir3D(); F.longs.material.opacity = 0.2;
 			F.longs.setMatrixAt(F.longs.count++, M.compose(V.set(x + ux * len * 0.5, 0.15, z + uz * len * 0.5), F.Q.setFromAxisAngle(F.Y || (F.Y = new THREE.Vector3(0, 1, 0)), -Math.atan2(uz, ux)), F.S.set(len * 0.5, 1, 4.2)));
 		} else if (ns > 0 && air < 20) {
-			F.longs.material.opacity = 0.12;
+			F.longs.material.opacity = real ? 0.24 : 0.12;
 			for (let k = 0; k < 4; k++) {
 				if (ns < 4 && k % 2) { continue; }   // Medium: the two lights on one diagonal
 				const lx = k === 0 || k === 3 ? -160 : FW + 160, lz = k < 2 ? -160 : FH + 160;

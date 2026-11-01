@@ -648,18 +648,19 @@ const bodies = await page.evaluate(async () => {
 	return { tall: h[0], small: h[1] };
 });
 check("body types: a target man stands taller than a pace merchant", bodies.tall > bodies.small + 0.05, JSON.stringify(bodies));
-// Real shadows: on High the shadow light casts and is aimed into the picture; on Low the painted ones are back.
+// Real shadows: on High the shadow light casts and is aimed into the picture, the ball casts too, and at night
+// the painted floodlight star stays round the players; on Low the painted ones are back.
 const shadows = await page.evaluate(async () => {
 	const F = window.__ff, G3 = F.G3, tick = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))), was = typeof F.gfxLevel === "function" ? F.gfxLevel() : F.gfxLevel;
 	const auto = F.gfxAuto && F.gfxAuto.on; F.setGfx("high", true); await tick();
 	const S = G3.shadow, c = G3.cam.position, t = S.light.target.position;
-	const high = { cast: S.light.castShadow, catcher: S.catcher.visible, map: S.light.shadow.mapSize.x, aimDist: Math.round(Math.hypot(t.x - c.x, t.z - c.z)), longs: G3.fig.longs.count };
+	const high = { cast: S.light.castShadow, catcher: S.catcher.visible, map: S.light.shadow.mapSize.x, aimDist: Math.round(Math.hypot(t.x - c.x, t.z - c.z)), longs: G3.fig.longs.count, day: F.cond.ko === "day", ballCast: G3.ball.castShadow };
 	F.setGfx("low", true); await tick(); await tick();
 	const S2 = G3.shadow, low = S2 ? { cast: S2.light.castShadow, catcher: S2.catcher.visible } : { none: true };   // Low may rebuild the 3D view: read its new light
 	low.level = F.gfxLevel; F.setGfx(auto ? "auto" : was, true); await tick();
 	return { high, low };
 });
-check("real shadows: on High the players cast them into the picture; Low goes back to painted ones", shadows.high.cast && shadows.high.catcher && shadows.high.map === 2048 && shadows.high.longs === 0 && shadows.high.aimDist < 3000 && !shadows.low.none && !shadows.low.cast && !shadows.low.catcher, JSON.stringify(shadows));
+check("real shadows: on High the players cast them into the picture; Low goes back to painted ones", shadows.high.cast && shadows.high.catcher && shadows.high.map === 2048 && (shadows.high.day ? shadows.high.longs === 0 : shadows.high.longs > 0) && shadows.high.ballCast && shadows.high.aimDist < 3000 && !shadows.low.none && !shadows.low.cast && !shadows.low.catcher, JSON.stringify(shadows));
 // Faces in play: effort as he strikes the ball, pain when he is brought down, joy celebrating (it wins over
 // the others at once), and back to calm a moment after.
 const faces = await page.evaluate(async () => {

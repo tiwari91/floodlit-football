@@ -741,7 +741,10 @@
 		const sh = 1 / (1 + h / 90), bk = br / 5;
 		const [ sux, suz ] = sunDir3D(); G3.ballShadow.position.set(bx + sux * (2.4 * bk + h * 0.07), 0.3, bz + suz * (2.4 * bk + h * 0.07));
 		G3.ballShadow.scale.set((4.5 * sh + 2) * bk, 1, (4.5 * sh + 2) * bk);
-		G3.ballShadow.material.opacity = 0.3 * sh + 0.08;
+		// With real shadows the ball casts its own, which slides off along the light as it rises (where a
+		// lofted ball will come down); the painted spot stays only as a contact patch on the grass.
+		const realB = !!realShadow3D(); G3.ball.castShadow = realB;
+		G3.ballShadow.material.opacity = realB ? 0.34 * clamp(1 - h / 6, 0, 1) : 0.3 * sh + 0.08;
 		ballContact3D(bx, bz, h * Z3, br, spd, held);
 		if (G3.shot.startsWith("replay")) { for (const m of Object.values(G3.marks)) { m.visible = false; } return; }   // a clean picture for the replay
 		// The markers on the grass.

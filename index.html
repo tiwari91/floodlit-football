@@ -18875,13 +18875,16 @@ td, th { font-variant-numeric: tabular-nums; }
 			}
 			V.setFromMatrixPosition(rig.root.matrixWorld);
 		}
-		const ns = realShadow3D() ? 0 : gfx3().shadows - 1;   // real shadows replace the painted ones
-		if (ns > 0 && air < 20 && cond && cond.ko === "day") {
+		// Real shadows replace the painted sun shadow; at night the faint star from the four floodlight
+		// pylons stays painted round them (one real light is enough; four would cost four shadow passes).
+		const real = realShadow3D(), night = !(cond && cond.ko === "day");
+		const ns = real && !night ? 0 : gfx3().shadows - 1;
+		if (ns > 0 && air < 20 && !night) {
 			// An afternoon game: one sun shadow, the same way for everyone, longer than his blob.
 			const len = 26, [ ux, uz ] = sunDir3D(); F.longs.material.opacity = 0.2;
 			F.longs.setMatrixAt(F.longs.count++, M.compose(V.set(x + ux * len * 0.5, 0.15, z + uz * len * 0.5), F.Q.setFromAxisAngle(F.Y || (F.Y = new THREE.Vector3(0, 1, 0)), -Math.atan2(uz, ux)), F.S.set(len * 0.5, 1, 4.2)));
 		} else if (ns > 0 && air < 20) {
-			F.longs.material.opacity = 0.12;
+			F.longs.material.opacity = real ? 0.24 : 0.12;
 			for (let k = 0; k < 4; k++) {
 				if (ns < 4 && k % 2) { continue; }   // Medium: the two lights on one diagonal
 				const lx = k === 0 || k === 3 ? -160 : FW + 160, lz = k < 2 ? -160 : FH + 160;
@@ -20348,7 +20351,10 @@ td, th { font-variant-numeric: tabular-nums; }
 		const sh = 1 / (1 + h / 90), bk = br / 5;
 		const [ sux, suz ] = sunDir3D(); G3.ballShadow.position.set(bx + sux * (2.4 * bk + h * 0.07), 0.3, bz + suz * (2.4 * bk + h * 0.07));
 		G3.ballShadow.scale.set((4.5 * sh + 2) * bk, 1, (4.5 * sh + 2) * bk);
-		G3.ballShadow.material.opacity = 0.3 * sh + 0.08;
+		// With real shadows the ball casts its own, which slides off along the light as it rises (where a
+		// lofted ball will come down); the painted spot stays only as a contact patch on the grass.
+		const realB = !!realShadow3D(); G3.ball.castShadow = realB;
+		G3.ballShadow.material.opacity = realB ? 0.34 * clamp(1 - h / 6, 0, 1) : 0.3 * sh + 0.08;
 		ballContact3D(bx, bz, h * Z3, br, spd, held);
 		if (G3.shot.startsWith("replay")) { for (const m of Object.values(G3.marks)) { m.visible = false; } return; }   // a clean picture for the replay
 		// The markers on the grass.
