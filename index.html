@@ -886,6 +886,8 @@
 	.staff li.staff-head { display: flex; justify-content: space-between; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
 	.staff li.staff-head span:first-child { color: var(--ink, #e8efe9); font-weight: 700; }
 	.staff .cands button.armed { border-color: #f2b52e; color: #f2b52e; }
+	.staff button.remove { color: var(--muted); }
+	.staff button.remove.armed { border-color: #e0574f; color: #ff8a80; white-space: normal; max-width: 220px; }
 	.staff li.staff-log { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; }
 	.staff li.staff-log .lbl { color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
 	.staff li.staff-log small { color: var(--muted); }
@@ -4387,7 +4389,7 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 		c.staffLog.unshift(`Season ${league.season}, matchday ${Math.min(league.round + 1, league.fixtures.length)}: ${text}`);
 		c.staffLog.length = Math.min(c.staffLog.length, 6);
 	}
-	let staffArmed = null;   // the candidate whose Hire button asks for a second press to confirm
+	let staffArmed = null;   // the candidate (or the job, for Remove coach) whose button asks for a second press to confirm
 	const redrawStaff = () => { try { renderCoaching(); } catch (e) { /* the full redraw has already run */ } };
 	// Hire the person named on the button. If the list changed since it was drawn, hire no one and redraw.
 	function hireStaff (want) {
@@ -4483,7 +4485,13 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 			if (!st) { who.append(" no one in this job"); }
 			who.append(el("small", "", st ? `${title}: ${staffEffect(job, st.lvl)} · ${wageWeek(st.wage)}` : `${title}: ${what}. Nobody is doing this job now.`));
 			li.append(who);
-			if (st) { const b = el("button", "", "Let go"); b.type = "button"; b.addEventListener("click", () => fireStaff(job)); li.append(b); }
+			if (st) {
+				// Removing a coach takes two presses too: the first asks, and the fee paid is not given back.
+				const armed = staffArmed === job, b = el("button", armed ? "remove armed" : "remove", armed ? `Confirm: remove ${st.name}? Fee not refunded` : "Remove coach");
+				b.type = "button"; b.title = `Ends ${st.name}'s job here. The job becomes vacant.`;
+				b.addEventListener("click", () => { if (staffArmed !== job) { staffArmed = job; redrawStaff(); return; } staffArmed = null; fireStaff(job); });
+				li.append(b);
+			}
 			else { li.append(el("span", "")); }
 			const cands = el("div", "cands");
 			cands.append(el("span", "lbl", st ? "Better candidates:" : "Candidates:"));

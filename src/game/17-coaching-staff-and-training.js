@@ -44,7 +44,7 @@
 		c.staffLog.unshift(`Season ${league.season}, matchday ${Math.min(league.round + 1, league.fixtures.length)}: ${text}`);
 		c.staffLog.length = Math.min(c.staffLog.length, 6);
 	}
-	let staffArmed = null;   // the candidate whose Hire button asks for a second press to confirm
+	let staffArmed = null;   // the candidate (or the job, for Remove coach) whose button asks for a second press to confirm
 	const redrawStaff = () => { try { renderCoaching(); } catch (e) { /* the full redraw has already run */ } };
 	// Hire the person named on the button. If the list changed since it was drawn, hire no one and redraw.
 	function hireStaff (want) {
@@ -140,7 +140,13 @@
 			if (!st) { who.append(" no one in this job"); }
 			who.append(el("small", "", st ? `${title}: ${staffEffect(job, st.lvl)} · ${wageWeek(st.wage)}` : `${title}: ${what}. Nobody is doing this job now.`));
 			li.append(who);
-			if (st) { const b = el("button", "", "Let go"); b.type = "button"; b.addEventListener("click", () => fireStaff(job)); li.append(b); }
+			if (st) {
+				// Removing a coach takes two presses too: the first asks, and the fee paid is not given back.
+				const armed = staffArmed === job, b = el("button", armed ? "remove armed" : "remove", armed ? `Confirm: remove ${st.name}? Fee not refunded` : "Remove coach");
+				b.type = "button"; b.title = `Ends ${st.name}'s job here. The job becomes vacant.`;
+				b.addEventListener("click", () => { if (staffArmed !== job) { staffArmed = job; redrawStaff(); return; } staffArmed = null; fireStaff(job); });
+				li.append(b);
+			}
 			else { li.append(el("span", "")); }
 			const cands = el("div", "cands");
 			cands.append(el("span", "lbl", st ? "Better candidates:" : "Candidates:"));
