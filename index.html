@@ -3992,6 +3992,7 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 				for (const id of list) { const x = el("option", "", TEAMS[id].name); x.value = String(id); g.append(x); }
 				club.append(g);
 			}
+			if (typeof abroadOptions === "function") { abroadOptions(club); }   // every league abroad (18q)
 		}
 		club.value = String(mkQ.club);
 		const max = el("input"); max.type = "number"; max.min = "0"; max.step = "1"; max.value = mkQ.max || ""; max.placeholder = "No limit"; max.id = "mkqMax";
@@ -4147,8 +4148,9 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 				b2.addEventListener("click", () => bidAnyClub(r, true));
 				btns.append(b, b2); li.append(btns);
 				li.append(el("span", "ratings", `OVR ${ovrOf(pl)} · PAC ${pl.pac} SHO ${pl.sho} PAS ${pl.pas} DEF ${pl.def}`));
-				li.append(el("span", "swap", `${TEAMS[r.id].name}${ok ? "" : " · talks broken off"}`));
-				if (!league.members.includes(r.id)) { li.append(el("span", "swap", "Plays in the division below")); }
+				li.append(el("span", "swap", `${r.abroad ? r.abroad.name : TEAMS[r.id].name}${ok ? "" : " · talks broken off"}`));
+				if (r.abroad) { li.append(el("span", "swap", `Abroad: ${NATIONS[r.abroad.nat] ? NATIONS[r.abroad.nat][0] : r.abroad.nat}${NATIONS[r.abroad.nat] && MARKETS[NATIONS[r.abroad.nat][1]] && MARKETS[NATIONS[r.abroad.nat][1]].permit ? ` · work permit needed (${PERMIT_OVR}+)` : ""}`)); }
+				else if (!league.members.includes(r.id)) { li.append(el("span", "swap", "Plays in the division below")); }
 				li.append(el("span", "swap", out ? `Replaces ${out.name} (${ovrNow(out)}), sold for ${money(round1(priceOf(out) * 0.5))}` : "Joins your bench"));
 				mk.append(li);
 			});
@@ -4657,11 +4659,13 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 				out.push({ id, slot, pl, ask, held });
 			});
 		}
+		if (typeof searchAbroad === "function") { out.push(...searchAbroad(q, name)); }   // every league abroad (18q)
 		return out.sort((a, b) => ovrOf(b.pl) - ovrOf(a.pl) || a.ask - b.ask);
 	}
 	function bidAnyClub (r, low) {
 		const c = league.club;
 		if (!windowOpen()) { return; }
+		if (r.abroad && typeof bidAbroad === "function") { bidAbroad(r, low); return; }   // a club abroad (18q)
 		let i = c.market.findIndex(m => m.name === r.pl.name && m.cpuClub === r.id);
 		if (i < 0) { c.market.push({ ...r.pl, from: TEAMS[r.id].name, ask: r.ask, cpuClub: r.id, cpuSlot: r.slot }); i = c.market.length - 1; }
 		bidFor(i, low);
@@ -4702,7 +4706,7 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 		if (hgNo) { lastDeal = hgNo; afterClubChange(); return; }
 		const m = MARKETS[pl.region];
 		pl.adapt = m ? Math.max(0, m.adapt - staffLvl(c, "scout") * 0.5) : 0;
-		delete pl.ask; delete pl.bids; delete pl.from; delete pl.scouted; delete pl.cpuClub; delete pl.cpuSlot;
+		delete pl.ask; delete pl.bids; delete pl.from; delete pl.scouted; delete pl.cpuClub; delete pl.cpuSlot; delete pl.abroad;
 		if (cpuFrom) { backfillCpu(cpuFrom.id, cpuFrom.slot); }
 		const tgt = signingTarget(pl.pos), out = tgt.out, fee = out ? round1(priceOf(out) * 0.5) : 0;
 		c.budget = round1(c.budget - price + fee);
@@ -7421,6 +7425,79 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 	}
 	// The kick-off card's line for a festive matchday.
 	const festiveLine = r => (isFestive(r) ? `${FESTIVE[r]}: games come two or three days apart over Christmas and New Year, so legs recover less in between. Rotate.` : "");
+	/* ---------- the transfer search abroad ----------
+	   "Any player, any club" reaches every league the game has, not only your division and the one below:
+	   Spain, Germany, Italy and the rest, each with its clubs named the way that country names them (18c).
+	   A league file (18h) that gives a country its clubs and players is used as it is, so those clubs and
+	   names are the file's; any other country's clubs are made up from a fixed seed, strongest first, from
+	   the country's standing in the continental cup (18f). A player bought from abroad goes onto the
+	   market list from his club and region, so the work permit, the asking price, the homegrown rule and
+	   the settling-in period all apply as for any signing from abroad. Your own league's country is the
+	   division itself, so it is not listed again. */
+	const ABROAD_CLUBS = 10;   // a country without a league file: its ten strongest clubs
+	const abroadNats = () => Object.keys(FOREIGN).filter(n => n !== (typeof leagueCountry === "function" ? leagueCountry(league) : HOME_NAT));
+	const natTop = n => { const row = typeof CC_NATIONS !== "undefined" ? CC_NATIONS.find(r => r[0] === n) : null; return row ? row[2] : 3.3; };
+	// A country's clubs: { key, name, slot, file } with the file's players when it has them.
+	function abroadClubs (nat) {
+		const lf = typeof leagueFile === "function" ? leagueFile() : { leagues: {} }, L = lf.leagues && lf.leagues[nat];
+		if (L && Array.isArray(L.clubs) && L.clubs.length) {
+			return L.clubs.slice().sort((a, b) => a.slot - b.slot).map(c => ({ key: `a:${nat}:${c.slot}`, nat, name: c.name, slot: c.slot, players: c.players || null }));
+		}
+		const ids = foreignIdent(nat, "") || [];
+		return ids.slice(1, ABROAD_CLUBS + 1).map((d, i) => ({ key: `a:${nat}:${i + 1}`, nat, name: d.name, slot: i + 1, players: null }));
+	}
+	// A club abroad's eleven: generated like the division's (a fixed seed per season), the file's players laid over it.
+	function abroadSquad (club) {
+		let h = (hashStr(club.key) + (league ? league.season : 1) * 104729) % 2147483647 || 1;
+		const rnd = () => { h = (h * 48271) % 2147483647; return h / 2147483647; };
+		const str = clamp(natTop(club.nat) - (club.slot - 1) * 0.12, 1.5, 5), base = cpuOvr(str), sp = styleOf(club.nat).sp;
+		const sq = POS_OF_SLOT.map((pos, i) => genPlayer(pos, base + Math.round((rnd() * 2 - 1) * 4 * sp) + (i === 9 || i === 2 ? 3 : 0), null, rnd, { lg: club.nat }));
+		for (const fp of club.players || []) {
+			const i = fp.slot, pl = sq[i];
+			if (!pl) { continue; }
+			for (const f of PLAYER_EDIT_KEYS) { if (Object.prototype.hasOwnProperty.call(fp, f)) { pl[f] = f === "lk" ? { ...fp.lk } : fp[f]; } }
+			if (fp.name && !Object.prototype.hasOwnProperty.call(fp, "trait")) { pl.trait = traitFor(pl); }
+		}
+		return sq;
+	}
+	// The search's results from abroad, in the same shape as the division's (the id is the club's key).
+	function searchAbroad (q, name) {
+		const out = [], want = String(q.club || ""), c = league.club;
+		const mine = new Set([ ...c.squad, ...c.bench, ...(c.loanedOut || []).map(L => L.pl) ].map(p => p.name));
+		for (const nat of abroadNats()) {
+			if (want && want !== `n:${nat}` && !want.startsWith(`a:${nat}:`)) { continue; }
+			for (const club of abroadClubs(nat)) {
+				if (want.startsWith("a:") && want !== club.key) { continue; }
+				abroadSquad(club).forEach(pl => {
+					if (!pl || mine.has(pl.name) || (name && !pl.name.toLowerCase().includes(name)) || (q.pos && pl.pos !== q.pos) || ovrOf(pl) < (q.min || 0)) { return; }
+					const held = c.market.find(m => m.name === pl.name && m.abroad === club.key), ask = held ? askOf(held) : round1(priceOf(pl) * 1.2);
+					if (q.max > 0 && ask * MONEY_SCALE > q.max + 1e-9) { return; }
+					out.push({ id: club.key, abroad: club, slot: -1, pl, ask, held });
+				});
+			}
+		}
+		return out;
+	}
+	// Bid for a player abroad: he joins the market list from his club and region, then the usual bid.
+	function bidAbroad (r, low) {
+		const c = league.club;
+		let i = c.market.findIndex(m => m.name === r.pl.name && m.abroad === r.id);
+		if (i < 0) {
+			const region = NATIONS[r.abroad.nat] ? NATIONS[r.abroad.nat][1] : "europe";
+			c.market.push({ ...r.pl, from: r.abroad.name, region: MARKETS[region] ? region : "europe", ask: r.ask, abroad: r.id });
+			i = c.market.length - 1;
+		}
+		bidFor(i, low);
+	}
+	// The club list in the search form: a group per country, its clubs when a league file names them.
+	function abroadOptions (select) {
+		for (const nat of abroadNats()) {
+			const g = el("optgroup"); g.label = `Abroad: ${NATIONS[nat] ? NATIONS[nat][0] : nat} (${FOREIGN[nat][0]})`;
+			const all = el("option", "", `${NATIONS[nat] ? NATIONS[nat][0] : nat} · every club`); all.value = `n:${nat}`; g.append(all);
+			for (const club of abroadClubs(nat)) { const o = el("option", "", club.name); o.value = club.key; g.append(o); }
+			select.append(g);
+		}
+	}
 	/* ---------- watch a match ----------
 	   Any other fixture of the coming matchday can be watched live from the League panel: the home side takes
 	   your seat (its name, kit, ground and players), the visitors the other, the computer plays both, and nothing

@@ -225,6 +225,7 @@
 				for (const id of list) { const x = el("option", "", TEAMS[id].name); x.value = String(id); g.append(x); }
 				club.append(g);
 			}
+			if (typeof abroadOptions === "function") { abroadOptions(club); }   // every league abroad (18q)
 		}
 		club.value = String(mkQ.club);
 		const max = el("input"); max.type = "number"; max.min = "0"; max.step = "1"; max.value = mkQ.max || ""; max.placeholder = "No limit"; max.id = "mkqMax";
@@ -380,8 +381,9 @@
 				b2.addEventListener("click", () => bidAnyClub(r, true));
 				btns.append(b, b2); li.append(btns);
 				li.append(el("span", "ratings", `OVR ${ovrOf(pl)} · PAC ${pl.pac} SHO ${pl.sho} PAS ${pl.pas} DEF ${pl.def}`));
-				li.append(el("span", "swap", `${TEAMS[r.id].name}${ok ? "" : " · talks broken off"}`));
-				if (!league.members.includes(r.id)) { li.append(el("span", "swap", "Plays in the division below")); }
+				li.append(el("span", "swap", `${r.abroad ? r.abroad.name : TEAMS[r.id].name}${ok ? "" : " · talks broken off"}`));
+				if (r.abroad) { li.append(el("span", "swap", `Abroad: ${NATIONS[r.abroad.nat] ? NATIONS[r.abroad.nat][0] : r.abroad.nat}${NATIONS[r.abroad.nat] && MARKETS[NATIONS[r.abroad.nat][1]] && MARKETS[NATIONS[r.abroad.nat][1]].permit ? ` · work permit needed (${PERMIT_OVR}+)` : ""}`)); }
+				else if (!league.members.includes(r.id)) { li.append(el("span", "swap", "Plays in the division below")); }
 				li.append(el("span", "swap", out ? `Replaces ${out.name} (${ovrNow(out)}), sold for ${money(round1(priceOf(out) * 0.5))}` : "Joins your bench"));
 				mk.append(li);
 			});

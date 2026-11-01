@@ -56,11 +56,11 @@ check("a bid at the asking price signs him: he is in your squad and the money is
 check("his club no longer has him but still has a full eleven", !after.theirs && after.size === 11, JSON.stringify(after));
 check("the signing is announced", /Signed/.test(after.deal));
 
-// A cheeky offer can be turned down and the price rises, through the same rules as the market.
+// A cheeky offer can be turned down and the price rises, through the same rules as the market (the best may be at a club abroad: 18q).
 await page.evaluate(() => { const orig = Math.random; Math.random = () => 0.99; window.__rnd = orig; });
 const b4 = await page.evaluate(() => { document.getElementById("mkqGo").click(); return [ ...document.querySelectorAll("#winMarket li .bids button:nth-child(2)") ].length; });
 await page.click("#winMarket li .bids button:nth-child(2)");
-const ask = await page.evaluate(() => { Math.random = window.__rnd; const m = window.__ff.league.club.market.filter(p => Number.isInteger(p.cpuClub)); return { n: m.length, bids: m[0] && m[0].bids, deal: document.getElementById("winNote").textContent }; });
+const ask = await page.evaluate(() => { Math.random = window.__rnd; const m = window.__ff.league.club.market.filter(p => Number.isInteger(p.cpuClub) || p.abroad); return { n: m.length, bids: m[0] && m[0].bids, deal: document.getElementById("winNote").textContent }; });
 check("a low offer that is refused is remembered: the price rises, the same talks as the market", b4 > 0 && ask.n === 1 && ask.bids === 1 && /turned down/.test(ask.deal), JSON.stringify(ask));
 
 // Outside the window nothing can be bought.

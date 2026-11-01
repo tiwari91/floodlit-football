@@ -332,11 +332,13 @@
 				out.push({ id, slot, pl, ask, held });
 			});
 		}
+		if (typeof searchAbroad === "function") { out.push(...searchAbroad(q, name)); }   // every league abroad (18q)
 		return out.sort((a, b) => ovrOf(b.pl) - ovrOf(a.pl) || a.ask - b.ask);
 	}
 	function bidAnyClub (r, low) {
 		const c = league.club;
 		if (!windowOpen()) { return; }
+		if (r.abroad && typeof bidAbroad === "function") { bidAbroad(r, low); return; }   // a club abroad (18q)
 		let i = c.market.findIndex(m => m.name === r.pl.name && m.cpuClub === r.id);
 		if (i < 0) { c.market.push({ ...r.pl, from: TEAMS[r.id].name, ask: r.ask, cpuClub: r.id, cpuSlot: r.slot }); i = c.market.length - 1; }
 		bidFor(i, low);
@@ -377,7 +379,7 @@
 		if (hgNo) { lastDeal = hgNo; afterClubChange(); return; }
 		const m = MARKETS[pl.region];
 		pl.adapt = m ? Math.max(0, m.adapt - staffLvl(c, "scout") * 0.5) : 0;
-		delete pl.ask; delete pl.bids; delete pl.from; delete pl.scouted; delete pl.cpuClub; delete pl.cpuSlot;
+		delete pl.ask; delete pl.bids; delete pl.from; delete pl.scouted; delete pl.cpuClub; delete pl.cpuSlot; delete pl.abroad;
 		if (cpuFrom) { backfillCpu(cpuFrom.id, cpuFrom.slot); }
 		const tgt = signingTarget(pl.pos), out = tgt.out, fee = out ? round1(priceOf(out) * 0.5) : 0;
 		c.budget = round1(c.budget - price + fee);
