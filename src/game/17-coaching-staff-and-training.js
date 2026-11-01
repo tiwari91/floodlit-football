@@ -10,7 +10,9 @@
 	const FIRST = [ "Ana", "Bruno", "Carla", "Dario", "Elif", "Femi", "Gus", "Hana", "Ivo", "Jonas", "Kofi", "Lena", "Mateo", "Nina", "Omar", "Pia", "Ravi", "Sven", "Tomo", "Uli", "Vera", "Wim", "Yara", "Zeki" ];
 	const staffLvl = (c, job) => (c.staff && c.staff[job] ? c.staff[job].lvl : 0);
 	const staffWages = c => Object.values(c.staff || {}).reduce((t, st) => t + (st ? st.wage : 0), 0);
-	const staffFee = lvl => round1(0.15 + lvl * lvl * 0.12);
+	// The fee to bring someone in (compensation to his old club): about £1m for one star to £8m for five at
+	// Premier League scale (MONEY_SCALE, 04). Coaches are cheap next to players, and earn a wage on top.
+	const staffFee = lvl => Math.round((0.04 + lvl * lvl * 0.014) * 1000) / 1000;
 	function genStaffPool () {
 		const pool = [];
 		for (const job of Object.keys(STAFF)) {
