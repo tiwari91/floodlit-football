@@ -304,9 +304,9 @@ const pk = await page.evaluate(() => {
 	xiRows()[3].querySelector("button.swap").click();
 	window.__bn = benchName;
 	const xi = F.intlCallUp(F.league).xi.map(e => e.pl.name), bench = F.intlCallUp(F.league).bench.map(e => e.pl.name);
-	return { benchName, outName, inXi: xi.includes(benchName), outOnBench: bench.includes(outName), stored: F.league.intl.xi.length, hasLeaveOut: !![ ...box.querySelectorAll("ol.nat-xi li button") ].find(b => b.textContent === "Leave out") };
+	return { benchName, outName, inXi: xi.includes(benchName), outOnBench: bench.includes(outName), stored: F.league.intl.xi.length, hasLeaveOut: !![ ...box.querySelectorAll("ol.nat-xi li button") ].find(b => b.textContent === "Drop from squad") };
 });
-check("the manager can move a bench player into the starting eleven (and the benched man goes to the bench); Leave out is still there", pk.inXi && pk.outOnBench && pk.stored >= 11 && pk.hasLeaveOut, JSON.stringify(pk));
+check("the manager can move a bench player into the starting eleven (and the benched man goes to the bench); Drop from squad is still there", pk.inXi && pk.outOnBench && pk.stored >= 11 && pk.hasLeaveOut, JSON.stringify(pk));
 const pk2 = await page.evaluate(() => {
 	const F = window.__ff; F.newMatchTest();
 	const sq = F.intlSide.club.squad.map(p => p.name);
@@ -528,6 +528,21 @@ const ph1 = await page.evaluate(() => { const c = document.querySelector(".lg-in
 await showTab(page, "squad");
 const ph2 = await page.evaluate(() => { const c = document.getElementById("intlSquad"); return { shown: !c.hidden, sw: c.scrollWidth, cw: c.clientWidth, doc: document.documentElement.scrollWidth <= window.innerWidth }; });
 check("the International cards fit a phone screen", ph1.sw <= ph1.cw + 1 && ph1.doc && ph2.shown && ph2.sw <= ph2.cw + 1 && ph2.doc, JSON.stringify({ ph1, ph2 }));
+
+// A country short of players: stand-ins fill the eleven and a bench of at least seven (a second keeper among them),
+// with the same names on every call, so substitutions work as from a club bench.
+const short = await page.evaluate(() => {
+	const F = window.__ff, I = F.league.intl;
+	if (!I || !I.nat) { return { skip: true }; }
+	const keep = { out: I.out, sel: I.sel, xi: I.xi };
+	const names = F.intlEligible(F.league).map(e => e.pl.name);
+	I.out = names.slice(3); I.sel = []; I.xi = [];
+	const a = F.intlCallUp(F.league), b = F.intlCallUp(F.league);
+	const res = { xi: a.xi.length, bench: a.bench.length, gk2: a.bench.some(e => e.pl.pos === "gk"), gen: a.bench.filter(e => e.gen).length, same: a.bench.map(e => e.pl.name).join() === b.bench.map(e => e.pl.name).join() };
+	Object.assign(I, keep);
+	return res;
+});
+check("a country short of players gets stand-ins for the eleven and a bench of seven with a second keeper, the same men every time", short.skip || (short.xi === 11 && short.bench >= 7 && short.gk2 && short.gen > 0 && short.same), JSON.stringify(short));
 
 check("no console errors", errs.length === 0, errs.join(" | "));
 await browser.close();

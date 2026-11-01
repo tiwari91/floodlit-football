@@ -5,7 +5,7 @@
 	   is filled with generated players at its own average less 4, so small nations stay playable without
 	   being strong. Built once per half-season (the summer and the January window change who is where) and
 	   kept in memory only: the computer clubs' elevens are rebuilt from their seeds, so nothing new is saved. */
-	const INTL_BENCH = 12, INTL_FILL_DROP = 4, INTL_EMPTY_OVR = 60;
+	const INTL_BENCH = 12, INTL_BENCH_MIN = 7, INTL_FILL_DROP = 4, INTL_EMPTY_OVR = 60;
 	// Generic shirts by region, not any real federation's.
 	const INTL_SHIRTS = { home: [ "#e8e8e8", "#1d3f8f", "#c8102e", "#1f7a3a" ], europe: [ "#1d3f8f", "#c8102e", "#f2f2f2", "#f39200", "#0a7d4f", "#5b2a86", "#0b2a5b", "#d4af37" ], samerica: [ "#f6d10a", "#7fb5e6", "#c8102e", "#ffffff", "#0b2a5b" ], africa: [ "#0a7d4f", "#f39200", "#f6d10a", "#c8102e", "#ffffff", "#1f7a3a" ], asia: [ "#0b2a5b", "#c8102e", "#ffffff", "#f6d10a", "#1d3f8f" ] };
 	// The 1..5 rating that cpuOvr (17) maps to this overall, the other way round.
@@ -404,6 +404,22 @@
 				side.xi = got.slice(0, 11); side.bench = [ ...got.slice(11), ...spare ].slice(0, INTL_BENCH);
 				const on = slotsFor(lg.fmt).map(i => side.xi[i]).filter(Boolean), ovr = on.reduce((t, e) => t + ovrOf(e.pl), 0) / on.length;
 				side.ovr = round1(ovr); side.str = strOfOvr(ovr);
+			}
+		}
+		// A country short of players in your save: stand-ins fill your bench too (a second keeper first), so you
+		// have as many to bring on as a club bench offers. Fixed by the season, so they keep their names.
+		if (side.bench.length < INTL_BENCH_MIN) {
+			const real = side.xi.filter(e => !e.gen), avg = real.length ? real.reduce((t, e) => t + ovrOf(e.pl), 0) / real.length : INTL_EMPTY_OVR + INTL_FILL_DROP;
+			let h = (hashStr(`${I.nat}|${lg.season}|bench`) % 2147483646) + 1;
+			const rnd = () => { h = (h * 48271) % 2147483647; return h / 2147483647; };
+			const st = { lg: NAT_STYLE[I.nat] ? I.nat : leagueNat(), nat: I.nat }, taken = new Set([ ...side.xi, ...side.bench ].map(e => e.pl.name));
+			const cycle = [ "def", "mid", "fwd" ], need = side.bench.some(e => e.pl.pos === "gk") ? [] : [ "gk" ];
+			for (let k = 0; need.length + side.bench.length < INTL_BENCH_MIN; k++) { need.push(cycle[k % 3]); }
+			for (const pos of need) {
+				let pl = null;
+				for (let t = 0; t < 5 && (!pl || taken.has(pl.name)); t++) { pl = genPlayer(pos, Math.round(avg - INTL_FILL_DROP + (rnd() * 2 - 1) * 2), null, rnd, st); }
+				pl.nat = I.nat; taken.add(pl.name);
+				side.bench.push({ pl, club: "Uncapped", own: false, gen: true });
 			}
 		}
 		return side;
@@ -880,6 +896,7 @@
 		cs.addEventListener("change", () => { if (cs.value) { I.capt = cs.value; } else { delete I.capt; } saveLeague(); });
 		const tsel = (id, label, map, key, dflt) => { const x = el("select"); x.id = id; x.setAttribute("aria-label", label); for (const [ v, t ] of Object.entries(map)) { const o = el("option", "", `${label}: ${t}`); o.value = v; x.append(o); } x.value = (I.tac && I.tac[key]) || dflt; x.addEventListener("change", () => intlTacSet(key, x.value)); return x; };
 		ctl.append(pre, tsel("intlStyle", "Style", STYLES, "style", styleSel.value), tsel("intlPress", "Press", PRESSES, "press", pressSel.value), cs); box.append(ctl);
+		{ const real = intlEligible(league).length, gen = [ ...side.xi, ...side.bench ].filter(e => e.gen).length; if (gen) { box.append(el("p", "intl-note", `Your save has ${real} ${natName(I.nat)} player${real === 1 ? "" : "s"}: ${gen} uncapped stand-in${gen === 1 ? "" : "s"} fill the rest of the eleven and the bench.`)); } }
 		const fr = intlFriendly(league);
 		if (fr) {   // a break with no competitive game: one friendly, a random country unless you pick one
 			const fc = el("div", "intl-friendly"); fc.id = "intlFriendly";
@@ -898,7 +915,7 @@
 			const mv = el("button", "swap", pk ? "Cancel" : intlPicked ? "Swap here" : "Move"); mv.type = "button";
 			mv.addEventListener("click", () => { if (!intlPicked || pk) { intlPicked = pk ? null : e.pl.name; renderIntlSquad(); } else { const a = intlPicked; intlPicked = null; intlSwap(a, e.pl.name); } });
 			r.append(mv);
-			if (!e.gen) { const lo = el("button", "", "Leave out"); lo.type = "button"; lo.addEventListener("click", () => { intlPicked = null; intlSelToggle(e.pl.name); }); r.append(lo); }
+			if (!e.gen) { const lo = el("button", "", "Drop from squad"); lo.title = "Takes him out of the 23; the next best is called up. To bench him, use Move."; lo.type = "button"; lo.addEventListener("click", () => { intlPicked = null; intlSelToggle(e.pl.name); }); r.append(lo); }
 			return r;
 		};
 		for (const i of slotsFor(league.fmt)) { if (side.xi[i]) { ol.append(row(side.xi[i], true)); } }
@@ -942,4 +959,4 @@
 		for (const id of [ "sqBox", "transfersBox", "assistCard", "coachPanel", "clubUpgrades", "lgAcademy" ]) { const b = $(id); if (b) { b.hidden = on; } }
 		for (const id of [ "sqNoClub", "transfersNoClub", "clubNoClub" ]) { const b = $(id); if (b) { b.hidden = !on; b.textContent = note; } }
 	}
-	queueMicrotask(() => { if (window.__ff) { Object.assign(window.__ff, { intlOnlyAdvance, intlFreeOffers, intlNoClub, intlLegacy, intlLegacyChoose, renderIntlOnly, nationSquads, nationSquad, nationIdent, strOfOvr, intlPool, pickNation, renderNations, NATIONS, INTL_BREAKS, ensureIntl, intlComp, intlNight, intlSummer, intlSummerBlocked, intlSummerNote, intlCallupDue, intlSummerSettle, intlSummerRun, intlSummerText, intlSummerCard, intlFixture, intlOffers, acceptIntl, declineIntl, resignIntl, intlChoose, intlCallUp, intlGroupTable, intlQualified, intlManager, intlNext, intlNewSeason, renderIntlSquad, intlRestToggle, intlSwap, intlTacSet, intlFriendly, intlObjective, intlConf, intlMood, intlAutoPick, intlSelToggle, intlCalled, intlEligible, nameTables: { FIRST, SURNAMES }, intlRep, renderOffers, newMatchTest () { clearLive(); state = "intro"; newMatch(); renderLeague(); }, readyTest () { clearLive(); state = "intro"; banner.hidden = true; newMatch(); showIntro(); renderLeague(); } }); Object.defineProperties(window.__ff, { intlSide: { get: () => intlSide, configurable: true }, leagueMatch: { get: () => leagueMatch, configurable: true } }); } });
+	queueMicrotask(() => { if (window.__ff) { Object.assign(window.__ff, { intlOnlyAdvance, intlFreeOffers, intlNoClub, intlLegacy, intlLegacyChoose, renderIntlOnly, nationSquads, nationSquad, nationIdent, strOfOvr, intlPool, pickNation, renderNations, NATIONS, INTL_BREAKS, ensureIntl, intlComp, intlNight, intlSummer, intlSummerBlocked, intlSummerNote, intlCallupDue, intlSummerSettle, intlSummerRun, intlSummerText, intlSummerCard, intlFixture, intlOffers, acceptIntl, declineIntl, resignIntl, intlChoose, intlCallUp, intlEligible, intlGroupTable, intlQualified, intlManager, intlNext, intlNewSeason, renderIntlSquad, intlRestToggle, intlSwap, intlTacSet, intlFriendly, intlObjective, intlConf, intlMood, intlAutoPick, intlSelToggle, intlCalled, intlEligible, nameTables: { FIRST, SURNAMES }, intlRep, renderOffers, newMatchTest () { clearLive(); state = "intro"; newMatch(); renderLeague(); }, readyTest () { clearLive(); state = "intro"; banner.hidden = true; newMatch(); showIntro(); renderLeague(); } }); Object.defineProperties(window.__ff, { intlSide: { get: () => intlSide, configurable: true }, leagueMatch: { get: () => leagueMatch, configurable: true } }); } });
