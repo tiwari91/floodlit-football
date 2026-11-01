@@ -30,6 +30,22 @@
 		if (!Number.isFinite(c.drill)) { c.drill = 30; }
 		if (lg && !Array.isArray(lg.staffPool)) { lg.staffPool = genStaffPool(); }
 	}
+	// What a coach of n stars does, in plain words (the numbers are the ones weeklyCoaching and the market use).
+	function staffEffect (job, n) {
+		const pc = Math.round(n * 22);
+		return { assistant: `tactical drills ${Math.round(n * 20)}% quicker, morale kept up`, attack: `shooting and passing improve ${pc}% faster`,
+			defence: `defending improves ${pc}% faster`, gk: `keepers improve ${pc}% faster`,
+			fitness: `pace improves ${pc}% faster, +${n} fitness a week, ${Math.round(n * 15)}% fewer training knocks`,
+			scout: `${n} more scouting report${n === 1 ? "" : "s"} a window, players from abroad settle in ${n * 0.5} game${n === 1 ? "" : "s"} sooner` }[job] || "";
+	}
+	// Every hire and departure, newest first, so you can always see what happened to your staff.
+	function staffNote (c, text) {
+		if (!Array.isArray(c.staffLog)) { c.staffLog = []; }
+		c.staffLog.unshift(`Season ${league.season}, matchday ${Math.min(league.round + 1, league.fixtures.length)}: ${text}`);
+		c.staffLog.length = Math.min(c.staffLog.length, 6);
+	}
+	let staffArmed = null;   // the candidate whose Hire button asks for a second press to confirm
+	const redrawStaff = () => { try { renderCoaching(); } catch (e) { /* the full redraw has already run */ } };
 	// Hire the person named on the button. If the list changed since it was drawn, hire no one and redraw.
 	function hireStaff (want) {
 		const c = league.club, i = league.staffPool.findIndex(cd => cd === want || (cd.job === want.job && cd.name === want.name && cd.lvl === want.lvl));
@@ -41,15 +57,20 @@
 		const old = c.staff[cand.job];
 		c.staff[cand.job] = { name: cand.name, lvl: cand.lvl, nat: cand.nat, wage: cand.wage };
 		league.staffPool.splice(i, 1);
+		staffArmed = null;
+		staffNote(c, `hired ${cand.name} (${"★".repeat(cand.lvl)}) as ${STAFF[cand.job][0].toLowerCase()} for ${money(fee)}${old ? `, replacing ${old.name}` : ""}`);
 		lastDeal = `${cand.name} (${"★".repeat(cand.lvl)}) is your new ${STAFF[cand.job][0].toLowerCase()}${old ? `, replacing ${old.name}` : ""}.`;
 		afterClubChange();
+		redrawStaff();
 	}
 	function fireStaff (job) {
 		const c = league.club, st = c.staff[job];
 		if (!st) { return; }
 		c.staff[job] = null;
+		staffNote(c, `let ${st.name} go (${STAFF[job][0].toLowerCase()})`);
 		lastDeal = `${st.name} has left the club.`;
 		afterClubChange();
+		redrawStaff();
 	}
 	// A week on the training ground, after each league match.
 	function weeklyCoaching (lm, played) {
@@ -108,13 +129,16 @@
 		$("trReport").textContent = r ? `After matchday ${r.round}: ${r.gains.length ? r.gains.join(", ") + (r.more ? ` and ${r.more} more` : "") : "no one improved a point this week"}.${r.knocks.length ? ` Knocks in training: ${r.knocks.join(", ")}.` : ""}` : "Your first report comes after the next league match.";
 		const ul = $("staffList");
 		ul.replaceChildren();
+		const wages = staffWages(c), head = el("li", "staff-head");
+		head.append(el("span", "", `Budget ${money(c.budget)}`), el("span", "", wages ? `Staff wages ${wageWeek(wages)}` : "No staff wages yet"));
+		ul.append(head);
 		for (const [ job, [ title, what ] ] of Object.entries(STAFF)) {
 			const st = c.staff[job], li = el("li");
 			li.append(el("span", "pos", st ? "★".repeat(st.lvl) : "–"));
 			const who = el("span", "who", st ? `${st.name} (${st.nat}) ` : "");
 			who.prepend(el("b", st ? "hired" : "vacant", st ? "Hired" : "Vacant"));
 			if (!st) { who.append(" no one in this job"); }
-			who.append(el("small", "", `${title}: ${what}${st ? ` · ${wageWeek(st.wage)}` : ""}`));
+			who.append(el("small", "", st ? `${title}: ${staffEffect(job, st.lvl)} · ${wageWeek(st.wage)}` : `${title}: ${what}. Nobody is doing this job now.`));
 			li.append(who);
 			if (st) { const b = el("button", "", "Let go"); b.type = "button"; b.addEventListener("click", () => fireStaff(job)); li.append(b); }
 			else { li.append(el("span", "")); }
@@ -122,13 +146,26 @@
 			cands.append(el("span", "lbl", st ? "Better candidates:" : "Candidates:"));
 			league.staffPool.forEach(cd => {
 				if (cd.job !== job || (st && cd.lvl <= st.lvl)) { return; }
-				const b = el("button", "", `Hire ${cd.name} ${"★".repeat(cd.lvl)} · ${money(staffFee(cd.lvl))}`);
-				b.type = "button"; b.disabled = c.budget + 1e-9 < staffFee(cd.lvl);
-				b.addEventListener("click", () => hireStaff(cd));
+				const fee = staffFee(cd.lvl), short = round1(fee - c.budget), armed = staffArmed === cd;
+				const b = el("button", armed ? "armed" : "", armed
+					? `Confirm: hire ${cd.name} for ${money(fee)} + ${wageWeek(cd.wage)}${st ? `, replacing ${st.name}` : ""}`
+					: `Hire ${cd.name} ${"★".repeat(cd.lvl)} · ${money(fee)} · ${wageWeek(cd.wage)}${short > 0 ? ` · need ${money(short)} more` : ""}`);
+				b.type = "button"; b.disabled = short > 0;
+				b.title = `With ${cd.lvl} star${cd.lvl === 1 ? "" : "s"}: ${staffEffect(job, cd.lvl)}`;
+				b.addEventListener("click", () => {
+					if (staffArmed !== cd) { staffArmed = cd; redrawStaff(); return; }   // first press asks, second press hires
+					hireStaff(cd);
+				});
 				cands.append(b);
 			});
 			if (cands.children.length > 1) { li.append(cands); }
 			ul.append(li);
+		}
+		if (Array.isArray(c.staffLog) && c.staffLog.length) {
+			const hist = el("li", "staff-log");
+			hist.append(el("span", "lbl", "Recent staff changes"));
+			for (const t of c.staffLog.slice(0, 4)) { hist.append(el("small", "", t)); }
+			ul.append(hist);
 		}
 	}
 
