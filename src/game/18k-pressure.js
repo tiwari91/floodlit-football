@@ -35,10 +35,11 @@
 	function pressureAfterMatch (played, gf, ga, rnd = Math.random) {
 		const d = ensureDrama(league), c = league.club, made = [], lm = leagueMatch || {};
 		const res = gf > ga ? "W" : gf < ga ? "L" : "D", home = lm.home !== false, heavy = ga - gf >= 3;
+		const derby = typeof isDerby === "function" && isDerby(), dk = derby ? 1.8 : 1;   // a derby counts for nearly double, either way
 		d.form = [ ...d.form, res ].slice(-6);
-		d.fans += res === "W" ? 4 : res === "D" ? -1 : -5 - (heavy ? 4 : 0) - (home ? 2 : 0);
+		d.fans += dk * (res === "W" ? 4 : res === "D" ? -1 : -5 - (heavy ? 4 : 0) - (home ? 2 : 0));
 		d.fans += (60 - d.fans) * 0.05;
-		d.board += (res === "W" ? 3 : res === "D" ? 0 : -4) + (d.fans - 50) * 0.04 + (60 - d.board) * 0.03;
+		d.board += dk * (res === "W" ? 3 : res === "D" ? 0 : -4) + (d.fans - 50) * 0.04 + (60 - d.board) * 0.03;
 		ensurePressure(d);
 		const add = (kind, who, text, o) => { const x = addIssue(kind, who, text, o); if (x) { made.push(x); } return x; };
 		// The fans turn on you.
@@ -95,7 +96,7 @@
 		if (d.board < 25 && !d.warned) { d.warned = true; dramaLog("The board have warned you: results must improve, and soon."); }
 		if (d.board < 20 && !d.voted) { d.voted = true; dramaLog("The chairman has given you a public vote of confidence. In football, that rarely ends well."); league.news = `${league.news || ""} The chairman says you have the board's full backing.`.trim(); }
 		if (d.board >= 40) { d.warned = false; d.voted = false; }
-		writePaper(d, made, gf, ga, home);
+		writePaper(d, made, gf, ga, home, derby);
 		return made;
 	}
 	// The buttons for each kind (18e's choicesFor asks here first).
@@ -203,7 +204,7 @@
 	// ---------- the back page ----------
 	// After each league match the papers have their say: one headline from the biggest story of the week (a
 	// sacking talk, a bust-up, a hammering, a hero) and the other stories under it. Shown in the League panel.
-	function writePaper (d, made, gf, ga, home) {
+	function writePaper (d, made, gf, ga, home, derby = false) {
 		const lm = leagueMatch || {}, opp = TEAMS[lm.opp] ? TEAMS[lm.opp].name : "the visitors", me = YOU.short || YOU.name, kinds = new Set(made.map(i => i.kind));
 		const scorer = matchGoals.length ? matchGoals.slice().sort((a, b) => matchGoals.filter(n => n === b).length - matchGoals.filter(n => n === a).length)[0] : null;
 		const n = scorer ? matchGoals.filter(x => x === scorer).length : 0, sur = s => String(s || "").split(" ").pop().toUpperCase();
@@ -211,6 +212,8 @@
 		let head;
 		if (d.voted && d.board < 20) { head = "CHAIRMAN BACKS UNDER-FIRE BOSS"; }
 		else if (kinds.has("faith")) { head = "PLAYERS GO TO THE BOARD"; }
+		else if (derby && gf > ga) { head = gf - ga >= 2 ? "DERBY DAY DELIGHT" : `${scorer ? sur(scorer) : me.toUpperCase()} WINS THE DERBY`; }
+		else if (derby && gf < ga) { head = "DERBY DAY DISASTER"; }
 		else if (ga - gf >= 3) { head = `${me.toUpperCase()} HUMILIATED`; }
 		else if (conf) { head = `${sur(conf.name)} STORMS OUT`; }
 		else if (fight) { head = "TRAINING GROUND BUST-UP"; }

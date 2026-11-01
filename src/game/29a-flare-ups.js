@@ -25,7 +25,8 @@
 		if (!mate) { return null; }
 		if (!o.force) { flareStats.chances++; }
 		if (!o.force && !flaresLive) { return null; }
-		if (!o.force && rnd() > flareChance(temperOf(mate), temperOf(off), flareWeight(behind, card, o.tackle))) { return null; }
+		const derbyK = typeof isDerby === "function" && isDerby() ? 1.8 : 1;   // a derby boils over more easily
+		if (!o.force && rnd() > derbyK * flareChance(temperOf(mate), temperOf(off), flareWeight(behind, card, o.tackle))) { return null; }
 		if (!o.force) { flareStats.flares++; }
 		flareLog = matchLog;
 		const pair = [ mate, off ];
