@@ -7,7 +7,7 @@
 	const temperOf = pl => (pl && Number.isFinite(pl.temper) ? pl.temper : 20 + (hashStr(String(pl && pl.name) + "|temper") % 70));   // 20 to 89
 	const temperWord = t => (t >= 75 ? "Hot-headed" : t >= 55 ? "Fiery" : t >= 35 ? "Level-headed" : "Calm");
 	const DRAMA_KINDS = { dropped: 1, oop: 1, request: 1, row: 1, contract: 1, signing: 1 };
-	const ISSUE_CAP = 4;
+	const ISSUE_CAP = 6;
 	const POS_WHERE = { def: "in defence", mid: "in midfield", fwd: "up front" }, POS_WHO = { gk: "keeper", def: "defender", mid: "midfielder", fwd: "forward" };
 	function ensureDrama (lg) {
 		if (!lg || typeof lg !== "object") { return null; }
@@ -17,11 +17,12 @@
 		d.room = clamp(Math.round(d.room), 0, 100);
 		d.log = Array.isArray(d.log) ? d.log.filter(s => typeof s === "string").slice(-6) : [];
 		if (!Number.isFinite(d.seq)) { d.seq = 0; }
+		ensurePressure(d);   // the fans and the board (18k)
 		lg.drama = d;
 		const c = lg.club;
 		if (c && Array.isArray(c.squad)) {
 			const here = new Set([ ...c.squad, ...(c.bench || []) ].filter(Boolean).map(p => p.name));
-			d.issues = d.issues.filter(i => i.kind === "signing" || here.has(i.name));   // he has gone: so has the problem
+			d.issues = d.issues.filter(i => i.kind === "signing" || PRESSURE_NOBODY[i.kind] || here.has(i.name));   // he has gone: so has the problem
 			for (const pl of [ ...c.squad, ...(c.bench || []) ]) {
 				if (!pl) { continue; }
 				if (!Number.isFinite(pl.temper)) { pl.temper = temperOf(pl); }
@@ -58,6 +59,7 @@
 	// What you can do about each kind of problem: the label on the button and what it does.
 	const MANAGER_CHOICES = [ [ "talk", "Talk to him" ], [ "back", "Back yourself" ], [ "fine", "Fine him" ], [ "drop", "Drop him" ] ];
 	function choicesFor (issue) {
+		if (PRESSURE_CHOICES[issue.kind]) { return PRESSURE_CHOICES[issue.kind](issue); }   // the fans, the press, bust-ups (18k)
 		if (issue.kind === "contract") { return [ [ "pay", issue.wantsOut ? "Talk him round" : `Pay what he asks (${wageWeek(issue.ask || 0)})` ], [ "letgo", issue.wantsOut ? "Sell him or let him go" : "Let him go" ] ]; }
 		if (issue.kind === "signing") { return [ [ "offer", `Offer ${money(issue.offer || 0)}` ], [ "forget", "Forget him" ] ]; }
 		if (issue.kind === "request") { return [ [ "accept", "Accept and list him" ], [ "refuse", "Refuse" ], [ "talk", "Talk to him" ] ]; }
@@ -77,7 +79,8 @@
 		const pl = clubPlayer(issue.name);
 		d.issues = d.issues.filter(i => i !== issue);
 		let note = "";
-		if (!pl && issue.kind !== "signing") { note = `${issue.name} has gone, so that's the end of it.`; }
+		if (PRESSURE_KINDS[issue.kind]) { note = resolvePressure(issue, choice); }
+		else if (!pl && issue.kind !== "signing") { note = `${issue.name} has gone, so that's the end of it.`; }
 		else if (issue.kind === "contract") {
 			if (choice === "pay" && issue.wantsOut) {
 				const hot = temperOf(pl) >= 75;
@@ -223,6 +226,7 @@
 		// The mood of the dressing room rubs off on everyone a little.
 		for (const pl of all) { pl.morale = clamp(Math.round(pl.morale + (d.room - 60) * 0.03), 5, 100); }
 		made.push(...finalYearReview(c));
+		made.push(...pressureAfterMatch(played, gf, ga, rnd));   // the fans, the press, the board, bust-ups (18k)
 		return made;
 	}
 
@@ -282,7 +286,7 @@
 		let box = $("lgDrama");
 		if (!box) { box = el("div", "lg-drama"); box.id = "lgDrama"; side.prepend(box); }
 		box.replaceChildren();
-		box.append(el("h4", "", "Dressing room"), el("p", "detail", `Mood: ${roomWord(d.room)} (${d.room})`));
+		box.append(el("h4", "", "Dressing room"), el("p", "detail", `Mood: ${roomWord(d.room)} (${d.room}) · Fans: ${fansWord(d.fans)} (${d.fans}) · Board: ${boardWord(d.board)} (${d.board})`));
 		const ul = el("ul", "drama-issues");
 		ul.style.cssText = "list-style:none;padding:0;margin:8px 0";
 		for (const issue of d.issues) {

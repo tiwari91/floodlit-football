@@ -230,6 +230,27 @@ const mus = await page.evaluate(() => { const F = window.__ff, a = F.musicState(
 check("three menu tracks take turns, with a saved music volume setting", mus.a.tracks.length === 3 && mus.a.sel && mus.b.level < mus.a.level && mus.stored === "quiet", JSON.stringify(mus));
 check("the new tracks play a bar without errors", mus.g1 && mus.g2);
 
+// Pressure (18k): a bad run turns the fans and the board, brings the press conference, a star confronting you,
+// a training-ground fight and the squad going to the board; every choice moves the moods.
+const pr = await page.evaluate(() => {
+	const F = window.__ff, lg = F.league, c = lg.club, d = F.ensureDrama(lg), all = [ ...c.squad, ...c.bench ];
+	d.issues = []; d.fans = 38; d.board = 60; d.room = 25; d.lowRoom = 1; d.form = [ "L", "L" ];
+	const star = all.find(p => F.roleOf(p, c) === "key" && p.pos !== "gk") || all[0];
+	star.temper = 95; star.morale = 30; star.benched = 3; star.injured = false;
+	const hot = all.filter(p => p !== star).slice(0, 1); for (const p of hot) { p.temper = 90; p.injured = false; }
+	const played = new Set(all.filter(p => p !== star).map(p => p.name));
+	const made = F.pressureAfterMatch(played, 0, 4, () => 0).map(i => i.kind);
+	const fans0 = d.fans, board0 = d.board;
+	const out = { made, fansFell: fans0 < 38, boardFell: board0 < 60, panel: !!document.querySelector("#lgDrama") };
+	const pick = (kind, ch) => { const i = d.issues.find(x => x.kind === kind); if (!i) { return null; } const r0 = d.room, f0 = d.fans, b0 = d.board; const note = F.resolveIssue(i.id, ch); return { note: !!note, room: d.room - r0, fans: d.fans - f0, board: d.board - b0, gone: !d.issues.includes(i) }; };
+	out.press = pick("press", "blame"); out.fans = pick("fans", "apologise"); out.conf = pick("confront", "fine"); out.train = pick("training", "both"); out.faith = pick("faith", "meeting");
+	return out;
+});
+check("pressure: a hammering after a bad run brings the fans' boos, the press, a star's confrontation, a training fight and the squad going to the board",
+	[ "fans", "press", "confront", "training", "faith" ].every(k => pr.made.includes(k)) && pr.fansFell && pr.boardFell, JSON.stringify(pr.made));
+check("pressure: each choice settles the problem and moves the moods (blaming the players hurts the room, apologising wins the fans back)",
+	pr.press && pr.press.gone && pr.press.room < 0 && pr.fans && pr.fans.fans > 0 && pr.conf && pr.conf.gone && pr.train && pr.train.gone && pr.faith && pr.faith.room > 0, JSON.stringify(pr));
+
 check("no page errors", errs.length === 0, errs.slice(0, 3).join(" | "));
 await browser.close(); server.stop();
 process.exit(done() ? 1 : 0);

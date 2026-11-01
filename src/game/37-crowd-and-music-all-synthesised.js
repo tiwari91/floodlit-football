@@ -385,6 +385,18 @@
 		return d > 1 ? 0 : clamp((minuteNow() - 75) / 13, 0, 1) * (d === 0 ? 0.85 : 1);
 	}
 	const reactAt = {};
+	// The crowd booing its own side (18k): a long low boo with whistles, at any moment (full time included).
+	function crowdBoo (g = 1) {
+		if (!soundOn || !audio) { return; }
+		const at = audio.currentTime + 0.05;
+		for (let k = 0; k < 3; k++) { voices(at + k * 0.6, 6, 150 - k * 6, 124, 1.6, 0.016 * g, 520, (k - 1) * 0.3); }
+		for (let i = 0; i < 6; i++) {
+			const o = audio.createOscillator(), wg = audio.createGain(), s0 = at + Math.random() * 1.4, f = 2200 + Math.random() * 1000;
+			o.type = "sine"; o.frequency.setValueAtTime(f, s0); o.frequency.linearRampToValueAtTime(f * 1.12, s0 + 0.35); o.frequency.linearRampToValueAtTime(f * 0.96, s0 + 0.8);
+			wg.gain.setValueAtTime(0.0001, s0); wg.gain.linearRampToValueAtTime(0.006 * g, s0 + 0.06); wg.gain.exponentialRampToValueAtTime(0.0001, s0 + 0.9);
+			o.connect(wg); connectPan(wg, (Math.random() - 0.5) * 0.8); o.start(s0); o.stop(s0 + 0.95);
+		}
+	}
 	function crowdReactImpl (kind, t) {
 		if (bulkSim || (state !== "play" && state !== "goal") || !(t === 0 || t === 1)) { return; }
 		const key = kind + t, now = frame;

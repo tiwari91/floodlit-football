@@ -147,6 +147,7 @@
 		charging = false;
 		sfx("final");
 		const [ h, a ] = score;
+		if (typeof fansAtFullTime === "function") { fansAtFullTime(h, a); }
 		const line = h > a ? `You beat ${opp.name} ${h} to ${a}.` : h < a ? `${cap(opp.name)} beat you ${a} to ${h}.` : `A ${h} to ${a} draw with ${opp.name}.`;
 		let nudge = h > a ? "Try a tougher opponent next." : h < a ? "Try keeping the ball: pass when a defender closes in." : "Level at the whistle.";
 		let btn = "Play again";

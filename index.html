@@ -5825,7 +5825,7 @@ td, th { font-variant-numeric: tabular-nums; }
 	const temperOf = pl => (pl && Number.isFinite(pl.temper) ? pl.temper : 20 + (hashStr(String(pl && pl.name) + "|temper") % 70));   // 20 to 89
 	const temperWord = t => (t >= 75 ? "Hot-headed" : t >= 55 ? "Fiery" : t >= 35 ? "Level-headed" : "Calm");
 	const DRAMA_KINDS = { dropped: 1, oop: 1, request: 1, row: 1, contract: 1, signing: 1 };
-	const ISSUE_CAP = 4;
+	const ISSUE_CAP = 6;
 	const POS_WHERE = { def: "in defence", mid: "in midfield", fwd: "up front" }, POS_WHO = { gk: "keeper", def: "defender", mid: "midfielder", fwd: "forward" };
 	function ensureDrama (lg) {
 		if (!lg || typeof lg !== "object") { return null; }
@@ -5835,11 +5835,12 @@ td, th { font-variant-numeric: tabular-nums; }
 		d.room = clamp(Math.round(d.room), 0, 100);
 		d.log = Array.isArray(d.log) ? d.log.filter(s => typeof s === "string").slice(-6) : [];
 		if (!Number.isFinite(d.seq)) { d.seq = 0; }
+		ensurePressure(d);   // the fans and the board (18k)
 		lg.drama = d;
 		const c = lg.club;
 		if (c && Array.isArray(c.squad)) {
 			const here = new Set([ ...c.squad, ...(c.bench || []) ].filter(Boolean).map(p => p.name));
-			d.issues = d.issues.filter(i => i.kind === "signing" || here.has(i.name));   // he has gone: so has the problem
+			d.issues = d.issues.filter(i => i.kind === "signing" || PRESSURE_NOBODY[i.kind] || here.has(i.name));   // he has gone: so has the problem
 			for (const pl of [ ...c.squad, ...(c.bench || []) ]) {
 				if (!pl) { continue; }
 				if (!Number.isFinite(pl.temper)) { pl.temper = temperOf(pl); }
@@ -5876,6 +5877,7 @@ td, th { font-variant-numeric: tabular-nums; }
 	// What you can do about each kind of problem: the label on the button and what it does.
 	const MANAGER_CHOICES = [ [ "talk", "Talk to him" ], [ "back", "Back yourself" ], [ "fine", "Fine him" ], [ "drop", "Drop him" ] ];
 	function choicesFor (issue) {
+		if (PRESSURE_CHOICES[issue.kind]) { return PRESSURE_CHOICES[issue.kind](issue); }   // the fans, the press, bust-ups (18k)
 		if (issue.kind === "contract") { return [ [ "pay", issue.wantsOut ? "Talk him round" : `Pay what he asks (${wageWeek(issue.ask || 0)})` ], [ "letgo", issue.wantsOut ? "Sell him or let him go" : "Let him go" ] ]; }
 		if (issue.kind === "signing") { return [ [ "offer", `Offer ${money(issue.offer || 0)}` ], [ "forget", "Forget him" ] ]; }
 		if (issue.kind === "request") { return [ [ "accept", "Accept and list him" ], [ "refuse", "Refuse" ], [ "talk", "Talk to him" ] ]; }
@@ -5895,7 +5897,8 @@ td, th { font-variant-numeric: tabular-nums; }
 		const pl = clubPlayer(issue.name);
 		d.issues = d.issues.filter(i => i !== issue);
 		let note = "";
-		if (!pl && issue.kind !== "signing") { note = `${issue.name} has gone, so that's the end of it.`; }
+		if (PRESSURE_KINDS[issue.kind]) { note = resolvePressure(issue, choice); }
+		else if (!pl && issue.kind !== "signing") { note = `${issue.name} has gone, so that's the end of it.`; }
 		else if (issue.kind === "contract") {
 			if (choice === "pay" && issue.wantsOut) {
 				const hot = temperOf(pl) >= 75;
@@ -6041,6 +6044,7 @@ td, th { font-variant-numeric: tabular-nums; }
 		// The mood of the dressing room rubs off on everyone a little.
 		for (const pl of all) { pl.morale = clamp(Math.round(pl.morale + (d.room - 60) * 0.03), 5, 100); }
 		made.push(...finalYearReview(c));
+		made.push(...pressureAfterMatch(played, gf, ga, rnd));   // the fans, the press, the board, bust-ups (18k)
 		return made;
 	}
 
@@ -6100,7 +6104,7 @@ td, th { font-variant-numeric: tabular-nums; }
 		let box = $("lgDrama");
 		if (!box) { box = el("div", "lg-drama"); box.id = "lgDrama"; side.prepend(box); }
 		box.replaceChildren();
-		box.append(el("h4", "", "Dressing room"), el("p", "detail", `Mood: ${roomWord(d.room)} (${d.room})`));
+		box.append(el("h4", "", "Dressing room"), el("p", "detail", `Mood: ${roomWord(d.room)} (${d.room}) · Fans: ${fansWord(d.fans)} (${d.fans}) · Board: ${boardWord(d.board)} (${d.board})`));
 		const ul = el("ul", "drama-issues");
 		ul.style.cssText = "list-style:none;padding:0;margin:8px 0";
 		for (const issue of d.issues) {
@@ -6200,6 +6204,149 @@ td, th { font-variant-numeric: tabular-nums; }
 		if (box) { box.querySelectorAll("button").forEach(b => { b.disabled = true; }); box.append(el("p", "fine", note)); }
 		if (typeof saveLeague === "function") { saveLeague(); }
 		return { note, morale: pl.morale, room: d.room, attr: p ? { ...p.attr } : null, onPitch: !!(p && players.includes(p) && p.name === pl.name) };
+	}
+	/* ---------- pressure: the fans, the press, the board and the bust-ups ----------
+	   Results build up or wear away two more moods kept in league.drama beside the dressing room (room,
+	   18e): the fans (fans) and the board (board). When they sour, problems arrive in the League panel
+	   with the dressing room's, each with choices that move those moods, morale and form:
+	   - fans: the crowd turns on you (boos at full time, chants, a "manager out" banner);
+	   - press: the press conference after a bad result asks the awkward question;
+	   - confront: a star you keep leaving out storms into your office and refuses to warm up;
+	   - training: two hot-heads come to blows on the training ground;
+	   - faith: the dressing room has been lost for weeks and the senior players go to the board.
+	   In matches, a hostile crowd boos at full time and when a favourite is taken off. */
+	const PRESSURE_KINDS = { fans: 1, press: 1, confront: 1, training: 1, faith: 1 };
+	const PRESSURE_NOBODY = { fans: 1, press: 1, faith: 1 };   // not about one player: they stay when anyone leaves
+	Object.assign(DRAMA_KINDS, PRESSURE_KINDS);
+	const fansWord = f => (f >= 75 ? "Adoring" : f >= 55 ? "Behind you" : f >= 35 ? "Restless" : "Hostile");
+	const boardWord = b => (b >= 70 ? "Fully behind you" : b >= 50 ? "Supportive" : b >= 30 ? "Concerned" : "Losing patience");
+	function ensurePressure (d) {
+		d.fans = clamp(Math.round(Number.isFinite(d.fans) ? d.fans : 65), 0, 100);
+		d.board = clamp(Math.round(Number.isFinite(d.board) ? d.board : 65), 0, 100);
+		d.form = Array.isArray(d.form) ? d.form.filter(x => x === "W" || x === "D" || x === "L").slice(-6) : [];
+		if (!Number.isFinite(d.lowRoom)) { d.lowRoom = 0; }
+		return d;
+	}
+	// The press conference: the question fits the week.
+	function pressQuestion (d, gf, ga) {
+		const losses = d.form.filter(x => x === "L").length;
+		if (d.room < 40) { return "Have you lost the dressing room?"; }
+		if (losses >= 3) { return `That's ${losses} defeats in your last ${d.form.length}. Is your job safe?`; }
+		if (ga - gf >= 3) { return `Your side let in ${ga}. Who is to blame for that?`; }
+		if (d.fans < 40) { return "The fans were booing you today. What do you say to them?"; }
+		return "Was that good enough?";
+	}
+	// After each league match (from dramaAfterMatch): the moods move and new problems may arrive.
+	function pressureAfterMatch (played, gf, ga, rnd = Math.random) {
+		const d = ensureDrama(league), c = league.club, made = [], lm = leagueMatch || {};
+		const res = gf > ga ? "W" : gf < ga ? "L" : "D", home = lm.home !== false, heavy = ga - gf >= 3;
+		d.form = [ ...d.form, res ].slice(-6);
+		d.fans += res === "W" ? 4 : res === "D" ? -1 : -5 - (heavy ? 4 : 0) - (home ? 2 : 0);
+		d.fans += (60 - d.fans) * 0.05;
+		d.board += (res === "W" ? 3 : res === "D" ? 0 : -4) + (d.fans - 50) * 0.04 + (60 - d.board) * 0.03;
+		ensurePressure(d);
+		const add = (kind, who, text, o) => { const x = addIssue(kind, who, text, o); if (x) { made.push(x); } return x; };
+		// The fans turn on you.
+		if (res === "L" && d.fans < 40) {
+			add("fans", { name: "The fans" }, home
+				? `The home fans booed at full time after the ${gf}-${ga}. They sang for the players, but your name got jeers, and a "Manager out" banner went up in the home end.`
+				: `The travelling fans turned on you after the ${gf}-${ga}: boos at the final whistle and chants against your team selection.`);
+		}
+		// The press conference.
+		const losses = d.form.filter(x => x === "L").length;
+		if ((res === "L" && rnd() < 0.55) || heavy || (res === "L" && losses >= 3)) {
+			add("press", { name: "The press" }, `Press conference after the ${gf}-${ga}. A reporter asks: "${pressQuestion(d, gf, ga)}"`);
+		}
+		// A star left out again confronts you.
+		for (const pl of [ ...c.squad, ...c.bench ]) {
+			if (!pl || played.has(pl.name) || pl.injured || roleOf(pl, c) !== "key") { continue; }
+			const t = temperOf(pl);
+			if (pl.benched >= 2 && t >= 60 && pl.morale < 55 && rnd() < 0.3 + (t - 60) / 100) {
+				if (add("confront", pl, `${pl.name} stormed into your office after being left out again. He says he's the best player at the club, he won't sit on your bench, and he refused to warm up.`)) {
+					pl.morale = clamp(pl.morale - 4, 5, 100); d.room = clamp(d.room - 3, 0, 100);
+				}
+				break;
+			}
+		}
+		// A fight on the training ground: the two hottest heads, more likely in a tense week.
+		const hot = [ ...c.squad, ...c.bench ].filter(p => p && temperOf(p) >= 60 && !p.injured).sort((a, b) => temperOf(b) - temperOf(a));
+		if (hot.length >= 2 && rnd() < clamp(0.04 + (70 - d.room) / 300 + (res === "L" ? 0.06 : 0), 0.02, 0.35)) {
+			const [ a, b ] = hot;
+			if (add("training", a, `${a.name} and ${b.name} came to blows at training. Their teammates had to pull them apart, and the whole squad saw it.`, { other: b.name })) {
+				d.room = clamp(d.room - 4, 0, 100); a.morale = clamp(a.morale - 3, 5, 100); b.morale = clamp(b.morale - 3, 5, 100);
+			}
+		}
+		// A dressing room lost for weeks: the players go to the board.
+		d.lowRoom = d.room < 30 ? d.lowRoom + 1 : 0;
+		if (d.lowRoom >= 2) {
+			if (add("faith", { name: "The squad" }, "The players have stopped listening to you. Senior players have been to see the board, and the board want to know what you'll do about it.")) { d.board = clamp(d.board - 6, 0, 100); d.lowRoom = 0; }
+		}
+		if (d.board < 25 && !d.warned) { d.warned = true; dramaLog("The board have warned you: results must improve, and soon."); }
+		if (d.board >= 40) { d.warned = false; }
+		return made;
+	}
+	// The buttons for each kind (18e's choicesFor asks here first).
+	const PRESSURE_CHOICES = {
+		fans: () => [ [ "apologise", "Apologise to the fans" ], [ "players", "Back the players" ], [ "ignore", "Ignore it" ] ],
+		press: () => [ [ "defend", "Defend the players" ], [ "blame", "Blame the players" ], [ "self", "Take the blame" ], [ "deflect", "Say nothing new" ] ],
+		confront: () => [ [ "peace", "Make peace" ], [ "fine", "Fine him" ], [ "drop", "Drop him" ], [ "sell", "Put him up for sale" ] ],
+		training: i => [ [ "a", `Punish ${i.name}` ], [ "b", `Punish ${i.other}` ], [ "both", "Punish both" ], [ "talk", "Talk to both" ] ],
+		faith: () => [ [ "meeting", "Clear-the-air meeting" ], [ "leaders", "Come down on the ringleaders" ], [ "board", "Ask the board for time" ] ]
+	};
+	// What each choice does (from 18e's resolveIssue). Returns the line for the log.
+	function resolvePressure (issue, choice) {
+		const d = ensureDrama(league), c = league.club, pl = clubPlayer(issue.name), mood = (k, v) => { d[k] = clamp(Math.round(d[k] + v), 0, 100); };
+		const starters = slotsFor(league.fmt).map(i => c.squad[i]).filter(Boolean);
+		if (issue.kind === "fans") {
+			if (choice === "apologise") { mood("fans", 8); mood("room", -2); mood("board", 1); return "You apologised to the fans and promised better. They'll give you a little time."; }
+			if (choice === "players") { mood("fans", -3); mood("room", 5); return "You stood up for your players in public. The squad noticed; the fans didn't like it."; }
+			mood("fans", -2); return "You said nothing to the fans. The mood in the stands hasn't changed.";
+		}
+		if (issue.kind === "press") {
+			if (choice === "defend") { mood("room", 4); mood("fans", -1); return "You defended your players in front of the cameras. The dressing room appreciated it."; }
+			if (choice === "blame") { mood("room", -8); mood("fans", 3); mood("board", 2); for (const p of starters) { p.morale = clamp(p.morale - 4, 5, 100); } return "You blamed the players in public. The fans and the board liked your honesty; the players did not."; }
+			if (choice === "self") { mood("room", 3); mood("fans", 2); mood("board", -3); return "You took the blame yourself. The players and fans respected it; the board took note."; }
+			mood("fans", -1); return "You gave the press nothing new. The story moves on.";
+		}
+		if (issue.kind === "faith") {
+			if (choice === "meeting") { mood("room", 12); mood("board", -4); return "A long clear-the-air meeting. Some home truths on both sides, and the squad are listening again."; }
+			if (choice === "leaders") {
+				const lead = [ ...c.squad, ...c.bench ].filter(Boolean).sort((a, b) => temperOf(b) - temperOf(a)).slice(0, 2);
+				for (const p of lead) { p.morale = clamp(p.morale - 12, 5, 100); }
+				mood("room", 6); mood("board", 2);
+				return `You came down hard on ${lead.map(p => p.name).join(" and ")}. The rest of the squad have fallen into line.`;
+			}
+			mood("board", -8); mood("room", 5); return "The board have given you time, but their patience is running out.";
+		}
+		if (!pl) { return `${issue.name} has gone, so that's the end of it.`; }
+		if (issue.kind === "confront") {
+			if (choice === "peace") { pl.morale = clamp(pl.morale + 8, 5, 100); pl.promised = 2; mood("room", -2); return `You made peace with ${pl.name} and promised him games. Some of the squad think he got his way.`; }
+			if (choice === "fine") { pl.morale = clamp(pl.morale - 10, 5, 100); mood("room", 3); const f = Math.max(0.001, wageOf(pl) / 52); c.budget = Math.round((c.budget + f) * 1000) / 1000; nudgeForm(pl, -0.3); return `${pl.name} has been fined a week's wages for refusing to warm up. Morale ${pl.morale}.`; }
+			if (choice === "drop") { pl.morale = clamp(pl.morale - 12, 5, 100); mood("room", 2); dropToBench(pl); nudgeForm(pl, -0.4); return `${pl.name} is out of the side until he apologises. Morale ${pl.morale}.`; }
+			pl.listed = true; pl.wantsOut = true; mood("room", 1); return `${pl.name} is on the transfer list. Clubs will bid for him when a window is open.`;
+		}
+		if (issue.kind === "training") {
+			const other = clubPlayer(issue.other), both = [ pl, other ].filter(Boolean), hit = (p, m, f) => { if (p) { p.morale = clamp(p.morale + m, 5, 100); nudgeForm(p, f); } };
+			if (choice === "a") { hit(pl, -8, -0.3); hit(other, 2, 0); mood("room", 2); return `You came down on ${pl.name}. ${issue.other} feels he was in the right.`; }
+			if (choice === "b") { hit(other, -8, -0.3); hit(pl, 2, 0); mood("room", 2); return `You came down on ${issue.other}. ${pl.name} feels he was in the right.`; }
+			if (choice === "both") { for (const p of both) { hit(p, -6, -0.2); } mood("room", 3); return `Both ${pl.name} and ${issue.other} have been fined. The squad know where the line is.`; }
+			for (const p of both) { hit(p, 3, 0.1); } mood("room", -1); return `You sat ${pl.name} and ${issue.other} down together. They shook hands, for now.`;
+		}
+		return "";
+	}
+	// In a match: a hostile crowd boos your side off at full time (a league game you lost), and boos when
+	// a favourite is taken off.
+	function fansAtFullTime (h, a) {
+		const d = league && league.drama;
+		if (!leagueMatch || leagueMatch.intl || !d || !Number.isFinite(d.fans) || h >= a || d.fans >= 50) { return; }
+		if (typeof crowdBoo === "function") { crowdBoo(d.fans < 35 ? 1.4 : 1); }
+		toast(d.fans < 35 ? `The fans boo at full time: "${fansWord(d.fans)}"` : "Boos from the stands at full time", "#e05a4f");
+	}
+	function fansAtSub (outName) {
+		const d = league && league.drama, pl = leagueMatch && !leagueMatch.intl ? clubPlayer(outName) : null;
+		if (!pl || !d || !Number.isFinite(d.fans) || d.fans >= 55 || roleOf(pl, league.club) !== "key") { return; }
+		if (typeof crowdBoo === "function") { crowdBoo(0.8); }
+		toast(`Boos as ${outName} goes off`, "#e05a4f");
 	}
 	/* ---------- the Continental Champions Cup ----------
 	   The top four of the league qualify for next season's continental cup (or you can start a career in it:
@@ -11598,6 +11745,7 @@ td, th { font-variant-numeric: tabular-nums; }
 		subLog.push([ p.idx, pl.name ]);
 		const out = p.name, hurt = p.injured;
 		logEvent(0, "sub", `${pl.name} on for ${out}`);
+		if (!quiet && typeof fansAtSub === "function") { fansAtSub(out); }
 		p.name = pl.name;
 		p.attr = effective(pl, p.role);
 		p.injured = false; p.yellow = 0; p.sqi = null;
@@ -12844,6 +12992,7 @@ td, th { font-variant-numeric: tabular-nums; }
 		charging = false;
 		sfx("final");
 		const [ h, a ] = score;
+		if (typeof fansAtFullTime === "function") { fansAtFullTime(h, a); }
 		const line = h > a ? `You beat ${opp.name} ${h} to ${a}.` : h < a ? `${cap(opp.name)} beat you ${a} to ${h}.` : `A ${h} to ${a} draw with ${opp.name}.`;
 		let nudge = h > a ? "Try a tougher opponent next." : h < a ? "Try keeping the ball: pass when a defender closes in." : "Level at the whistle.";
 		let btn = "Play again";
@@ -14809,6 +14958,18 @@ td, th { font-variant-numeric: tabular-nums; }
 		return d > 1 ? 0 : clamp((minuteNow() - 75) / 13, 0, 1) * (d === 0 ? 0.85 : 1);
 	}
 	const reactAt = {};
+	// The crowd booing its own side (18k): a long low boo with whistles, at any moment (full time included).
+	function crowdBoo (g = 1) {
+		if (!soundOn || !audio) { return; }
+		const at = audio.currentTime + 0.05;
+		for (let k = 0; k < 3; k++) { voices(at + k * 0.6, 6, 150 - k * 6, 124, 1.6, 0.016 * g, 520, (k - 1) * 0.3); }
+		for (let i = 0; i < 6; i++) {
+			const o = audio.createOscillator(), wg = audio.createGain(), s0 = at + Math.random() * 1.4, f = 2200 + Math.random() * 1000;
+			o.type = "sine"; o.frequency.setValueAtTime(f, s0); o.frequency.linearRampToValueAtTime(f * 1.12, s0 + 0.35); o.frequency.linearRampToValueAtTime(f * 0.96, s0 + 0.8);
+			wg.gain.setValueAtTime(0.0001, s0); wg.gain.linearRampToValueAtTime(0.006 * g, s0 + 0.06); wg.gain.exponentialRampToValueAtTime(0.0001, s0 + 0.9);
+			o.connect(wg); connectPan(wg, (Math.random() - 0.5) * 0.8); o.start(s0); o.stop(s0 + 0.95);
+		}
+	}
 	function crowdReactImpl (kind, t) {
 		if (bulkSim || (state !== "play" && state !== "goal") || !(t === 0 || t === 1)) { return; }
 		const key = kind + t, now = frame;
@@ -23098,7 +23259,7 @@ td, th { font-variant-numeric: tabular-nums; }
 	}
 
 	// More test hooks, kept apart from the big list above.
-	if (window.__ff) { Object.assign(window.__ff, { renewWorth, renewPlan, assistContracts, unrestReasons, finalYearReview, windowEvents, renderLeague, reportText, rolloverClub, showContract, goalCall, COMM, cupNight, cupTie, cupPens, ensureCup, seasonAwards, youthIntake, promoteYouth, releaseYouth, renderExtras, CUP_NIGHTS, ensureDrama, dramaAfterMatch, resolveIssue, renewRefusal, signRefusal, sellRefusal, renderDrama, temperOf, signPlayer, sellPlayer, rejectBid, weeklyClub, flareUp, flareTick, flareStats, flareChance, set flaresLive (v) { flaresLive = !!v; }, halfTimeRow, resolveHalfTime, musicState () { return { tracks: TRACKS.map(x => x.name), vol: musicVol, level: musicLevel(), sel: !!$("musicVol"), next: trackNext, playing: music ? music.track : null }; }, setMusicVol, grooveBarTest (k) { ensureAudio(); const was = music; music = { g: audio.createGain() }; try { grooveBar(audio.currentTime + 0.05, 9, TRACKS[k]); return true; } finally { music.g.disconnect(); music = was; } }, voiceState () { return { on: voiceOn, available: voiceAvailable(), button: !!$("voiceBtn"), spoke: speakLine("Test line", "goal") }; }, commitFoulTest (r) { if (state !== "play") { return null; } freeze = 0; const off = outfield(1)[0], vic = outfield(0).sort((a, b) => dist(a, off) - dist(b, off))[0]; return flareUp(off, vic, true, "", { force: true, rnd: () => r }); } }); }
+	if (window.__ff) { Object.assign(window.__ff, { renewWorth, renewPlan, assistContracts, unrestReasons, finalYearReview, windowEvents, renderLeague, reportText, rolloverClub, showContract, goalCall, COMM, cupNight, cupTie, cupPens, ensureCup, seasonAwards, youthIntake, promoteYouth, releaseYouth, renderExtras, CUP_NIGHTS, ensureDrama, dramaAfterMatch, resolveIssue, pressureAfterMatch, fansAtFullTime, renewRefusal, signRefusal, sellRefusal, renderDrama, temperOf, signPlayer, sellPlayer, rejectBid, weeklyClub, flareUp, flareTick, flareStats, flareChance, set flaresLive (v) { flaresLive = !!v; }, halfTimeRow, resolveHalfTime, musicState () { return { tracks: TRACKS.map(x => x.name), vol: musicVol, level: musicLevel(), sel: !!$("musicVol"), next: trackNext, playing: music ? music.track : null }; }, setMusicVol, grooveBarTest (k) { ensureAudio(); const was = music; music = { g: audio.createGain() }; try { grooveBar(audio.currentTime + 0.05, 9, TRACKS[k]); return true; } finally { music.g.disconnect(); music = was; } }, voiceState () { return { on: voiceOn, available: voiceAvailable(), button: !!$("voiceBtn"), spoke: speakLine("Test line", "goal") }; }, commitFoulTest (r) { if (state !== "play") { return null; } freeze = 0; const off = outfield(1)[0], vic = outfield(0).sort((a, b) => dist(a, off) - dist(b, off))[0]; return flareUp(off, vic, true, "", { force: true, rnd: () => r }); } }); }
 	// Offside, the two commentators and the chants.
 	if (window.__ff) { Object.assign(window.__ff, { kickTest (p, x, y, sp, restart) { if (restart) { deadBall = { kind: restart, taker: p }; } ball.owner = null; kick(p, x, y, sp); }, aerialTest (t) { lastTouch = t; return aerial(); }, chantLogTest () { return chantLog.slice(); }, CALLERS, COLOUR, GOAL_SHOUT, goalShout }); }
 	if (window.__ff) { Object.assign(window.__ff, { trophyCeremony, ceremonySeek, ceremonyInfo, endCeremony, queueTrophy, trophyDue, lastCeremony: () => lastCeremony }); }

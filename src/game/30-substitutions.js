@@ -75,6 +75,7 @@
 		subLog.push([ p.idx, pl.name ]);
 		const out = p.name, hurt = p.injured;
 		logEvent(0, "sub", `${pl.name} on for ${out}`);
+		if (!quiet && typeof fansAtSub === "function") { fansAtSub(out); }
 		p.name = pl.name;
 		p.attr = effective(pl, p.role);
 		p.injured = false; p.yellow = 0; p.sqi = null;
