@@ -19,7 +19,7 @@ const sq = await page.evaluate(() => {
 		if (s.xi.length !== 11 || s.xi.some((e, i) => e.pl.pos !== P[i])) { bad.push(`${s.nat} shape`); }
 		if ([ ...s.xi, ...s.bench ].some(e => e.pl.nat !== s.nat)) { bad.push(`${s.nat} nat`); }
 		if (!(s.str >= 1 && s.str <= 5)) { bad.push(`${s.nat} str ${s.str}`); }
-		if (s.bench.length > 5) { bad.push(`${s.nat} bench`); }
+		if (s.bench.length > 12) { bad.push(`${s.nat} bench`); }
 		// The best player in the save at each position is in the eleven.
 		for (const pos of [ "gk", "def", "mid", "fwd" ]) {
 			const best = pool.filter(e => e.pl.nat === s.nat && e.pl.pos === pos).sort((a, b) => ovr(b.pl) - ovr(a.pl))[0];
@@ -369,7 +369,7 @@ const cu = await page.evaluate(() => {
 	rows().find(r => r.querySelector(".who").textContent.startsWith(victim + " · ")).querySelector("button").click();
 	return { head, first, n0, victim, out, n1, sel, back: F.intlCalled(F.league).includes(victim), total: rows().length };
 });
-check("Squad selection lists the eligible players with position, rating, club, form and fitness; the manager drops and calls up, max 23, and a player dropped cannot play", /called up/.test(cu.head) && /form/.test(cu.first) && /fit \d+%/.test(cu.first) && cu.n0 <= 23 && cu.n0 >= 11 && cu.out && cu.n1 === cu.n0 - 1 && cu.back, JSON.stringify(cu));
+check("Squad selection lists the eligible players with position, rating, club, form and fitness; the manager drops and calls up, max 23, a player dropped cannot play and the next best takes his place", /called up/.test(cu.head) && /form/.test(cu.first) && /fit \d+%/.test(cu.first) && cu.n0 <= 23 && cu.n0 >= 11 && cu.out && cu.n1 === cu.n0 && cu.back, JSON.stringify(cu));
 // Formation and captain for the national side.
 const fc = await page.evaluate(() => {
 	const F = window.__ff, box = document.getElementById("intlSquad"), I = F.league.intl;
