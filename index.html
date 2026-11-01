@@ -2032,7 +2032,7 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 				<p class="fine"><b>Camera.</b> On a laptop or desktop the match opens in 3D; on a phone, overhead. 3D draws the ground, the players and the ball in real 3D (three.js). The players are jointed figures in their kits, numbers on their backs and keepers in their own colours, who jog, sprint, turn, pass, shoot, head, slide in, dive, take throw-ins and go down when fouled. A referee and two assistants keep up with play, in a bright kit picked to clash with neither side; the assistants run the far touchline and raise their flags for offside (straight up) and when the ball goes out. Every seat holds a fan in the home or away colours, swaying, rising for a chance, holding their heads at a near miss and leaping at a goal. At the start of each half the camera sweeps in from high over the stadium during the countdown; then a broadcast camera follows the ball along the near stand, cuts in close for free kicks and penalties, and pulls out wide at the breaks; lofted balls and headers show their true height. Overhead follows the ball from above. TV watches from high in the main stand, like a broadcast, and cuts to the benches at kick-off, the breaks and after goals. 3D needs WebGL and loads three.js from cdnjs; if either is missing or blocked you are told and the 2D cameras stay. Press C, or the Camera button (it reads "Camera: 3D", "Camera: TV" or "Camera: overhead" for the view you are on), to cycle overhead, TV and 3D; the camera you pick is remembered.</p>
 				<p class="fine"><b>Graphics.</b> Low, Medium or High (under the pitch with the camera, and on the pause card) sets how much the 3D view draws: how full the stands are and how many fans get the detailed shape, the floodlight towers' lattice, how many floodlight shadows each player throws (four on High), and the sharpness and smoothing of the picture. Phones start on Low (a big tablet on Medium) and computers on High; the setting you pick is remembered.</p>
 				<p class="fine"><b>Free kicks.</b> The other side stands 9.15 m back, and near your goal they build a wall. From shooting range, press W to curl it over the wall (up or down picks the corner, the far post if you don't choose), or D to drive it low and hard. S plays it short. Hold E (or Shift) to sprint at any time: you'll see speed streaks behind your player.</p>
-				<p class="fine"><b>Fouls and cards.</b> A slide that misses the ball and takes the man, above all from behind, is a foul: a free kick where it happened, or a penalty in the box (pick a side with ↑ ↓ and press D; the keeper guesses). Reckless tackles get a yellow card, a second yellow is a red, and a bad one from behind can be a straight red: the player walks off and his side plays a man down. In the league a red card is a ban (two games for a straight red), five yellows in a season is one, and a player hurt in a foul limps on and then misses one to three games. Banned and injured players come off the team sheet by themselves and go back on it when they're available.</p>
+				<p class="fine"><b>Fouls and cards.</b> A slide that misses the ball and takes the man, above all from behind, is a foul: a free kick where it happened, or a penalty in the box (pick a side with ↑ ↓ and press D; the keeper guesses). Reckless tackles get a yellow card, a second yellow is a red, and a bad one from behind can be a straight red: the player walks off and his side plays a man down. In the league, as in the Premier League, a straight red is a three-game ban and a second yellow one game; yellows count all season: five by matchday 19 is a one-game ban, ten by matchday 32 two games, fifteen three; and a player hurt in a foul limps on and then misses one to three games. Banned and injured players come off the team sheet by themselves and go back on it when they're available.</p>
 				<p class="fine"><b>Throw-ins.</b> When the ball goes over a touchline, the other side throws it back in from that spot. On yours, aim with the arrows and press S for a short throw to feet or Q for a long throw. Opponents stand off the thrower, and there is no offside from a throw-in.</p>
 				<p class="fine"><b>Corners and goal kicks.</b> If a defender puts the ball over their own goal line it's a corner; if an attacker does, it's a goal kick. On your corners, S whips an in-swinger at the near post, Q floats an out-swinger to the far post and W drops one on the penalty spot; the ball bends in the air and comes down where you picked, give or take your taker's passing. Your runners wait in a knot around the spot and attack the near post, far post, spot and six-yard box as it is struck, each with a man goal-side of him, while two defenders hold the near post and the six-yard line and a keeper comes for anything dropping into his area: he catches it, punches it clear or flaps and misses. Whoever gets up highest wins the header, and in the box that can be a goal. The same goes for crosses from out wide (Q from near the byline) and long balls over the top. Central and in range, Q chips the keeper instead. There is no offside from a corner.</p>
 				<p class="fine"><b>Offside</b> (every format; switch it off with the Offside button). A teammate is offside if, when the ball is played, they are in the other half and nearer the goal line than both the ball and the second-last defender, and they are the next to touch it. The defenders get a free kick. While you have the ball, a red dashed line shows the offside line and anyone beyond it is marked OFF. Your pass markers prefer onside teammates.</p>
@@ -3180,7 +3180,7 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 	   most of them, "get stuck in" more than anyone; a player running on empty can pull something. */
 	const INJURIES = {
 		knock: [ [ "dead leg", 1, 1 ], [ "ankle knock", 1, 2 ], [ "bruised shin", 1, 1 ], [ "tight calf", 1, 2 ] ],
-		serious: [ [ "hamstring strain", 2, 4 ], [ "ankle ligaments", 3, 6 ], [ "groin strain", 2, 4 ], [ "knee ligaments", 5, 9 ], [ "broken toe", 3, 5 ] ]
+		serious: [ [ "hamstring strain", 2, 4 ], [ "ankle ligaments", 3, 6 ], [ "groin strain", 2, 4 ], [ "knee ligaments", 5, 9 ], [ "broken toe", 3, 5 ], [ "concussion", 1, 2 ] ]
 	};
 	function rollInjury (serious) {
 		const list = INJURIES[serious ? "serious" : "knock"], [ type, lo, hi ] = list[Math.floor(Math.random() * list.length)];
@@ -3227,14 +3227,17 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 		freeze = 40; freezeKind = "free";
 		if (s.after) { s.after(); }
 	}
-	// Off he goes: a substitute comes on if there's one left, otherwise his side plays a man short.
+	// Off he goes: a substitute comes on if there's one left, otherwise his side plays a man short. A
+	// concussion brings on an extra substitute that doesn't count against the five (the Premier League's
+	// concussion substitutes), even when the changes are used up.
 	function injuredOff (p) {
 		if (!players.includes(p)) { return; }
+		const concussion = !!(p.injInfo && p.injInfo.type === "concussion");
 		if (p.team === 1) {
-			if (cpuSubs > 0) { cpuSub(p, p.role, "injured"); p.x = clamp(p.x, 12, FW - 12); p.y = clamp(p.y, 12, FH - 12); return; }
-		} else if (subsLeft > 0 && !tut) {
+			if (cpuSubs > 0 || concussion) { cpuSub(p, p.role, concussion ? "concussion" : "injured", concussion); p.x = clamp(p.x, 12, FW - 12); p.y = clamp(p.y, 12, FH - 12); return; }
+		} else if ((subsLeft > 0 || concussion) && !tut) {
 			const pool = subPool(), pick = pool.filter(pl => pl.pos === p.role).sort((a, b) => ovrNow(b) - ovrNow(a))[0] || pool.sort((a, b) => ovrNow(b) - ovrNow(a))[0];
-			if (pick) { makeSub(p, pick); p.x = clamp(p.x, 12, FW - 12); p.y = clamp(p.y, 12, FH - 12); toast("Change made for the injury", "#7fd49b"); return; }
+			if (pick) { makeSub(p, pick, false, concussion); p.x = clamp(p.x, 12, FW - 12); p.y = clamp(p.y, 12, FH - 12); toast(concussion ? "Concussion substitute: an extra change, not one of your five" : "Change made for the injury", "#7fd49b"); return; }
 		}
 		// Nobody left to bring on: down to ten (or fewer).
 		const i = players.indexOf(p), cur = players[ctrl];
@@ -3647,6 +3650,8 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 			}
 		}
 	}
+	// The ban for a card (kind "y", "r2" or "r"), with the player's yellows so far this season and the matchday (from 1).
+	const banFor = (kind, n, md) => (kind === "r" ? 3 : kind === "r2" ? 1 : kind !== "y" ? 0 : n === 5 && md <= 19 ? 1 : n === 10 && md <= 32 ? 2 : n === 15 ? 3 : 0);
 	// Record your result and play out the rest of the matchday.
 	function recordLeagueResult (lm, h, a) {
 		if (!league || (league.round !== lm.round && !(lm.intl && lm.intl.summer))) { return; }   // a summer final stands in the last matchday's round (18j)
@@ -3685,15 +3690,16 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 			if (pl) { pl.inj = Math.max(pl.inj || 0, info.games); pl.injType = info.type; pl.wasStarter = true; }
 		}
 		matchInjInfo = {};
-		// Suspensions: a red is a ban (two games for a straight red), and five yellows in a season is one.
+		// Suspensions, as in the Premier League: a straight red is three games, a second yellow one. Yellows
+		// count all season: the fifth by matchday 19 is a one-game ban, the tenth by matchday 32 two, the
+		// fifteenth three (a fifth or tenth after its deadline costs nothing).
 		league.banned = [];
 		for (const c of matchCards) {
 			const pl = byName(c.name);
 			if (!pl) { continue; }
 			if (c.kind === "y") { pl.ycount = (pl.ycount || 0) + 1; }
-			const ban = c.kind === "r" ? 2 : c.kind === "r2" ? 1 : pl.ycount >= 5 ? 1 : 0;
-			if (c.kind === "y" && pl.ycount >= 5) { pl.ycount = 0; }
-			if (ban) { pl.ban = Math.max(pl.ban || 0, ban); pl.wasStarter = true; league.banned.push(`${pl.name} (${ban} game${ban === 1 ? "" : "s"}, ${c.kind === "y" ? "five yellows" : "red card"})`); }
+			const n = pl.ycount || 0, ban = banFor(c.kind, n, lm.round + 1);
+			if (ban) { pl.ban = Math.max(pl.ban || 0, ban); pl.wasStarter = true; league.banned.push(`${pl.name} (${ban} game${ban === 1 ? "" : "s"}, ${c.kind === "y" ? `${n} yellow cards` : c.kind === "r2" ? "two yellows" : "straight red"})`); }
 		}
 		matchCards = [];
 		league.injured = matchInjuries.map(byName).filter(Boolean).map(pl => `${pl.name} (${pl.injType ? pl.injType + ", " : ""}${pl.inj} game${pl.inj === 1 ? "" : "s"})`);
@@ -10497,6 +10503,7 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 		if (!V.off) {
 			banner.textContent = "Goal stands"; banner.className = "banner goal " + (V.scorer === 0 ? "home" : "away"); banner.hidden = false;
 			caption("Goal stands", "review", V.kind === "offside" ? `Onside by ${cm(V.d)}` : "No foul", who, V.scorer);
+			refAnnounce(`After a VAR review, the goal stands: ${V.kind === "offside" ? `onside by ${cm(V.d)}` : "no foul in the build-up"}.`);
 			if (typeof roar === "function") { roar(0.8); }
 			return false;
 		}
@@ -10510,7 +10517,7 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 		caption("Goal ruled out", "review", V.kind === "offside" ? `Offside by ${cm(V.d)}` : "Foul in the build-up", who, V.scorer);
 		banner.textContent = "No goal"; banner.className = "banner call " + (V.scorer === 0 ? "away" : "home"); banner.hidden = false;
 		setTimeout(() => { if (banner.textContent === "No goal") { banner.hidden = true; } }, 1800);
-		$("announce").textContent = `VAR: no goal. ${score[0]} to ${score[1]}.`;
+		refAnnounce(`After a VAR review, the decision is no goal: ${V.kind === "offside" ? `offside by ${cm(V.d)}` : "a foul in the build-up"}. ${score[0]} to ${score[1]}.`);
 		if (V.scorer === homeSide && typeof crowdBoo === "function") { crowdBoo(1.1); }
 		for (const p of players) { p.celebA = 0; p.celebK = 0; p.hug = 0; p.kneel = 0; p.sulk = 0; p.jump = 0; p.headHands = 0; }
 		celeb = null; replay = null; goalTimer = 0; state = "play";
@@ -10521,6 +10528,14 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 		freeze = 60;
 		varCheck = null;
 		return false;
+	}
+
+	// The referee announces the decision to the ground, as Premier League referees have since 2025: on the
+	// screen for everyone, and read out to screen readers through the live region.
+	function refAnnounce (text) {
+		if (bulkSim) { return; }
+		toast(`🎙 Referee: ${text}`, "#eef6ea");
+		$("announce").textContent = `Referee: ${text}`;
 	}
 	/* ---------- human actions ---------- */
 	// Opponents (of team `side`, red by default) standing in the line between two points.
@@ -11534,8 +11549,14 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 		}
 		if (p.role === "gk") {
 			p.hold++;
-			// A second or so with the ball, so the team can spread out before he plays it.
-			const H = p.holdFor || (p.holdFor = 60 + Math.floor(Math.random() * 30));
+			// A second or so with the ball, so the team can spread out before he plays it. The computer's
+			// keeper wastes time when his side leads in the last ten minutes: four to ten seconds.
+			const wasting = p.team === 1 && score[1] > score[0] && minuteNow() >= 80 && !setPiece;
+			const H = p.holdFor || (p.holdFor = wasting ? 240 + Math.floor(Math.random() * 360) : 60 + Math.floor(Math.random() * 30));
+			// The Premier League's eight-second rule: the referee counts down the last five out loud
+			// (from three seconds in), and a keeper who holds it longer gives away a corner.
+			if (p.hold === KEEPER_COUNT_AT) { toast("The referee is counting: the keeper has five seconds", "#f2b52e"); }
+			if (p.hold > KEEPER_LIMIT) { prepDone(p); keeperTooLong(p); return null; }
 			if (p.hold < H) { prepRelease(p, H - p.hold, () => gkPrepKind(p)); return null; }
 			prepDone(p);
 			gkDistribute(p);
@@ -11629,6 +11650,16 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 		return [ goal.x, clamp(ty, 30, FH - 30) ];
 	}
 
+
+	// The eight-second rule (above): over eight seconds in the keeper's hands, a corner to the other side.
+	const KEEPER_COUNT_AT = 180, KEEPER_LIMIT = 480;   // frames: three seconds in, eight seconds
+	function keeperTooLong (k) {
+		const att = 1 - k.team, leftEnd = attackX(k.team) === FW;   // the corner is at the keeper's own end
+		ball.owner = null; k.hold = 0; k.holdFor = 0; lastTouch = k.team;
+		logEvent(k.team, "eight", `${k.name || "The keeper"} held it over eight seconds: corner`);
+		toast("Over eight seconds: corner", "#f2b52e");
+		awardCorner(att, leftEnd, k.y < FH / 2);
+	}
 	/* ---------- simulation ---------- */
 	// Legs and arms: about one and a half full strides a second at a sprint, fewer
 	// when jogging, and the swing eases in and out as a player starts and stops.
@@ -13060,8 +13091,8 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 		subWalks = subWalks.filter(w => w.n < w.end);
 		if (!subWalks.length) { freeze = 0; }
 	}
-	function makeSub (p, pl, quiet = false) {
-		if (subsLeft <= 0 || !players.includes(p) || p.team !== 0) { return; }
+	function makeSub (p, pl, quiet = false, extra = false) {   // extra: a concussion substitute, not one of the five (10-injuries)
+		if ((subsLeft <= 0 && !extra) || !players.includes(p) || p.team !== 0) { return; }
 		wentOff.push(p.name);
 		cameOn.push(pl.name);
 		subLog.push([ p.idx, pl.name ]);
@@ -13073,10 +13104,10 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 		p.injured = false; p.yellow = 0; p.sqi = null;
 		p.sta = clamp(fitOf(pl) / 100, 0.5, 1); p.nudged = false; p.endure = endureOf(pl);
 		if (typeof ensureTraitP === "function") { ensureTraitP(p, pl); }
-		subsLeft--;
+		if (!extra) { subsLeft--; }
 		if (!quiet) {
 			burst(p.x, p.y, "Sub on");
-			caption("Substitution", "sub", pl.name, `On for ${out} · ${minuteNow()}'`, 0);
+			caption(extra ? "Concussion substitute" : "Substitution", "sub", pl.name, `On for ${out} · ${minuteNow()}'`, 0);
 			subBoard(0, p);
 			$("announce").textContent = `Substitution: ${pl.name} on for ${out}.`;
 			if (!hurt) { startSubWalk(p, out, pl.name); }
@@ -13108,16 +13139,16 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 			if (pl) { makeSub(p, pl); }
 		}
 	}
-	function cpuSub (p, kind, why) {
+	function cpuSub (p, kind, why, extra = false) {
 		const was = p.name, np = genPlayer(kind, cpuOvr(clamp(Math.round(oppStrength), 1, 5)) - 2);
 		p.name = np.name; p.attr = ratingsOf(np);
 		p.sta = 1; p.injured = false; p.yellow = 0; p.nudged = false;
 		if (typeof ensureTraitP === "function") { ensureTraitP(p, np); }
-		cpuSubs--;
+		if (!extra) { cpuSubs--; }
 		logEvent(1, "sub", `${np.name} on for ${was || "a tired man"}`);
 		caption("Substitution", "sub", np.name, `${opp.short} · off: ${was || "?"} (${why})`, 1);
 		subBoard(1, p);
-		if (why !== "injured" && was) { startSubWalk(p, was, np.name); }
+		if (why !== "injured" && why !== "concussion" && was) { startSubWalk(p, was, np.name); }
 	}
 	// When one of yours is running on empty (or limping), say so once and point at the pause card.
 	function tiredNudge () {
@@ -24843,7 +24874,7 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 	}
 
 	// More test hooks, kept apart from the big list above.
-	if (window.__ff) { Object.assign(window.__ff, { renewWorth, renewPlan, assistContracts, unrestReasons, finalYearReview, windowEvents, renderLeague, reportText, rolloverClub, showContract, goalCall, COMM, cupNight, cupTie, cupPens, ensureCup, seasonAwards, youthIntake, promoteYouth, releaseYouth, renderExtras, CUP_NIGHTS, ensureDrama, dramaAfterMatch, resolveIssue, pressureAfterMatch, fansAtFullTime, renewRefusal, signRefusal, sellRefusal, renderDrama, temperOf, signPlayer, sellPlayer, rejectBid, weeklyClub, flareUp, flareTick, flareStats, flareChance, set flaresLive (v) { flaresLive = !!v; }, halfTimeRow, resolveHalfTime, musicState () { return { tracks: TRACKS.map(x => x.name), vol: musicVol, level: musicLevel(), sel: !!$("musicVol"), next: trackNext, playing: music ? music.track : null }; }, setMusicVol, grooveBarTest (k) { ensureAudio(); const was = music; music = { g: audio.createGain() }; try { grooveBar(audio.currentTime + 0.05, 9, TRACKS[k]); return true; } finally { music.g.disconnect(); music = was; } }, voiceState () { return { on: voiceOn, available: voiceAvailable(), button: !!$("voiceBtn"), spoke: speakLine("Test line", "goal") }; }, commitFoulTest (r) { if (state !== "play") { return null; } freeze = 0; const off = outfield(1)[0], vic = outfield(0).sort((a, b) => dist(a, off) - dist(b, off))[0]; return flareUp(off, vic, true, "", { force: true, rnd: () => r }); } }); }
+	if (window.__ff) { Object.assign(window.__ff, { banFor, renewWorth, renewPlan, assistContracts, unrestReasons, finalYearReview, windowEvents, renderLeague, reportText, rolloverClub, showContract, goalCall, COMM, cupNight, cupTie, cupPens, ensureCup, seasonAwards, youthIntake, promoteYouth, releaseYouth, renderExtras, CUP_NIGHTS, ensureDrama, dramaAfterMatch, resolveIssue, pressureAfterMatch, fansAtFullTime, renewRefusal, signRefusal, sellRefusal, renderDrama, temperOf, signPlayer, sellPlayer, rejectBid, weeklyClub, flareUp, flareTick, flareStats, flareChance, set flaresLive (v) { flaresLive = !!v; }, halfTimeRow, resolveHalfTime, musicState () { return { tracks: TRACKS.map(x => x.name), vol: musicVol, level: musicLevel(), sel: !!$("musicVol"), next: trackNext, playing: music ? music.track : null }; }, setMusicVol, grooveBarTest (k) { ensureAudio(); const was = music; music = { g: audio.createGain() }; try { grooveBar(audio.currentTime + 0.05, 9, TRACKS[k]); return true; } finally { music.g.disconnect(); music = was; } }, voiceState () { return { on: voiceOn, available: voiceAvailable(), button: !!$("voiceBtn"), spoke: speakLine("Test line", "goal") }; }, commitFoulTest (r) { if (state !== "play") { return null; } freeze = 0; const off = outfield(1)[0], vic = outfield(0).sort((a, b) => dist(a, off) - dist(b, off))[0]; return flareUp(off, vic, true, "", { force: true, rnd: () => r }); } }); }
 	// Offside, the two commentators and the chants.
 	if (window.__ff) { Object.assign(window.__ff, { kickTest (p, x, y, sp, restart) { if (restart) { deadBall = { kind: restart, taker: p }; } ball.owner = null; kick(p, x, y, sp); }, aerialTest (t) { lastTouch = t; return aerial(); }, chantLogTest () { return chantLog.slice(); }, CALLERS, COLOUR, GOAL_SHOUT, goalShout }); }
 	if (window.__ff) { Object.assign(window.__ff, { trophyCeremony, ceremonySeek, ceremonyInfo, endCeremony, queueTrophy, trophyDue, lastCeremony: () => lastCeremony }); }

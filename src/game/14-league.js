@@ -183,6 +183,8 @@
 			}
 		}
 	}
+	// The ban for a card (kind "y", "r2" or "r"), with the player's yellows so far this season and the matchday (from 1).
+	const banFor = (kind, n, md) => (kind === "r" ? 3 : kind === "r2" ? 1 : kind !== "y" ? 0 : n === 5 && md <= 19 ? 1 : n === 10 && md <= 32 ? 2 : n === 15 ? 3 : 0);
 	// Record your result and play out the rest of the matchday.
 	function recordLeagueResult (lm, h, a) {
 		if (!league || (league.round !== lm.round && !(lm.intl && lm.intl.summer))) { return; }   // a summer final stands in the last matchday's round (18j)
@@ -221,15 +223,16 @@
 			if (pl) { pl.inj = Math.max(pl.inj || 0, info.games); pl.injType = info.type; pl.wasStarter = true; }
 		}
 		matchInjInfo = {};
-		// Suspensions: a red is a ban (two games for a straight red), and five yellows in a season is one.
+		// Suspensions, as in the Premier League: a straight red is three games, a second yellow one. Yellows
+		// count all season: the fifth by matchday 19 is a one-game ban, the tenth by matchday 32 two, the
+		// fifteenth three (a fifth or tenth after its deadline costs nothing).
 		league.banned = [];
 		for (const c of matchCards) {
 			const pl = byName(c.name);
 			if (!pl) { continue; }
 			if (c.kind === "y") { pl.ycount = (pl.ycount || 0) + 1; }
-			const ban = c.kind === "r" ? 2 : c.kind === "r2" ? 1 : pl.ycount >= 5 ? 1 : 0;
-			if (c.kind === "y" && pl.ycount >= 5) { pl.ycount = 0; }
-			if (ban) { pl.ban = Math.max(pl.ban || 0, ban); pl.wasStarter = true; league.banned.push(`${pl.name} (${ban} game${ban === 1 ? "" : "s"}, ${c.kind === "y" ? "five yellows" : "red card"})`); }
+			const n = pl.ycount || 0, ban = banFor(c.kind, n, lm.round + 1);
+			if (ban) { pl.ban = Math.max(pl.ban || 0, ban); pl.wasStarter = true; league.banned.push(`${pl.name} (${ban} game${ban === 1 ? "" : "s"}, ${c.kind === "y" ? `${n} yellow cards` : c.kind === "r2" ? "two yellows" : "straight red"})`); }
 		}
 		matchCards = [];
 		league.injured = matchInjuries.map(byName).filter(Boolean).map(pl => `${pl.name} (${pl.injType ? pl.injType + ", " : ""}${pl.inj} game${pl.inj === 1 ? "" : "s"})`);

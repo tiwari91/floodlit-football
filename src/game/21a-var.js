@@ -44,6 +44,7 @@
 		if (!V.off) {
 			banner.textContent = "Goal stands"; banner.className = "banner goal " + (V.scorer === 0 ? "home" : "away"); banner.hidden = false;
 			caption("Goal stands", "review", V.kind === "offside" ? `Onside by ${cm(V.d)}` : "No foul", who, V.scorer);
+			refAnnounce(`After a VAR review, the goal stands: ${V.kind === "offside" ? `onside by ${cm(V.d)}` : "no foul in the build-up"}.`);
 			if (typeof roar === "function") { roar(0.8); }
 			return false;
 		}
@@ -57,7 +58,7 @@
 		caption("Goal ruled out", "review", V.kind === "offside" ? `Offside by ${cm(V.d)}` : "Foul in the build-up", who, V.scorer);
 		banner.textContent = "No goal"; banner.className = "banner call " + (V.scorer === 0 ? "away" : "home"); banner.hidden = false;
 		setTimeout(() => { if (banner.textContent === "No goal") { banner.hidden = true; } }, 1800);
-		$("announce").textContent = `VAR: no goal. ${score[0]} to ${score[1]}.`;
+		refAnnounce(`After a VAR review, the decision is no goal: ${V.kind === "offside" ? `offside by ${cm(V.d)}` : "a foul in the build-up"}. ${score[0]} to ${score[1]}.`);
 		if (V.scorer === homeSide && typeof crowdBoo === "function") { crowdBoo(1.1); }
 		for (const p of players) { p.celebA = 0; p.celebK = 0; p.hug = 0; p.kneel = 0; p.sulk = 0; p.jump = 0; p.headHands = 0; }
 		celeb = null; replay = null; goalTimer = 0; state = "play";
@@ -68,4 +69,12 @@
 		freeze = 60;
 		varCheck = null;
 		return false;
+	}
+
+	// The referee announces the decision to the ground, as Premier League referees have since 2025: on the
+	// screen for everyone, and read out to screen readers through the live region.
+	function refAnnounce (text) {
+		if (bulkSim) { return; }
+		toast(`🎙 Referee: ${text}`, "#eef6ea");
+		$("announce").textContent = `Referee: ${text}`;
 	}

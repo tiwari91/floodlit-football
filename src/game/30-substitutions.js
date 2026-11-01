@@ -69,8 +69,8 @@
 		subWalks = subWalks.filter(w => w.n < w.end);
 		if (!subWalks.length) { freeze = 0; }
 	}
-	function makeSub (p, pl, quiet = false) {
-		if (subsLeft <= 0 || !players.includes(p) || p.team !== 0) { return; }
+	function makeSub (p, pl, quiet = false, extra = false) {   // extra: a concussion substitute, not one of the five (10-injuries)
+		if ((subsLeft <= 0 && !extra) || !players.includes(p) || p.team !== 0) { return; }
 		wentOff.push(p.name);
 		cameOn.push(pl.name);
 		subLog.push([ p.idx, pl.name ]);
@@ -82,10 +82,10 @@
 		p.injured = false; p.yellow = 0; p.sqi = null;
 		p.sta = clamp(fitOf(pl) / 100, 0.5, 1); p.nudged = false; p.endure = endureOf(pl);
 		if (typeof ensureTraitP === "function") { ensureTraitP(p, pl); }
-		subsLeft--;
+		if (!extra) { subsLeft--; }
 		if (!quiet) {
 			burst(p.x, p.y, "Sub on");
-			caption("Substitution", "sub", pl.name, `On for ${out} · ${minuteNow()}'`, 0);
+			caption(extra ? "Concussion substitute" : "Substitution", "sub", pl.name, `On for ${out} · ${minuteNow()}'`, 0);
 			subBoard(0, p);
 			$("announce").textContent = `Substitution: ${pl.name} on for ${out}.`;
 			if (!hurt) { startSubWalk(p, out, pl.name); }
@@ -117,16 +117,16 @@
 			if (pl) { makeSub(p, pl); }
 		}
 	}
-	function cpuSub (p, kind, why) {
+	function cpuSub (p, kind, why, extra = false) {
 		const was = p.name, np = genPlayer(kind, cpuOvr(clamp(Math.round(oppStrength), 1, 5)) - 2);
 		p.name = np.name; p.attr = ratingsOf(np);
 		p.sta = 1; p.injured = false; p.yellow = 0; p.nudged = false;
 		if (typeof ensureTraitP === "function") { ensureTraitP(p, np); }
-		cpuSubs--;
+		if (!extra) { cpuSubs--; }
 		logEvent(1, "sub", `${np.name} on for ${was || "a tired man"}`);
 		caption("Substitution", "sub", np.name, `${opp.short} · off: ${was || "?"} (${why})`, 1);
 		subBoard(1, p);
-		if (why !== "injured" && was) { startSubWalk(p, was, np.name); }
+		if (why !== "injured" && why !== "concussion" && was) { startSubWalk(p, was, np.name); }
 	}
 	// When one of yours is running on empty (or limping), say so once and point at the pause card.
 	function tiredNudge () {

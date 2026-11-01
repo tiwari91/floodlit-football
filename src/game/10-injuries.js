@@ -4,7 +4,7 @@
 	   most of them, "get stuck in" more than anyone; a player running on empty can pull something. */
 	const INJURIES = {
 		knock: [ [ "dead leg", 1, 1 ], [ "ankle knock", 1, 2 ], [ "bruised shin", 1, 1 ], [ "tight calf", 1, 2 ] ],
-		serious: [ [ "hamstring strain", 2, 4 ], [ "ankle ligaments", 3, 6 ], [ "groin strain", 2, 4 ], [ "knee ligaments", 5, 9 ], [ "broken toe", 3, 5 ] ]
+		serious: [ [ "hamstring strain", 2, 4 ], [ "ankle ligaments", 3, 6 ], [ "groin strain", 2, 4 ], [ "knee ligaments", 5, 9 ], [ "broken toe", 3, 5 ], [ "concussion", 1, 2 ] ]
 	};
 	function rollInjury (serious) {
 		const list = INJURIES[serious ? "serious" : "knock"], [ type, lo, hi ] = list[Math.floor(Math.random() * list.length)];
@@ -51,14 +51,17 @@
 		freeze = 40; freezeKind = "free";
 		if (s.after) { s.after(); }
 	}
-	// Off he goes: a substitute comes on if there's one left, otherwise his side plays a man short.
+	// Off he goes: a substitute comes on if there's one left, otherwise his side plays a man short. A
+	// concussion brings on an extra substitute that doesn't count against the five (the Premier League's
+	// concussion substitutes), even when the changes are used up.
 	function injuredOff (p) {
 		if (!players.includes(p)) { return; }
+		const concussion = !!(p.injInfo && p.injInfo.type === "concussion");
 		if (p.team === 1) {
-			if (cpuSubs > 0) { cpuSub(p, p.role, "injured"); p.x = clamp(p.x, 12, FW - 12); p.y = clamp(p.y, 12, FH - 12); return; }
-		} else if (subsLeft > 0 && !tut) {
+			if (cpuSubs > 0 || concussion) { cpuSub(p, p.role, concussion ? "concussion" : "injured", concussion); p.x = clamp(p.x, 12, FW - 12); p.y = clamp(p.y, 12, FH - 12); return; }
+		} else if ((subsLeft > 0 || concussion) && !tut) {
 			const pool = subPool(), pick = pool.filter(pl => pl.pos === p.role).sort((a, b) => ovrNow(b) - ovrNow(a))[0] || pool.sort((a, b) => ovrNow(b) - ovrNow(a))[0];
-			if (pick) { makeSub(p, pick); p.x = clamp(p.x, 12, FW - 12); p.y = clamp(p.y, 12, FH - 12); toast("Change made for the injury", "#7fd49b"); return; }
+			if (pick) { makeSub(p, pick, false, concussion); p.x = clamp(p.x, 12, FW - 12); p.y = clamp(p.y, 12, FH - 12); toast(concussion ? "Concussion substitute: an extra change, not one of your five" : "Change made for the injury", "#7fd49b"); return; }
 		}
 		// Nobody left to bring on: down to ten (or fewer).
 		const i = players.indexOf(p), cur = players[ctrl];

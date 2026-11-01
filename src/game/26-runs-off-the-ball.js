@@ -363,8 +363,14 @@
 		}
 		if (p.role === "gk") {
 			p.hold++;
-			// A second or so with the ball, so the team can spread out before he plays it.
-			const H = p.holdFor || (p.holdFor = 60 + Math.floor(Math.random() * 30));
+			// A second or so with the ball, so the team can spread out before he plays it. The computer's
+			// keeper wastes time when his side leads in the last ten minutes: four to ten seconds.
+			const wasting = p.team === 1 && score[1] > score[0] && minuteNow() >= 80 && !setPiece;
+			const H = p.holdFor || (p.holdFor = wasting ? 240 + Math.floor(Math.random() * 360) : 60 + Math.floor(Math.random() * 30));
+			// The Premier League's eight-second rule: the referee counts down the last five out loud
+			// (from three seconds in), and a keeper who holds it longer gives away a corner.
+			if (p.hold === KEEPER_COUNT_AT) { toast("The referee is counting: the keeper has five seconds", "#f2b52e"); }
+			if (p.hold > KEEPER_LIMIT) { prepDone(p); keeperTooLong(p); return null; }
 			if (p.hold < H) { prepRelease(p, H - p.hold, () => gkPrepKind(p)); return null; }
 			prepDone(p);
 			gkDistribute(p);
@@ -458,3 +464,13 @@
 		return [ goal.x, clamp(ty, 30, FH - 30) ];
 	}
 
+
+	// The eight-second rule (above): over eight seconds in the keeper's hands, a corner to the other side.
+	const KEEPER_COUNT_AT = 180, KEEPER_LIMIT = 480;   // frames: three seconds in, eight seconds
+	function keeperTooLong (k) {
+		const att = 1 - k.team, leftEnd = attackX(k.team) === FW;   // the corner is at the keeper's own end
+		ball.owner = null; k.hold = 0; k.holdFor = 0; lastTouch = k.team;
+		logEvent(k.team, "eight", `${k.name || "The keeper"} held it over eight seconds: corner`);
+		toast("Over eight seconds: corner", "#f2b52e");
+		awardCorner(att, leftEnd, k.y < FH / 2);
+	}
