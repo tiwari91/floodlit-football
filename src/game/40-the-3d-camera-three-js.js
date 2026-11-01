@@ -434,6 +434,16 @@
 							vec3 worn = ${cond.wet || cond.snow ? "vec3(0.36, 0.29, 0.19)" : "diffuseColor.rgb * vec3(1.18, 1.02, 0.58)"};
 							diffuseColor.rgb = mix(diffuseColor.rgb, worn, wear * ${cond.wet ? "0.7" : "0.5"});
 						}
+						${cond.ko === "day" ? "" : `// Under the floodlights: softly brighter pools where the banks of lamps aim (four, over the
+						// quarters of the pitch), a cooler white, and the grass dimmer towards the stands.
+						{
+							vec2 u = q / ffPitch.xy;
+							float pool = 0.0;
+							for (int k = 0; k < 4; k++) { vec2 a = vec2(k < 2 ? 0.27 : 0.73, (k == 0 || k == 2) ? 0.3 : 0.7); vec2 dd = (u - a) * vec2(1.0, 1.35); pool += exp(-dot(dd, dd) / 0.045); }
+							float edge = smoothstep(0.0, 0.16, min(min(u.x, 1.0 - u.x), min(u.y, 1.0 - u.y)) + 0.04);
+							diffuseColor.rgb *= (0.86 + 0.1 * min(pool, 1.4)) * mix(0.9, 1.0, edge);
+							diffuseColor.rgb *= vec3(0.97, 1.0, 1.04);
+						}`}
 						${detail ? `float near = 1.0 - smoothstep(120.0, 620.0, dist);
 						if (near > 0.0) {
 							float g1 = ffGn(q * vec2(1.9, 0.55)), g2 = ffGn(q * vec2(0.6, 2.3) + 13.0), g3 = ffGn(q * 0.11);
@@ -441,7 +451,7 @@
 						}` : ""}
 					}`);
 		};
-		mat.customProgramCacheKey = () => `${prevKey}|ff-grass${kind}${detail ? "d" : ""}${cond.wet ? "w" : ""}${cond.snow ? "s" : ""}`;
+		mat.customProgramCacheKey = () => `${prevKey}|ff-grass${kind}${detail ? "d" : ""}${cond.wet ? "w" : ""}${cond.snow ? "s" : ""}${cond.ko === "day" ? "" : "n"}`;
 	}
 	// An afternoon in the sun: the stands' shadow on the grass, painted into the pitch picture once (no cost
 	// per frame). The sun comes over the near stand (as the players' shadows say); the sunlit part of the pitch
