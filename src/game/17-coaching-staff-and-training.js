@@ -371,6 +371,8 @@
 		if (c.budget + 1e-9 < price || c.budget < 0) { return; }
 		const no = typeof signRefusal === "function" ? signRefusal(pl, c, price) : null;
 		if (no) { lastDeal = no.why; addIssue("signing", pl, no.why, { offer: no.offer }); afterClubChange(); return; }
+		const hgNo = typeof hgRefusal === "function" ? hgRefusal(pl, signingTarget(pl.pos).out) : null;   // the homegrown rule (18n)
+		if (hgNo) { lastDeal = hgNo; afterClubChange(); return; }
 		const m = MARKETS[pl.region];
 		pl.adapt = m ? Math.max(0, m.adapt - staffLvl(c, "scout") * 0.5) : 0;
 		delete pl.ask; delete pl.bids; delete pl.from; delete pl.scouted; delete pl.cpuClub; delete pl.cpuSlot;

@@ -335,6 +335,7 @@
 		}
 		notes.push(`Wage bill ${money(squadWages(c))} a season. TV money ${money(TV_EQUAL / SEASON_ROUNDS)} a matchday (${money(TV_FACILITY)} more when you are on TV); home gates about ${money((0.05 + 0.015 * yourStr()) * GATE_SHARE)} each.`);
 		if (c.budget < 0) { notes.push("You're in the red: the board has frozen signings until the budget is back above zero."); }
+		if (typeof hgLine === "function") { notes.push(hgLine(c)); }
 		$("winNote").textContent = notes.join(" ");
 		if (typeof renderOwnerBox === "function") { renderOwnerBox(c, open); }
 
@@ -388,7 +389,7 @@
 			ensurePlayer(pl);
 			const ask = askOf(pl), tgt = signingTarget(pl.pos), out = tgt.out, rr = ratingRange(pl), ok = permitOk(pl), talks = pl.bids >= 0 || pl.bids === undefined;
 			const li = el("li");
-			li.append(el("span", "pos", POS_LABEL[pl.pos]), el("span", "who", `${pl.name} · ${pl.age} · ${pl.nat}${pl.trait ? ` · ${traitName(pl.trait)}` : ""}`));
+			li.append(el("span", "pos", POS_LABEL[pl.pos]), el("span", "who", `${pl.name} · ${pl.age} · ${pl.nat}${typeof isHomegrown === "function" && isHomegrown(pl) ? " · HG" : ""}${pl.trait ? ` · ${traitName(pl.trait)}` : ""}`));
 			const btns = el("span", "bids");
 			const b = el("button", "", `Bid ${money(ask)}`);
 			b.type = "button"; b.disabled = !ok || !talks || c.budget + 1e-9 < ask || c.budget < 0;
@@ -459,7 +460,7 @@
 	// A youngster from the academy, for when a position would otherwise be empty.
 	function youthPlayer (pos) {
 		const pl = genPlayer(pos, 50 + Math.floor(Math.random() * 6), null, Math.random, { nat: localNat() });
-		pl.age = 17 + Math.floor(Math.random() * 2); pl.pot = 66 + Math.floor(Math.random() * 18); pl.contract = 3; pl.role = "prospect";
+		pl.age = 17 + Math.floor(Math.random() * 2); pl.pot = 66 + Math.floor(Math.random() * 18); pl.contract = 3; pl.role = "prospect"; pl.academy = true;
 		return pl;
 	}
 	// Eleven starters and a bench of at most seven, a keeper among them: fill any gap from the academy.

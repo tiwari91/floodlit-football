@@ -4098,6 +4098,7 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 		}
 		notes.push(`Wage bill ${money(squadWages(c))} a season. TV money ${money(TV_EQUAL / SEASON_ROUNDS)} a matchday (${money(TV_FACILITY)} more when you are on TV); home gates about ${money((0.05 + 0.015 * yourStr()) * GATE_SHARE)} each.`);
 		if (c.budget < 0) { notes.push("You're in the red: the board has frozen signings until the budget is back above zero."); }
+		if (typeof hgLine === "function") { notes.push(hgLine(c)); }
 		$("winNote").textContent = notes.join(" ");
 		if (typeof renderOwnerBox === "function") { renderOwnerBox(c, open); }
 
@@ -4151,7 +4152,7 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 			ensurePlayer(pl);
 			const ask = askOf(pl), tgt = signingTarget(pl.pos), out = tgt.out, rr = ratingRange(pl), ok = permitOk(pl), talks = pl.bids >= 0 || pl.bids === undefined;
 			const li = el("li");
-			li.append(el("span", "pos", POS_LABEL[pl.pos]), el("span", "who", `${pl.name} · ${pl.age} · ${pl.nat}${pl.trait ? ` · ${traitName(pl.trait)}` : ""}`));
+			li.append(el("span", "pos", POS_LABEL[pl.pos]), el("span", "who", `${pl.name} · ${pl.age} · ${pl.nat}${typeof isHomegrown === "function" && isHomegrown(pl) ? " · HG" : ""}${pl.trait ? ` · ${traitName(pl.trait)}` : ""}`));
 			const btns = el("span", "bids");
 			const b = el("button", "", `Bid ${money(ask)}`);
 			b.type = "button"; b.disabled = !ok || !talks || c.budget + 1e-9 < ask || c.budget < 0;
@@ -4222,7 +4223,7 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 	// A youngster from the academy, for when a position would otherwise be empty.
 	function youthPlayer (pos) {
 		const pl = genPlayer(pos, 50 + Math.floor(Math.random() * 6), null, Math.random, { nat: localNat() });
-		pl.age = 17 + Math.floor(Math.random() * 2); pl.pot = 66 + Math.floor(Math.random() * 18); pl.contract = 3; pl.role = "prospect";
+		pl.age = 17 + Math.floor(Math.random() * 2); pl.pot = 66 + Math.floor(Math.random() * 18); pl.contract = 3; pl.role = "prospect"; pl.academy = true;
 		return pl;
 	}
 	// Eleven starters and a bench of at most seven, a keeper among them: fill any gap from the academy.
@@ -4687,6 +4688,8 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 		if (c.budget + 1e-9 < price || c.budget < 0) { return; }
 		const no = typeof signRefusal === "function" ? signRefusal(pl, c, price) : null;
 		if (no) { lastDeal = no.why; addIssue("signing", pl, no.why, { offer: no.offer }); afterClubChange(); return; }
+		const hgNo = typeof hgRefusal === "function" ? hgRefusal(pl, signingTarget(pl.pos).out) : null;   // the homegrown rule (18n)
+		if (hgNo) { lastDeal = hgNo; afterClubChange(); return; }
 		const m = MARKETS[pl.region];
 		pl.adapt = m ? Math.max(0, m.adapt - staffLvl(c, "scout") * 0.5) : 0;
 		delete pl.ask; delete pl.bids; delete pl.from; delete pl.scouted; delete pl.cpuClub; delete pl.cpuSlot;
@@ -6303,6 +6306,7 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 	function promoteYouth (name, swap = false) {
 		const c = league.club, acad = ensureAcademy(c), i = acad.findIndex(pl => pl.name === name);
 		if (i < 0) { return false; }
+		acad[i].academy = true;   // brought up at the club: homegrown (18n)
 		let out = null;
 		if (c.bench.length >= BENCH) {
 			out = promoteSwapFor(acad[i]);
@@ -7184,6 +7188,29 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 		}
 		box.append(card);
 	}
+	/* ---------- the homegrown rule ----------
+	   The Premier League lets a club register at most seventeen players of twenty-five who are not
+	   homegrown, and under-21s don't count. Scaled to this game's eighteen (eleven and a bench of seven),
+	   that is at most twelve. Homegrown here: from the league's country (the home nations at home) or
+	   brought up through your academy. At the limit you can't sign another senior player who isn't
+	   homegrown; the Transfers and Squad tabs say where you stand, and the market marks homegrown players. */
+	const HG_MAX_OTHERS = 12, HG_U21 = 21;
+	const hgNats = () => { const n = leagueNat(); return n === HOME_NAT ? new Set(natsOf("home")) : new Set([ n ]); };
+	const isHomegrown = (pl, nats = hgNats()) => !!(pl && (pl.academy || nats.has(pl.nat)));
+	const hgCounts = (pl, nats) => !!pl && (pl.age || 99) > HG_U21 && !isHomegrown(pl, nats);   // takes one of the twelve places
+	function hgOthers (c) {
+		const nats = hgNats();
+		return [ ...c.squad, ...c.bench ].filter(pl => hgCounts(pl, nats)).length;
+	}
+	// Signing pl (and losing out, if he makes room): would it break the rule? A reason, or null.
+	function hgRefusal (pl, out) {
+		const c = league.club, nats = hgNats();
+		if (!hgCounts(pl, nats)) { return null; }
+		const now = hgOthers(c), after = now + 1 - (hgCounts(out, nats) ? 1 : 0);
+		if (after <= Math.max(HG_MAX_OTHERS, now)) { return null; }   // a squad already over (an older save) may swap like for like
+		return `The homegrown rule: you already have ${hgOthers(c)} of the ${HG_MAX_OTHERS} places for senior players who aren't homegrown. ${pl.name} (${pl.nat}, ${pl.age}) would need one: sell or release one of them first, or sign someone homegrown or under ${HG_U21 + 1}.`;
+	}
+	const hgLine = c => { const n = hgOthers(c); return `Homegrown rule: ${n} of ${HG_MAX_OTHERS} places for senior players who aren't homegrown${n >= HG_MAX_OTHERS ? " (full: the next senior signing must be homegrown)" : ""}; under-21s don't count.`; };
 	/* ---------- watch a match ----------
 	   Any other fixture of the coming matchday can be watched live from the League panel: the home side takes
 	   your seat (its name, kit, ground and players), the visitors the other, the computer plays both, and nothing

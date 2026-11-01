@@ -161,6 +161,7 @@
 	function promoteYouth (name, swap = false) {
 		const c = league.club, acad = ensureAcademy(c), i = acad.findIndex(pl => pl.name === name);
 		if (i < 0) { return false; }
+		acad[i].academy = true;   // brought up at the club: homegrown (18n)
 		let out = null;
 		if (c.bench.length >= BENCH) {
 			out = promoteSwapFor(acad[i]);
