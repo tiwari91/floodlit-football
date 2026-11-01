@@ -114,14 +114,17 @@ for (let v = 0; v < nv; v++) {
 	let left = 255;
 	list.forEach(([ r, w ], c) => { const q = Math.floor(w / sum * 255); jo[v * 4 + c] = RIG.indexOf(r); we[v * 4 + c] = q; left -= q; });
 	if (list.length) { we[v * 4] += left; } else { we[v * 4] = 255; jo[v * 4] = RIG.indexOf("neck"); }
-	// The kit, from where the vertex sits (model metres) and its strongest joint: 0 skin, 1 shirt, 2 shorts, 3 sock, 4 boot.
+	// The kit, from where the vertex sits (model metres) and its strongest joint: 0 skin, 1 shirt, 2 shorts, 3 sock,
+	// 4 boot, 5 arm below the sleeve (a long sleeve or skin), 6 hand (a keeper's glove or skin).
 	const top = list.length ? list[0][0] : "hips", y = p[1];
 	let R = 0;
 	if (top.startsWith("an")) { R = y < 0.115 ? 4 : 3; }
 	else if (top.startsWith("kn")) { R = y < 0.47 ? 3 : 0; }
 	else if (top.startsWith("hip")) { R = y > 0.70 ? 2 : 0; }
 	else if (top === "hips" || top === "spine" || top === "chest") { R = y < 0.955 ? 2 : 1; }   // one clean line at the waist
-	else if (top.startsWith("sh")) { const i = +top[2], d = Math.abs(p[2] - jpos[sideName("upperarm", i)][2]); R = d < 0.13 ? 1 : 0; }
+	else if (top.startsWith("sh")) { const i = +top[2], d = Math.abs(p[2] - jpos[sideName("upperarm", i)][2]); R = d < 0.13 ? 1 : 5; }
+	else if (top.startsWith("el")) { R = 5; }
+	else if (top.startsWith("ha")) { R = 6; }
 	reg[v] = R;
 }
 // The kit sits off the skin: the shirt a little, the shorts more (loose, and wider toward the hem).
@@ -153,5 +156,5 @@ for (const v of order) { buf.writeUInt8(reg[v], o++); }
 for (const i of keep) { buf.writeUInt16LE(used[i], o); o += 2; }
 fs.mkdirSync(path.join(root, "assets"), { recursive: true });
 fs.writeFileSync(path.join(root, "assets", "body.bin"), buf);
-const counts = [ 0, 0, 0, 0, 0 ]; for (const v of order) { counts[reg[v]]++; }
-console.log(`assets/body.bin: ${m} vertices, ${keep.length / 3} triangles, ${buf.length} bytes; skin/shirt/shorts/sock/boot ${counts.join("/")}`);
+const counts = [ 0, 0, 0, 0, 0, 0, 0 ]; for (const v of order) { counts[reg[v]]++; }
+console.log(`assets/body.bin: ${m} vertices, ${keep.length / 3} triangles, ${buf.length} bytes; skin/shirt/shorts/sock/boot/arm/hand ${counts.join("/")}`);

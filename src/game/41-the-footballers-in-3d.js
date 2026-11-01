@@ -1301,15 +1301,47 @@
 				G3.scene.add(m);
 			}
 			G3.fig.body = true;
+			// The number, the name and the chest print were curved onto the old shirt: lay them on the new one,
+			// just proud of the shirt's surface (its back, or its front) at each point, in the spine's frame.
+			const shirt = [];
+			for (let v = 0; v < nv; v++) { if (reg[v] === 1) { shirt.push(pos[v * 3], pos[v * 3 + 1] - 16.2, pos[v * 3 + 2]); } }
+			const fit = (geo, back) => {
+				if (!geo) { return; }
+				const A = geo.attributes.position;
+				for (let i = 0; i < A.count; i++) {
+					const y = A.getY(i), z = A.getZ(i);
+					let best = back ? Infinity : -Infinity;
+					for (let r = 0.5; r <= 2 && !Number.isFinite(best); r *= 2) {
+						for (let k = 0; k < shirt.length; k += 3) {
+							if (Math.abs(shirt[k + 1] - y) < r && Math.abs(shirt[k + 2] - z) < r) { best = back ? Math.min(best, shirt[k]) : Math.max(best, shirt[k]); }
+						}
+					}
+					if (Number.isFinite(best)) { A.setX(i, best + (back ? -0.12 : 0.12)); }
+				}
+				A.needsUpdate = true; geo.computeVertexNormals();
+			};
+			const F = G3.fig;
+			fit(F.nums && F.nums.geometry, true); fit(F.names && F.names.geometry, true); fit(F.chest && F.chest.geometry, false);
 		}).catch(() => {});
 	}
-	// Paint a body's kit: skin, shirt, shorts, socks, boots (the region of each vertex, from the converter).
-	function paintBody3D (rig, cols) {
-		const key = cols.join("|");
+	// Paint a body's kit by region (from the converter): 0 skin, 1 shirt, 2 shorts, 3 socks, 4 boots, 5 arm below
+	// the sleeve, 6 hand. The shirt takes its club's pattern from where each point sits on the body at rest,
+	// by the same rules as the old shirt's shader (pat: PATTERN3; second: its other colour).
+	function paintBody3D (rig, cols, pat, second) {
+		const key = `${cols.join("|")}|${pat}|${second}`;
 		if (rig.bodyKey === key) { return; }
 		rig.bodyKey = key;
-		const C = G3.fig.C, a = rig.body.geometry.attributes.color, reg = rig.bodyReg, rgb = cols.map(c => { C.set(c); return [ C.r, C.g, C.b ]; });
-		for (let v = 0; v < reg.length; v++) { const c = rgb[reg[v]]; a.setXYZ(v, c[0], c[1], c[2]); }
+		const C = G3.fig.C, g = rig.body.geometry, a = g.attributes.color, P = g.attributes.position, reg = rig.bodyReg;
+		const rgb = cols.map(c => { C.set(c); return [ C.r, C.g, C.b ]; }), c2 = (C.set(second || cols[1]), [ C.r, C.g, C.b ]);
+		for (let v = 0; v < reg.length; v++) {
+			let c = rgb[reg[v]];
+			if (reg[v] === 1 && pat) {
+				const x = P.getX(v), y = P.getY(v) - 16.2, z = P.getZ(v);   // in the spine's frame, as the old shirt
+				const km = pat === 1 ? Math.sin(Math.atan2(z, x) * 5) >= 0 : pat === 2 ? Math.sin(y * 1.7) >= 0 : pat === 3 ? z >= 0 : pat === 4 ? Math.abs(y - 4.7 + z * 0.95) < 1.5 : (Math.abs(z) > 2.7 && y < 8.3) || y > 8.4;
+				if (km) { c = c2; }
+			}
+			a.setXYZ(v, c[0], c[1], c[2]);
+		}
 		a.needsUpdate = true;
 	}
 	function commitFigure3D (rig, lk, kit, num) {
@@ -1325,10 +1357,12 @@
 		// His own shade of skin within his tone (a little warmer or cooler, lighter or darker), fixed by his look.
 		if (!lk.skin3) { const h = hashStr(`${lk.skin}|${lk.face}|${lk.hair}|${lk.name || ""}skin`), u = k => ((h >>> (k * 7)) % 101) / 100 - 0.5; lk.skin3 = "#" + new THREE.Color(lk.skin).offsetHSL(u(0) * 0.03, u(1) * 0.12, u(2) * 0.07).getHexString(); }
 		const skin = lk.skin3;
-		const body = rig.body && !rig.shirtHead ? rig.body : null;   // the shirt pulled over his head keeps the old body for now
+		const body = rig.body || null;
 		if (body) {
 			body.visible = true;
-			paintBody3D(rig, [ skin, kit.shirt, kit.shorts, kit.socks || kit.shirt, kit.boots || "#1a1a1a" ]);
+			// the shirt pulled up over his head: a bare chest and arms (the head parts draw the shirt round his head)
+			const sh = rig.shirtHead, top = sh ? skin : kit.shirt;
+			paintBody3D(rig, [ skin, top, kit.shorts, kit.socks || kit.shirt, kit.boots || "#1a1a1a", kit.sleeves && !sh ? kit.shirt : skin, kit.gloves || skin ], sh ? 0 : kit.pattern || 0, kit.second);
 		}
 		for (const [ name, joint, side ] of PART_PLAN3) {
 			if (body && BODY_SKIP3.has(name)) { continue; }
