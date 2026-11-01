@@ -6,7 +6,7 @@ import { spawn, spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 const here = path.dirname(fileURLToPath(import.meta.url));
-const SUITES = [ "switch", "phone", "move", "club", "intro", "welcome", "look", "drama", "happy", "ceremony", "continental", "buyanyclub", "edit", "leaguefile", "kits", "matchinfo", "hub", "styles", "attrs", "offside", "corners", "intl", "worldcup", "euro", "summer" ];
+const SUITES = [ "switch", "phone", "move", "club", "intro", "welcome", "nothree", "look", "drama", "happy", "ceremony", "continental", "buyanyclub", "edit", "leaguefile", "kits", "matchinfo", "hub", "styles", "attrs", "offside", "corners", "intl", "worldcup", "euro", "summer" ];
 const JOBS = Math.max(1, Number(process.env.FF_JOBS || 3));
 const t0 = Date.now();
 let failed = 0;
