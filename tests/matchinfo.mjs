@@ -13,7 +13,7 @@ try {
 	await page.goto(URL); await ready(page);
 	const before = await page.evaluate(() => ({ btn: document.getElementById("mcToggle").hidden, box: document.getElementById("matchCentre").hidden }));
 	check("before kick-off neither the button nor the card shows", before.btn && before.box, JSON.stringify(before));
-	await kickOff(page); await page.waitForTimeout(700);
+	await kickOff(page); await page.waitForFunction(() => !document.getElementById("mcToggle").hidden, null, { timeout: 5000 }).catch(() => {});   // the ground is built first (a moment on a big one)
 	const shown = await page.evaluate(() => ({ btn: !document.getElementById("mcToggle").hidden, box: document.getElementById("matchCentre").hidden }));
 	check("in a match the Match info button shows and the card stays closed until asked", shown.btn && shown.box, JSON.stringify(shown));
 	// The pitch draws the weather and tactic tags top right from 44 px down: the button must sit clear of them and of Show menu.

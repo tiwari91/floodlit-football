@@ -16954,9 +16954,9 @@ td, th { font-variant-numeric: tabular-nums; }
 	// the long sides and mountains behind (like Monterrey). Everything that stands still is merged
 	// into a handful of meshes, so the whole ground is a few draw calls.
 	const ARCH3 = {
-		azteca: { rc: 150, tiers: [ [ 9, 10, 5.6 ], [ 9, 9.2, 8.8 ] ], roofIn: 0.5, ring: true },
-		akron: { rc: 320, tiers: [ [ 15, 10, 7.6 ] ], roofIn: 0.32, ring: true },
-		monterrey: { rc: 40, tiers: [ [ 8, 10, 6.6 ], [ 8, 9.4, 9.6 ] ], roofIn: 0.4, ring: false }
+		azteca: { rc: 150, tiers: [ [ 12, 10, 5.6 ], [ 12, 9.2, 8.8 ] ], roofIn: 0.5, ring: true },
+		akron: { rc: 320, tiers: [ [ 14, 10, 7.6 ], [ 9, 9.4, 9.2 ] ], roofIn: 0.36, ring: true },
+		monterrey: { rc: 40, tiers: [ [ 11, 10, 6.6 ], [ 10, 9.4, 9.6 ] ], roofIn: 0.4, ring: false }
 	};
 	// The ground's size, by the club's: a small club's ground is one low tier with roofs over the sides
 	// (no ring of boxes), a middling one keeps its shape with fewer rows, only the big clubs get the full bowl.
@@ -16964,8 +16964,9 @@ td, th { font-variant-numeric: tabular-nums; }
 	function arch3 (gs) {
 		const A = ARCH3[gs && gs.arch] || ARCH3.azteca, sz = (gs && gs.size) || "big";
 		if (sz === "big") { return A; }
-		if (sz === "small") { const [ n, rd, rh ] = A.tiers[0]; return { ...A, tiers: [ [ Math.max(6, Math.round(n * 0.7)), rd, rh * 0.85 ] ], ring: false, rc: Math.min(A.rc, 60) }; }
-		return { ...A, tiers: A.tiers.map(([ n, rd, rh ], i) => [ Math.max(5, Math.round(n * (i ? 0.6 : 0.85))), rd, rh ]) };
+		// a small club still has a proper stand: a full lower tier and a short upper one; a middling one nearly the full bowl
+		if (sz === "small") { return { ...A, tiers: A.tiers.slice(0, 2).map(([ n, rd, rh ], i) => [ Math.max(6, Math.round(n * (i ? 0.45 : 0.85))), rd, rh * (i ? 1 : 0.9) ]), ring: false, rc: Math.min(A.rc, 60) }; }
+		return { ...A, tiers: A.tiers.map(([ n, rd, rh ], i) => [ Math.max(5, Math.round(n * (i ? 0.8 : 0.95))), rd, rh ]) };
 	}
 	// The stands' front: back from the touchlines, and from the goal lines (a country's grounds can sit closer
 	// or further back: gs.gap, set when the stadium is built).
@@ -17091,6 +17092,7 @@ td, th { font-variant-numeric: tabular-nums; }
 		g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = cond.heat ? 0.4 : 0.33; g.drawImage(c, 0, 0); g.restore();
 	}
 	function buildStadium3D () {
+		const t0 = performance.now();
 		const gs = gstyle || { mow: "stripes", roof: true, lights: "roof", fill: 0.8, seat: "#3b4a58", concrete: "#1b2520", steps: "#262f21", arch: "azteca" };
 		const key = `${WW}x${WH}|${cond.label}|${cond.ko}|${cond.surfaceKey}|${gs.mow}${gs.roof}${gs.lights}${gs.fill}${gs.arch}${gs.size}${gs.mountains}|${gs.nat}${gs.seats}${gs.flags}${gs.bunting}${gs.concrete}|${KITS[0].outfield}${KITS[1].outfield}${homeSide}|${gfxLevel}`;
 		if (G3.stadium && G3.stadiumKey === key && G3.standsRef === stands) { return; }
@@ -17103,6 +17105,7 @@ td, th { font-variant-numeric: tabular-nums; }
 			});
 		}
 		G3.stadiumKey = key; G3.standsRef = stands;
+		queueMicrotask(() => { G3.buildMs = Math.round(performance.now() - t0); });
 		F_SIDE3 = 24 + ((gs.gap && gs.gap[0]) || 0); F_END3 = NET + 28 + ((gs.gap && gs.gap[1]) || 0);
 		const st = new THREE.Group(), Q = gfx3();
 		G3.nearRoof = [];   // the near side of the ground: hidden while the camera sits in it
@@ -17489,6 +17492,72 @@ td, th { font-variant-numeric: tabular-nums; }
 					prev = [ x, y ];
 				}
 			}
+		}
+		// The town round the ground, seen from the high cameras: a ring road, a car park full of cars behind one
+		// end, rows of houses with pitched roofs, blocks of flats further out (lit windows at night) and trees.
+		// All merged into one mesh (and the windows into the lamps'), so it costs a draw call, not thousands.
+		{
+			const boxes = [], wins = [], tb = (A, ...v) => (A === lamp ? wins : boxes).push(v);
+			const rb = bowlRing3(P.back, A.rc), x0 = Math.min(...rb.map(p => p.x)) - 30, x1 = Math.max(...rb.map(p => p.x)) + 30, z0 = Math.min(...rb.map(p => p.z)) - 30, z1 = Math.max(...rb.map(p => p.z)) + 30;
+			let th = 9137 + (gs.nat || "").length * 31;
+			const tr = () => (th = (th * 48271) % 2147483647) / 2147483647, lit = cond.ko === "day", dim = lit ? 1 : 0.32;
+			const T = main, road = [ 0.2 * dim, 0.21 * dim, 0.23 * dim ], kerb = [ 0.55 * dim, 0.55 * dim, 0.53 * dim ];
+			const flat = (ax, az, bx, bz, col, y = 0.4) => accQuad3(T, [ ax, y, az ], [ bx, y, az ], [ bx, y, bz ], [ ax, y, bz ], col, [ 0, 1, 0 ]);
+			// the concourse and the ring road round it
+			flat(x0, z0, x1, z1, kerb, -0.3);   // under the pitch's own sheet, so it only shows round the ground
+			flat(x0 - 40, z0 - 40, x1 + 40, z0, road); flat(x0 - 40, z1, x1 + 40, z1 + 40, road); flat(x0 - 40, z0, x0, z1, road); flat(x1, z0, x1 + 40, z1, road);
+			// the car park behind the right-hand end
+			const cpx0 = x1 + 60, cpx1 = x1 + 360, cpz0 = FH / 2 - 260, cpz1 = FH / 2 + 260;
+			flat(cpx0, cpz0, cpx1, cpz1, road, 0.3);
+			const carCols = [ [ 0.85, 0.85, 0.86 ], [ 0.12, 0.13, 0.15 ], [ 0.62, 0.1, 0.1 ], [ 0.16, 0.28, 0.55 ], [ 0.55, 0.57, 0.6 ], [ 0.75, 0.68, 0.45 ] ];
+			for (let cx = cpx0 + 16; cx < cpx1 - 10; cx += 22) {
+				for (let cz = cpz0 + 14; cz < cpz1 - 10; cz += 13) {
+					if (tr() < 0.18) { continue; }
+					const c = carCols[Math.floor(tr() * carCols.length)];
+					tb(T, cx, 2.4, cz, 15, 4.4, 7.2, c.map(v => v * dim));
+					tb(T, cx - 1, 5.6, cz, 8, 2.4, 6.6, c.map(v => v * 0.8 * dim));
+				}
+			}
+			// houses, flats and trees on a loose grid, kept clear of the ground, the roads and the car park
+			const cell = gfx3().feet ? 84 : 120, X0 = -FW * 1.4, X1 = FW * 2.4, Z0 = -FH * 2.1, Z1 = FH * 3.1;
+			const roofCols = [ [ 0.45, 0.2, 0.15 ], [ 0.3, 0.3, 0.33 ], [ 0.52, 0.3, 0.2 ] ], wallCols = [ [ 0.62, 0.42, 0.32 ], [ 0.78, 0.74, 0.66 ], [ 0.55, 0.36, 0.28 ], [ 0.86, 0.84, 0.8 ] ];
+			const clear = (x, z, m) => x > x0 - 60 - m && x < x1 + 60 + m && z > z0 - 60 - m && z < z1 + 60 + m;
+			for (let gx = X0; gx < X1; gx += cell) {
+				for (let gz = Z0; gz < Z1; gz += cell) {
+					const x = gx + (tr() - 0.5) * cell * 0.3, z = gz + (tr() - 0.5) * cell * 0.3, far = Math.hypot((x - FW / 2) / FW, (z - FH / 2) / FH);
+					if (clear(x, z, 0) || (x > cpx0 - 30 && x < cpx1 + 30 && z > cpz0 - 30 && z < cpz1 + 30)) { continue; }
+					if (Math.abs(z - FH / 2) < 30 || Math.abs(x - FW / 2) < 30) { flat(x - cell / 2, z - cell / 2, x + cell / 2, z + cell / 2, road, 0.3); continue; }   // the roads out of town
+					const r = tr();
+					if (r < 0.22) {   // trees
+						for (let k = 0; k < 3; k++) { const tx = x + (tr() - 0.5) * cell * 0.7, tz = z + (tr() - 0.5) * cell * 0.7, s = 10 + tr() * 8; tb(T, tx, s * 0.9, tz, s, s * 1.3, s, [ 0.18 * dim, (0.32 + tr() * 0.1) * dim, 0.16 * dim ], tr() * 3); }
+					} else if (far > 1.7 && r < 0.3) {   // a block of flats
+						const h = 40 + tr() * 50, w = cell * 0.6, c = wallCols[Math.floor(tr() * wallCols.length)].map(v => v * dim);
+						tb(T, x, h / 2, z, w, h, w * 0.8, c);
+						if (!lit) { for (let fy = 10; fy < h - 6; fy += 12) { for (let fx = -w / 2 + 6; fx < w / 2 - 4; fx += 10) { if (tr() < 0.45) { tb(lamp, x + fx, fy, z + w * 0.4 + 0.6, 4, 4.5, 0.4, [ 1.1, 0.86, 0.5 ]); } } } }
+					} else {   // a row of houses with pitched roofs
+						const along = tr() < 0.5, n = 4, w = cell * 0.22, d = cell * 0.34, wall = wallCols[Math.floor(tr() * wallCols.length)].map(v => v * dim), roof = roofCols[Math.floor(tr() * roofCols.length)].map(v => v * dim);
+						for (let k = 0; k < n; k++) {
+							const hx = along ? x + (k - 1) * w * 1.05 : x, hz = along ? z : z + (k - 1) * w * 1.05;
+							tb(T, hx, 8, hz, along ? w : d, 16, along ? d : w, wall);
+							tb(T, hx, 16, hz, along ? w * 1.02 : d * 0.72, d * 0.5, along ? d * 0.72 : w * 1.02, roof, 0, along ? Math.PI / 4 : 0, along ? 0 : Math.PI / 4);
+							if (!lit && tr() < 0.5) { tb(lamp, hx + (along ? 0 : d / 2 + 0.4), 9, hz + (along ? d / 2 + 0.4 : 0), along ? 4 : 0.4, 4, along ? 0.4 : 4, [ 1.1, 0.82, 0.45 ]); }
+						}
+					}
+				}
+			}
+			// instanced: one box shape, a matrix and a colour each (building thousands of merged boxes took half a second)
+			const inst = (list, mat) => {
+				if (!list.length) { return; }
+				box3Init();
+				const im = own(new THREE.InstancedMesh(box3Geo.clone(), mat, list.length), true), C = new THREE.Color();
+				list.forEach(([ cx, cy, cz, sx, sy, sz, col, ry = 0, rx = 0, rz = 0 ], i) => {
+					M3.m.compose(M3.p.set(cx, cy, cz), M3.q.setFromEuler(M3.e.set(rx, ry, rz, "YXZ")), M3.s.set(sx, sy, sz));
+					im.setMatrixAt(i, M3.m); im.setColorAt(i, C.setRGB(col[0], col[1], col[2]));
+				});
+				im.frustumCulled = false; st.add(im);
+			};
+			inst(boxes, ownMat(new THREE.MeshLambertMaterial({ color: 0xffffff })));
+			inst(wins, ownMat(new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false })));
 		}
 		if (stands) {
 			// The ground's name, white on black, across the far side.
