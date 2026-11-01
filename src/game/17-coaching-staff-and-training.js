@@ -30,9 +30,11 @@
 		if (!Number.isFinite(c.drill)) { c.drill = 30; }
 		if (lg && !Array.isArray(lg.staffPool)) { lg.staffPool = genStaffPool(); }
 	}
-	function hireStaff (i) {
-		const c = league.club, cand = league.staffPool[i];
-		if (!cand) { return; }
+	// Hire the person named on the button. If the list changed since it was drawn, hire no one and redraw.
+	function hireStaff (want) {
+		const c = league.club, i = league.staffPool.findIndex(cd => cd === want || (cd.job === want.job && cd.name === want.name && cd.lvl === want.lvl));
+		const cand = league.staffPool[i];
+		if (!cand) { lastDeal = `${want.name} is no longer available. Here is the latest list.`; afterClubChange(); return; }
 		const fee = staffFee(cand.lvl);
 		if (c.budget + 1e-9 < fee) { lastDeal = `${cand.name} wants a ${money(fee)} fee to join.`; afterClubChange(); return; }
 		c.budget = round1(c.budget - fee);
@@ -118,11 +120,11 @@
 			else { li.append(el("span", "")); }
 			const cands = el("div", "cands");
 			cands.append(el("span", "lbl", st ? "Better candidates:" : "Candidates:"));
-			league.staffPool.forEach((cd, i) => {
+			league.staffPool.forEach(cd => {
 				if (cd.job !== job || (st && cd.lvl <= st.lvl)) { return; }
 				const b = el("button", "", `Hire ${cd.name} ${"★".repeat(cd.lvl)} · ${money(staffFee(cd.lvl))}`);
 				b.type = "button"; b.disabled = c.budget + 1e-9 < staffFee(cd.lvl);
-				b.addEventListener("click", () => hireStaff(i));
+				b.addEventListener("click", () => hireStaff(cd));
 				cands.append(b);
 			});
 			if (cands.children.length > 1) { li.append(cands); }
