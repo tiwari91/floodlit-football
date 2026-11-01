@@ -17672,7 +17672,7 @@ td, th { font-variant-numeric: tabular-nums; }
 			try { drawPitch(true); } finally { ctx = keep; stands = keepStands; }
 			standShadow(pg, gs);
 			const tex = canvasTex3D(pc);
-			const v2 = rv2(), mat = v2 ? new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9, metalness: 0, envMapIntensity: 0.35, color: new THREE.Color(0.5, 0.52, 0.5) }) : new THREE.MeshBasicMaterial({ map: tex });   // (the painted colours are already lit: the lights bring them back up, with shadow and falloff)
+			const v2 = rv2(), mat = v2 ? new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9, metalness: 0, envMapIntensity: 0.35, color: new THREE.Color(0.44, 0.58, 0.4) }) : new THREE.MeshBasicMaterial({ map: tex });   // (the painted colours are already lit: the lights bring them back up, with shadow and falloff)
 			if (cond.wet > 0) { wetGround3D(mat, Q.wetLamps || 8); }
 			grassShader3D(mat, gs, !!Q.grass);
 			const ground = own(new THREE.Mesh(new THREE.PlaneGeometry(WW, WH), mat), true);
@@ -18364,7 +18364,7 @@ td, th { font-variant-numeric: tabular-nums; }
 		// Intensities carry the factor of PI that three.js scaled in for us before r155.
 		const LI = Math.PI, V2 = rv2();
 		if (G3.renderer) {
-			if (V2 && THREE.NeutralToneMapping !== undefined) { G3.renderer.toneMapping = THREE.NeutralToneMapping; G3.renderer.toneMappingExposure = dayLit ? 1.0 : 1.1; }   // neutral: it keeps the grass and the kits their own colours
+			if (V2 && THREE.NeutralToneMapping !== undefined) { G3.renderer.toneMapping = THREE.NeutralToneMapping; G3.renderer.toneMappingExposure = dayLit ? 1.0 : 1.18; }   // neutral: it keeps the grass and the kits their own colours
 			else if (THREE.NeutralToneMapping !== undefined) { G3.renderer.toneMapping = THREE.NeutralToneMapping; G3.renderer.toneMappingExposure = 1.08; }
 		}
 		G3.scene.environment = V2 ? envMap3D(dayLit) : null;
@@ -19227,7 +19227,7 @@ td, th { font-variant-numeric: tabular-nums; }
 		// Render v2: this is the real key light (the sun, or the main bank of floodlights), lighting the pitch and
 		// the players and throwing their shadows on the grass; otherwise it only casts onto the clear sheet.
 		const dayK = cond && cond.ko === "day";
-		S.light.intensity = v2 ? (dayK ? 1.55 : 1.15) * Math.PI : 0;
+		S.light.intensity = v2 ? (dayK ? 1.55 : 1.75) * Math.PI : 0;
 		S.light.color.setHex(dayK ? 0xfff0da : 0xeef3ff);
 		if (!size) { return; }
 		if (S.size !== size) { S.size = size; S.light.shadow.mapSize.set(size, size); if (S.light.shadow.map) { S.light.shadow.map.dispose(); S.light.shadow.map = null; } }
@@ -21289,7 +21289,7 @@ td, th { font-variant-numeric: tabular-nums; }
 	const TVC = { x: 0, z: 0, tilt: 0, at: -1e9, shot: false, punchAt: -1e9 };
 	// The desktop broadcast camera: how much of the pitch's width it shows either side of the ball (as a share
 	// of the pitch), and how steeply it looks down. Closer and lower makes the players bigger and more side-on.
-	const TV_COVER3 = 0.24, TV_ELEV3 = 24;
+	const TV_COVER3 = 0.165, TV_ELEV3 = 23, TV_FOLLOW3 = 0.78;   // a main-stand camera close in (players about half as big again) and lower; it follows the ball across more
 	function tvShot3D (out, bx, by, WX) {
 		const asp = G3.cam.aspect, tall = asp < 1;
 		const fov = tall ? 46 : asp < 1.5 ? 36 : 30, tanX = Math.tan(fov * Math.PI / 360) * asp;
@@ -21299,7 +21299,7 @@ td, th { font-variant-numeric: tabular-nums; }
 		const dist = cover / tanX, eyeH = dist * Math.sin(elev), back = dist * Math.cos(elev);
 		const half = cover, halfNear = Math.hypot(eyeH, back - FH / 2) * tanX;
 		const wantX = half * 2 >= FW ? FW / 2 : clamp(bx, Math.min(FW / 2, halfNear - MX * 0.55), Math.max(FW / 2, FW - halfNear + MX * 0.55));
-		const wantZ = FH * (tall ? 0.5 : 0.66) + (clamp(by, 0, FH) - FH / 2) * (tall ? 0.6 : k > 1.01 ? 0.25 : 0.45);   // centred a little toward the near side; on a desktop screen it is closer in (players big enough to read, the near touchline may leave the picture) and follows the ball's depth further, so play near either touchline stays in shot
+		const wantZ = FH * (tall ? 0.5 : 0.66) + (clamp(by, 0, FH) - FH / 2) * (tall ? 0.6 : k > 1.01 ? 0.25 : TV_FOLLOW3);   // centred a little toward the near side; on a desktop screen it is closer in (players big enough to read, the near touchline may leave the picture) and follows the ball's depth further, so play near either touchline stays in shot
 		const wantT = tall ? 0 : smooth3(clamp((FH * 0.32 - by) / (FH * 0.3), 0, 1));
 		const now = performance.now();
 		if (G3.shot !== "tv" || now - TVC.at > 1000 || reduceMotion) { TVC.x = wantX; TVC.z = wantZ; TVC.tilt = wantT; }   // a cut into the shot

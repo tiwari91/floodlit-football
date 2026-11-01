@@ -552,7 +552,7 @@
 			try { drawPitch(true); } finally { ctx = keep; stands = keepStands; }
 			standShadow(pg, gs);
 			const tex = canvasTex3D(pc);
-			const v2 = rv2(), mat = v2 ? new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9, metalness: 0, envMapIntensity: 0.35, color: new THREE.Color(0.5, 0.52, 0.5) }) : new THREE.MeshBasicMaterial({ map: tex });   // (the painted colours are already lit: the lights bring them back up, with shadow and falloff)
+			const v2 = rv2(), mat = v2 ? new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9, metalness: 0, envMapIntensity: 0.35, color: new THREE.Color(0.44, 0.58, 0.4) }) : new THREE.MeshBasicMaterial({ map: tex });   // (the painted colours are already lit: the lights bring them back up, with shadow and falloff)
 			if (cond.wet > 0) { wetGround3D(mat, Q.wetLamps || 8); }
 			grassShader3D(mat, gs, !!Q.grass);
 			const ground = own(new THREE.Mesh(new THREE.PlaneGeometry(WW, WH), mat), true);
@@ -1244,7 +1244,7 @@
 		// Intensities carry the factor of PI that three.js scaled in for us before r155.
 		const LI = Math.PI, V2 = rv2();
 		if (G3.renderer) {
-			if (V2 && THREE.NeutralToneMapping !== undefined) { G3.renderer.toneMapping = THREE.NeutralToneMapping; G3.renderer.toneMappingExposure = dayLit ? 1.0 : 1.1; }   // neutral: it keeps the grass and the kits their own colours
+			if (V2 && THREE.NeutralToneMapping !== undefined) { G3.renderer.toneMapping = THREE.NeutralToneMapping; G3.renderer.toneMappingExposure = dayLit ? 1.0 : 1.18; }   // neutral: it keeps the grass and the kits their own colours
 			else if (THREE.NeutralToneMapping !== undefined) { G3.renderer.toneMapping = THREE.NeutralToneMapping; G3.renderer.toneMappingExposure = 1.08; }
 		}
 		G3.scene.environment = V2 ? envMap3D(dayLit) : null;

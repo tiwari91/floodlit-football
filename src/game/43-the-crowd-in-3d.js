@@ -585,7 +585,7 @@
 	const TVC = { x: 0, z: 0, tilt: 0, at: -1e9, shot: false, punchAt: -1e9 };
 	// The desktop broadcast camera: how much of the pitch's width it shows either side of the ball (as a share
 	// of the pitch), and how steeply it looks down. Closer and lower makes the players bigger and more side-on.
-	const TV_COVER3 = 0.24, TV_ELEV3 = 24;
+	const TV_COVER3 = 0.165, TV_ELEV3 = 23, TV_FOLLOW3 = 0.78;   // a main-stand camera close in (players about half as big again) and lower; it follows the ball across more
 	function tvShot3D (out, bx, by, WX) {
 		const asp = G3.cam.aspect, tall = asp < 1;
 		const fov = tall ? 46 : asp < 1.5 ? 36 : 30, tanX = Math.tan(fov * Math.PI / 360) * asp;
@@ -595,7 +595,7 @@
 		const dist = cover / tanX, eyeH = dist * Math.sin(elev), back = dist * Math.cos(elev);
 		const half = cover, halfNear = Math.hypot(eyeH, back - FH / 2) * tanX;
 		const wantX = half * 2 >= FW ? FW / 2 : clamp(bx, Math.min(FW / 2, halfNear - MX * 0.55), Math.max(FW / 2, FW - halfNear + MX * 0.55));
-		const wantZ = FH * (tall ? 0.5 : 0.66) + (clamp(by, 0, FH) - FH / 2) * (tall ? 0.6 : k > 1.01 ? 0.25 : 0.45);   // centred a little toward the near side; on a desktop screen it is closer in (players big enough to read, the near touchline may leave the picture) and follows the ball's depth further, so play near either touchline stays in shot
+		const wantZ = FH * (tall ? 0.5 : 0.66) + (clamp(by, 0, FH) - FH / 2) * (tall ? 0.6 : k > 1.01 ? 0.25 : TV_FOLLOW3);   // centred a little toward the near side; on a desktop screen it is closer in (players big enough to read, the near touchline may leave the picture) and follows the ball's depth further, so play near either touchline stays in shot
 		const wantT = tall ? 0 : smooth3(clamp((FH * 0.32 - by) / (FH * 0.3), 0, 1));
 		const now = performance.now();
 		if (G3.shot !== "tv" || now - TVC.at > 1000 || reduceMotion) { TVC.x = wantX; TVC.z = wantZ; TVC.tilt = wantT; }   // a cut into the shot
