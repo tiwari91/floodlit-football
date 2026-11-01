@@ -753,7 +753,7 @@
 		if (S.size !== size) { S.size = size; S.light.shadow.mapSize.set(size, size); if (S.light.shadow.map) { S.light.shadow.map.dispose(); S.light.shadow.map = null; } }
 		const c = G3.cam, d = G3.v.set(0, 0, -1).applyQuaternion(c.quaternion), t = d.y < -0.05 ? -c.position.y / d.y : 900;
 		const gx = clamp(c.position.x + d.x * t, -200, FW + 200), gz = clamp(c.position.z + d.z * t, -200, FH + 200), span = clamp(Math.hypot(c.position.x - gx, c.position.y, c.position.z - gz) * 0.55, 220, 760);
-		const day = cond && cond.ko === "day", el = day ? 0.9 : 1.15, [ ux, uz ] = sunDir3D(), L = 1500;
+		const day = cond && cond.ko === "day", el = day ? (typeof rv2 === "function" && rv2() ? 0.3 : 0.9) : 1.15, [ ux, uz ] = sunDir3D(), L = 1500;
 		S.light.target.position.set(gx, 0, gz);
 		S.light.position.set(gx - ux * Math.cos(el) * L, Math.sin(el) * L, gz - uz * Math.cos(el) * L);
 		const sc = S.light.shadow.camera;
@@ -1296,9 +1296,11 @@
 			const pos = take(Float32Array, nv * 3), nor = take(Float32Array, nv * 3), jo = take(Uint8Array, nv * 4), we = take(Uint8Array, nv * 4), reg = take(Uint8Array, nv), idx = take(Uint16Array, ni);
 			const aPos = new T.BufferAttribute(pos, 3), aNor = new T.BufferAttribute(nor, 3), aIdx = new T.BufferAttribute(idx, 1);
 			const aJo = new T.Uint16BufferAttribute(Uint16Array.from(jo), 4), aWe = new T.Float32BufferAttribute(Float32Array.from(we, x => x / 255), 4);
-			const mat = new T.MeshLambertMaterial({ vertexColors: true });
+			// Render v2: a physically lit body (soft cloth and skin, the sky's light in the folds); else as before.
+			const v2 = typeof rv2 === "function" && rv2();
+			const mat = v2 ? new T.MeshStandardMaterial({ vertexColors: true, roughness: 0.72, metalness: 0, envMapIntensity: 0.9 }) : new T.MeshLambertMaterial({ vertexColors: true });
 			mat.onBeforeCompile = sh => { sh.fragmentShader = skinLight3D(sh.fragmentShader, SHIRT_LIGHT3); };
-			mat.customProgramCacheKey = () => "ff-body";
+			mat.customProgramCacheKey = () => (v2 ? "ff-body2" : "ff-body");
 			for (const r of rigs) {
 				const g = new T.BufferGeometry();
 				g.setAttribute("position", aPos); g.setAttribute("normal", aNor); g.setAttribute("skinIndex", aJo); g.setAttribute("skinWeight", aWe); g.setIndex(aIdx);

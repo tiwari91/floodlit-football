@@ -459,14 +459,15 @@
 	// sun's rays, and everything outside it is in shade. Not under cloud (rain, snow) and not at night.
 	function standShadow (g, gs) {
 		if (!g || cond.ko !== "day" || cond.wet || cond.snow || !gs) { return; }
-		const A = arch3(gs), P = bowlProfile3(A), [ sx, sz ] = sunDir3D(), cot = 2.3;   // a low sun (about 23 degrees): a 3pm kick-off in the season
+		const A = arch3(gs), P = bowlProfile3(A), [ sx, sz ] = sunDir3D(), cot = rv2() ? 3.2 : 2.3;   // a low sun (about 23 degrees; v2 a winter 3pm, about 17, the stand's shade well out across the pitch)
 		const r0 = bowlRing3(0, A.rc), rR = bowlRing3(P.back * A.roofIn, A.rc), rB = bowlRing3(P.back, A.rc);
 		const c = document.createElement("canvas"); c.width = g.canvas.width; c.height = g.canvas.height;
 		const s = c.getContext && c.getContext("2d");
 		if (!s || !s.fill) { return; }
 		const k = c.width / WW;
 		s.scale(k, k);
-		s.fillStyle = "rgb(4, 14, 22)"; s.fillRect(0, 0, WW, WH);
+		const v2 = rv2();
+		s.fillStyle = v2 ? "rgb(8, 26, 52)" : "rgb(4, 14, 22)"; s.fillRect(0, 0, WW, WH);   // v2: the shade a cool blue-green, as on television
 		s.globalCompositeOperation = "destination-out";
 		try { s.filter = "blur(6px)"; } catch (e) { /* a hard edge, then */ }
 		s.beginPath();
@@ -476,7 +477,7 @@
 			if (i) { s.lineTo(x, y); } else { s.moveTo(x, y); }
 		});
 		s.closePath(); s.fill();
-		g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = cond.heat ? 0.4 : 0.33; g.drawImage(c, 0, 0); g.restore();
+		g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = v2 ? (cond.heat ? 0.62 : 0.55) : cond.heat ? 0.4 : 0.33; g.drawImage(c, 0, 0); g.restore();
 	}
 	// Render v2 (Medium and High): a lit pitch under a real sun or floodlight (with its shadows on the grass),
 	// sky light from a small gradient environment, and a filmic tone curve. Low keeps the painted, unlit
@@ -1248,6 +1249,8 @@
 			else if (THREE.NeutralToneMapping !== undefined) { G3.renderer.toneMapping = THREE.NeutralToneMapping; G3.renderer.toneMappingExposure = 1.08; }
 		}
 		G3.scene.environment = V2 ? envMap3D(dayLit) : null;
+		// Colour grading (v2): a broadcast picture, a touch more contrast and colour.
+		if (canvas3d) { canvas3d.style.filter = V2 ? (dayLit ? "contrast(1.07) saturate(1.12)" : "contrast(1.1) saturate(1.08)") : ""; }
 		st.add(new THREE.AmbientLight(dayLit ? 0x9aa7b2 : 0x5e6a74, (dayLit ? 0.85 : 0.5) * LI));
 		st.add(new THREE.HemisphereLight(dayLit ? 0x9cb9d6 : 0x46586c, dayLit ? 0x2e4a34 : 0x1e3a2a, (dayLit ? 0.7 : 0.45) * LI));
 		const key1 = new THREE.DirectionalLight(0xfff1d6, (dayLit ? 0.9 : 0.75) * LI * (V2 ? 0.55 : 1));   // (v2: the shadow light is the real key, 41) key1.position.set(-FW * 0.2, FH * 1.6, FH * 1.6); key1.target.position.set(FW / 2, 0, FH / 2);

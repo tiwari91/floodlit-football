@@ -17598,14 +17598,15 @@ td, th { font-variant-numeric: tabular-nums; }
 	// sun's rays, and everything outside it is in shade. Not under cloud (rain, snow) and not at night.
 	function standShadow (g, gs) {
 		if (!g || cond.ko !== "day" || cond.wet || cond.snow || !gs) { return; }
-		const A = arch3(gs), P = bowlProfile3(A), [ sx, sz ] = sunDir3D(), cot = 2.3;   // a low sun (about 23 degrees): a 3pm kick-off in the season
+		const A = arch3(gs), P = bowlProfile3(A), [ sx, sz ] = sunDir3D(), cot = rv2() ? 3.2 : 2.3;   // a low sun (about 23 degrees; v2 a winter 3pm, about 17, the stand's shade well out across the pitch)
 		const r0 = bowlRing3(0, A.rc), rR = bowlRing3(P.back * A.roofIn, A.rc), rB = bowlRing3(P.back, A.rc);
 		const c = document.createElement("canvas"); c.width = g.canvas.width; c.height = g.canvas.height;
 		const s = c.getContext && c.getContext("2d");
 		if (!s || !s.fill) { return; }
 		const k = c.width / WW;
 		s.scale(k, k);
-		s.fillStyle = "rgb(4, 14, 22)"; s.fillRect(0, 0, WW, WH);
+		const v2 = rv2();
+		s.fillStyle = v2 ? "rgb(8, 26, 52)" : "rgb(4, 14, 22)"; s.fillRect(0, 0, WW, WH);   // v2: the shade a cool blue-green, as on television
 		s.globalCompositeOperation = "destination-out";
 		try { s.filter = "blur(6px)"; } catch (e) { /* a hard edge, then */ }
 		s.beginPath();
@@ -17615,7 +17616,7 @@ td, th { font-variant-numeric: tabular-nums; }
 			if (i) { s.lineTo(x, y); } else { s.moveTo(x, y); }
 		});
 		s.closePath(); s.fill();
-		g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = cond.heat ? 0.4 : 0.33; g.drawImage(c, 0, 0); g.restore();
+		g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = v2 ? (cond.heat ? 0.62 : 0.55) : cond.heat ? 0.4 : 0.33; g.drawImage(c, 0, 0); g.restore();
 	}
 	// Render v2 (Medium and High): a lit pitch under a real sun or floodlight (with its shadows on the grass),
 	// sky light from a small gradient environment, and a filmic tone curve. Low keeps the painted, unlit
@@ -18387,6 +18388,8 @@ td, th { font-variant-numeric: tabular-nums; }
 			else if (THREE.NeutralToneMapping !== undefined) { G3.renderer.toneMapping = THREE.NeutralToneMapping; G3.renderer.toneMappingExposure = 1.08; }
 		}
 		G3.scene.environment = V2 ? envMap3D(dayLit) : null;
+		// Colour grading (v2): a broadcast picture, a touch more contrast and colour.
+		if (canvas3d) { canvas3d.style.filter = V2 ? (dayLit ? "contrast(1.07) saturate(1.12)" : "contrast(1.1) saturate(1.08)") : ""; }
 		st.add(new THREE.AmbientLight(dayLit ? 0x9aa7b2 : 0x5e6a74, (dayLit ? 0.85 : 0.5) * LI));
 		st.add(new THREE.HemisphereLight(dayLit ? 0x9cb9d6 : 0x46586c, dayLit ? 0x2e4a34 : 0x1e3a2a, (dayLit ? 0.7 : 0.45) * LI));
 		const key1 = new THREE.DirectionalLight(0xfff1d6, (dayLit ? 0.9 : 0.75) * LI * (V2 ? 0.55 : 1));   // (v2: the shadow light is the real key, 41) key1.position.set(-FW * 0.2, FH * 1.6, FH * 1.6); key1.target.position.set(FW / 2, 0, FH / 2);
@@ -19252,7 +19255,7 @@ td, th { font-variant-numeric: tabular-nums; }
 		if (S.size !== size) { S.size = size; S.light.shadow.mapSize.set(size, size); if (S.light.shadow.map) { S.light.shadow.map.dispose(); S.light.shadow.map = null; } }
 		const c = G3.cam, d = G3.v.set(0, 0, -1).applyQuaternion(c.quaternion), t = d.y < -0.05 ? -c.position.y / d.y : 900;
 		const gx = clamp(c.position.x + d.x * t, -200, FW + 200), gz = clamp(c.position.z + d.z * t, -200, FH + 200), span = clamp(Math.hypot(c.position.x - gx, c.position.y, c.position.z - gz) * 0.55, 220, 760);
-		const day = cond && cond.ko === "day", el = day ? 0.9 : 1.15, [ ux, uz ] = sunDir3D(), L = 1500;
+		const day = cond && cond.ko === "day", el = day ? (typeof rv2 === "function" && rv2() ? 0.3 : 0.9) : 1.15, [ ux, uz ] = sunDir3D(), L = 1500;
 		S.light.target.position.set(gx, 0, gz);
 		S.light.position.set(gx - ux * Math.cos(el) * L, Math.sin(el) * L, gz - uz * Math.cos(el) * L);
 		const sc = S.light.shadow.camera;
@@ -19795,9 +19798,11 @@ td, th { font-variant-numeric: tabular-nums; }
 			const pos = take(Float32Array, nv * 3), nor = take(Float32Array, nv * 3), jo = take(Uint8Array, nv * 4), we = take(Uint8Array, nv * 4), reg = take(Uint8Array, nv), idx = take(Uint16Array, ni);
 			const aPos = new T.BufferAttribute(pos, 3), aNor = new T.BufferAttribute(nor, 3), aIdx = new T.BufferAttribute(idx, 1);
 			const aJo = new T.Uint16BufferAttribute(Uint16Array.from(jo), 4), aWe = new T.Float32BufferAttribute(Float32Array.from(we, x => x / 255), 4);
-			const mat = new T.MeshLambertMaterial({ vertexColors: true });
+			// Render v2: a physically lit body (soft cloth and skin, the sky's light in the folds); else as before.
+			const v2 = typeof rv2 === "function" && rv2();
+			const mat = v2 ? new T.MeshStandardMaterial({ vertexColors: true, roughness: 0.72, metalness: 0, envMapIntensity: 0.9 }) : new T.MeshLambertMaterial({ vertexColors: true });
 			mat.onBeforeCompile = sh => { sh.fragmentShader = skinLight3D(sh.fragmentShader, SHIRT_LIGHT3); };
-			mat.customProgramCacheKey = () => "ff-body";
+			mat.customProgramCacheKey = () => (v2 ? "ff-body2" : "ff-body");
 			for (const r of rigs) {
 				const g = new T.BufferGeometry();
 				g.setAttribute("position", aPos); g.setAttribute("normal", aNor); g.setAttribute("skinIndex", aJo); g.setAttribute("skinWeight", aWe); g.setIndex(aIdx);
