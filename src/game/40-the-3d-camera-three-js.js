@@ -478,6 +478,26 @@
 		s.closePath(); s.fill();
 		g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = cond.heat ? 0.4 : 0.33; g.drawImage(c, 0, 0); g.restore();
 	}
+	// Render v2 (Medium and High): a lit pitch under a real sun or floodlight (with its shadows on the grass),
+	// sky light from a small gradient environment, and a filmic tone curve. Low keeps the painted, unlit
+	// look. Test hook: window.__ffV1 = true draws the old look for comparisons.
+	const rv2 = () => !window.__ffV1 && !!(gfx3() || {}).shadowMap;
+	function envMap3D (day) {
+		const R = G3.renderer;
+		if (!R || !THREE.PMREMGenerator) { return null; }
+		G3.envMaps = G3.envMaps || {};
+		const key = day ? "day" : "night";
+		if (G3.envMaps[key]) { return G3.envMaps[key]; }
+		const sc = new THREE.Scene(), top = new THREE.Color(day ? 0x6f9fd8 : 0x0b1420), hor = new THREE.Color(day ? 0xd9e4ec : 0x2a3846), gnd = new THREE.Color(day ? 0x3c5a34 : 0x0a120c);
+		const g = new THREE.SphereGeometry(100, 32, 16), cols = [], P = g.attributes.position;
+		for (let i = 0; i < P.count; i++) { const y = P.getY(i) / 100, c = y > 0 ? hor.clone().lerp(top, Math.pow(y, 0.6)) : hor.clone().lerp(gnd, Math.min(1, -y * 4)); cols.push(c.r, c.g, c.b); }
+		g.setAttribute("color", new THREE.Float32BufferAttribute(cols, 3));
+		sc.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide })));
+		if (day) { const sun = new THREE.Mesh(new THREE.SphereGeometry(8, 12, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color(9, 8.4, 7.2) })); sun.position.set(-60, 45, 50); sc.add(sun); }
+		const pm = new THREE.PMREMGenerator(R), tex = pm.fromScene(sc, 0.02).texture;
+		pm.dispose(); g.dispose();
+		return (G3.envMaps[key] = tex);
+	}
 	// Paint the big screen when what it shows changes: the two sides, the score and the minute, or GOAL!.
 	function screen3D () {
 		const S = G3.screen, g = S && S.cv.getContext && S.cv.getContext("2d");
@@ -532,12 +552,13 @@
 			try { drawPitch(true); } finally { ctx = keep; stands = keepStands; }
 			standShadow(pg, gs);
 			const tex = canvasTex3D(pc);
-			const mat = new THREE.MeshBasicMaterial({ map: tex });
+			const v2 = rv2(), mat = v2 ? new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9, metalness: 0, envMapIntensity: 0.35, color: new THREE.Color(0.5, 0.52, 0.5) }) : new THREE.MeshBasicMaterial({ map: tex });   // (the painted colours are already lit: the lights bring them back up, with shadow and falloff)
 			if (cond.wet > 0) { wetGround3D(mat, Q.wetLamps || 8); }
 			grassShader3D(mat, gs, !!Q.grass);
 			const ground = own(new THREE.Mesh(new THREE.PlaneGeometry(WW, WH), mat), true);
 			ground.rotation.x = -Math.PI / 2;
 			ground.position.set(WW / 2 - MX, 0, WH / 2 - MY);
+			ground.receiveShadow = v2;   // Render v2: the players' shadows fall on the grass itself
 			st.add(ground);
 		}
 		// The land round the stadium, seen past the far stand from the gantry: by night near black; by day
@@ -1221,10 +1242,15 @@
 		const dayLit = cond.ko === "day";
 		if (!dayLit) { st.add(own(new THREE.Points(stg, new THREE.PointsMaterial({ color: 0xdde6ff, size: 1.8, sizeAttenuation: false, fog: false })), true)); }
 		// Intensities carry the factor of PI that three.js scaled in for us before r155.
-		const LI = Math.PI;
+		const LI = Math.PI, V2 = rv2();
+		if (G3.renderer) {
+			if (V2 && THREE.NeutralToneMapping !== undefined) { G3.renderer.toneMapping = THREE.NeutralToneMapping; G3.renderer.toneMappingExposure = dayLit ? 1.0 : 1.1; }   // neutral: it keeps the grass and the kits their own colours
+			else if (THREE.NeutralToneMapping !== undefined) { G3.renderer.toneMapping = THREE.NeutralToneMapping; G3.renderer.toneMappingExposure = 1.08; }
+		}
+		G3.scene.environment = V2 ? envMap3D(dayLit) : null;
 		st.add(new THREE.AmbientLight(dayLit ? 0x9aa7b2 : 0x5e6a74, (dayLit ? 0.85 : 0.5) * LI));
 		st.add(new THREE.HemisphereLight(dayLit ? 0x9cb9d6 : 0x46586c, dayLit ? 0x2e4a34 : 0x1e3a2a, (dayLit ? 0.7 : 0.45) * LI));
-		const key1 = new THREE.DirectionalLight(0xfff1d6, (dayLit ? 0.9 : 0.75) * LI); key1.position.set(-FW * 0.2, FH * 1.6, FH * 1.6); key1.target.position.set(FW / 2, 0, FH / 2);
+		const key1 = new THREE.DirectionalLight(0xfff1d6, (dayLit ? 0.9 : 0.75) * LI * (V2 ? 0.55 : 1));   // (v2: the shadow light is the real key, 41) key1.position.set(-FW * 0.2, FH * 1.6, FH * 1.6); key1.target.position.set(FW / 2, 0, FH / 2);
 		const key2 = new THREE.DirectionalLight(0xfff1d6, 0.45 * LI); key2.position.set(FW * 1.2, FH * 1.6, -FH * 0.5); key2.target.position.set(FW / 2, 0, FH / 2);
 		st.add(key1, key1.target, key2, key2.target);
 		// At night the lamps on the far side catch the players' edges, as they do on television: a cool back light.

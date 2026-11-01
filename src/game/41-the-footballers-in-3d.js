@@ -742,8 +742,13 @@
 	function shadowFollow3D () {
 		const S = G3.shadow;
 		if (!S) { return; }
-		const size = realShadow3D();
-		S.light.castShadow = !!size; S.catcher.visible = !!size;
+		const size = realShadow3D(), v2 = typeof rv2 === "function" && rv2();
+		S.light.castShadow = !!size; S.catcher.visible = !!size && !v2;
+		// Render v2: this is the real key light (the sun, or the main bank of floodlights), lighting the pitch and
+		// the players and throwing their shadows on the grass; otherwise it only casts onto the clear sheet.
+		const dayK = cond && cond.ko === "day";
+		S.light.intensity = v2 ? (dayK ? 1.55 : 1.15) * Math.PI : 0;
+		S.light.color.setHex(dayK ? 0xfff0da : 0xeef3ff);
 		if (!size) { return; }
 		if (S.size !== size) { S.size = size; S.light.shadow.mapSize.set(size, size); if (S.light.shadow.map) { S.light.shadow.map.dispose(); S.light.shadow.map = null; } }
 		const c = G3.cam, d = G3.v.set(0, 0, -1).applyQuaternion(c.quaternion), t = d.y < -0.05 ? -c.position.y / d.y : 900;
