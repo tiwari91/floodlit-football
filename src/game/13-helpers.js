@@ -75,8 +75,9 @@
 		document.documentElement.style.setProperty("--you-kit", you.outfield);
 		document.documentElement.style.setProperty("--you-text", textFor(you.outfield));
 		leftIsYou = youHome;
-		$("homeName").textContent = youHome ? "You" : o.short;
-		$("awayName").textContent = youHome ? o.short : "You";
+		const me = watchFix ? YOU.short || YOU.name : "You";   // watching: the home club's own name (18l)
+		$("homeName").textContent = youHome ? me : o.short;
+		$("awayName").textContent = youHome ? o.short : me;
 		document.documentElement.style.setProperty("--left-kit", youHome ? KITS[0].outfield : shirt);
 		document.documentElement.style.setProperty("--right-kit", youHome ? shirt : KITS[0].outfield);
 		lastMood = "";

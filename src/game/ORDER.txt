@@ -24,6 +24,7 @@
 18d-the-cup-awards-and-the-academy.js
 18e-the-dressing-room.js
 18k-pressure.js
+18l-watch.js
 18f-continental-cup.js
 18g-edit-mode.js
 18h-league-files.js

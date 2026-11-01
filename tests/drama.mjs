@@ -270,6 +270,19 @@ const sk = await page.evaluate(() => {
 check("sacked: a board out of patience at the season's end sacks you, only weaker clubs offer, no Decline, and the new job starts afresh",
 	sk.sacked && sk.n > 0 && /Sacked/.test(sk.title) && !sk.decline && sk.weaker && sk.took && sk.board === 65 && sk.fans === 65 && sk.cleared, JSON.stringify(sk));
 
+// Watch another fixture (18l): the home side takes your seat with the computer on both, nothing is recorded,
+// and your club is yours again afterwards (and never saved under the lent name).
+const wt = await page.evaluate(() => {
+	const F = window.__ff, lg = F.league, me = F.YOU.name, r0 = lg.round, n = document.querySelectorAll(".watch-list button").length;
+	const pair = lg.fixtures[lg.round].find(([ x, y ]) => x !== 0 && y !== 0);
+	F.state = "intro"; const ok = F.startWatch(pair[0], pair[1]);
+	const during = { you: F.YOU.name, auto: F.autoPilot, squad: F.matchSquad().squad.length };
+	F.saveLeague(); const saved = JSON.parse(localStorage.getItem("ff-league")).ident.you.name;
+	F.endWatch();
+	return { n, ok, during, home: F.TEAMS[pair[0]].name, saved, me, after: F.YOU.name, auto: F.autoPilot, round: lg.round === r0 };
+});
+check("watch: any other fixture can be watched live (the home side in your seat, the computer on both), nothing recorded, your club back after", wt.n > 0 && wt.ok && wt.during.you === wt.home && wt.during.auto && wt.during.squad === 11 && wt.saved === wt.me && wt.after === wt.me && !wt.auto && wt.round, JSON.stringify(wt));
+
 check("no page errors", errs.length === 0, errs.slice(0, 3).join(" | "));
 await browser.close(); server.stop();
 process.exit(done() ? 1 : 0);

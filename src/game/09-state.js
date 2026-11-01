@@ -3,6 +3,7 @@
 	let state = "intro";  // intro | play | goal | paused | full
 	let ctrl = 3;          // index of the human-controlled player in team 0
 	let frame = 0, freeze = 0, goalTimer = 0, switchCd = 0, manualLock = 0, goFlash = 0;
+	let watchFix = null;   // a fixture you are watching (18l)
 	let autoPilot = false, dribbleTest = false, lastCarrier = null;   // test harness: the computer drives your player too (batch sims)
 	let pressHeld = false, touchPress = false, padPressBtn = false;   // A / Tackle button / X held: the press assist
 	let possLostAt = -1000;  // frame your side last lost the ball

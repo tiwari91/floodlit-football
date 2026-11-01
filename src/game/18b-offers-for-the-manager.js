@@ -15,7 +15,8 @@
 		const edits = typeof stripClubEdits === "function" && stripClubEdits();   // record the clubs without option-file edits (18g)
 		const clubs = {};
 		TEAMS.forEach((t, i) => { if (i !== 0 && JSON.stringify(identOf(t)) !== JSON.stringify(DEFAULT_IDENT[i])) { clubs[i] = identOf(t); } });
-		lg.ident = { you: identOf(YOU), clubs, country: lg.ident && lg.ident.country ? lg.ident.country : undefined };
+		// (never the identity lent to a watched match, 18l)
+		lg.ident = { you: watchFix ? identOf({ ...YOU, ...watchFix.you }) : identOf(YOU), clubs, country: lg.ident && lg.ident.country ? lg.ident.country : undefined };
 		if (edits) { reapplyClubEdits(lg); }
 	}
 	function applyIdentity (lg) {

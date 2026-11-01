@@ -487,7 +487,7 @@
 		saveLeague(); renderIntlSquad();
 		return true;
 	}
-	const matchSquad = () => (intlSide ? intlSide.club : league && league.club);
+	const matchSquad = () => (watchFix ? watchFix.club : intlSide ? intlSide.club : league && league.club);   // (watching another fixture: the home side's players, 18l)
 	function intlBegin (lm) {
 		intlRestoreYou();
 		intlTacRestore();

@@ -1,27 +1,30 @@
 	/* ---------- flow ---------- */
 	function newMatch () {
+		if (watchFix && watchFix.done) { endWatch(); }   // a watched match is over: your club again (18l)
 		if (typeof intlBegin === "function") { intlBegin(null); }   // your own club's identity back, if an international had it
 		if (mode === "league" && typeof intlOnlyAdvance === "function") { intlOnlyAdvance(); }   // no club: the club's matchdays are played for you, up to the next international (18j)
-		leagueMatch = mode === "league" ? currentFixture() : null;
+		leagueMatch = mode === "league" && !watchFix ? currentFixture() : null;
+		if (watchFix) { watchLend(true); }   // watching: the home side in your seat (18l)
 		if (leagueMatch && leagueMatch.intl && typeof intlBegin === "function") { intlBegin(leagueMatch); }   // your national side, in its kit (18j)
 		applyFormat(mode === "league" && league ? league.fmt : fmtSel.value);
 		track(`match-start-${mode}`, `${mode} ${FMT.label}`);
 		// An international's opponent is a copy: the guest seat can change hands (the next country) before the full-time card goes (18j).
-		setOpponent(leagueMatch ? (leagueMatch.intl ? { ...TEAMS[leagueMatch.opp] } : TEAMS[leagueMatch.opp]) : FRIENDLY, !leagueMatch || leagueMatch.home);
+		setOpponent(watchFix ? TEAMS[watchFix.a] : leagueMatch ? (leagueMatch.intl ? { ...TEAMS[leagueMatch.opp] } : TEAMS[leagueMatch.opp]) : FRIENDLY, !leagueMatch || leagueMatch.home);
 		homeSide = !leagueMatch || leagueMatch.home ? 0 : 1;
-		cond = leagueMatch
+		cond = watchFix && league ? makeConditions(TEAMS[watchFix.h].surface, league.weather[league.round], league.wind[league.round], league.ko[league.round])
+			: leagueMatch
 			? makeConditions((leagueMatch.home ? YOU : TEAMS[leagueMatch.opp]).surface, league.weather[leagueMatch.round], league.wind[leagueMatch.round], league.ko[leagueMatch.round])
 			: makeConditions(groundSel.value, weatherSel.value, null, weatherSel.value === "hot" ? "day" : "night");   // the heat is an afternoon game
 		// Home advantage: the visitors play a little below their rating.
 		// Home advantage: the visitors play a little below their rating.
-		oppStrength = leagueMatch ? getStr(leagueMatch.opp) + (leagueMatch.home ? -0.3 : 0.3) : { easy: 2, normal: 3, hard: 4.5 }[diffSel.value] || 3;
+		oppStrength = watchFix ? getStr(watchFix.a) + 0.3 : leagueMatch ? getStr(leagueMatch.opp) + (leagueMatch.home ? -0.3 : 0.3) : { easy: 2, normal: 3, hard: 4.5 }[diffSel.value] || 3;
 		// The corner shootout is played against a side nearer your own level.
-		const oppStr = leagueMatch ? getStr(leagueMatch.opp) + (leagueMatch.home ? -0.3 : 0.3) : (mode === "corners" ? { easy: 1.5, normal: 2.2, hard: 3.4 } : { easy: 2, normal: 3, hard: 4.5 })[diffSel.value] || 3;
+		const oppStr = watchFix ? getStr(watchFix.a) + 0.3 : leagueMatch ? getStr(leagueMatch.opp) + (leagueMatch.home ? -0.3 : 0.3) : (mode === "corners" ? { easy: 1.5, normal: 2.2, hard: 3.4 } : { easy: 2, normal: 3, hard: 4.5 })[diffSel.value] || 3;
 		diff = strengthCfg(oppStr);
 		applyLevel();
 		subNo = [ 0, 0 ]; stall = 0; addedDone = [ false, false ];
 		planOthers(leagueMatch && !leagueMatch.intl ? leagueMatch : null);   // the ticker follows league matchdays
-		oppSquad = cpuSquad(leagueMatch ? leagueMatch.opp : 99, oppStr);
+		oppSquad = cpuSquad(watchFix ? watchFix.a : leagueMatch ? leagueMatch.opp : 99, oppStr);
 		if (intlSide && intlSide.opp) { oppSquad = intlSide.opp; }   // the other country's picked eleven
 		youSquad = leagueMatch ? null : cpuSquad(99, friendlyYouStr());
 		$("fmtName").textContent = FMT.label;

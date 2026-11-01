@@ -1510,3 +1510,9 @@ td, th { font-variant-numeric: tabular-nums; }
 /* A broadcast lens: the corners of the 3D picture a little darker (ff-vignette). */
 .pitchwrap.v3::after { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 2; border-radius: inherit;
 	background: radial-gradient(ellipse 75% 70% at 50% 52%, transparent 62%, rgba(0, 0, 0, 0.28) 100%); }
+
+/* Watch another fixture (18l) */
+.watch-head { display: block; margin-top: 12px; }
+.watch-list { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 4px; }
+.watch-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; }
+.watch-list li button { padding: 3px 10px; font-size: 12px; }

@@ -1532,6 +1532,12 @@ td, th { font-variant-numeric: tabular-nums; }
 /* A broadcast lens: the corners of the 3D picture a little darker (ff-vignette). */
 .pitchwrap.v3::after { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 2; border-radius: inherit;
 	background: radial-gradient(ellipse 75% 70% at 50% 52%, transparent 62%, rgba(0, 0, 0, 0.28) 100%); }
+
+/* Watch another fixture (18l) */
+.watch-head { display: block; margin-top: 12px; }
+.watch-list { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 4px; }
+.watch-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; }
+.watch-list li button { padding: 3px 10px; font-size: 12px; }
 </style>
 
 <main class="wrap">
@@ -3095,6 +3101,7 @@ td, th { font-variant-numeric: tabular-nums; }
 	let state = "intro";  // intro | play | goal | paused | full
 	let ctrl = 3;          // index of the human-controlled player in team 0
 	let frame = 0, freeze = 0, goalTimer = 0, switchCd = 0, manualLock = 0, goFlash = 0;
+	let watchFix = null;   // a fixture you are watching (18l)
 	let autoPilot = false, dribbleTest = false, lastCarrier = null;   // test harness: the computer drives your player too (batch sims)
 	let pressHeld = false, touchPress = false, padPressBtn = false;   // A / Tackle button / X held: the press assist
 	let possLostAt = -1000;  // frame your side last lost the ball
@@ -3384,8 +3391,9 @@ td, th { font-variant-numeric: tabular-nums; }
 		document.documentElement.style.setProperty("--you-kit", you.outfield);
 		document.documentElement.style.setProperty("--you-text", textFor(you.outfield));
 		leftIsYou = youHome;
-		$("homeName").textContent = youHome ? "You" : o.short;
-		$("awayName").textContent = youHome ? o.short : "You";
+		const me = watchFix ? YOU.short || YOU.name : "You";   // watching: the home club's own name (18l)
+		$("homeName").textContent = youHome ? me : o.short;
+		$("awayName").textContent = youHome ? o.short : me;
 		document.documentElement.style.setProperty("--left-kit", youHome ? KITS[0].outfield : shirt);
 		document.documentElement.style.setProperty("--right-kit", youHome ? shirt : KITS[0].outfield);
 		lastMood = "";
@@ -3739,6 +3747,7 @@ td, th { font-variant-numeric: tabular-nums; }
 			next.append(el("span", "detail", `${host.ground} · ${SURFACES[host.surface].label} · ${league.ko[f.round] === "day" ? "Afternoon" : "Night"} kick-off, ${koLabel(league.ko[f.round])} · Forecast: ${WEATHER[league.weather[f.round]].label.toLowerCase()}, ${wn.s >= 6 ? `${windWord(wn.s)} of ${wn.s} km/h` : "still air"}`));
 			const tired = tiredStarters();
 			if (tired.length) { next.append(el("span", "detail tiredwarn", `⚠ ${tiredText(tired)}`)); }
+			if (!f.intl && typeof watchList === "function") { watchList(next, f.round); }   // watch another fixture live (18l)
 			}
 		}
 
@@ -5589,7 +5598,8 @@ td, th { font-variant-numeric: tabular-nums; }
 		const edits = typeof stripClubEdits === "function" && stripClubEdits();   // record the clubs without option-file edits (18g)
 		const clubs = {};
 		TEAMS.forEach((t, i) => { if (i !== 0 && JSON.stringify(identOf(t)) !== JSON.stringify(DEFAULT_IDENT[i])) { clubs[i] = identOf(t); } });
-		lg.ident = { you: identOf(YOU), clubs, country: lg.ident && lg.ident.country ? lg.ident.country : undefined };
+		// (never the identity lent to a watched match, 18l)
+		lg.ident = { you: watchFix ? identOf({ ...YOU, ...watchFix.you }) : identOf(YOU), clubs, country: lg.ident && lg.ident.country ? lg.ident.country : undefined };
 		if (edits) { reapplyClubEdits(lg); }
 	}
 	function applyIdentity (lg) {
@@ -6792,6 +6802,56 @@ td, th { font-variant-numeric: tabular-nums; }
 		const ul = el("ul", "paper-lines");
 		for (const l of p.lines) { ul.append(el("li", "", l)); }
 		pa.append(ul); box.append(pa);
+	}
+	/* ---------- watch a match ----------
+	   Any other fixture of the coming matchday can be watched live from the League panel: the home side takes
+	   your seat (its name, kit, ground and players), the visitors the other, the computer plays both, and nothing
+	   is recorded (the league plays that fixture out as it always does). Your own identity is put back at full
+	   time, and never saved while it is lent out. */
+	// watchFix ({ h, a, you, club, auto, done }) is declared in 09-state: saving reads it at load, before this runs.
+	const WATCH_KEYS = [ "name", "short", "color", "color2", "text", "ground", "surface", "pattern", "gk" ];
+	function watchLend (on) {   // swap your identity for the home side's (on) or back (off)
+		const W = watchFix;
+		if (!W) { return; }
+		if (on) { const h = TEAMS[W.h]; for (const k of WATCH_KEYS) { if (h[k] === undefined) { delete YOU[k]; } else { YOU[k] = h[k]; } } }
+		else { for (const k of WATCH_KEYS) { if (W.you[k] === undefined) { delete YOU[k]; } else { YOU[k] = W.you[k]; } } }
+	}
+	function startWatch (h, a) {
+		if (!league || !TEAMS[h] || !TEAMS[a] || h === 0 || a === 0) { return false; }
+		if (state === "play" || state === "paused" || state === "half" || state === "goal") { toast("Finish your match first", "#f2b52e"); return false; }
+		const you = {}; for (const k of WATCH_KEYS) { you[k] = YOU[k]; }
+		const str = getStr(h), base = cpuOvr(str);
+		watchFix = { h, a, you, auto: autoPilot, done: false,
+			club: { squad: cpuSquad(h, str), bench: BENCH_POS.map((pos, i) => genPlayer(pos, base - 5 + (i % 3))), upgrades: { training: 0, coaching: 0, defence: 0 }, staff: {}, drill: 30 } };
+		autoPilot = true;
+		clearLive();
+		state = "intro"; newMatch(); showIntro(); renderLeague();
+		try { window.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" }); } catch (e) { window.scrollTo(0, 0); }
+		return true;
+	}
+	// At the next match (or a new season), your club is yours again.
+	function endWatch () {
+		if (!watchFix) { return; }
+		watchLend(false);
+		autoPilot = watchFix.auto;
+		watchFix = null;
+	}
+	const watching = () => !!watchFix;
+	// The other fixtures of the coming matchday, with a Watch button each (in the League panel's next-match card).
+	function watchList (box, round) {
+		const fx = league && league.fixtures && league.fixtures[round];
+		if (!fx) { return; }
+		const others = fx.filter(([ x, y ]) => x !== 0 && y !== 0);
+		if (!others.length) { return; }
+		box.append(el("span", "eyebrow watch-head", "Also this matchday · watch live"));
+		const ul = el("ul", "watch-list");
+		for (const [ x, y ] of others) {
+			const li = el("li"), b = el("button", "", "Watch");
+			b.type = "button"; b.addEventListener("click", () => startWatch(x, y));
+			const who = el("span", "who"); who.append(dotFor(TEAMS[x]), document.createTextNode(` ${TEAMS[x].name} v ${TEAMS[y].name} `), dotFor(TEAMS[y]));
+			li.append(who, b); ul.append(li);
+		}
+		box.append(ul);
 	}
 	/* ---------- the Continental Champions Cup ----------
 	   The top four of the league qualify for next season's continental cup (or you can start a career in it:
@@ -8736,7 +8796,7 @@ td, th { font-variant-numeric: tabular-nums; }
 		saveLeague(); renderIntlSquad();
 		return true;
 	}
-	const matchSquad = () => (intlSide ? intlSide.club : league && league.club);
+	const matchSquad = () => (watchFix ? watchFix.club : intlSide ? intlSide.club : league && league.club);   // (watching another fixture: the home side's players, 18l)
 	function intlBegin (lm) {
 		intlRestoreYou();
 		intlTacRestore();
@@ -13088,28 +13148,31 @@ td, th { font-variant-numeric: tabular-nums; }
 
 	/* ---------- flow ---------- */
 	function newMatch () {
+		if (watchFix && watchFix.done) { endWatch(); }   // a watched match is over: your club again (18l)
 		if (typeof intlBegin === "function") { intlBegin(null); }   // your own club's identity back, if an international had it
 		if (mode === "league" && typeof intlOnlyAdvance === "function") { intlOnlyAdvance(); }   // no club: the club's matchdays are played for you, up to the next international (18j)
-		leagueMatch = mode === "league" ? currentFixture() : null;
+		leagueMatch = mode === "league" && !watchFix ? currentFixture() : null;
+		if (watchFix) { watchLend(true); }   // watching: the home side in your seat (18l)
 		if (leagueMatch && leagueMatch.intl && typeof intlBegin === "function") { intlBegin(leagueMatch); }   // your national side, in its kit (18j)
 		applyFormat(mode === "league" && league ? league.fmt : fmtSel.value);
 		track(`match-start-${mode}`, `${mode} ${FMT.label}`);
 		// An international's opponent is a copy: the guest seat can change hands (the next country) before the full-time card goes (18j).
-		setOpponent(leagueMatch ? (leagueMatch.intl ? { ...TEAMS[leagueMatch.opp] } : TEAMS[leagueMatch.opp]) : FRIENDLY, !leagueMatch || leagueMatch.home);
+		setOpponent(watchFix ? TEAMS[watchFix.a] : leagueMatch ? (leagueMatch.intl ? { ...TEAMS[leagueMatch.opp] } : TEAMS[leagueMatch.opp]) : FRIENDLY, !leagueMatch || leagueMatch.home);
 		homeSide = !leagueMatch || leagueMatch.home ? 0 : 1;
-		cond = leagueMatch
+		cond = watchFix && league ? makeConditions(TEAMS[watchFix.h].surface, league.weather[league.round], league.wind[league.round], league.ko[league.round])
+			: leagueMatch
 			? makeConditions((leagueMatch.home ? YOU : TEAMS[leagueMatch.opp]).surface, league.weather[leagueMatch.round], league.wind[leagueMatch.round], league.ko[leagueMatch.round])
 			: makeConditions(groundSel.value, weatherSel.value, null, weatherSel.value === "hot" ? "day" : "night");   // the heat is an afternoon game
 		// Home advantage: the visitors play a little below their rating.
 		// Home advantage: the visitors play a little below their rating.
-		oppStrength = leagueMatch ? getStr(leagueMatch.opp) + (leagueMatch.home ? -0.3 : 0.3) : { easy: 2, normal: 3, hard: 4.5 }[diffSel.value] || 3;
+		oppStrength = watchFix ? getStr(watchFix.a) + 0.3 : leagueMatch ? getStr(leagueMatch.opp) + (leagueMatch.home ? -0.3 : 0.3) : { easy: 2, normal: 3, hard: 4.5 }[diffSel.value] || 3;
 		// The corner shootout is played against a side nearer your own level.
-		const oppStr = leagueMatch ? getStr(leagueMatch.opp) + (leagueMatch.home ? -0.3 : 0.3) : (mode === "corners" ? { easy: 1.5, normal: 2.2, hard: 3.4 } : { easy: 2, normal: 3, hard: 4.5 })[diffSel.value] || 3;
+		const oppStr = watchFix ? getStr(watchFix.a) + 0.3 : leagueMatch ? getStr(leagueMatch.opp) + (leagueMatch.home ? -0.3 : 0.3) : (mode === "corners" ? { easy: 1.5, normal: 2.2, hard: 3.4 } : { easy: 2, normal: 3, hard: 4.5 })[diffSel.value] || 3;
 		diff = strengthCfg(oppStr);
 		applyLevel();
 		subNo = [ 0, 0 ]; stall = 0; addedDone = [ false, false ];
 		planOthers(leagueMatch && !leagueMatch.intl ? leagueMatch : null);   // the ticker follows league matchdays
-		oppSquad = cpuSquad(leagueMatch ? leagueMatch.opp : 99, oppStr);
+		oppSquad = cpuSquad(watchFix ? watchFix.a : leagueMatch ? leagueMatch.opp : 99, oppStr);
 		if (intlSide && intlSide.opp) { oppSquad = intlSide.opp; }   // the other country's picked eleven
 		youSquad = leagueMatch ? null : cpuSquad(99, friendlyYouStr());
 		$("fmtName").textContent = FMT.label;
@@ -13397,6 +13460,7 @@ td, th { font-variant-numeric: tabular-nums; }
 	   paused where you left it. The season itself is saved separately after every result. */
 	const liveKey = () => (mode === "league" && league ? `L${league.season}-${league.round}-${league.fmt}${leagueMatch && leagueMatch.intl ? `-i${leagueMatch.intl.gi}` : ""}` : `F-${fmtKey}`);
 	function saveLive () {
+		if (watchFix) { return; }   // a watched match is not resumed after a refresh (18l)
 		if (tut || shoot || mode === "tutorial" || mode === "corners" || !(state === "play" || state === "paused" || state === "goal" || state === "half") || !(timeLeft > 0)) { return; }
 		store.set("ff-live", JSON.stringify({
 			v: 1, key: liveKey(), score, timeLeft, momentum, possFrames, stats, ostats: oppStats, best: bestStreak, ment: mentality[0], lastConceded, half: halfDone, at: Date.now(),
@@ -13454,7 +13518,7 @@ td, th { font-variant-numeric: tabular-nums; }
 	function showCoachMark () {
 		const el = $("coachMark");
 		let touch = false; try { touch = window.matchMedia("(pointer: coarse)").matches; } catch (e) { touch = false; }
-		if (!el || touch || store.get("ff-coach") === "1") { return; }
+		if (!el || touch || watchFix || store.get("ff-coach") === "1") { return; }
 		store.set("ff-coach", "1");
 		const b = aboveRadar(10, true);
 		if (b && parseFloat(b) > 96) { el.style.bottom = b; }   // never on the minimap's top edge
@@ -13542,9 +13606,10 @@ td, th { font-variant-numeric: tabular-nums; }
 		sfx("final");
 		const [ h, a ] = score;
 		if (typeof fansAtFullTime === "function") { fansAtFullTime(h, a); }
-		const line = h > a ? `You beat ${opp.name} ${h} to ${a}.` : h < a ? `${cap(opp.name)} beat you ${a} to ${h}.` : `A ${h} to ${a} draw with ${opp.name}.`;
+		let line = h > a ? `You beat ${opp.name} ${h} to ${a}.` : h < a ? `${cap(opp.name)} beat you ${a} to ${h}.` : `A ${h} to ${a} draw with ${opp.name}.`;
 		let nudge = h > a ? "Try a tougher opponent next." : h < a ? "Try keeping the ball: pass when a defender closes in." : "Level at the whistle.";
 		let btn = "Play again";
+		if (watchFix) { watchFix.done = true; btn = "Back to your club"; line = `Full time: ${YOU.name} ${h}-${a} ${TEAMS[watchFix.a].name}.`; nudge = "You watched it live; the league plays this fixture out on its own."; }
 		if (leagueMatch) {
 			recordLeagueResult(leagueMatch, h, a);
 			const rows = standings(), pos = rows.findIndex(r => r.id === 0) + 1, pts = rows[pos - 1].pts;
@@ -24007,7 +24072,7 @@ td, th { font-variant-numeric: tabular-nums; }
 			get manualLock () { return manualLock; }, get receiver () { return receiver; }, get cond () { return cond; }, get celeb () { return typeof celeb === "undefined" ? null : celeb; },
 			get autoSwitchMode () { return autoSwitchMode; }, set autoSwitchMode (v) { autoSwitchMode = v; autoSwitchSel.value = v; },
 			get assistMode () { return assistMode; }, setAssist, assistRun, get lastDeal () { return lastDeal; }, valueOf, ovrNow, windowOpen,
-			offerJobs, takeJob, yourStr, declineJob, get YOU () { return YOU; }, get TEAMS () { return TEAMS; },
+			offerJobs, takeJob, yourStr, startWatch, endWatch, matchSquad, declineJob, get YOU () { return YOU; }, get TEAMS () { return TEAMS; },
 			agentApproaches, agreeApproach, honourAgreed, renderSimChip, moveAbroad, takeOffer, assistShortlist, assistBuy, scoutShortlist, bestOffer, inheritSetup, keyContracts, contractAlerts, roleOf, slotsFor, renderAssistNote, assistRenewAnyway, retireVeterans, renewDeal, benchReact, get tlc () { return tlc; }, set tlcLast (v) { tlcLast = v; }, divisionName, applyForeignLeague, commitFoul, board, halfTime, toast, staffReact, get staff3 () { return staff3; }, get setPiece () { return setPiece; }, simulateMineTest () { simulateMine(); }, ensureClub, validLeague: typeof validLeague === "function" ? validLeague : null, get mode () { return mode; }, finishTutorialTest () { if (!tut) { return false; } tut.step = TUT.length - 1; nextTutStep(); return true; },
 			get autoHold () { return autoHold; }, set autoHold (v) { autoHold = v; },
 			get charging () { return charging; }, get passCharge () { return passCharge; }, get meterRect () { return meterRect; }, get drawMs () { return drawMs; }, get drawn () { return drawn; }, frameDue, get scale () { return scale; }, get kits () { return KITS; }, get stats () { return stats; }, get oppStats () { return oppStats; }, get steerAt () { return steerAt; }, set steerAt (v) { steerAt = v; }, set possTeam (v) { possTeam = v; },

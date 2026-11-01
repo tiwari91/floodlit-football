@@ -4,6 +4,7 @@
 	   paused where you left it. The season itself is saved separately after every result. */
 	const liveKey = () => (mode === "league" && league ? `L${league.season}-${league.round}-${league.fmt}${leagueMatch && leagueMatch.intl ? `-i${leagueMatch.intl.gi}` : ""}` : `F-${fmtKey}`);
 	function saveLive () {
+		if (watchFix) { return; }   // a watched match is not resumed after a refresh (18l)
 		if (tut || shoot || mode === "tutorial" || mode === "corners" || !(state === "play" || state === "paused" || state === "goal" || state === "half") || !(timeLeft > 0)) { return; }
 		store.set("ff-live", JSON.stringify({
 			v: 1, key: liveKey(), score, timeLeft, momentum, possFrames, stats, ostats: oppStats, best: bestStreak, ment: mentality[0], lastConceded, half: halfDone, at: Date.now(),
@@ -61,7 +62,7 @@
 	function showCoachMark () {
 		const el = $("coachMark");
 		let touch = false; try { touch = window.matchMedia("(pointer: coarse)").matches; } catch (e) { touch = false; }
-		if (!el || touch || store.get("ff-coach") === "1") { return; }
+		if (!el || touch || watchFix || store.get("ff-coach") === "1") { return; }
 		store.set("ff-coach", "1");
 		const b = aboveRadar(10, true);
 		if (b && parseFloat(b) > 96) { el.style.bottom = b; }   // never on the minimap's top edge
@@ -149,9 +150,10 @@
 		sfx("final");
 		const [ h, a ] = score;
 		if (typeof fansAtFullTime === "function") { fansAtFullTime(h, a); }
-		const line = h > a ? `You beat ${opp.name} ${h} to ${a}.` : h < a ? `${cap(opp.name)} beat you ${a} to ${h}.` : `A ${h} to ${a} draw with ${opp.name}.`;
+		let line = h > a ? `You beat ${opp.name} ${h} to ${a}.` : h < a ? `${cap(opp.name)} beat you ${a} to ${h}.` : `A ${h} to ${a} draw with ${opp.name}.`;
 		let nudge = h > a ? "Try a tougher opponent next." : h < a ? "Try keeping the ball: pass when a defender closes in." : "Level at the whistle.";
 		let btn = "Play again";
+		if (watchFix) { watchFix.done = true; btn = "Back to your club"; line = `Full time: ${YOU.name} ${h}-${a} ${TEAMS[watchFix.a].name}.`; nudge = "You watched it live; the league plays this fixture out on its own."; }
 		if (leagueMatch) {
 			recordLeagueResult(leagueMatch, h, a);
 			const rows = standings(), pos = rows.findIndex(r => r.id === 0) + 1, pts = rows[pos - 1].pts;

@@ -48,6 +48,7 @@
 			next.append(el("span", "detail", `${host.ground} · ${SURFACES[host.surface].label} · ${league.ko[f.round] === "day" ? "Afternoon" : "Night"} kick-off, ${koLabel(league.ko[f.round])} · Forecast: ${WEATHER[league.weather[f.round]].label.toLowerCase()}, ${wn.s >= 6 ? `${windWord(wn.s)} of ${wn.s} km/h` : "still air"}`));
 			const tired = tiredStarters();
 			if (tired.length) { next.append(el("span", "detail tiredwarn", `⚠ ${tiredText(tired)}`)); }
+			if (!f.intl && typeof watchList === "function") { watchList(next, f.round); }   // watch another fixture live (18l)
 			}
 		}
 
