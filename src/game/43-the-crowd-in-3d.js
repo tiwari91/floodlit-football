@@ -435,6 +435,7 @@
 	}
 	// The stands' moods: excitement follows the match's heat; goals, chances and fouls give jolts that fade.
 	function animateCrowd3D () {
+		if (typeof screen3D === "function" && G3.screen) { screen3D(); }
 		const k = frameDt / 1000, m = crowdMood;
 		m.excite += ((state === "play" || state === "goal" ? crowdHeat : 0.15) - m.excite) * Math.min(1, k * 2.5);
 		CROWD_U.uTime.value = reduceMotion ? 0 : performance.now() / 1000;

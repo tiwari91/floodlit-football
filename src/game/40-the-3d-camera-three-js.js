@@ -447,6 +447,26 @@
 		s.closePath(); s.fill();
 		g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = cond.heat ? 0.4 : 0.33; g.drawImage(c, 0, 0); g.restore();
 	}
+	// Paint the big screen when what it shows changes: the two sides, the score and the minute, or GOAL!.
+	function screen3D () {
+		const S = G3.screen, g = S && S.cv.getContext && S.cv.getContext("2d");
+		if (!g) { return; }
+		const goal = state === "goal" && Math.floor(performance.now() / 400) % 2 === 0, k = `${score[0]}-${score[1]}|${minuteNow()}|${goal}|${KITS[0].outfield}${KITS[1].outfield}`;
+		if (S.key === k) { return; }
+		S.key = k;
+		g.fillStyle = "#06090c"; g.fillRect(0, 0, 512, 160);
+		if (goal) {
+			g.fillStyle = KITS[lastScorer === 1 ? 1 : 0].outfield; g.fillRect(0, 0, 512, 160);
+			g.fillStyle = lum(KITS[lastScorer === 1 ? 1 : 0].outfield) > 0.5 ? "#0b0d10" : "#ffffff"; g.font = "900 104px 'Big Shoulders Display', Impact, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("GOAL!", 256, 86);
+		} else {
+			const name = t => String((t === 0 ? YOU.short : opp && opp.short) || (t === 0 ? "YOU" : "OPP")).toUpperCase().slice(0, 4);
+			g.textBaseline = "middle"; g.font = "800 50px 'Big Shoulders Display', Impact, sans-serif";
+			for (const t of [ 0, 1 ]) { const x = t ? 336 : 16; g.fillStyle = KITS[t].outfield; g.fillRect(x, 26, 14, 58); g.fillStyle = "#eef2ee"; g.textAlign = "left"; g.fillText(name(t), x + 24, 56); }
+			g.textAlign = "center"; g.fillStyle = "#f2b52e"; g.font = "900 64px 'Big Shoulders Display', Impact, sans-serif"; g.fillText(`${score[0]} - ${score[1]}`, 256, 58);
+			g.fillStyle = "#9fb0a6"; g.font = "700 32px 'Big Shoulders Display', Impact, sans-serif"; g.fillText(`${minuteNow()}'`, 256, 124);
+		}
+		S.tex.needsUpdate = true;
+	}
 	function buildStadium3D () {
 		const t0 = performance.now();
 		const gs = gstyle || { mow: "stripes", roof: true, lights: "roof", fill: 0.8, seat: "#3b4a58", concrete: "#1b2520", steps: "#262f21", arch: "azteca" };
@@ -914,6 +934,17 @@
 			};
 			inst(boxes, ownMat(new THREE.MeshLambertMaterial({ color: 0xffffff })));
 			inst(wins, ownMat(new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false })));
+		}
+		// The big screen, high above the right-hand end on a steel frame: the score and the minute, and GOAL! in
+		// the scorers' colour when one goes in (painted by screen3D as the match goes on).
+		{
+			const sc = document.createElement("canvas"); sc.width = 512; sc.height = 160;
+			const tex = canvasTex3D(sc), W = 230, H = 72, ex = FW + F_END3 + P.back * 0.55, ey = P.top + 58;
+			const face = own(new THREE.Mesh(new THREE.PlaneGeometry(W, H), ownMat(new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }))), true);
+			face.position.set(ex - 2.2, ey, FH / 2); face.rotation.y = -Math.PI / 2; st.add(face);
+			accBox3(main, ex + 2, ey, FH / 2, 4, H + 8, W + 8, [ 0.08, 0.09, 0.1 ]);   // the screen's housing
+			for (const z of [ FH / 2 - W * 0.35, FH / 2 + W * 0.35 ]) { accBox3(main, ex + 4, (ey - H / 2) / 2, z, 4, ey - H / 2, 4, [ 0.32, 0.34, 0.37 ]); }   // its legs
+			G3.screen = { cv: sc, tex, key: "" };
 		}
 		if (stands) {
 			// The ground's name, white on black, across the far side.
