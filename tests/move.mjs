@@ -465,7 +465,7 @@ const goalAt = (sc, frac) => page.evaluate(async ([ sc, frac ]) => {
 	return out;
 }, [ sc, frac ]);
 const lateWin = await goalAt([ 1, 1 ], 0.06);
-check("a late winner: a wild celebration, the losing side slumps, and the commentator calls the drama", lateWin.mood === "wild" && [ 1, 2, 6 ].includes(lateWin.style) && lateWin.maxCel > 0.5 && lateWin.slump > 0.5 && lateWin.hh > 0 && lateWin.comm === "lateWin" && /Late winner/.test(lateWin.cap || ""), JSON.stringify(lateWin));
+check("a late winner: a wild celebration, the losing side slumps, and the commentator calls the drama", lateWin.mood === "wild" && [ 1, 2, 6, 7 ].includes(lateWin.style) && lateWin.maxCel > 0.5 && lateWin.slump > 0.5 && lateWin.hh > 0 && lateWin.comm === "lateWin" && /Late winner/.test(lateWin.cap || ""), JSON.stringify(lateWin));
 const cons = await goalAt([ 0, 3 ], 0.5);
 check("a 3-0 consolation: muted, he grabs the ball and runs it back to the centre, nobody celebrates", cons.mood === "muted" && cons.grabbed && cons.toCentre > 40 && cons.maxCel < 0.15 && cons.maxHug < 0.05 && !cons.comm, JSON.stringify(cons));
 const sky = await page.evaluate(() => {

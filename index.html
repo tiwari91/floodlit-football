@@ -11204,7 +11204,7 @@ td, th { font-variant-numeric: tabular-nums; }
 		}
 		const kneeling = C.kneelAt >= 0 && T - C.kneelAt < 70;
 		if (C.kneelAt >= 0 && T === C.kneelAt + 1 && sc === homeSide) { roar(0.7); }   // the slide brings the fans up again
-		const home = T > 300 + (C.rp || 0);   // back for the restart (later when there is a replay first)
+		const home = T > (C.style === 7 ? 450 : 300) + (C.rp || 0);   // back for the restart (later when there is a replay first, or after the run to the bench)
 		for (const p of players) {
 			let tx = p.x, ty = p.y, spd = 0, acc = ACC_AI;
 			const scored = p.team === sc;
@@ -11221,10 +11221,15 @@ td, th { font-variant-numeric: tabular-nums; }
 					// The other celebrations: a run (arms out like wings for the aeroplane), then he stops
 					// and turns to the camera to pump his fist or kiss the badge in front of the fans.
 					if (C.posedAt < 0) {
-						[ tx, ty ] = C.target; spd = BASE_SPD; acc = 0.14;
-						if (Math.hypot(tx - p.x, ty - p.y) < 40 || T > 140) { C.posedAt = T; if (sc === homeSide) { roar(0.6); } }
+						[ tx, ty ] = C.target; spd = BASE_SPD * (C.style === 7 ? 1.5 : 1); acc = 0.14;
+						if (C.style === 7 && T === 40 && typeof benchJoin === "function") { benchJoin(sc, p.x); }   // the bench sees him coming and runs to meet him
+						if (C.style === 7 && T > 40 && typeof benchFront === "function") { const f = benchFront(sc); if (f !== null && Math.abs(f - p.x) < 140) { tx = f; ty = FH - 34; } }   // he meets them at the touchline
+						if (Math.hypot(tx - p.x, ty - p.y) < 40 || T > (C.style === 7 ? 300 : 140)) {
+							C.posedAt = T;
+							if (sc === homeSide || C.style === 7) { roar(0.6); }
+						}
 					}
-					p.celebK = C.posedAt < 0 && C.style !== 2 && C.style !== 6 ? 0 : C.style;   // the aeroplane and the shirt over the head are run, the rest are struck on arrival
+					p.celebK = C.posedAt < 0 && C.style !== 2 && C.style !== 6 ? 0 : C.style === 7 ? 5 : C.style;   // at the bench: both arms to the sky   // the aeroplane and the shirt over the head are run, the rest are struck on arrival
 				} else if (kneeling) {
 					// Sliding on his knees: he carries his pace into the slide and it bleeds away.
 					p.vx *= 0.955; p.vy *= 0.955;
@@ -11332,7 +11337,11 @@ td, th { font-variant-numeric: tabular-nums; }
 				lastCelebStyle = style;
 			}
 			const cx = scorer === 0 ? FW - 70 : 70, cy = hero.y < FH / 2 ? 44 : FH - 44, dx = cx - hero.x, dy = cy - hero.y, L = Math.hypot(dx, dy) || 1, run = Math.min(L, plan.run || (style >= 3 ? 110 : 260));
-			celeb = { t: 0, hero, style, mood: plan.mood, comm: plan.comm, commDone: false, sulk: plan.sulk, mgr: plan.mgr, target: [ hero.x + dx / L * run, hero.y + dy / L * run ], kneelAt: -1, posedAt: -1, fetched: plan.mood === "muted", rp: goalTimer - GOAL_CELEB };
+			// Now and then (7) he runs to his own bench instead: the subs and the manager come to meet him.
+			let toBench = null;
+			if (plan.mood !== "muted" && !own0 && !shoot && !tut && (window.__ffBenchCeleb || Math.random() < (plan.mood === "wild" ? 0.45 : 0.3)) && typeof benchSimX === "function") { style = 7; toBench = [ benchSimX(scorer), FH - 12 ]; }
+			celeb = { t: 0, hero, style, mood: plan.mood, comm: plan.comm, commDone: false, sulk: plan.sulk, mgr: plan.mgr, target: toBench || [ hero.x + dx / L * run, hero.y + dy / L * run ], kneelAt: -1, posedAt: -1, fetched: plan.mood === "muted", rp: goalTimer - GOAL_CELEB };
+			if (toBench) { goalTimer += 150; }   // two seconds more: the run to the bench is a long one
 			tlc = null;   // no touchline cutaway over a goal
 			for (const p of players) { p.kneel = 0; p.sulk = 0; p.celebK = 0; p.hug = 0; }
 			if (plan.sulk === "costly") {
@@ -21308,7 +21317,7 @@ td, th { font-variant-numeric: tabular-nums; }
 	   The match clock is stopped throughout, as it is for any goal. */
 	const REC_F = [ "x", "y", "dir", "stride", "runAmt", "vx", "vy", "kickA", "kickPow", "jump", "slideAI", "fall", "dive", "diveSide", "throwA", "idlePh", "shuf", "celebA", "kneel", "sulk", "celebK", "hug", "windUp", "windN", "kickLoft", "lungeCd", "diveCd", "plant", "pokeA" ];
 	const REC_N = 360, REC_P = 24, REC_W = REC_P * REC_F.length + 5 + 15 + 2;   // frames kept, players, floats a frame (the ball, the officials, who has it and who last touched it)
-	const REPLAY_AT = 230, REPLAY_BEFORE = 150, REPLAY_AFTER = 28, REPLAY_SPEED = 0.64;
+	const REPLAY_AT = 230, REPLAY_BENCH = 220, REPLAY_BEFORE = 150, REPLAY_AFTER = 28, REPLAY_SPEED = 0.64;
 	const REPLAY_FR = Math.round((REPLAY_BEFORE + REPLAY_AFTER) / REPLAY_SPEED);   // frames on screen
 	const rec = { buf: null, who: new Array(REC_N), head: 0, n: 0 };
 	let replay = null;   // { end, len, left (frames still to record), angle, goalX, shotY }
@@ -21344,14 +21353,16 @@ td, th { font-variant-numeric: tabular-nums; }
 		replay = { left: REPLAY_AFTER, end: -1, len: 0, angle: (score[0] + score[1]) % 2, goalX: scorer === 0 ? FW : 0, shotY: ball.y };
 		return REPLAY_FR;
 	}
-	const replayOn = () => !!(replay && replay.len > 0 && state === "goal" && celeb && celeb.t >= REPLAY_AT && celeb.t < REPLAY_AT + REPLAY_FR && goalTimer > 70 && view3D());
+	// After a run to the bench (style 7) the replay waits until the celebration on the touchline has been seen.
+	const rpAt = () => REPLAY_AT + (celeb && celeb.style === 7 ? REPLAY_BENCH : 0);
+	const replayOn = () => !!(replay && replay.len > 0 && state === "goal" && celeb && celeb.t >= rpAt() && celeb.t < rpAt() + REPLAY_FR && goalTimer > 70 && view3D());
 	// Where the clip is: a fractional frame, 0 at the start. The build-up runs a little quicker, then the
 	// last second or so (the shot and the ball going in) slows right down for the angle from behind the goal;
 	// the whole thing still fits the time the plain slow motion took.
 	const RP_FAST = 0.85, RP_SLOW = 0.45;
 	const rpTail = () => Math.min(60, Math.floor(replay.len * 0.4));
 	const replayPos = () => {
-		const u = celeb.t - REPLAY_AT, lead = replay.len - rpTail(), head = lead / RP_FAST;
+		const u = celeb.t - rpAt(), lead = replay.len - rpTail(), head = lead / RP_FAST;
 		return clamp(u < head ? u * RP_FAST : lead + (u - head) * RP_SLOW, 0, replay.len - 1.001);
 	};
 	// Put the recorded moment onto the players, the ball and the officials for drawing; returns
@@ -22362,6 +22373,26 @@ td, th { font-variant-numeric: tabular-nums; }
 		else if (kind === "near") { set(o.team, Math.random() < 0.6 ? "head" : "clap", 2200); }
 		else if (kind === "foul") { set(o.fouled, "protest", 2400); }
 	}
+	// Where a side's dugout is, along the near touchline, in the simulation's own x (the 3D world swaps ends
+	// after half-time; the dugouts stay put).
+	function benchSimX (t) {
+		const dw = 190 * Math.sqrt(S), left = t === homeSide, cx = left ? FW / 2 - dw * 0.62 - 20 : FW / 2 + dw * 0.62 + 20;
+		return endsSwapped() ? FW - cx : cx;
+	}
+	// The scorer has run to his own bench: the substitutes and the coach come over the line to meet him and
+	// the manager throws his arms up.
+	function benchJoin (t, heroX) {
+		if ((t !== 0 && t !== 1) || reduceMotion || bulkSim) { return; }
+		const now = performance.now(), sf = staff3[t], bx = benchSimX(t);
+		sf.runOn = { t0: now, dir: (endsSwapped() ? -1 : 1) * (heroX === undefined ? (Math.random() < 0.5 ? 1 : -1) : Math.sign(heroX - bx) || 1), meet: true };
+		sf.g = "up"; sf.t = now + 4200; sf.up = now + 4200;
+	}
+	// How far down the touchline the leading substitute has got (simulation x), while the bench runs on.
+	function benchFront (t) {
+		const sf = staff3[t], q = sf && sf.runOn && sf.bench && sf.bench[sf.bench.length - 1];
+		if (!q || !q.running) { return null; }
+		return endsSwapped() ? FW - q.x : q.x;
+	}
 	function staffKit (t, kind) {
 		const kit = KITS[t] || KITS[0];
 		if (kind === "mgr") { return { shirt: STAFF_COAT[t], shorts: STAFF_COAT[t], socks: "#121418", second: "#e9e9e9", pattern: 0, ink: STAFF_COAT[t], gloves: null, sleeves: true, boots: "#121418", ring: null }; }
@@ -22503,12 +22534,12 @@ td, th { font-variant-numeric: tabular-nums; }
 			// The bench running on: out of the dugout, over the line and away down the touchline towards the
 			// end the goal went in at, arms up, then back to their seats.
 			const ro = sf.runOn, re = ro ? (now - ro.t0) / 1000 : -1;
-			if (ro && re > 7.5) { sf.runOn = null; }
+			if (ro && re > (ro.meet ? 9.5 : 7.5)) { sf.runOn = null; }
 			sf.bench.forEach((q, i) => {
 				const hx = cx + (i - 1.5) * Math.min(26, dw / 5), hy = FH + F_SIDE3 + 5;
 				if (!sf.runOn) { q.x = hx; q.y = hy; q.vx = q.vy = 0; q.celebA = 0; q.running = false; return; }
 				if (!ro.dir) { ro.dir = bx > cx ? 1 : -1; }
-				const out = re < 3.8, tx = out ? hx + ro.dir * (70 + 28 * i) * Math.min(1, re / 2.4) : hx, ty = out ? FH - 8 - 7 * i : hy;
+				const out = re < (ro.meet ? 6 : 3.8), tx = out ? hx + ro.dir * ((ro.meet ? 260 : 70) + 28 * i) * Math.min(1, re / (ro.meet ? 3.4 : 2.4)) : hx, ty = out ? FH - 8 - 7 * i : hy;   // meeting the scorer: further down the line
 				const dx = tx - q.x, dy = ty - q.y, d = Math.hypot(dx, dy), v = d > 2 ? Math.min(out ? 2.7 : 1.6, d / 8) : 0;
 				q.vx += ((d ? dx / d * v : 0) - q.vx) * Math.min(1, 0.18 * dt); q.vy += ((d ? dy / d * v : 0) - q.vy) * Math.min(1, 0.18 * dt);
 				q.x += q.vx * dt; q.y += q.vy * dt;

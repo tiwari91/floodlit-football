@@ -751,7 +751,7 @@
 		}
 		const kneeling = C.kneelAt >= 0 && T - C.kneelAt < 70;
 		if (C.kneelAt >= 0 && T === C.kneelAt + 1 && sc === homeSide) { roar(0.7); }   // the slide brings the fans up again
-		const home = T > 300 + (C.rp || 0);   // back for the restart (later when there is a replay first)
+		const home = T > (C.style === 7 ? 450 : 300) + (C.rp || 0);   // back for the restart (later when there is a replay first, or after the run to the bench)
 		for (const p of players) {
 			let tx = p.x, ty = p.y, spd = 0, acc = ACC_AI;
 			const scored = p.team === sc;
@@ -768,10 +768,15 @@
 					// The other celebrations: a run (arms out like wings for the aeroplane), then he stops
 					// and turns to the camera to pump his fist or kiss the badge in front of the fans.
 					if (C.posedAt < 0) {
-						[ tx, ty ] = C.target; spd = BASE_SPD; acc = 0.14;
-						if (Math.hypot(tx - p.x, ty - p.y) < 40 || T > 140) { C.posedAt = T; if (sc === homeSide) { roar(0.6); } }
+						[ tx, ty ] = C.target; spd = BASE_SPD * (C.style === 7 ? 1.5 : 1); acc = 0.14;
+						if (C.style === 7 && T === 40 && typeof benchJoin === "function") { benchJoin(sc, p.x); }   // the bench sees him coming and runs to meet him
+						if (C.style === 7 && T > 40 && typeof benchFront === "function") { const f = benchFront(sc); if (f !== null && Math.abs(f - p.x) < 140) { tx = f; ty = FH - 34; } }   // he meets them at the touchline
+						if (Math.hypot(tx - p.x, ty - p.y) < 40 || T > (C.style === 7 ? 300 : 140)) {
+							C.posedAt = T;
+							if (sc === homeSide || C.style === 7) { roar(0.6); }
+						}
 					}
-					p.celebK = C.posedAt < 0 && C.style !== 2 && C.style !== 6 ? 0 : C.style;   // the aeroplane and the shirt over the head are run, the rest are struck on arrival
+					p.celebK = C.posedAt < 0 && C.style !== 2 && C.style !== 6 ? 0 : C.style === 7 ? 5 : C.style;   // at the bench: both arms to the sky   // the aeroplane and the shirt over the head are run, the rest are struck on arrival
 				} else if (kneeling) {
 					// Sliding on his knees: he carries his pace into the slide and it bleeds away.
 					p.vx *= 0.955; p.vy *= 0.955;
@@ -879,7 +884,11 @@
 				lastCelebStyle = style;
 			}
 			const cx = scorer === 0 ? FW - 70 : 70, cy = hero.y < FH / 2 ? 44 : FH - 44, dx = cx - hero.x, dy = cy - hero.y, L = Math.hypot(dx, dy) || 1, run = Math.min(L, plan.run || (style >= 3 ? 110 : 260));
-			celeb = { t: 0, hero, style, mood: plan.mood, comm: plan.comm, commDone: false, sulk: plan.sulk, mgr: plan.mgr, target: [ hero.x + dx / L * run, hero.y + dy / L * run ], kneelAt: -1, posedAt: -1, fetched: plan.mood === "muted", rp: goalTimer - GOAL_CELEB };
+			// Now and then (7) he runs to his own bench instead: the subs and the manager come to meet him.
+			let toBench = null;
+			if (plan.mood !== "muted" && !own0 && !shoot && !tut && (window.__ffBenchCeleb || Math.random() < (plan.mood === "wild" ? 0.45 : 0.3)) && typeof benchSimX === "function") { style = 7; toBench = [ benchSimX(scorer), FH - 12 ]; }
+			celeb = { t: 0, hero, style, mood: plan.mood, comm: plan.comm, commDone: false, sulk: plan.sulk, mgr: plan.mgr, target: toBench || [ hero.x + dx / L * run, hero.y + dy / L * run ], kneelAt: -1, posedAt: -1, fetched: plan.mood === "muted", rp: goalTimer - GOAL_CELEB };
+			if (toBench) { goalTimer += 150; }   // two seconds more: the run to the bench is a long one
 			tlc = null;   // no touchline cutaway over a goal
 			for (const p of players) { p.kneel = 0; p.sulk = 0; p.celebK = 0; p.hug = 0; }
 			if (plan.sulk === "costly") {

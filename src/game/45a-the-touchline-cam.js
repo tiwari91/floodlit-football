@@ -197,6 +197,26 @@
 		else if (kind === "near") { set(o.team, Math.random() < 0.6 ? "head" : "clap", 2200); }
 		else if (kind === "foul") { set(o.fouled, "protest", 2400); }
 	}
+	// Where a side's dugout is, along the near touchline, in the simulation's own x (the 3D world swaps ends
+	// after half-time; the dugouts stay put).
+	function benchSimX (t) {
+		const dw = 190 * Math.sqrt(S), left = t === homeSide, cx = left ? FW / 2 - dw * 0.62 - 20 : FW / 2 + dw * 0.62 + 20;
+		return endsSwapped() ? FW - cx : cx;
+	}
+	// The scorer has run to his own bench: the substitutes and the coach come over the line to meet him and
+	// the manager throws his arms up.
+	function benchJoin (t, heroX) {
+		if ((t !== 0 && t !== 1) || reduceMotion || bulkSim) { return; }
+		const now = performance.now(), sf = staff3[t], bx = benchSimX(t);
+		sf.runOn = { t0: now, dir: (endsSwapped() ? -1 : 1) * (heroX === undefined ? (Math.random() < 0.5 ? 1 : -1) : Math.sign(heroX - bx) || 1), meet: true };
+		sf.g = "up"; sf.t = now + 4200; sf.up = now + 4200;
+	}
+	// How far down the touchline the leading substitute has got (simulation x), while the bench runs on.
+	function benchFront (t) {
+		const sf = staff3[t], q = sf && sf.runOn && sf.bench && sf.bench[sf.bench.length - 1];
+		if (!q || !q.running) { return null; }
+		return endsSwapped() ? FW - q.x : q.x;
+	}
 	function staffKit (t, kind) {
 		const kit = KITS[t] || KITS[0];
 		if (kind === "mgr") { return { shirt: STAFF_COAT[t], shorts: STAFF_COAT[t], socks: "#121418", second: "#e9e9e9", pattern: 0, ink: STAFF_COAT[t], gloves: null, sleeves: true, boots: "#121418", ring: null }; }
@@ -338,12 +358,12 @@
 			// The bench running on: out of the dugout, over the line and away down the touchline towards the
 			// end the goal went in at, arms up, then back to their seats.
 			const ro = sf.runOn, re = ro ? (now - ro.t0) / 1000 : -1;
-			if (ro && re > 7.5) { sf.runOn = null; }
+			if (ro && re > (ro.meet ? 9.5 : 7.5)) { sf.runOn = null; }
 			sf.bench.forEach((q, i) => {
 				const hx = cx + (i - 1.5) * Math.min(26, dw / 5), hy = FH + F_SIDE3 + 5;
 				if (!sf.runOn) { q.x = hx; q.y = hy; q.vx = q.vy = 0; q.celebA = 0; q.running = false; return; }
 				if (!ro.dir) { ro.dir = bx > cx ? 1 : -1; }
-				const out = re < 3.8, tx = out ? hx + ro.dir * (70 + 28 * i) * Math.min(1, re / 2.4) : hx, ty = out ? FH - 8 - 7 * i : hy;
+				const out = re < (ro.meet ? 6 : 3.8), tx = out ? hx + ro.dir * ((ro.meet ? 260 : 70) + 28 * i) * Math.min(1, re / (ro.meet ? 3.4 : 2.4)) : hx, ty = out ? FH - 8 - 7 * i : hy;   // meeting the scorer: further down the line
 				const dx = tx - q.x, dy = ty - q.y, d = Math.hypot(dx, dy), v = d > 2 ? Math.min(out ? 2.7 : 1.6, d / 8) : 0;
 				q.vx += ((d ? dx / d * v : 0) - q.vx) * Math.min(1, 0.18 * dt); q.vy += ((d ? dy / d * v : 0) - q.vy) * Math.min(1, 0.18 * dt);
 				q.x += q.vx * dt; q.y += q.vy * dt;

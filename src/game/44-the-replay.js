@@ -6,7 +6,7 @@
 	   The match clock is stopped throughout, as it is for any goal. */
 	const REC_F = [ "x", "y", "dir", "stride", "runAmt", "vx", "vy", "kickA", "kickPow", "jump", "slideAI", "fall", "dive", "diveSide", "throwA", "idlePh", "shuf", "celebA", "kneel", "sulk", "celebK", "hug", "windUp", "windN", "kickLoft", "lungeCd", "diveCd", "plant", "pokeA" ];
 	const REC_N = 360, REC_P = 24, REC_W = REC_P * REC_F.length + 5 + 15 + 2;   // frames kept, players, floats a frame (the ball, the officials, who has it and who last touched it)
-	const REPLAY_AT = 230, REPLAY_BEFORE = 150, REPLAY_AFTER = 28, REPLAY_SPEED = 0.64;
+	const REPLAY_AT = 230, REPLAY_BENCH = 220, REPLAY_BEFORE = 150, REPLAY_AFTER = 28, REPLAY_SPEED = 0.64;
 	const REPLAY_FR = Math.round((REPLAY_BEFORE + REPLAY_AFTER) / REPLAY_SPEED);   // frames on screen
 	const rec = { buf: null, who: new Array(REC_N), head: 0, n: 0 };
 	let replay = null;   // { end, len, left (frames still to record), angle, goalX, shotY }
@@ -42,14 +42,16 @@
 		replay = { left: REPLAY_AFTER, end: -1, len: 0, angle: (score[0] + score[1]) % 2, goalX: scorer === 0 ? FW : 0, shotY: ball.y };
 		return REPLAY_FR;
 	}
-	const replayOn = () => !!(replay && replay.len > 0 && state === "goal" && celeb && celeb.t >= REPLAY_AT && celeb.t < REPLAY_AT + REPLAY_FR && goalTimer > 70 && view3D());
+	// After a run to the bench (style 7) the replay waits until the celebration on the touchline has been seen.
+	const rpAt = () => REPLAY_AT + (celeb && celeb.style === 7 ? REPLAY_BENCH : 0);
+	const replayOn = () => !!(replay && replay.len > 0 && state === "goal" && celeb && celeb.t >= rpAt() && celeb.t < rpAt() + REPLAY_FR && goalTimer > 70 && view3D());
 	// Where the clip is: a fractional frame, 0 at the start. The build-up runs a little quicker, then the
 	// last second or so (the shot and the ball going in) slows right down for the angle from behind the goal;
 	// the whole thing still fits the time the plain slow motion took.
 	const RP_FAST = 0.85, RP_SLOW = 0.45;
 	const rpTail = () => Math.min(60, Math.floor(replay.len * 0.4));
 	const replayPos = () => {
-		const u = celeb.t - REPLAY_AT, lead = replay.len - rpTail(), head = lead / RP_FAST;
+		const u = celeb.t - rpAt(), lead = replay.len - rpTail(), head = lead / RP_FAST;
 		return clamp(u < head ? u * RP_FAST : lead + (u - head) * RP_SLOW, 0, replay.len - 1.001);
 	};
 	// Put the recorded moment onto the players, the ball and the officials for drawing; returns
