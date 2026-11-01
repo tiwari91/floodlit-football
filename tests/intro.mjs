@@ -121,7 +121,7 @@ const run = await page.evaluate(async () => {
 	if (F.state !== "play") { document.getElementById("ovButton").click(); await wait(300); }
 	for (let i = 0; i < 4000 && F.state !== "play"; i++) { F.step(1); }
 	if (!F.view3D) { return { skip: F.camMode }; }
-	F.freeze = 0; F.forceGoal(0);
+	F.freeze = 0; window.__ffPlainGoal = true; F.forceGoal(0);
 	for (let i = 0; i < 80 && F.state !== "goal"; i++) { F.step(1); }
 	const m = F.staff3[0].mgr, x0 = m.x;
 	F.staff3[0].sprint = { t0: performance.now(), dir: 0 }; F.staff3[0].up = performance.now() + 6000;

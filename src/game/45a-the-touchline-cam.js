@@ -18,6 +18,9 @@
 			team = o.fouled;
 			pose = o.red ? "furious" : "shout";
 			line = pickOf(o.red ? [ "Off! Get him off, ref!", "That's a red! A RED!" ] : o.card ? [ "Book him, ref!", "That's a card, surely!", "Every time! Book him!" ] : [ "Referee!", "That's a foul, ref!", "Come on, ref! Free kick!", "He's been clattered, ref!" ], seed);
+		} else if (kind === "behind") {
+			team = o.team; pose = Math.random() < 0.5 ? "furious" : "anguish";
+			line = pickOf([ "Wake up! Wake up!", "That's not good enough!", "Come on! Concentrate!", "Who was marking him?!", "Sort it out at the back!" ], seed);
 		} else if (kind === "near") {
 			team = o.team; pose = "anguish";
 			line = pickOf([ "So close!", "How's that not in?!", "Unlucky! Keep going!", "Ohh! Inches!" ], seed);
@@ -195,6 +198,7 @@
 			if (o.wild && (o.team === 0 || o.team === 1) && !reduceMotion && !bulkSim) { staff3[o.team].runOn = { t0: now, dir: 0 }; }
 		}
 		else if (kind === "near") { set(o.team, Math.random() < 0.6 ? "head" : "clap", 2200); }
+		else if (kind === "behind") { set(o.team, "head", 3200); }   // behind after conceding: head in hands on the touchline
 		else if (kind === "foul") { set(o.fouled, "protest", 2400); }
 	}
 	// Where a side's dugout is, along the near touchline, in the simulation's own x (the 3D world swaps ends

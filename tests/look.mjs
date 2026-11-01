@@ -108,7 +108,7 @@ for (const [ label, opts ] of [
 	const { ctx, page, errs } = await open("replay", { viewport: { width: 1280, height: 720 } }, { "ff-cam2": "tv" });
 	const r = await page.evaluate(async () => {
 		const F = window.__ff, wipe = document.getElementById("replayWipe"), seen = { replay: false, wipe: false, goalShot: false, celeb: false };
-		F.freeze = 0; F.forceGoal(0);
+		F.freeze = 0; window.__ffPlainGoal = true; F.forceGoal(0);
 		for (let i = 0; i < 80 && F.state !== "goal"; i++) { F.step(1); }
 		const t0 = performance.now();
 		while (performance.now() - t0 < 12000 && !seen.goalShot) {

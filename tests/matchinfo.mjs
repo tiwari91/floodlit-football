@@ -66,7 +66,7 @@ try {
 		F.makeSub(p, pl);
 		const first = { kind: F.freezeKind, walks: F.subWalks.length, name: p.name, perf: F.lastApplause && F.lastApplause.perf };
 		let maxStep = 0, maxY = p.y, minY = p.y, steps = 0, handed = null;
-		while (F.subWalks.length && steps < 600) {
+		while (F.subWalks.length && steps < 1200) {   // the walk to the bench can be a long one
 			const x = p.x, y = p.y;
 			F.step(1); steps++;
 			maxStep = Math.max(maxStep, Math.hypot(p.x - x, p.y - y)); maxY = Math.max(maxY, p.y); minY = Math.min(minY, p.y);

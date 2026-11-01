@@ -29,11 +29,12 @@
 	function startSubWalk (p, offName, onName) {
 		if (bulkSim || mode === "tutorial" || shoot || !players.includes(p)) { return false; }
 		if (freeze > 0 && freezeKind !== "sub") { return false; }   // another stoppage is on: the change is made in place
-		const edge = { x: clamp(p.x + subWalks.length * 16, 30, FW - 30), y: p.y < FH / 2 ? -12 : FH + 12 };   // off at the nearest point of the touchline, as the law asks
+		// Off to his own bench, on the near touchline by the dugout, where the new man is waiting to come on.
+		const bx = typeof benchSimX === "function" ? benchSimX(p.team) : p.x, edge = { x: clamp(bx + subWalks.length * 18, 30, FW - 30), y: FH + 12 };
 		const perf = subPerf(p.team, offName);
 		const far = Math.hypot(edge.x - p.x, edge.y - p.y);
 		// A walk off (about 0.7 of a jog) and a jog back on, each a few seconds at most.
-		const a = Math.round(clamp(far / (BASE_SPD * 0.7), 45, 240)), c = Math.round(clamp(far / (BASE_SPD * 1.1), 40, 170));
+		const a = Math.round(Math.max(clamp(far / (BASE_SPD * 0.8), 45, 330), far / 3.2)), c = Math.round(Math.max(clamp(far / (BASE_SPD * 1.15), 40, 240), far / 3.2));   // (the bench can be across the pitch: a brisk walk, never a dash)
 		subWalks.push({ p, off: offName, on: onName, at: { x: p.x, y: p.y }, edge, n: 0, perf, far, a, c, end: a + SUB_HAND + c });
 		p.name = offName;   // he walks off under his own name; the new man's comes on at the line
 		freeze = 1; freezeKind = "sub"; charging = false;

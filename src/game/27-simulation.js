@@ -191,6 +191,8 @@
 				if (timeLeft <= 0 && stall <= 0) { endMatch(); return; }
 				state = "play";
 				kickoff(lastConceded);
+				// The side that conceded is behind: the touchline camera finds their bench, frustrated (45a).
+				if (score[lastConceded] < score[1 - lastConceded] && typeof benchReact === "function") { benchReact("behind", { team: lastConceded }); }
 			}
 			return;
 		}
@@ -888,7 +890,7 @@
 			const cx = scorer === 0 ? FW - 70 : 70, cy = hero.y < FH / 2 ? 44 : FH - 44, dx = cx - hero.x, dy = cy - hero.y, L = Math.hypot(dx, dy) || 1, run = Math.min(L, plan.run || (style >= 3 ? 110 : 260));
 			// Now and then (7) he runs to his own bench instead: the subs and the manager come to meet him.
 			let toBench = null;
-			if (plan.mood !== "muted" && !own0 && !shoot && !tut && (window.__ffBenchCeleb || Math.random() < (plan.mood === "wild" ? 0.45 : 0.3)) && typeof benchSimX === "function") { style = 7; toBench = [ benchSimX(scorer), FH - 12 ]; }
+			if (plan.mood !== "muted" && !own0 && !shoot && !tut && (window.__ffBenchCeleb || (!window.__ffPlainGoal && Math.random() < (plan.mood === "wild" ? 0.45 : 0.3))) && typeof benchSimX === "function") { style = 7; toBench = [ benchSimX(scorer), FH - 12 ]; }
 			celeb = { t: 0, hero, style, mood: plan.mood, comm: plan.comm, commDone: false, sulk: plan.sulk, mgr: plan.mgr, target: toBench || [ hero.x + dx / L * run, hero.y + dy / L * run ], kneelAt: -1, posedAt: -1, fetched: plan.mood === "muted", rp: goalTimer - GOAL_CELEB };
 			if (toBench) { goalTimer += 150; }   // two seconds more: the run to the bench is a long one
 			varOnGoal(scorer);   // perhaps a VAR check (21a)

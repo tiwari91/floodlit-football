@@ -11,7 +11,7 @@
 	const VAR_LEN = 240, VAR_AT = 130;   // frames of checking (4 s), from this far into the celebration
 	function varOnGoal (scorer) {
 		varCheck = null;
-		if (shoot || tut || bulkSim || mode === "tutorial") { return; }
+		if (shoot || tut || bulkSim || mode === "tutorial" || (window.__ffPlainGoal && !window.__ffVar)) { return; }   // __ffPlainGoal: tests that time a replay
 		const by = ball.lastBy;
 		if (!by || by.team !== scorer) { return; }   // own goals are not checked
 		const P = lastPassOffside, mg = P && P.team === scorer && P.margin ? P.margin.get(by) : null, force = window.__ffVar;
