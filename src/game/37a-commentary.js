@@ -79,9 +79,10 @@
 		commWho(who);
 		$("commText").textContent = text;
 		el.style.setProperty("--comm-kit", (KITS[t] || KITS[0]).outfield);
-		// Just above the minimap (it used to sit across the lower half of it), or above the first-match hint.
-		const cm = $("coachMark"), wb = $("pitchwrap").getBoundingClientRect().bottom;
-		el.style.bottom = cm && !cm.hidden && cm.offsetHeight ? `${Math.round(wb - cm.getBoundingClientRect().top + 6)}px` : aboveRadar(6);
+		// On a desktop, at the top of the picture over the far stand (styles.css), never across the play or the
+		// minimap; on a phone (as before) just above the minimap, or above the first-match hint.
+		let phone = false; try { phone = window.matchMedia("(pointer: coarse), (max-width: 640px)").matches; } catch (e) { phone = false; }
+		if (phone) { const cm = $("coachMark"), wb = $("pitchwrap").getBoundingClientRect().bottom; el.style.bottom = cm && !cm.hidden && cm.offsetHeight ? `${Math.round(wb - cm.getBoundingClientRect().top + 6)}px` : aboveRadar(6); } else { el.style.bottom = ""; }
 		el.hidden = false; el.classList.remove("in"); void el.offsetWidth; el.classList.add("in");
 		clearTimeout(commTimer);
 		commTimer = setTimeout(() => { el.hidden = true; }, ms);
