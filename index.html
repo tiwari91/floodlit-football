@@ -20613,12 +20613,18 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 			// Render v2: a physically lit body (soft cloth and skin, the sky's light in the folds); else as before.
 			const v2 = typeof rv2 === "function" && rv2();
 			const mat = v2 ? new T.MeshStandardMaterial({ vertexColors: true, roughness: 0.72, metalness: 0, envMapIntensity: 0.9 }) : new T.MeshLambertMaterial({ vertexColors: true });
-			mat.onBeforeCompile = sh => { sh.fragmentShader = skinLight3D(sh.fragmentShader, SHIRT_LIGHT3); };
+			mat.onBeforeCompile = sh => {
+				sh.fragmentShader = skinLight3D(sh.fragmentShader, SHIRT_LIGHT3);
+				// A keeper's gloves: his hands puffed out along their normals (aPuff is 1 on a gloved hand, 0 elsewhere).
+				sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nattribute float aPuff;")
+					.replace("#include <begin_vertex>", "#include <begin_vertex>\ntransformed += normal * aPuff * 0.55;");
+			};
 			mat.customProgramCacheKey = () => (v2 ? "ff-body2" : "ff-body");
 			for (const r of rigs) {
 				const g = new T.BufferGeometry();
 				g.setAttribute("position", aPos); g.setAttribute("normal", aNor); g.setAttribute("skinIndex", aJo); g.setAttribute("skinWeight", aWe); g.setIndex(aIdx);
 				g.setAttribute("color", new T.BufferAttribute(new Float32Array(nv * 3), 3));
+				g.setAttribute("aPuff", new T.BufferAttribute(new Float32Array(nv), 1));   // gloves (paintBody3D)
 				g.boundingSphere = new T.Sphere(new T.Vector3(0, 14, 0), 40);
 				// Bind in the T-pose the body was made in: arms straight out to the sides, the root at the origin.
 				resetRig3D(r); r.sh[0].rotation.x = OUT3(0) * Math.PI / 2; r.sh[1].rotation.x = OUT3(1) * Math.PI / 2; r.root.updateMatrixWorld(true);
@@ -20719,6 +20725,8 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 		if (rig.bodyKey === key) { return; }
 		rig.bodyKey = key;
 		const C = G3.fig.C, g = rig.body.geometry, a = g.attributes.color, P = g.attributes.position, reg = rig.bodyReg;
+		const gloved = cols[6] !== cols[0], puff = g.attributes.aPuff;   // region 6 is a hand: gloved when it isn't skin
+		if (puff && rig.bodyGloved !== gloved) { rig.bodyGloved = gloved; for (let v = 0; v < reg.length; v++) { puff.array[v] = gloved && reg[v] === 6 ? 1 : 0; } puff.needsUpdate = true; }
 		const rgb = cols.map(c => { C.set(c); return [ C.r, C.g, C.b ]; }), c2 = (C.set(second || cols[1]), [ C.r, C.g, C.b ]);
 		for (let v = 0; v < reg.length; v++) {
 			let c = rgb[reg[v]];

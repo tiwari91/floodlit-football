@@ -89,7 +89,7 @@ function rigOf (n) {
 }
 const jointRig = names.map(rigOf);
 if (process.env.DEBUG) { for (const n of [ "pelvis", "spine_03", "upperarm_l", "thigh_l", "foot_l" ]) { console.log(n, jpos[n].map(x => x.toFixed(3))); } }
-const nv = P.length / 3, pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), jo = new Uint8Array(nv * 4), we = new Uint8Array(nv * 4), reg = new Uint8Array(nv);
+const nv = P.length / 3, pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), jo = new Uint8Array(nv * 4), we = new Uint8Array(nv * 4), reg = new Uint8Array(nv), topOf = new Array(nv).fill("hips");
 const headW = new Float64Array(nv);
 for (let v = 0; v < nv; v++) {
 	const p = toRig(P[v * 3], P[v * 3 + 1], P[v * 3 + 2]), n = toRig(Nn[v * 3], Nn[v * 3 + 1], Nn[v * 3 + 2]);
@@ -117,6 +117,7 @@ for (let v = 0; v < nv; v++) {
 	// The kit, from where the vertex sits (model metres) and its strongest joint: 0 skin, 1 shirt, 2 shorts, 3 sock,
 	// 4 boot, 5 arm below the sleeve (a long sleeve or skin), 6 hand (a keeper's glove or skin).
 	const top = list.length ? list[0][0] : "hips", y = p[1];
+	topOf[v] = top;
 	let R = 0;
 	if (top.startsWith("an")) { R = y < 0.14 ? 4 : 3; }   // the boot up to the ankle bone, the sock above
 	else if (top.startsWith("kn")) { R = y < 0.11 ? 4 : y < 0.47 ? 3 : 0; }
@@ -139,6 +140,61 @@ for (let v = 0; v < nv; v++) {
 	const y = P[v * 3 + 1], R = reg[v];
 	const lift = R === 1 ? 0.28 : R === 2 ? 0.32 + 0.5 * Math.max(0, Math.min(1, (0.93 - y) / 0.2)) : R === 3 ? 0.08 : 0;
 	for (let k = 0; k < 3; k++) { pos[v * 3 + k] += nor[v * 3 + k] * lift; }
+}
+// The seat of the shorts drapes over the buttocks instead of following them: behind (-x; the face is +x),
+// from the waist down to the top of the thighs, the cloth is pulled in toward the body's middle line.
+for (let v = 0; v < nv; v++) {
+	if (reg[v] !== 2 || pos[v * 3] >= 0 || pos[v * 3 + 1] < 12.2) { continue; }
+	pos[v * 3] *= 0.82;
+}
+// ... and spans the cleft between them: across the middle of the seat, no dip behind the deepest point of each band.
+{
+	const deepest = new Map(), band = y => Math.round(y * 2);
+	for (let v = 0; v < nv; v++) {
+		if (reg[v] !== 2 || pos[v * 3] >= 0 || pos[v * 3 + 1] < 12.2 || Math.abs(pos[v * 3 + 2]) > 2.6) { continue; }
+		const b = band(pos[v * 3 + 1]); deepest.set(b, Math.min(deepest.get(b) ?? 0, pos[v * 3]));
+	}
+	for (let v = 0; v < nv; v++) {
+		if (reg[v] !== 2 || pos[v * 3] >= 0 || pos[v * 3 + 1] < 12.2) { continue; }
+		const z = Math.abs(pos[v * 3 + 2]), d = deepest.get(band(pos[v * 3 + 1]));
+		if (d === undefined || z > 1.4) { continue; }
+		const w = 1 - z / 1.4, fill = d * 0.96;   // fully filled on the middle line, fading out over the cheeks
+		if (pos[v * 3] > fill) { pos[v * 3] += (fill - pos[v * 3]) * w; }
+	}
+}
+// Less of a superhero: the slope from the neck to the shoulders (the trapezius) comes down, and the upper back
+// is a little narrower. Only the shirt and its trim over the chest, spine and neck; the arms and the joints stay.
+for (let v = 0; v < nv; v++) {
+	if (reg[v] !== 1 && reg[v] !== 7) { continue; }
+	const t = topOf[v];
+	if (t !== "chest" && t !== "neck" && t !== "spine") { continue; }
+	const y = pos[v * 3 + 1], z = Math.abs(pos[v * 3 + 2]);
+	if (y < 21) { continue; }
+	const up = Math.min(1, (y - 21) / 3), mid = Math.max(0, 1 - Math.abs(z - 2.5) / 1.6);   // highest between the neck and the shoulder
+	pos[v * 3 + 1] -= 0.7 * up * mid;
+	if (z > 2.2) { pos[v * 3 + 2] *= 1 - 0.05 * up; }
+	if (pos[v * 3] < 0) { pos[v * 3] *= 1 - 0.06 * up; }   // the hump of the upper back, a little flatter
+}
+// Football shorts hang: on each thigh they are a tube that flares to the hem, not cloth painted on the leg.
+// Round each leg's axis (hip to knee, rig units) every shorts vertex is pushed out to at least a cone's radius:
+// the leg's own widest at the top, about a tenth more at the hem. Inward never; the buttocks' curve is filled.
+for (const i of [ 0, 1 ]) {
+	const A = rigPos[`hip${i}`], B = rigPos[`kn${i}`], ax = [ B[0] - A[0], B[1] - A[1], B[2] - A[2] ], L = Math.hypot(...ax), u = ax.map(c => c / L);
+	const legShorts = [];
+	for (let v = 0; v < nv; v++) {
+		if (reg[v] !== 2 || !topOf[v].startsWith(`hip${i}`)) { continue; }
+		const q = [ pos[v * 3] - A[0], pos[v * 3 + 1] - A[1], pos[v * 3 + 2] - A[2] ], t = q[0] * u[0] + q[1] * u[1] + q[2] * u[2];
+		const r = [ q[0] - u[0] * t, q[1] - u[1] * t, q[2] - u[2] * t ], d = Math.hypot(...r) || 1e-6;
+		legShorts.push({ v, t: t / L, r, d });
+	}
+	if (!legShorts.length) { continue; }
+	const tMax = Math.max(...legShorts.map(x => x.t)), dTop = Math.max(...legShorts.filter(x => x.t < tMax * 0.35).map(x => x.d), 0.1);
+	for (const x of legShorts) {
+		const f = Math.max(0, Math.min(1, x.t / (tMax || 1))), want = dTop * (0.96 + 0.14 * f);   // a cone: 96% of the top width there, 110% at the hem
+		if (x.d >= want) { continue; }
+		const k = want / x.d;
+		for (let c = 0; c < 3; c++) { pos[x.v * 3 + c] = A[c] + u[c] * x.t * L + x.r[c] * k; }
+	}
 }
 // Drop the head (the game keeps its own) and anything left on it.
 const keep = [];
