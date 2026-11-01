@@ -18234,6 +18234,7 @@ td, th { font-variant-numeric: tabular-nums; }
 			const hip = [ node(hips, 0, -1.0, -2.45), node(hips, 0, -1.0, 2.45) ], kn = hip.map(h => node(h, 0, -7.3, 0)), an = kn.map(k => node(k, 0, -6.5, 0));
 			rigs.push({ root, hips, spine, chest, neck, head, sh, el, ha, hip, kn, an });
 		}
+		loadBody3D(rigs);
 		// Real shadows (Medium and High): one light that throws no light of its own, only the players' shadows,
 		// following the camera so its shadow map is spent on what is in the picture. The grass is painted and
 		// unlit, so the shadows land on a clear sheet just above it that shows nothing but shadow.
@@ -18811,6 +18812,53 @@ td, th { font-variant-numeric: tabular-nums; }
 		else if (now > (p.exprTill || 0)) { p.exprNow = 0; }
 		return p.exprNow || 0;
 	}
+	// The modelled body (assets/body.bin, from tools/body-convert.mjs): one skinned mesh per rig, bound to the
+	// rig's own joints, so every pose the game writes drives it. It replaces the code-built torso, shorts,
+	// limbs, hands and boots; the head, face, hair and the number stay as they are. Until it has loaded (or if
+	// it cannot be fetched), the old body is drawn.
+	const BODY_SKIP3 = new Set([ "torso", "collar", "shorts", "shortLeg", "sleeve", "cuff", "armband", "arm", "hand", "leg", "band", "boot", "sole" ]);
+	function loadBody3D (rigs) {
+		if (typeof fetch !== "function") { return; }
+		fetch("assets/body.bin").then(r => (r.ok ? r.arrayBuffer() : null)).then(buf => {
+			if (!buf || !G3.fig || G3.fig.rigs !== rigs) { return; }
+			const dv = new DataView(buf);
+			if (dv.getUint32(0, true) !== 0x31424646) { return; }   // "FFB1"
+			const T = THREE, nv = dv.getUint32(4, true), ni = dv.getUint32(8, true);
+			let o = 12;
+			const take = (Arr, n, k) => { const a = new Arr(buf.slice(o, o + n * Arr.BYTES_PER_ELEMENT)); o += n * Arr.BYTES_PER_ELEMENT; return a; };
+			const pos = take(Float32Array, nv * 3), nor = take(Float32Array, nv * 3), jo = take(Uint8Array, nv * 4), we = take(Uint8Array, nv * 4), reg = take(Uint8Array, nv), idx = take(Uint16Array, ni);
+			const aPos = new T.BufferAttribute(pos, 3), aNor = new T.BufferAttribute(nor, 3), aIdx = new T.BufferAttribute(idx, 1);
+			const aJo = new T.Uint16BufferAttribute(Uint16Array.from(jo), 4), aWe = new T.Float32BufferAttribute(Float32Array.from(we, x => x / 255), 4);
+			const mat = new T.MeshLambertMaterial({ vertexColors: true });
+			mat.onBeforeCompile = sh => { sh.fragmentShader = skinLight3D(sh.fragmentShader, SHIRT_LIGHT3); };
+			mat.customProgramCacheKey = () => "ff-body";
+			for (const r of rigs) {
+				const g = new T.BufferGeometry();
+				g.setAttribute("position", aPos); g.setAttribute("normal", aNor); g.setAttribute("skinIndex", aJo); g.setAttribute("skinWeight", aWe); g.setIndex(aIdx);
+				g.setAttribute("color", new T.BufferAttribute(new Float32Array(nv * 3), 3));
+				g.boundingSphere = new T.Sphere(new T.Vector3(0, 14, 0), 40);
+				// Bind in the T-pose the body was made in: arms straight out to the sides, the root at the origin.
+				resetRig3D(r); r.sh[0].rotation.x = OUT3(0) * Math.PI / 2; r.sh[1].rotation.x = OUT3(1) * Math.PI / 2; r.root.updateMatrixWorld(true);
+				const bones = [ r.hips, r.spine, r.chest, r.neck, r.head, r.sh[0], r.el[0], r.ha[0], r.sh[1], r.el[1], r.ha[1], r.hip[0], r.kn[0], r.an[0], r.hip[1], r.kn[1], r.an[1] ];
+				const m = new T.SkinnedMesh(g, mat);
+				m.bindMode = T.DetachedBindMode; m.bind(new T.Skeleton(bones), new T.Matrix4());
+				m.frustumCulled = false; m.castShadow = true; m.visible = false; m.matrixAutoUpdate = false;
+				resetRig3D(r);
+				r.body = m; r.bodyReg = reg; r.bodyKey = "";
+				G3.scene.add(m);
+			}
+			G3.fig.body = true;
+		}).catch(() => {});
+	}
+	// Paint a body's kit: skin, shirt, shorts, socks, boots (the region of each vertex, from the converter).
+	function paintBody3D (rig, cols) {
+		const key = cols.join("|");
+		if (rig.bodyKey === key) { return; }
+		rig.bodyKey = key;
+		const C = G3.fig.C, a = rig.body.geometry.attributes.color, reg = rig.bodyReg, rgb = cols.map(c => { C.set(c); return [ C.r, C.g, C.b ]; });
+		for (let v = 0; v < reg.length; v++) { const c = rgb[reg[v]]; a.setXYZ(v, c[0], c[1], c[2]); }
+		a.needsUpdate = true;
+	}
 	function commitFigure3D (rig, lk, kit, num) {
 		const F = G3.fig, M = F.M, C = F.C;
 		if (F.n >= MAXF3) { return; }
@@ -18824,7 +18872,13 @@ td, th { font-variant-numeric: tabular-nums; }
 		// His own shade of skin within his tone (a little warmer or cooler, lighter or darker), fixed by his look.
 		if (!lk.skin3) { const h = hashStr(`${lk.skin}|${lk.face}|${lk.hair}|${lk.name || ""}skin`), u = k => ((h >>> (k * 7)) % 101) / 100 - 0.5; lk.skin3 = "#" + new THREE.Color(lk.skin).offsetHSL(u(0) * 0.03, u(1) * 0.12, u(2) * 0.07).getHexString(); }
 		const skin = lk.skin3;
+		const body = rig.body && !rig.shirtHead ? rig.body : null;   // the shirt pulled over his head keeps the old body for now
+		if (body) {
+			body.visible = true;
+			paintBody3D(rig, [ skin, kit.shirt, kit.shorts, kit.socks || kit.shirt, kit.boots || "#1a1a1a" ]);
+		}
 		for (const [ name, joint, side ] of PART_PLAN3) {
+			if (body && BODY_SKIP3.has(name)) { continue; }
 			const mesh = F.parts[name], node = side === undefined ? rig[joint] : rig[joint][side];
 			let mtx = node.matrixWorld;
 			if (name === "hair") {
@@ -19499,6 +19553,7 @@ td, th { font-variant-numeric: tabular-nums; }
 	function drawFigures3D (WX, WD) {
 		const F = G3.fig;
 		for (const k in F.parts) { F.cnt[k] = 0; }
+		for (const rg of F.rigs) { if (rg.body) { rg.body.visible = false; } }   // shown again by commitFigure3D for each figure drawn
 		// Each side's captain, chosen once per match; if he goes off the armband passes to the next in line.
 		// Yours is the man on the pitch with the best season (see captainScore); theirs, and yours outside a
 		// league, the best passer and defender together.

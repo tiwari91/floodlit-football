@@ -124,6 +124,7 @@
 	function drawFigures3D (WX, WD) {
 		const F = G3.fig;
 		for (const k in F.parts) { F.cnt[k] = 0; }
+		for (const rg of F.rigs) { if (rg.body) { rg.body.visible = false; } }   // shown again by commitFigure3D for each figure drawn
 		// Each side's captain, chosen once per match; if he goes off the armband passes to the next in line.
 		// Yours is the man on the pitch with the best season (see captainScore); theirs, and yours outside a
 		// league, the best passer and defender together.

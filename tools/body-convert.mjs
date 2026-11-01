@@ -55,13 +55,13 @@ for (const i of [ 0, 1 ]) {
 	rigPos[`hip${i}`] = [ 0, 14.6, S[i] * 2.45 ]; rigPos[`kn${i}`] = [ 0, 7.3, S[i] * 2.45 ]; rigPos[`an${i}`] = [ 0, 0.8, S[i] * 2.45 ];
 }
 // Each rig joint: the model joint it is measured from, and its scale on the rig's x (forward), y, z.
-const K = 16;   // rig units per metre for the body's girth
+const K = 15.2;   // rig units per metre for the body's girth (a little under true scale: the free pack's body is a superhero's)
 const sideName = (b, i) => `${b}_${i ? "r" : "l"}`;
 const span = (a, b, ours) => Math.abs(ours) / Math.max(1e-6, Math.hypot(...jpos[b].map((v, k) => v - jpos[a][k])));
 const MAP = {
 	hips: { from: "pelvis", s: [ K, K, 18 ] },
 	spine: { from: "spine_01", s: [ K, 5.4 / (jpos.spine_03[1] - jpos.spine_01[1]), K * 1.08 ] },
-	chest: { from: "spine_03", s: [ K, 3.6 / (jpos.neck_01[1] - jpos.spine_03[1]), 19 ] },
+	chest: { from: "spine_03", s: [ K, 3.6 / (jpos.neck_01[1] - jpos.spine_03[1]), 18 ] },
 	neck: { from: "neck_01", s: [ K, 1.55 / (jpos.Head[1] - jpos.neck_01[1]), K ] }
 };
 for (const i of [ 0, 1 ]) {
@@ -70,7 +70,7 @@ for (const i of [ 0, 1 ]) {
 	MAP[`ha${i}`] = { from: sideName("hand", i), s: [ K * 1.05, K * 1.05, K * 1.05 ] };
 	MAP[`hip${i}`] = { from: sideName("thigh", i), s: [ K, span(sideName("thigh", i), sideName("calf", i), 7.3), K ] };
 	MAP[`kn${i}`] = { from: sideName("calf", i), s: [ K, span(sideName("calf", i), sideName("foot", i), 6.5), K ] };
-	MAP[`an${i}`] = { from: sideName("foot", i), s: [ K, 0.8 / jpos[sideName("foot", i)][1], K ] };
+	MAP[`an${i}`] = { from: sideName("foot", i), s: [ K * 1.05, 11, K ] };   // the boot a touch flatter than true so the ankle sits at the rig's height
 }
 // Which rig joint each model joint drives.
 function rigOf (n) {
@@ -120,10 +120,15 @@ for (let v = 0; v < nv; v++) {
 	if (top.startsWith("an")) { R = y < 0.115 ? 4 : 3; }
 	else if (top.startsWith("kn")) { R = y < 0.47 ? 3 : 0; }
 	else if (top.startsWith("hip")) { R = y > 0.70 ? 2 : 0; }
-	else if (top === "hips") { R = y < 1.0 ? 2 : 1; }
-	else if (top === "spine" || top === "chest") { R = 1; }
+	else if (top === "hips" || top === "spine" || top === "chest") { R = y < 0.955 ? 2 : 1; }   // one clean line at the waist
 	else if (top.startsWith("sh")) { const i = +top[2], d = Math.abs(p[2] - jpos[sideName("upperarm", i)][2]); R = d < 0.13 ? 1 : 0; }
 	reg[v] = R;
+}
+// The kit sits off the skin: the shirt a little, the shorts more (loose, and wider toward the hem).
+for (let v = 0; v < nv; v++) {
+	const y = P[v * 3 + 1], R = reg[v];
+	const lift = R === 1 ? 0.28 : R === 2 ? 0.32 + 0.5 * Math.max(0, Math.min(1, (0.93 - y) / 0.2)) : R === 3 ? 0.08 : 0;
+	for (let k = 0; k < 3; k++) { pos[v * 3 + k] += nor[v * 3 + k] * lift; }
 }
 // Drop the head (the game keeps its own) and anything left on it.
 const keep = [];
