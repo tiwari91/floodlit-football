@@ -1506,3 +1506,7 @@ td, th { font-variant-numeric: tabular-nums; }
 	#intro.out { opacity: 0; pointer-events: none; }
 	@keyframes introPulse { 50% { opacity: .55; } }
 	@media (prefers-reduced-motion: reduce) { #intro .intro-card p { animation: none; } }
+
+/* A broadcast lens: the corners of the 3D picture a little darker (ff-vignette). */
+.pitchwrap.v3::after { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 2; border-radius: inherit;
+	background: radial-gradient(ellipse 75% 70% at 50% 52%, transparent 62%, rgba(0, 0, 0, 0.28) 100%); }

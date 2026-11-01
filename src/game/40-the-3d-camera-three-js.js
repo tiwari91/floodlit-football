@@ -73,6 +73,7 @@
 	function show3D (on) {
 		if (!canvas3d) { return; }
 		canvas3d.hidden = !on;
+		const wrap = $("pitchwrap"); if (wrap) { wrap.classList.toggle("v3", !!on); }   // the broadcast lens over the 3D picture (styles.css)
 		if (on) { resize3D(); }
 	}
 	function resize3D () {
@@ -413,6 +414,26 @@
 						${kind === 2 ? "float cp = mod(floor(q.x / (ffPitch.x / 12.0)) + floor(q.y / (ffPitch.y / 8.0)), 2.0); sheen = cp > 0.5 ? v2.y : v2.x;" : ""}
 						${kind === 3 ? "vec2 dq = q - ffPitch.xy * 0.5; float u = (dq.x + dq.y) * 0.7071; sheen = (1.0 - 2.0 * mod(floor(u / ffPitch.w), 2.0)) * dot(v2, vec2(-0.7071, 0.7071));" : ""}
 						diffuseColor.rgb *= 1.0 + 0.075 * sheen * inP;
+						// What a season does to a pitch, seen from the gantry: big soft patches lighter and darker, and the
+						// worn ground in both goalmouths, round the penalty spots and in the centre circle (yellowed in the
+						// dry, mud in the wet), with ragged edges.
+						{
+							float b1 = ffGn(q * 0.012), b2 = ffGn(q * 0.031 + 7.0), rag = ffGn(q * 0.09 + 3.0);
+							diffuseColor.rgb *= 1.0 + inP * (0.07 * (b1 - 0.5) + 0.04 * (b2 - 0.5));
+							vec2 c = ffPitch.xy * 0.5; float gw = ffPitch.y * 0.14, gd = ffPitch.x * 0.05, ps = ffPitch.x * 0.105;
+							float wear = 0.0;
+							for (int e = 0; e < 2; e++) {
+								float gx = e == 0 ? 0.0 : ffPitch.x, dir = e == 0 ? 1.0 : -1.0;
+								vec2 m = vec2((q.x - (gx + dir * gd * 0.7)) / (gd * 1.25), (q.y - c.y) / gw);
+								wear = max(wear, 1.0 - smoothstep(0.35, 1.0, length(m)));
+								vec2 sp = vec2(q.x - (gx + dir * ps), q.y - c.y);
+								wear = max(wear, 0.8 * (1.0 - smoothstep(6.0, 26.0, length(sp))));
+							}
+							wear = max(wear, 0.55 * (1.0 - smoothstep(10.0, 55.0, length(q - c))));
+							wear *= smoothstep(0.25, 0.75, rag + 0.25 * wear) * inP;
+							vec3 worn = ${cond.wet || cond.snow ? "vec3(0.36, 0.29, 0.19)" : "diffuseColor.rgb * vec3(1.18, 1.02, 0.58)"};
+							diffuseColor.rgb = mix(diffuseColor.rgb, worn, wear * ${cond.wet ? "0.7" : "0.5"});
+						}
 						${detail ? `float near = 1.0 - smoothstep(120.0, 620.0, dist);
 						if (near > 0.0) {
 							float g1 = ffGn(q * vec2(1.9, 0.55)), g2 = ffGn(q * vec2(0.6, 2.3) + 13.0), g3 = ffGn(q * 0.11);
@@ -420,7 +441,7 @@
 						}` : ""}
 					}`);
 		};
-		mat.customProgramCacheKey = () => `${prevKey}|ff-grass${kind}${detail ? "d" : ""}`;
+		mat.customProgramCacheKey = () => `${prevKey}|ff-grass${kind}${detail ? "d" : ""}${cond.wet ? "w" : ""}${cond.snow ? "s" : ""}`;
 	}
 	// An afternoon in the sun: the stands' shadow on the grass, painted into the pitch picture once (no cost
 	// per frame). The sun comes over the near stand (as the players' shadows say); the sunlit part of the pitch
