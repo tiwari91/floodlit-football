@@ -1384,7 +1384,7 @@
 		for (let j = 0; j < 17; j++) {
 			animQ3(k[0], u, j, q0);
 			if (k[2] > 0) { q0.slerp(animQ3(k[1], u, j, q1), k[2]); }
-			const side = j >= 14 ? 1 : 0, wj = w * ANIM_W3[j] * (j >= 11 && G && G.feet && G.feet[side] && G.feet[side].st ? 0 : 1);
+			const side = j >= 14 ? 1 : 0, ft = j >= 11 && G && G.feet ? G.feet[side] : null, wj = w * ANIM_W3[j] * (j < 11 ? 1 : !ft || ft.st ? 0 : Math.sin(Math.PI * clamp(ft.sv || 0, 0, 1)));   // the swinging leg only, faded in after it lifts and out before it lands
 			bones[j].quaternion.slerp(q0, wj);
 		}
 		r.neck.rotation.z -= (r.spine.rotation.z + r.chest.rotation.z - lean0) * 0.85;   // the head stays up: the neck takes back most of any extra lean

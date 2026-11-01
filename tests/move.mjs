@@ -636,16 +636,18 @@ const limbs = await page.evaluate(() => {
 	return out;
 });
 check("modelled body: every man drawn has one, its boots at his ankles and its hands at his wrists, knees bent or not", limbs.body && limbs.n > 20 && limbs.shown > 20 && limbs.bent > 0 && limbs.worstLeg < 4.5 && limbs.worstArm < 4, JSON.stringify(limbs));
-// Body types: a target man is drawn taller than a pace merchant in the same position (whatever their own seeds).
+// Body types: the same man is drawn taller as a target man than as a pace merchant.
 const bodies = await page.evaluate(async () => {
 	const F = window.__ff, G3 = F.G3, tick = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 	const ps = F.players.filter(p => p.team === 0 && p.role === "mid" && G3.fig.rigOf.get(p)).slice(0, 2);
 	if (ps.length < 2) { return { skip: ps.length }; }
 	const keep = ps.map(p => p.trait);
-	ps[0].trait = "target"; ps[1].trait = "pace"; await tick();
-	const h = ps.map(p => { const r = G3.fig.rigOf.get(p); return r ? +r.root.scale.y.toFixed(3) : 0; });
+	// the same man as a target man and as a pace merchant (two men's own builds could hide the trait)
+	const hOf = () => { const r = G3.fig.rigOf.get(ps[0]); return r ? +r.root.scale.y.toFixed(3) : 0; };
+	ps[0].trait = "target"; await tick(); const tall = hOf();
+	ps[0].trait = "pace"; await tick(); const small = hOf();
 	ps.forEach((p, i) => { p.trait = keep[i]; });
-	return { tall: h[0], small: h[1] };
+	return { tall, small };
 });
 check("body types: a target man stands taller than a pace merchant", bodies.tall > bodies.small + 0.05, JSON.stringify(bodies));
 // Real shadows: on High the shadow light casts and is aimed into the picture, the ball casts too, and at night
