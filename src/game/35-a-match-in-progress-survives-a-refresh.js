@@ -197,6 +197,7 @@
 		if (leagueMatch && !leagueMatch.intl && seasonDone() && standings()[0].id === 0) { celebrateTrophy("league trophy"); }
 		if (typeof trophyDue === "function") { trophyDue(); }   // a cup won on the night
 		$("ovHelp").hidden = false;
+		if (!wasSim && !watchFix && typeof askFeedback === "function") { askFeedback(leagueMatch ? "league match" : "friendly"); }
 		renderReport();
 		if (leagueMatch) { offerSeasonSim(); }
 		pauseBtn.textContent = "Pause";
@@ -239,6 +240,7 @@
 		$("ovQuick").hidden = true;
 		$("ovHelp").hidden = true;
 		$("ovLearn").hidden = true;
+		if ($("ovFeedback")) { $("ovFeedback").hidden = true; }
 		ovCard()?.classList.toggle("wide", false);
 		ovStats.replaceChildren();
 		ovStats.hidden = !statRows;
