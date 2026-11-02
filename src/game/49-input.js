@@ -2,7 +2,12 @@
 	const GAME_KEYS = new Set([ "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Space", "KeyA", "KeyS", "KeyD", "KeyW", "KeyQ", "KeyE", "KeyT", "KeyX", "Digit1", "Digit2", "Digit3", "Digit4", "Tab" ]);
 
 	window.addEventListener("keydown", e => {
-		if (e.target instanceof HTMLSelectElement) { return; }
+		if (e.target instanceof HTMLSelectElement) {
+			// A drop-down you just used (tactics, formation) keeps the focus; during play the keys are the
+			// match's, not the menu's, or your player would stop answering the arrows.
+			if (!((state === "play" || state === "goal") && GAME_KEYS.has(e.code))) { return; }
+			e.target.blur();
+		}
 		if (!$("howto").hidden) {
 			if (e.code === "Escape" || e.code === "KeyH" || e.key === "?") { e.preventDefault(); closeHowto(); }
 			return;

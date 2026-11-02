@@ -9,6 +9,9 @@
 	const IDENT_KEYS = [ "name", "short", "color", "color2", "text", "ink", "ground", "surface" ];
 	const identOf = t => Object.fromEntries(IDENT_KEYS.map(k => [ k, t[k] ]));
 	const DEFAULT_IDENT = TEAMS.map(identOf);
+	// Your first club's short name is "You". Leave it for another job and it plays on as a computer side,
+	// so it needs a name of its own on the scoreboard, or the match reads "You 0-0 You".
+	const ownShort = t => { if (t && t !== YOU && t.short === "You") { t.short = String(t.name || "Home").split(" ")[0]; } };
 	function rememberIdentity (lg) {
 		if (!lg) { return; }
 		if (typeof intlRestoreYou === "function") { intlRestoreYou(); }   // never bake a national kit into your club (18j)
@@ -23,7 +26,7 @@
 		TEAMS.forEach((t, i) => Object.assign(t, DEFAULT_IDENT[i]));
 		if (lg && lg.ident && typeof lg.ident === "object") {
 			if (lg.ident.you) { Object.assign(YOU, lg.ident.you); }
-			for (const [ i, id ] of Object.entries(lg.ident.clubs || {})) { if (TEAMS[i] && Number(i) !== 0) { Object.assign(TEAMS[i], id); } }
+			for (const [ i, id ] of Object.entries(lg.ident.clubs || {})) { if (TEAMS[i] && Number(i) !== 0) { Object.assign(TEAMS[i], id); ownShort(TEAMS[i]); } }
 		}
 		if (typeof applyEditsOnLoad === "function") { applyEditsOnLoad(lg); }   // option-file edits on top (18g)
 	}
@@ -204,7 +207,7 @@
 		if (typeof stripClubEdits === "function") { stripClubEdits(); }   // swap the plain identities; edits go back on after (18g)
 		const to = TEAMS[id], from = { ...YOU }, oldStr = yourStr(), theirs = cpuSquad(id, offer.str);   // their eleven, found by their own name (a league file's players, 18h)
 		// The two clubs trade identities: you wear theirs now; your old side keeps its name and your old squad's strength.
-		for (const k of [ "name", "short", "color", "color2", "ground", "surface" ]) { YOU[k] = to[k]; to[k] = from[k]; }
+		for (const k of [ "name", "short", "color", "color2", "ground", "surface" ]) { YOU[k] = to[k]; to[k] = from[k]; } ownShort(to);
 		lg.clubStr[id] = oldStr;
 		rememberIdentity(lg);
 		const c = inheritSetup(newClub(), lg.club, offer.str), base = cpuOvr(offer.str);

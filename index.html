@@ -5777,6 +5777,9 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 	const IDENT_KEYS = [ "name", "short", "color", "color2", "text", "ink", "ground", "surface" ];
 	const identOf = t => Object.fromEntries(IDENT_KEYS.map(k => [ k, t[k] ]));
 	const DEFAULT_IDENT = TEAMS.map(identOf);
+	// Your first club's short name is "You". Leave it for another job and it plays on as a computer side,
+	// so it needs a name of its own on the scoreboard, or the match reads "You 0-0 You".
+	const ownShort = t => { if (t && t !== YOU && t.short === "You") { t.short = String(t.name || "Home").split(" ")[0]; } };
 	function rememberIdentity (lg) {
 		if (!lg) { return; }
 		if (typeof intlRestoreYou === "function") { intlRestoreYou(); }   // never bake a national kit into your club (18j)
@@ -5791,7 +5794,7 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 		TEAMS.forEach((t, i) => Object.assign(t, DEFAULT_IDENT[i]));
 		if (lg && lg.ident && typeof lg.ident === "object") {
 			if (lg.ident.you) { Object.assign(YOU, lg.ident.you); }
-			for (const [ i, id ] of Object.entries(lg.ident.clubs || {})) { if (TEAMS[i] && Number(i) !== 0) { Object.assign(TEAMS[i], id); } }
+			for (const [ i, id ] of Object.entries(lg.ident.clubs || {})) { if (TEAMS[i] && Number(i) !== 0) { Object.assign(TEAMS[i], id); ownShort(TEAMS[i]); } }
 		}
 		if (typeof applyEditsOnLoad === "function") { applyEditsOnLoad(lg); }   // option-file edits on top (18g)
 	}
@@ -5972,7 +5975,7 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 		if (typeof stripClubEdits === "function") { stripClubEdits(); }   // swap the plain identities; edits go back on after (18g)
 		const to = TEAMS[id], from = { ...YOU }, oldStr = yourStr(), theirs = cpuSquad(id, offer.str);   // their eleven, found by their own name (a league file's players, 18h)
 		// The two clubs trade identities: you wear theirs now; your old side keeps its name and your old squad's strength.
-		for (const k of [ "name", "short", "color", "color2", "ground", "surface" ]) { YOU[k] = to[k]; to[k] = from[k]; }
+		for (const k of [ "name", "short", "color", "color2", "ground", "surface" ]) { YOU[k] = to[k]; to[k] = from[k]; } ownShort(to);
 		lg.clubStr[id] = oldStr;
 		rememberIdentity(lg);
 		const c = inheritSetup(newClub(), lg.club, offer.str), base = cpuOvr(offer.str);
@@ -16487,7 +16490,7 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 			if (o.team !== crowd.oleTeam || !o.recv || state !== "play") { crowd.oleTeam = o.team; crowd.oleN = 0; }
 			else {
 				crowd.oleN = (crowd.oleN || 0) + 1;
-				if (crowd.oleN >= 5 && crowdHush <= 0) { oleChant(crowd.oleN, o.team !== homeSide); crowd.nextChant = Math.max(crowd.nextChant, t + 6); }
+				// (no sung "olé" on every pass: it started and stopped with each touch; the message on screen stays)
 			}
 			crowd.oleLast = o;
 		}
@@ -24199,7 +24202,12 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 	const GAME_KEYS = new Set([ "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Space", "KeyA", "KeyS", "KeyD", "KeyW", "KeyQ", "KeyE", "KeyT", "KeyX", "Digit1", "Digit2", "Digit3", "Digit4", "Tab" ]);
 
 	window.addEventListener("keydown", e => {
-		if (e.target instanceof HTMLSelectElement) { return; }
+		if (e.target instanceof HTMLSelectElement) {
+			// A drop-down you just used (tactics, formation) keeps the focus; during play the keys are the
+			// match's, not the menu's, or your player would stop answering the arrows.
+			if (!((state === "play" || state === "goal") && GAME_KEYS.has(e.code))) { return; }
+			e.target.blur();
+		}
 		if (!$("howto").hidden) {
 			if (e.code === "Escape" || e.code === "KeyH" || e.key === "?") { e.preventDefault(); closeHowto(); }
 			return;

@@ -482,7 +482,7 @@
 			if (o.team !== crowd.oleTeam || !o.recv || state !== "play") { crowd.oleTeam = o.team; crowd.oleN = 0; }
 			else {
 				crowd.oleN = (crowd.oleN || 0) + 1;
-				if (crowd.oleN >= 5 && crowdHush <= 0) { oleChant(crowd.oleN, o.team !== homeSide); crowd.nextChant = Math.max(crowd.nextChant, t + 6); }
+				// (no sung "olé" on every pass: it started and stopped with each touch; the message on screen stays)
 			}
 			crowd.oleLast = o;
 		}
