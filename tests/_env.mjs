@@ -19,10 +19,22 @@ export function serve (port) {
 	// else's build to this test: step on to the first free one instead.
 	const free = q => spawnSync("python3", [ "-c", `import socket\ns=socket.socket()\ntry:\n    s.bind(("127.0.0.1", ${q}))\nexcept OSError:\n    raise SystemExit(1)` ]).status === 0;
 	for (let k = 0; k < 40 && !free(port); k++) { port += 97; }
-	const server = spawn("python3", [ "-m", "http.server", String(port), "--bind", "127.0.0.1", "--directory", root ], { stdio: "ignore" });
+	// The server watches the test that started it and shuts down once that test is gone, however it ends
+	// (finished, crashed, Ctrl+C, timeout or kill -9), so no server is ever left running after a test.
+	const watch = `import functools, http.server, os, threading, time
+ppid = os.getppid()
+h = functools.partial(http.server.SimpleHTTPRequestHandler, directory=${JSON.stringify(root)})
+s = http.server.ThreadingHTTPServer(("127.0.0.1", ${port}), h)
+threading.Thread(target=s.serve_forever, daemon=True).start()
+while os.getppid() == ppid:
+    time.sleep(0.5)`;
+	const server = spawn("python3", [ "-c", watch ], { stdio: "ignore" });
+	server.unref();   // the server alone never keeps a finished test from exiting
+	const stop = () => { try { server.kill(); } catch (e) { /* already gone */ } };
+	process.once("exit", stop);   // and stop it straight away on a normal exit, without waiting for the watch
 	// Wait (up to 10 s) until the server answers, so the first page.goto never races its start-up.
 	spawnSync("python3", [ "-c", `import socket,time\nfor _ in range(200):\n    try:\n        socket.create_connection(("127.0.0.1", ${port}), 0.2).close(); break\n    except OSError: time.sleep(0.05)` ]);
-	return { url: `http://127.0.0.1:${port}/index.html?test`, stop: () => server.kill() };
+	return { url: `http://127.0.0.1:${port}/index.html?test`, stop, close: stop };
 }
 export function launch () {
 	return chromium.launch({ executablePath: CHROME, headless: true, args: [ "--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist", "--autoplay-policy=no-user-gesture-required" ] });
