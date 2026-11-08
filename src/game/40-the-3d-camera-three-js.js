@@ -523,6 +523,105 @@
 		}
 		S.tex.needsUpdate = true;
 	}
+	// Match-day kit round the pitch: free models from Polyfork (https://polyfork.dev, CC BY 4.0, credits in
+	// assets/polyfork/README.md). Fetched once, the first time a ground is built (never on Light), read here
+	// (a few meshes each, colours on the vertices, no textures, sizes in metres) and merged at true size into
+	// two meshes: the near side's (by the dugouts, hidden with them) and the rest.
+	const PROPS3 = { lib: null, busy: false, files: { crate: "water-bottle-crate-78c8db", bag: "kit-bag-7d617f", stretcher: "touchline-stretcher-f08e97", trolley: "goal-net-trolley-f5bd28", cart: "ball-cart-8274fd", bin: "ball-bin-3198fe" } };
+	// A .glb file as flat triangle lists { pos, nor, col }: centred on its footprint, standing on y = 0, in metres.
+	function glb3 (buf) {
+		const dv = new DataView(buf);
+		if (dv.getUint32(0, true) !== 0x46546C67) { throw new Error("not a .glb"); }
+		let json = null, bin = null;
+		for (let o = 12; o + 8 <= buf.byteLength;) {
+			const len = dv.getUint32(o, true), type = dv.getUint32(o + 4, true);
+			if (type === 0x4E4F534A) { json = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, o + 8, len))); }
+			else if (type === 0x004E4942) { bin = new DataView(buf, o + 8, len); }
+			o += 8 + len;
+		}
+		const GET = { 5120: [ "getInt8", 1, 127 ], 5121: [ "getUint8", 1, 255 ], 5122: [ "getInt16", 2, 32767 ], 5123: [ "getUint16", 2, 65535 ], 5125: [ "getUint32", 4, 1 ], 5126: [ "getFloat32", 4, 1 ] };
+		const read = i => {
+			const a = json.accessors[i], v = json.bufferViews[a.bufferView], n = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4 }[a.type], [ fn, es, div ] = GET[a.componentType];
+			const stride = v.byteStride || n * es, base = (v.byteOffset || 0) + (a.byteOffset || 0), out = new Float32Array(a.count * n), k = a.normalized ? div : 1;
+			for (let e = 0; e < a.count; e++) { for (let c = 0; c < n; c++) { out[e * n + c] = bin[fn](base + e * stride + c * es, true) / k; } }
+			return { d: out, n };
+		};
+		const pos = [], nor = [], col = [], V = new THREE.Vector3(), N3 = new THREE.Matrix3();
+		const walk = (ni, parent) => {
+			const nd = json.nodes[ni], M = new THREE.Matrix4();
+			if (nd.matrix) { M.fromArray(nd.matrix); }
+			else { M.compose(new THREE.Vector3().fromArray(nd.translation || [ 0, 0, 0 ]), new THREE.Quaternion().fromArray(nd.rotation || [ 0, 0, 0, 1 ]), new THREE.Vector3().fromArray(nd.scale || [ 1, 1, 1 ])); }
+			M.premultiply(parent);
+			if (nd.mesh !== undefined) {
+				N3.getNormalMatrix(M);
+				const flip = M.determinant() < 0;   // a mirrored part: turn its triangles back the right way out
+				for (const p of json.meshes[nd.mesh].primitives) {
+					const mt = json.materials && json.materials[p.material], f = (mt && mt.pbrMetallicRoughness && mt.pbrMetallicRoughness.baseColorFactor) || [ 1, 1, 1, 1 ];
+					if ((p.mode !== undefined && p.mode !== 4) || (mt && mt.alphaMode === "BLEND")) { continue; }
+					const P = read(p.attributes.POSITION).d, Nn = p.attributes.NORMAL !== undefined ? read(p.attributes.NORMAL).d : null, C = p.attributes.COLOR_0 !== undefined ? read(p.attributes.COLOR_0) : null;
+					const idx = p.indices !== undefined ? read(p.indices).d : Array.from({ length: P.length / 3 }, (_, i) => i);
+					for (let t = 0; t + 2 < idx.length; t += 3) {
+						const tri = flip ? [ idx[t], idx[t + 2], idx[t + 1] ] : [ idx[t], idx[t + 1], idx[t + 2] ], w = [];
+						for (const e of tri) { V.fromArray(P, e * 3).applyMatrix4(M); w.push(V.x, V.y, V.z); }
+						pos.push(...w);
+						if (Nn) { for (const e of tri) { V.fromArray(Nn, e * 3).applyMatrix3(N3).normalize(); nor.push(V.x, V.y, V.z); } }
+						else {
+							const ux = w[3] - w[0], uy = w[4] - w[1], uz = w[5] - w[2], vx = w[6] - w[0], vy = w[7] - w[1], vz = w[8] - w[2];
+							V.set(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx).normalize(); nor.push(V.x, V.y, V.z, V.x, V.y, V.z, V.x, V.y, V.z);
+						}
+						for (const e of tri) { for (let c = 0; c < 3; c++) { col.push((C ? C.d[e * C.n + c] : 1) * f[c]); } }
+					}
+				}
+			}
+			for (const c of nd.children || []) { walk(c, M); }
+		};
+		const scene = json.scenes ? json.scenes[json.scene || 0].nodes : json.nodes.map((_, i) => i);
+		for (const ni of scene) { walk(ni, new THREE.Matrix4()); }
+		const lo = [ Infinity, Infinity, Infinity ], hi = [ -Infinity, -Infinity, -Infinity ];
+		for (let i = 0; i < pos.length; i++) { lo[i % 3] = Math.min(lo[i % 3], pos[i]); hi[i % 3] = Math.max(hi[i % 3], pos[i]); }
+		const sh = [ (lo[0] + hi[0]) / 2, lo[1], (lo[2] + hi[2]) / 2 ];
+		for (let i = 0; i < pos.length; i++) { pos[i] -= sh[i % 3]; }
+		return { pos, nor, col };
+	}
+	function loadProps3D () {
+		if (PROPS3.lib || PROPS3.busy || typeof fetch !== "function") { return; }
+		PROPS3.busy = true;   // one try a page: a file that will not load is not fetched again every match
+		const names = Object.keys(PROPS3.files);
+		Promise.all(names.map(n => fetch(`assets/polyfork/${PROPS3.files[n]}.glb`).then(r => { if (!r.ok) { throw new Error(`${n}: ${r.status}`); } return r.arrayBuffer(); }).then(glb3)))
+			.then(parts => {
+				const lib = {};
+				names.forEach((n, i) => { lib[n] = parts[i]; });
+				PROPS3.lib = lib;
+				if (G3.stadium) { propsInto3D(G3.stadium); }
+			})
+			.catch(e => { console.warn("Polyfork props not loaded:", e && e.message); });
+	}
+	// The kit, into a ground built with a list of where it goes (once, and only into the ground still standing).
+	function propsInto3D (st) {
+		const at = st.userData.propsAt, lib = PROPS3.lib;
+		if (!at || !lib || st.userData.propsIn || st !== G3.stadium) { return; }
+		st.userData.propsIn = true;
+		const K = 55 * Z3 / 2.44, material = new THREE.MeshLambertMaterial({ vertexColors: true });   // pitch units a metre: the crossbar is 2.44 m
+		let first = true;
+		for (const side of [ "near", "far" ]) {
+			const A = acc3();
+			for (const [ n, x, z, ry ] of at[side]) {
+				const p = lib[n], c = Math.cos(ry), s = Math.sin(ry);
+				for (let i = 0; i < p.pos.length; i += 3) {
+					const px = p.pos[i] * K, pz = p.pos[i + 2] * K, nx = p.nor[i], nz = p.nor[i + 2];
+					A.pos.push(x + px * c + pz * s, p.pos[i + 1] * K, z - px * s + pz * c);
+					A.nor.push(nx * c + nz * s, p.nor[i + 1], -nx * s + nz * c);
+					A.col.push(p.col[i], p.col[i + 1], p.col[i + 2]);
+				}
+			}
+			const m = meshAcc3(A, material);
+			if (!m) { continue; }
+			m.userData.ownMat = first; first = false; m.userData.props = side;
+			st.add(m);
+			if (side === "near") { G3.nearRoof.push(m); m.visible = G3.showNear !== false; }
+		}
+		if (first) { material.dispose(); }
+	}
 	function buildStadium3D () {
 		const t0 = performance.now();
 		const gs = gstyle || { mow: "stripes", roof: true, lights: "roof", fill: 0.8, seat: "#3b4a58", concrete: "#1b2520", steps: "#262f21", arch: "azteca" };
@@ -1142,6 +1241,22 @@
 			seat.scale.set(dw - 6, 1.6, 6); seat.position.set(cx, 7, FH + F_SIDE3 + 5); st.add(seat);
 			G3.nearRoof.push(dug, roof, seat); dug.userData.dugout = cx;
 		}
+		// 4a. The match-day kit (Polyfork models, above), at true size: water crates in front of each dugout and
+		// kit bags under its canopy; a crate at each end of the far warm-up strip; and behind the goals, between
+		// the ball kid by the corner and the photographers, a ball bin, the goal-net trolley, the stretcher and the
+		// ball cart, each only where it fits (on the smallest pitch the photographers fill the ends).
+		if (gfxLevel !== "light") {
+			const near = [], far = [ [ "crate", 36, -6, 0.3 ], [ "crate", FW - 36, -6, -0.4 ] ];
+			for (const cx of [ FW / 2 - dw * 0.62 - 20, FW / 2 + dw * 0.62 + 20 ]) {
+				near.push([ "crate", cx - dw / 2 + 8, FH + 9, 0.25 ], [ "crate", cx + dw / 2 - 8, FH + 9, -0.2 ], [ "bag", cx - dw * 0.28, FH + F_SIDE3 - 4, 0.1 ], [ "bag", cx + dw * 0.3, FH + F_SIDE3 - 4, Math.PI - 0.15 ]);
+			}
+			const lo = FH * 0.1 + 14, hi = FH / 2 - 242, mid = (lo + hi) / 2;   // past the ball kid, short of the outermost photographer
+			for (const [ n, x, top, len, ry ] of [ [ "bin", -26, true, 9, 0.2 ], [ "trolley", -26, false, 25, Math.PI / 2 ], [ "stretcher", FW + 26, true, 33, Math.PI / 2 ], [ "cart", FW + 26, false, 17, -Math.PI / 2 ] ]) {
+				if (hi - lo >= len + 6) { far.push([ n, x, top ? mid : FH - mid, ry ]); }
+			}
+			st.userData.propsAt = { near, far };
+			loadProps3D();
+		}
 		// 4b. LED advertising boards all round the pitch, with gaps for the dugouts: invented sponsors (no real
 		// brand) on dark panels, lit from behind (not tone mapped, so they glow), a fine grid of LEDs over
 		// them, and every few seconds the panels roll on to the next sponsor (a texture offset, nothing
@@ -1277,6 +1392,7 @@
 		G3.scene.fog = new THREE.Fog(hazeCol, FH * hazeAt[0], FH * hazeAt[1]);
 		G3.stadium = st;
 		G3.scene.add(st);
+		propsInto3D(st);   // (if the kit is not here yet, it goes in when it arrives)
 	}
 	// The nets: a mesh of lines over the roof, the back and the sides of each goal, every knot a
 	// vertex that can move. The frame and the ground hold the edges; a ball in the net pushes the

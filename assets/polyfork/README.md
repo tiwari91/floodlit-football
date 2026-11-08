@@ -19,13 +19,19 @@ Add one line per file: file, model name and link, licence, and what you changed 
 | File | Model | Licence | Changes |
 |---|---|---|---|
 | `advertising-hoarding-run-efe4bc.glb` | "Advertising Hoarding Run" by Polyfork (https://polyfork.dev/asset/advertising-hoarding-run-efe4bc) | CC BY 4.0 | none |
+| `ball-bin-3198fe.glb` | "Ball Bin" by Polyfork (https://polyfork.dev/asset/ball-bin-3198fe) | CC BY 4.0 | none |
+| `ball-cart-8274fd.glb` | "Ball Cart" by Polyfork (https://polyfork.dev/asset/ball-cart-8274fd) | CC BY 4.0 | none |
 | `bleacher-stand-run-1627c2.glb` | "Bleacher Stand Run" by Polyfork (https://polyfork.dev/asset/bleacher-stand-run-1627c2) | CC BY 4.0 | none |
 | `corner-flag-0b43b0.glb` | "Corner Flag" by Polyfork (https://polyfork.dev/asset/corner-flag-0b43b0) | CC BY 4.0 | none |
 | `floodlight-mast-4482be.glb` | "Floodlight Mast" by Polyfork (https://polyfork.dev/asset/floodlight-mast-4482be) | CC BY 4.0 | none |
 | `football-goal-78fee1.glb` | "Football Goal" by Polyfork (https://polyfork.dev/asset/football-goal-78fee1) | CC BY 4.0 | none |
+| `goal-net-trolley-f5bd28.glb` | "Goal Net Trolley" by Polyfork (https://polyfork.dev/asset/goal-net-trolley-f5bd28) | CC BY 4.0 | none |
+| `kit-bag-7d617f.glb` | "Kit Bag" by Polyfork (https://polyfork.dev/asset/kit-bag-7d617f) | CC BY 4.0 | none |
 | `match-scoreboard-58f51e.glb` | "Match Scoreboard" by Polyfork (https://polyfork.dev/asset/match-scoreboard-58f51e) | CC BY 4.0 | none |
 | `players-tunnel-4a210b.glb` | "Players Tunnel" by Polyfork (https://polyfork.dev/asset/players-tunnel-4a210b) | CC BY 4.0 | none |
 | `team-dugout-ddb70c.glb` | "Team Dugout" by Polyfork (https://polyfork.dev/asset/team-dugout-ddb70c) | CC BY 4.0 | none |
+| `touchline-stretcher-f08e97.glb` | "Touchline Stretcher" by Polyfork (https://polyfork.dev/asset/touchline-stretcher-f08e97) | CC BY 4.0 | none |
+| `water-bottle-crate-78c8db.glb` | "Water Bottle Crate" by Polyfork (https://polyfork.dev/asset/water-bottle-crate-78c8db) | CC BY 4.0 | none |
 
 Example:
 `acorn.glb` - "Acorn" by Polyfork (https://polyfork.dev/asset/acorn-6b2dd9) - CC BY 4.0 - scaled, recoloured
