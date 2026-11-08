@@ -19189,6 +19189,16 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 			// The stanchions along the ground to the back of the net.
 			for (const y of [ GOAL_T, GOAL_B ]) { M.compose(V.set((x0 + xb) / 2, 0.8, y), Qn.setFromEuler(E.set(0, 0, Math.PI / 2)), Sc.set(1, NET, 1)); accGeo3(frame, thin, "#d9ded8", M); }
 		}
+		// The corner flags, as the TV camera draws them: a thin white pole (1.5 m) and a yellow flag
+		// pointing in along the goal line. Part of the frame mesh, so no extra draw call.
+		const flagGeo = new THREE.BoxGeometry(11 * Z3, 7 * Z3, 0.5), flagH = 34 * Z3;
+		for (const [ fx, d ] of [ [ 0, 1 ], [ FW, -1 ] ]) {
+			for (const fz of [ 0, FH ]) {
+				put(thin, fx, flagH / 2, fz, flagH, 0);
+				M.compose(V.set(fx + d * 5.5 * Z3, flagH - 3.5 * Z3, fz), Qn.identity(), Sc.set(1, 1, 1)); accGeo3(frame, flagGeo, "#f2b52e", M);
+			}
+		}
+		flagGeo.dispose();
 		post.dispose(); thin.dispose();
 		st.add(meshAcc3(frame, ownMat(new THREE.MeshBasicMaterial({ vertexColors: true }))));
 		buildNets3D(st, cb, bb, gw);
