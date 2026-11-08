@@ -18,7 +18,14 @@ Add one line per file: file, model name and link, licence, and what you changed 
 
 | File | Model | Licence | Changes |
 |---|---|---|---|
-| _none yet_ | | | |
+| `advertising-hoarding-run-efe4bc.glb` | "Advertising Hoarding Run" by Polyfork (https://polyfork.dev/asset/advertising-hoarding-run-efe4bc) | CC BY 4.0 | none |
+| `bleacher-stand-run-1627c2.glb` | "Bleacher Stand Run" by Polyfork (https://polyfork.dev/asset/bleacher-stand-run-1627c2) | CC BY 4.0 | none |
+| `corner-flag-0b43b0.glb` | "Corner Flag" by Polyfork (https://polyfork.dev/asset/corner-flag-0b43b0) | CC BY 4.0 | none |
+| `floodlight-mast-4482be.glb` | "Floodlight Mast" by Polyfork (https://polyfork.dev/asset/floodlight-mast-4482be) | CC BY 4.0 | none |
+| `football-goal-78fee1.glb` | "Football Goal" by Polyfork (https://polyfork.dev/asset/football-goal-78fee1) | CC BY 4.0 | none |
+| `match-scoreboard-58f51e.glb` | "Match Scoreboard" by Polyfork (https://polyfork.dev/asset/match-scoreboard-58f51e) | CC BY 4.0 | none |
+| `players-tunnel-4a210b.glb` | "Players Tunnel" by Polyfork (https://polyfork.dev/asset/players-tunnel-4a210b) | CC BY 4.0 | none |
+| `team-dugout-ddb70c.glb` | "Team Dugout" by Polyfork (https://polyfork.dev/asset/team-dugout-ddb70c) | CC BY 4.0 | none |
 
 Example:
 `acorn.glb` - "Acorn" by Polyfork (https://polyfork.dev/asset/acorn-6b2dd9) - CC BY 4.0 - scaled, recoloured
