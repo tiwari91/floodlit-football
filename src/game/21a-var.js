@@ -60,7 +60,7 @@
 		setTimeout(() => { if (banner.textContent === "No goal") { banner.hidden = true; } }, 1800);
 		refAnnounce(`After a VAR review, the decision is no goal: ${V.kind === "offside" ? `offside by ${cm(V.d)}` : "a foul in the build-up"}. ${score[0]} to ${score[1]}.`);
 		if (V.scorer === homeSide && typeof crowdBoo === "function") { crowdBoo(1.1); }
-		for (const p of players) { p.celebA = 0; p.celebK = 0; p.hug = 0; p.kneel = 0; p.sulk = 0; p.jump = 0; p.headHands = 0; }
+		for (const p of players) { p.celebA = 0; p.celebK = 0; p.hug = 0; p.kneel = 0; p.sulk = 0; p.jump = 0; p.headHands = 0; p.moan = 0; p.sorry = 0; }
 		celeb = null; replay = null; goalTimer = 0; state = "play";
 		const defs = players.filter(q => q.team !== V.scorer && q.role !== "gk"), taker = defs.reduce((a, b) => (dist(a, V.spot) < dist(b, V.spot) ? a : b));
 		taker.dir = taker.team === 0 ? 0 : Math.PI;

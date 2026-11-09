@@ -159,7 +159,7 @@
 			// Shared geometry: the ball, rings and markers. (The footballers are built in initFigures3D.)
 			const g = G3.geo = {
 				ball: new THREE.SphereGeometry(5, 16, 12), shadow: new THREE.CircleGeometry(1, 14),
-				ring: new THREE.RingGeometry(0.9, 1, 40), disc: new THREE.CircleGeometry(1, 32), cone: new THREE.ConeGeometry(4.5, 9, 4),
+				ring: new THREE.RingGeometry(0.9, 1, 40), thinRing: new THREE.RingGeometry(0.982, 1, 96), /* thin, for the wide circles (9.15 m at a free kick, the keeper's space): a tenth of the radius made a band like a road */ disc: new THREE.CircleGeometry(1, 32), cone: new THREE.ConeGeometry(4.5, 9, 4),
 				arrow: (() => { const b = new THREE.BufferGeometry(); b.setAttribute("position", new THREE.Float32BufferAttribute([ 33, 0, 0, 25, 0, 6, 25, 0, -6 ], 3)); b.computeVertexNormals(); return b; })(),
 				box: new THREE.BoxGeometry(1, 1, 1)
 			};
@@ -195,8 +195,8 @@
 			const amber = 0xf2b52e;
 			const mk = {
 				pass: flat3D(g.ring, amber, 0.95), me: flat3D(g.ring, amber, 0.95), meFill: flat3D(g.disc, amber, 0.2), arrow: flat3D(g.arrow, amber, 1),
-				cone: new THREE.Mesh(g.cone, mat3D("#f2b52e", false)), offside: flat3D(g.box, 0xde4f5a, 0.55), fk: flat3D(g.ring, 0xffffff, 0.55),
-				wall: flat3D(g.box, 0xffffff, 0.8), keeper: flat3D(g.ring, 0xffffff, 0.28), tut: flat3D(g.ring, amber, 0.9), tutFill: flat3D(g.disc, amber, 0.25),
+				cone: new THREE.Mesh(g.cone, mat3D("#f2b52e", false)), offside: flat3D(g.box, 0xde4f5a, 0.55), fk: flat3D(g.thinRing, 0xffffff, 0.5),
+				wall: flat3D(g.box, 0xffffff, 0.8), keeper: flat3D(g.thinRing, 0xffffff, 0.3), tut: flat3D(g.ring, amber, 0.9), tutFill: flat3D(g.disc, amber, 0.25),
 				next: flat3D(g.ring, 0xffffff, 0.42)
 			};
 			mk.arrow.material.side = THREE.DoubleSide;

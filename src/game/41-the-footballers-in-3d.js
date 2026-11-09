@@ -828,7 +828,7 @@
 			r.chest.rotation.y += (sd - 0.5) * 0.4 * still;
 			r.spine.rotation.z += Math.sin(idle * 1.3) * 0.015 * still;
 			// Arms hang loose: the elbow eased nearly straight (his own small bend), the palms turned in toward the thighs.
-				for (let i = 0; i < 2; i++) { r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.18 + 0.22 * ((sd * 7.3 + i * 0.31) % 1), still); r.sh[i].rotation.x += OUT3(i) * 0.04 * still; r.ha[i].rotation.y = OUT3(i) * 0.9 * still; }   // arms eased away from the sides
+				for (let i = 0; i < 2; i++) { r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.18 + 0.22 * ((sd * 7.3 + i * 0.31) % 1), still); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, OUT3(i) * 0.06, still); r.ha[i].rotation.y = OUT3(i) * 0.9 * still; }   // arms eased away from the sides
 			const calm = state !== "play" || freeze > 0;   // only at a stoppage: in open play a tired man stays upright
 			const w = p.team >= 0 && calm ? clamp((0.6 - staOf(p)) / 0.25, 0, 1) * still : 0;
 			if (w > 0) {
@@ -886,6 +886,20 @@
 			// A flare-up (29a): chest out, leaning in, both hands up to shove the other man.
 			const fl = p.flare > 0 && p.flareWith ? clamp(p.flare / 15, 0, 1) * clamp((170 - p.flare) / 10, 0, 1) : 0;
 			if (fl > 0) { const push = 0.25 * Math.max(0, Math.sin(p.flare * 0.12)); for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 1.35 + push, fl); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, OUT3(i) * 0.15, fl); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.5 - push, fl); } r.chest.rotation.z -= 0.18 * fl; r.neck.rotation.z -= 0.1 * fl; }
+			// "Come on!": both arms flung out to the sides, palms up, chest lifted and the head back a touch (mateMoan, 37a).
+			const mo = p.moan > 0 ? clamp(p.moan / 14, 0, 1) * clamp((72 - p.moan) / 6, 0, 1) : 0;
+			if (mo > 0) {
+				const beat = 0.12 * Math.sin((70 - p.moan) * 0.22);
+				for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 0.85 + beat, mo); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, OUT3(i) * 0.85, mo); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.75, mo); r.ha[i].rotation.y = lerp3(r.ha[i].rotation.y, -OUT3(i) * 1.2, mo); }
+				r.spine.rotation.z += 0.1 * mo; r.neck.rotation.z += 0.18 * mo;
+			}
+			// Sorry: one hand raised (the right), palm out, the head dropped.
+			const so = p.sorry > 0 ? clamp(p.sorry / 12, 0, 1) * clamp((62 - p.sorry) / 6, 0, 1) : 0;
+			if (so > 0) {
+				const i = 1;
+				r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 2.15, so); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, OUT3(i) * 0.35, so); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.6, so);
+				r.neck.rotation.z -= 0.35 * so;
+			}
 			const fp = p.fistPump > 0 ? clamp(p.fistPump / 12, 0, 1) * clamp((55 - p.fistPump) / 6, 0, 1) : 0;
 			if (fp > 0) {
 				const i = 1, pump = 0.25 * Math.sin((50 - p.fistPump) * 0.45);
@@ -944,7 +958,7 @@
 		}
 		// Recorded movement over the coded run, for the players (not standing, where the coded stance and its
 		// gestures stay, nor in an action, a fall, a dive, a celebration or shielding the ball).
-		if (!rm && !acting && cel <= 0 && kneel <= 0 && fall < 0 && dive < 0 && !down && !gk && a > 0.06 && p.team >= 0 && p.role !== "staff" && !(p.shieldW > 0) && !(p.headHands > 0) && !(p.fistPump > 0) && !(p.hug > 0) && !(p.flare > 0)) {   // not over a gesture: hands on the head, a fist pump, a hug, a flare-up
+		if (!rm && !acting && cel <= 0 && kneel <= 0 && fall < 0 && dive < 0 && !down && !gk && a > 0.06 && p.team >= 0 && p.role !== "staff" && !(p.shieldW > 0) && !(p.headHands > 0) && !(p.fistPump > 0) && !(p.moan > 0) && !(p.sorry > 0) && !(p.hug > 0) && !(p.flare > 0)) {   // not over a gesture: hands on the head, a fist pump, a hug, a flare-up
 			const ms = (r.mir || 1) > 0 ? 0 : 1;
 			if (animLand3[ms] === null && G.feet && G.feet[0] && G.feet[0].st && a > 0.4 && r.wasSwing0) { animLand3[ms] = ph; }
 			r.wasSwing0 = G.feet && G.feet[0] && !G.feet[0].st;
@@ -1272,7 +1286,7 @@
 	const EXPR_RANK3 = [ 0, 3, 1, 2 ];   // which expression wins while another is still held: joy, then pain, then effort
 	function expr3D (p) {
 		const raw = (p.celebA || 0) > 0.3 || (p.fistPump || 0) > 0 || (p.hug || 0) > 0 ? 1
-			: (p.fall || 0) > 0 || (p.sulk || 0) > 0.2 || (p.headHands || 0) > 0 ? 3
+			: (p.fall || 0) > 0 || (p.sulk || 0) > 0.2 || (p.headHands || 0) > 0 || (p.moan || 0) > 0 || (p.sorry || 0) > 0 ? 3
 			: (p.kickA || 0) > 0 || (p.windUp || 0) > 0 || (p.lunge || 0) > 0 || (p.slideAI || 0) > 0 || (p.pokeA || 0) > 0 || (p.shieldW || 0) > 0.3 || (p.flare || 0) > 0 || (p.dive || 0) > 0 || (p.sprintAmt || 0) > 0.7 ? 2 : 0;
 		const now = performance.now();
 		if (raw) { if (EXPR_RANK3[raw] >= EXPR_RANK3[p.exprNow || 0] || now > (p.exprTill || 0)) { p.exprNow = raw; } p.exprTill = now + 450; }

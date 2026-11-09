@@ -798,6 +798,9 @@
 		return c.spd < 7 && (c.seed < 0.4 || c.play) ? "sole" : "inside";
 	}
 	function gainBall (p) {
+		// A pass the other side has won (cut out, or picked up after it ran astray): frustration (37a).
+		const meantFor = receiver || ball.intended, passer = ball.lastBy;
+		if (meantFor && passer && passer !== meantFor && passer.team === meantFor.team && p.team !== passer.team && !ball.shot) { passFrustration(passer, meantFor); }
 		ball.intended = null;
 		const lostBy = p.team !== possTeam ? possTeam : -1;
 		// First touch by a teammate who was offside when the ball was played (or a tight one either way).

@@ -188,9 +188,11 @@ for (const i of [ 0, 1 ]) {
 		legShorts.push({ v, t: t / L, r, d });
 	}
 	if (!legShorts.length) { continue; }
-	const tMax = Math.max(...legShorts.map(x => x.t)), dTop = Math.max(...legShorts.filter(x => x.t < tMax * 0.35).map(x => x.d), 0.1);
+	// The top width is the thigh's typical (median) reach round the axis, not its widest point: the widest is the
+	// buttock, and a tube that wide on every side hung off the legs like a skirt.
+	const tMax = Math.max(...legShorts.map(x => x.t)), tops = legShorts.filter(x => x.t < tMax * 0.35).map(x => x.d).sort((a, b) => a - b), dTop = Math.max(tops[Math.floor(tops.length / 2)] || 0, 0.1);
 	for (const x of legShorts) {
-		const f = Math.max(0, Math.min(1, x.t / (tMax || 1))), want = dTop * (0.96 + 0.14 * f);   // a cone: 96% of the top width there, 110% at the hem
+		const f = Math.max(0, Math.min(1, x.t / (tMax || 1))), want = dTop * (1.0 + 0.06 * f);   // a gentle cone: the thigh's width at the top, 6% more at the hem
 		if (x.d >= want) { continue; }
 		const k = want / x.d;
 		for (let c = 0; c < 3; c++) { pos[x.v * 3 + c] = A[c] + u[c] * x.t * L + x.r[c] * k; }

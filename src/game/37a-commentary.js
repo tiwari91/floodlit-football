@@ -138,11 +138,31 @@
 		return commentary("welcome", { g, h: (h && h.name) || "", a: (a && a.name) || "" }, homeSide, true);
 	}
 	const hideCommentary = () => { const el = $("commLine"); if (el) { el.hidden = true; } clearTimeout(commTimer); };
+	// Frustration on the pitch. A pass cut out: the man it was meant for throws his arms out ("come on!"),
+	// sometimes another teammate near the play too, and the passer puts a hand up in apology, head down.
+	// A chance missed: a teammate or two throw their arms out. Not every time (most misplaced passes pass
+	// without a word), more often for a side that is behind, and at most once in eight seconds a side.
+	const moanAt = [ -1e9, -1e9 ];
+	function mateMoan (culprit, first, chance) {
+		const t = culprit.team;
+		if (bulkSim || t < 0 || t > 1 || frame - moanAt[t] < 480 || state !== "play") { return false; }
+		const behind = score[t] < score[1 - t] ? 0.2 : 0;
+		if (Math.random() > chance + behind) { return false; }
+		moanAt[t] = frame;
+		const near = players.filter(m => m.team === t && m !== culprit && m !== first && m.role !== "gk" && dist(m, culprit) < 300 * GH).sort((a, b) => dist(a, culprit) - dist(b, culprit));
+		if (first) { first.moan = 70; }
+		const extra = near[0];
+		if (extra && (!first || Math.random() < 0.4)) { extra.moan = 64; }
+		return true;
+	}
+	function passFrustration (passer, meant) {
+		if (mateMoan(passer, meant.role === "gk" ? null : meant, 0.55)) { passer.sorry = 60; }
+	}
 	function moment (kind, p, o = {}) {
 		if (bulkSim || !p) { return false; }
 		const said = commentary(kind === "woodwork" && o.bar ? "bar" : kind, { n: shortName(p), k: shortName(o.keeper) }, p.team, !!o.priority);
 		// The player's own reaction, played out by the 3D figure (and decayed in the player tick).
-		if (kind === "near" || kind === "over" || kind === "woodwork") { p.headHands = 90; }
+		if (kind === "near" || kind === "over" || kind === "woodwork") { p.headHands = 90; if (kind !== "woodwork") { mateMoan(p, null, 0.55); } }
 		if (kind === "woodwork" || kind === "save") { gasp(kind === "save" && o.shooter ? o.shooter.team : p.team); }
 		if (kind === "save" && o.shooter === p) { p.headHands = 70; }
 		if (kind === "tackle" && typeof flareTackle === "function") { flareTackle(p); }

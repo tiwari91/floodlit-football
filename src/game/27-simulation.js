@@ -23,6 +23,8 @@
 			if (p.plant > 0) { p.plant--; }
 			if (p.headHands > 0) { p.headHands--; }
 			if (p.fistPump > 0) { p.fistPump--; }
+			if (p.moan > 0) { p.moan--; }
+			if (p.sorry > 0) { p.sorry--; }
 			if (p.heavyT > 0) { p.heavyT--; }
 		}
 	}
