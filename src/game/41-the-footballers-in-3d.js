@@ -9,7 +9,7 @@
 	// Which joint carries which part. Limbs appear twice (left, right); the instance buffers are
 	// sized from this plan, so a pair of limbs always has two slots per figure.
 	const PART_PLAN3 = [
-		[ "torso", "spine" ], [ "collar", "spine" ], [ "shorts", "hips" ], [ "neck", "neck" ], [ "head", "head" ], [ "hair", "head" ], [ "ear", "head" ], [ "ear", "head" ], [ "nose", "head" ], [ "tail", "head" ],
+		[ "torso", "spine" ], [ "collar", "spine" ], [ "shorts", "hips" ], [ "neck", "neck" ], [ "throat", "neck" ], [ "head", "head" ], [ "hair", "head" ], [ "ear", "head" ], [ "ear", "head" ], [ "nose", "head" ], [ "tail", "head" ],
 		[ "sleeve", "sh", 0 ], [ "sleeve", "sh", 1 ], [ "cuff", "sh", 0 ], [ "cuff", "sh", 1 ], [ "armband", "sh", 0 ],
 		[ "arm", "sh", 0 ], [ "arm", "sh", 1 ], [ "hand", "ha", 0 ], [ "hand", "ha", 1 ],
 		[ "shortLeg", "hip", 0 ], [ "shortLeg", "hip", 1 ],
@@ -140,7 +140,8 @@
 			g.fillStyle = "rgba(70, 30, 24, 0.18)"; g.beginPath(); g.ellipse(cx, ey + 34, 7, 2, 0, 0, Math.PI * 2); g.fill();
 		} else {
 			g.fillStyle = "rgba(105, 42, 34, 0.2)"; g.filter = "blur(0.8px)"; g.beginPath(); g.ellipse(cx, ey + 27.2, 9.5, 2.2, 0, 0, Math.PI * 2); g.fill(); g.filter = "none";
-			g.strokeStyle = "rgba(70, 26, 20, 0.6)"; g.lineWidth = 2; g.beginPath();
+			g.fillStyle = "rgba(90, 36, 28, 0.16)"; g.beginPath(); g.ellipse(cx, ey + 26.6, 8.5, 1.8, 0, 0, Math.PI * 2); g.fill();   // the upper lip, a shade above the line
+			g.strokeStyle = "rgba(60, 22, 16, 0.78)"; g.lineWidth = 2.2; g.beginPath();
 			if (mouth === 1) { g.moveTo(cx - 10, ey + 28); g.quadraticCurveTo(cx, ey + 34, cx + 10, ey + 28); }
 			else if (mouth === 2) { g.moveTo(cx - 9, ey + 30); g.quadraticCurveTo(cx, ey + 27, cx + 9, ey + 30); }
 			else { g.moveTo(cx - 9, ey + 29); g.lineTo(cx + 9, ey + 29); }
@@ -249,8 +250,8 @@
 		// [ y, z, ry, rz, amount, front-only ]: a gaussian along the surface, centred on direction (y, z)
 		[ 0.36, 0.3, 0.12, 0.3, 0.14, 1 ], [ 0.36, -0.3, 0.12, 0.3, 0.14, 1 ],      // the brow ridge
 		[ 0.12, 0.37, 0.12, 0.15, -0.2, 1 ], [ 0.12, -0.37, 0.12, 0.15, -0.2, 1 ],   // eye sockets
-		[ -0.04, 0.62, 0.14, 0.16, 0.16, 1 ], [ -0.04, -0.62, 0.14, 0.16, 0.16, 1 ], // cheekbones, high and clear
-		[ -0.3, 0.55, 0.14, 0.16, -0.11, 1 ], [ -0.3, -0.55, 0.14, 0.16, -0.11, 1 ], // hollows under them, an athlete's lean face
+		[ -0.04, 0.62, 0.2, 0.2, 0.1, 1 ], [ -0.04, -0.62, 0.2, 0.2, 0.1, 1 ],     // cheekbones, high and rounded (a sharp ledge under them went black in close-up)
+		[ -0.3, 0.55, 0.14, 0.16, -0.05, 1 ], [ -0.3, -0.55, 0.14, 0.16, -0.05, 1 ], // hollows under them, an athlete's lean face (shallow: deeper, the light turned them into dark blotches on the cheek)
 		[ -0.55, 0, 0.18, 0.28, 0.1, 1 ],                                           // the muzzle and lips
 		[ -0.84, 0, 0.14, 0.4, 0.2, 1 ],                                            // the chin, broad and square rather than pointed
 		[ -0.55, 0.8, 0.2, 0.18, 0.2, 0 ], [ -0.55, -0.8, 0.2, 0.18, 0.2, 0 ],      // the angle of the jaw, a defined jawline
@@ -327,7 +328,7 @@
 	// surfaces facing down (under the brow, nose and chin), a warm band where the key light turns to shadow,
 	// a rim of floodlight on the edge turned to the light, and a faint sheen. All of it fades out by
 	// distance, so the broadcast camera sees the figures as before. k: [ fill, warmth, rim, sheen ].
-	const SKIN_LIGHT3 = [ 1, 1, 1, 1 ], HAIR_LIGHT3 = [ 0.6, 0, 0.7, 0.5 ], BODY_LIGHT3 = [ 1, 0, 0.8, 0 ], SHIRT_LIGHT3 = [ 1, 0, 0.9, 0.7 ];   // the shirt: a soft fabric sheen
+	const SKIN_LIGHT3 = [ 0.55, 1, 1, 1 ],   /* the face: less of the fill taken off underneath, or the cheeks and under the nose go black */ HAIR_LIGHT3 = [ 0.6, 0, 0.7, 0.5 ], BODY_LIGHT3 = [ 1, 0, 0.8, 0 ], SHIRT_LIGHT3 = [ 1, 0, 0.9, 0.7 ];   // the shirt: a soft fabric sheen
 	function skinLight3D (fs, k) {
 		return fs.replace("#include <aomap_fragment>", `#include <aomap_fragment>
 			{
@@ -379,7 +380,9 @@
 			// below it (no box hanging between the legs); the hips are as wide as the legs' outsides, so no step.
 			shorts: () => loft3D([ [ 1.6, 3.0, 2.0, 2.02 ], [ 1.75, 3.06, 2.06, 2.06 ], [ 0.6, 3.2, 2.06, 2.14 ], [ -0.5, 3.38, 2.04, 2.16 ], [ -1.25, 3.16, 1.92, 2.04 ], [ -1.75, 2.2, 1.46, 1.58 ], [ -2.0, 0.9, 0.8, 0.9 ] ], 22, 2.2),   // an athlete's hips, narrower than his shoulders
 			shortLeg: () => loft3D([ [ 1.1, 1.582, 1.831, 1.898 ], [ 0.2, 1.921, 2.102, 2.057 ], [ -0.9, 1.989, 2.215, 2.057 ], [ -2.2, 1.989, 2.26, 2.011, 0.08 ], [ -3.05, 2.011, 2.283, 2.034, 0.12 ], [ -3.15, 1.876, 2.102, 1.876, 0.12 ], [ -3.2, 1.469, 1.605, 1.469, 0.12 ] ], 22, 2.1),   // shorts to mid-thigh, hanging loose and straight off the quads to a light flare at the hem
-			neck: () => loft3D([ [ -0.8, 2.1, 1.5, 1.75 ], [ -0.2, 1.85, 1.42, 1.62 ], [ 0.5, 1.56, 1.32, 1.44, -0.05 ], [ 1.3, 1.42, 1.24, 1.32, 0.0 ], [ 2.0, 1.34, 1.16, 1.24, 0.08 ], [ 2.3, 0.8, 0.8, 0.8, 0.1 ] ], 18, 2),   // a footballer's neck: thick, flaring into the trapezius at the base, not a stalk
+			neck: () => loft3D([ [ -0.8, 2.1, 1.5, 1.75 ], [ -0.2, 1.85, 1.42, 1.62 ], [ 0.5, 1.56, 1.32, 1.44, -0.05 ], [ 1.3, 1.42, 1.24, 1.32, 0.0 ], [ 2.0, 1.34, 1.16, 1.24, 0.08 ], [ 2.3, 0.8, 0.8, 0.8, 0.1 ] ], 18, 2),
+			// With the modelled body on, its own neck carries the head; this slim one only fills the throat under the chin.
+			throat: () => loft3D([ [ 0.3, 0.74, 0.86, 0.6, 0.15 ], [ 1.2, 0.72, 0.9, 0.6, 0.2 ], [ 1.9, 0.66, 0.84, 0.56, 0.25 ], [ 2.3, 0.4, 0.45, 0.4, 0.25 ] ], 16, 2),   // a footballer's neck: thick, flaring into the trapezius at the base, not a stalk
 			head: () => sculpt3D(new T.SphereGeometry(1, 48, 36)),
 		ear: () => { const g = new T.SphereGeometry(0.51, 10, 8); g.scale(0.5, 1.0, 0.32); g.rotateZ(0.18); return g; },
 		nose: () => noseGeo3(),
@@ -577,7 +580,7 @@
 			if (name === "hair") { ia("aHairA", 4); ia("aHairB", 1); ia("aJaw", 1); }
 			if (name === "leg" || name === "arm") { for (let c = 0; c < 4; c++) { ia(`aLo${c}`, 4); } }
 			if (name === "leg") { ia("aCol2", 3); }
-			const m = new T.InstancedMesh(g, name === "leg" ? legMat : name === "arm" ? armMat : name === "torso" ? shirtMat : name === "head" ? headMat : name === "hair" ? hairMat : name === "neck" || name === "ear" || name === "nose" ? skinMat : plain, cap);
+			const m = new T.InstancedMesh(g, name === "leg" ? legMat : name === "arm" ? armMat : name === "torso" ? shirtMat : name === "head" ? headMat : name === "hair" ? hairMat : name === "neck" || name === "throat" || name === "ear" || name === "nose" ? skinMat : plain, cap);
 			m.instanceMatrix.setUsage(T.DynamicDrawUsage);
 			m.setColorAt(0, white);   // so the colour buffer exists before the first frame
 			m.frustumCulled = false; m.count = 0;
@@ -1294,7 +1297,17 @@
 	const trim3D = kit => (kit.second && kit.second !== kit.shirt ? kit.second : kit.ink || kit.shirt);
 	// Commit one posed rig to the instanced parts.
 	// Which cell of the face atlas: his own face, open-mouthed when celebrating; -1 (none) with his shirt over his head.
-	const faceCell3D = (lk, rig) => (rig.shirtHead ? -1 : ((lk.face || 0) % FACES3 + FACES3) % FACES3 + FACES3 * ((rig.cel || 0) > 0.3 ? 1 : rig.expr || 0));
+	// A dark-skinned man gets one of the brown-eyed faces (every third one): a pale blue iris on dark skin read as wrong.
+	const BROWN_EYES3 = Array.from({ length: FACES3 }, (_, v) => v).filter(v => v % 3 === 0);
+	function faceOf3D (lk) {
+		if (lk.faceV === undefined || lk.faceFor !== lk.skin + "|" + lk.face) {
+			const f = ((lk.face || 0) % FACES3 + FACES3) % FACES3, m = /^#?([0-9a-f]{6})$/i.exec(lk.skin || ""), n = m ? parseInt(m[1], 16) : 0xffffff;
+			const lum = (0.3 * (n >> 16) + 0.59 * ((n >> 8) & 255) + 0.11 * (n & 255)) / 255;   // the three darker tones of six (#9c6a44 and darker)
+			lk.faceV = lum < 0.5 ? BROWN_EYES3[f % BROWN_EYES3.length] : f; lk.faceFor = lk.skin + "|" + lk.face;
+		}
+		return lk.faceV;
+	}
+	const faceCell3D = (lk, rig) => (rig.shirtHead ? -1 : faceOf3D(lk) + FACES3 * ((rig.cel || 0) > 0.3 ? 1 : rig.expr || 0));
 	// What his face shows this moment, from what he is doing: joy celebrating; pain or dismay when he is brought
 	// down, sulking after a goal against or holding his head at a miss; effort as he strikes the ball, tackles,
 	// slides, shields it, squares up in a flare-up or sprints flat out. It holds a moment after the cause has
@@ -1478,6 +1491,7 @@
 		}
 		for (const [ name, joint, side ] of PART_PLAN3) {
 			if (body && BODY_SKIP3.has(name)) { continue; }
+			if (name === "throat" && !body) { continue; }   // the code-built neck already reaches the chin
 			const mesh = F.parts[name], node = side === undefined ? rig[joint] : rig[joint][side];
 			let mtx = node.matrixWorld;
 			if (name === "hair") {

@@ -159,7 +159,7 @@ const looks = await page.evaluate(async () => {
 check("every player has a face, hair colour and style", looks.length > 0 && looks.every(l => l.face >= 0 && l.face < 16 && /^#/.test(l.hair || "") && [ "short", "crop", "curly", "afro", "long", "tied", "buzz", "shaved" ].includes(l.style)), JSON.stringify(looks.filter(l => !(l.face >= 0 && l.face < 16 && l.hair)).slice(0, 2)));
 check("a player's look is fixed by name (same after a rebuild)", looks.every(l => l.a === l.b), JSON.stringify(looks.filter(l => l.a !== l.b).slice(0, 1)));
 // Brace and hat-trick captions: the same man scoring again is named in the goal caption.
-const caps = await page.evaluate(() => { const F = window.__ff, out = []; F.autoPilot = false; F.timeLeft = 1e9; for (let k = 0; k < 3; k++) { F.freeze = 0; F.forceGoal(0); const s0 = F.score[0]; for (let i = 0; i < 200 && F.score[0] === s0; i++) { F.step(1); } out.push(F.lastCaption && F.lastCaption.sub); for (let i = 0; i < 3000 && (F.state !== "play" || F.setPiece || F.restartWalk); i++) { F.step(1); } } return out; });
+const caps = await page.evaluate(() => { const F = window.__ff, out = []; F.autoPilot = false; F.timeLeft = 1e9; window.__ffPlainGoal = true; for (let k = 0; k < 3; k++) { F.freeze = 0; F.forceGoal(0); const s0 = F.score[0]; for (let i = 0; i < 200 && F.score[0] === s0; i++) { F.step(1); } out.push(F.lastCaption && F.lastCaption.sub); for (let i = 0; i < 3000 && (F.state !== "play" || F.setPiece || F.restartWalk); i++) { F.step(1); } } window.__ffPlainGoal = false; return out; });   // (no VAR: a review's caption, or a goal ruled out, is not what this checks)
 check("same scorer: first goal plain, then Brace, then Hat-trick", caps.length === 3 && !/Brace|Hat-trick/.test(caps[0]) && /Brace/.test(caps[1]) && /Hat-trick/.test(caps[2]), JSON.stringify(caps));
 // The score bug clock is always a sane mm:ss, even with the test-sized timeLeft above (once read "16666666:36").
 const clk = await page.evaluate(() => { const F = window.__ff; F.forceGoal(0); for (let i = 0; i < 5; i++) { F.step(1); } return { shown: document.getElementById("clock").textContent, f: [ F.fmtClock(1e9, 180), F.fmtClock(NaN, 180), F.fmtClock(-5, 180), F.fmtClock(95.2, 180), F.fmtClock(1e12) ] }; });
@@ -445,7 +445,7 @@ const goalAt = (sc, frac) => page.evaluate(async ([ sc, frac ]) => {
 	for (let i = 0; i < 1500 && F.state !== "play"; i++) { F.step(1); }
 	if (F.setPiece) { F.step(400); }
 	F.score[0] = sc[0]; F.score[1] = sc[1]; F.timeLeft = F.matchLen * frac; F.freeze = 0;
-	F.forceGoal(0);
+	window.__ffPlainGoal = true; F.forceGoal(0);   // (no VAR: its caption would replace the goal's)
 	for (let i = 0; i < 20 && F.state === "play"; i++) { F.step(1); }
 	const C = F.celeb, hero = C && C.hero, out = { st: F.state, mood: C && C.mood, style: C && C.style };
 	if (!C) { return out; }
@@ -462,6 +462,7 @@ const goalAt = (sc, frac) => page.evaluate(async ([ sc, frac ]) => {
 	for (let i = 0; i < 900 && F.state === "goal" && !comm; i++) { F.step(1); hide(); if (fresh()) { comm = F.lastCommentary; } }
 	Object.assign(out, { maxHug: +maxHug.toFixed(2), maxCel: +maxCel.toFixed(2), slump: +slump.toFixed(2), hh, grabbed, toCentre: +(c0 - Math.hypot(hero.x - F.FW / 2, hero.y - F.FH / 2)).toFixed(0), comm: comm && comm.kind, text: comm && comm.text, cap: F.lastCaption && F.lastCaption.sub });
 	for (let i = 0; i < 1500 && F.state === "goal"; i++) { F.step(1); }
+	window.__ffPlainGoal = false;
 	return out;
 }, [ sc, frac ]);
 const lateWin = await goalAt([ 1, 1 ], 0.06);

@@ -830,7 +830,9 @@
 				if (home || muted) { tx = p.bx; ty = p.by; spd = BASE_SPD * (muted ? 0.55 : 0.7); }
 				else {
 					const d = dist(p, hero);
-					if (d > 36) { tx = hero.x; ty = hero.y; spd = BASE_SPD * (d > 120 ? (wild ? 1.65 : 1.45) : 0.85); }
+					// Far off, they run to where he is going (he may be off to the fans or the bench), not where he is.
+					const lead = d > 120 ? Math.min(90, d / (BASE_SPD * 1.6)) * 0.85 : 0;
+					if (d > 36) { tx = clamp(hero.x + hero.vx * lead, 20, FW - 20); ty = clamp(hero.y + hero.vy * lead, 20, FH - 20); spd = BASE_SPD * (d > 120 ? (wild ? 1.65 : 1.45) : 0.85); }
 					else if (T > (C.kneelAt >= 0 ? C.kneelAt + 20 : 120) && !(p.jump > 0) && Math.random() < (wild ? 0.09 : 0.04)) { p.jump = JUMP; }
 				}
 			} else if (scored) {   // their keeper wanders out of his goal
