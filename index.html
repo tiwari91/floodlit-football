@@ -11925,6 +11925,28 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 		return [ dx / d * s, dy / d * s ];
 	}
 
+	// Nobody reacts on the frame: when the ball is struck, or changes sides, each player carries on as he was for a
+	// moment (a fifth of a second or so, his own) before he turns to the new picture. The kicker's teammates saw it
+	// coming and are first away; the side that has just lost it is a beat slower; a man far from it has less to read.
+	// Without this a whole side changed direction on the same frame, which is the computer showing.
+	let seenKick = -1, seenSide = -1;
+	function readThePlay () {
+		const kicked = ball.kickedAt !== undefined && ball.kickedAt !== seenKick && frame - ball.kickedAt < 3;
+		const side = ball.owner ? ball.owner.team : -1, turned = side >= 0 && seenSide >= 0 && side !== seenSide;
+		if (ball.kickedAt !== undefined) { seenKick = ball.kickedAt; }
+		if (side >= 0) { seenSide = side; }
+		if ((!kicked && !turned) || setPiece) { return; }
+		const by = kicked ? lastTouch : side;
+		for (const p of players) {
+			if (p === ball.owner || p.role === "gk" || (p.team === 0 && players.indexOf(p) === ctrl)) { continue; }
+			const own = hashStr(`${p.name || `${p.team}-${p.idx}`}|react`) % 5;   // his own speed of mind, 0 to 4 frames
+			let rt = 5 + own + Math.min(5, dist(p, ball) / 260) + Math.random() * 3;
+			if (kicked && p.team === by) { rt -= 4; }    // his own side's pass: he was expecting it
+			if (turned && p.team !== side) { rt += 3; }  // just lost it: a beat to switch on
+			p.reactAt = frame + Math.round(rt);
+		}
+	}
+
 	// Players have weight: they build up to speed over about half a second, and brake or
 	// turn harder than they accelerate. Wet or muddy grass takes some grip away.
 	const ACC_AI = 0.1, ACC_YOU = 0.24;
@@ -12226,6 +12248,7 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 
 		// Under autopilot your man nearest the ball chases it as their chaser does, at the same pace.
 		const autoChaser = p => autoPilot && players.indexOf(p) === ctrl && !(ball.owner && ball.owner.team === 0);
+		readThePlay();
 		for (const p of players) {
 			if (p.kickCd > 0) { p.kickCd--; }
 			if (p.jump > 0) { p.jump--; }
@@ -12367,6 +12390,12 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 				continue;
 			}
 
+			// Still taking it in (see readThePlay): he carries on as he was, easing off a touch, his eyes going to the ball.
+			if (frame < (p.reactAt || 0) && !setPiece && p.role !== "gk" && ball.owner !== p && p !== receiver && p !== ball.intended && !airMen.has(p) && !(cornerPlan && cornerPlan.role.has(p))) {
+				movePlayer(p, p.vx * 0.97, p.vy * 0.97);
+				p.dir = turnToward(p.dir, Math.atan2(ball.y - p.y, ball.x - p.x), 0.06);
+				continue;
+			}
 			let target, setRole = false;
 			if (ball.owner === p) {
 				target = aiOwnerAct(p);
