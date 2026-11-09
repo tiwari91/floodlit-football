@@ -286,10 +286,28 @@
 	// tap costs no ground on the way in.
 	const TAP_FRAMES = 15;   // a quarter of a second: an ordinary key press is a tap (at 8 frames many presses counted as a hold, and no slide came)
 	let tackleDownAt = -1;
-	function tackleDown () { if (odr) { endOdr(); return; } tackleDownAt = frame; }
-	function tackleUp () { const tap = tackleDownAt >= 0 && frame - tackleDownAt < TAP_FRAMES; tackleDownAt = -1; if (tap) { humanTackle(); } }
+	// A twice, quickly (the second press within a third of a second of the first tap): a slide tackle, always, even
+	// straight after a shoulder challenge (whose cooldown would otherwise stop it). X does the same, for old hands.
+	const DTAP_FRAMES = 20;
+	let lastTapAt = -1e9, slidOnTap = false;
+	function tackleDown () {
+		if (odr) { endOdr(); return; }
+		if (frame - lastTapAt <= DTAP_FRAMES) {
+			const p = human();
+			if (p && p.lunge <= 0) { p.lungeCd = 0; }
+			lastTapAt = -1e9; slidOnTap = true; tackleDownAt = -1;
+			humanSlide();
+			return;
+		}
+		tackleDownAt = frame;
+	}
+	function tackleUp () {
+		if (slidOnTap) { slidOnTap = false; return; }
+		const tap = tackleDownAt >= 0 && frame - tackleDownAt < TAP_FRAMES; tackleDownAt = -1;
+		if (tap) { lastTapAt = frame; humanTackle(); }
+	}
 	const pressOn = () => pressHeld || touchPress || padPressBtn;
-	// X: a slide tackle, always. Within reach of the carrier (a little further than a tap of A allows) he goes
+	// A twice (or X): a slide tackle, always. Within reach of the carrier (a little further than a tap of A allows) he goes
 	// in at where the carrier is heading; otherwise at the loose ball if it is near, or straight ahead.
 	function humanSlide () {
 		if (odr) { endOdr(); return; }

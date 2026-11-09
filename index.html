@@ -2016,7 +2016,7 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 				<h3>Controls</h3>
 				<div class="key"><kbd>Arrows</kbd><b>Move</b></div>
 				<div class="key"><kbd>E</kbd> or <kbd>Shift</kbd><b>Sprint</b>: hold it while you move. The bar under your player shows how much sprint is left; run it dry and you jog until it refills</div>
-				<div class="key"><kbd>A</kbd><b>Tackle</b>: tap it for a shoulder challenge when you're right alongside the carrier, a slide tackle (aimed for you) from further out. <b>Hold</b> it and your man closes the carrier down by himself, goal-side, from any distance, and jockeys him until you let go</div>
+				<div class="key"><kbd>A</kbd><b>Tackle</b>: tap it for a shoulder challenge when you're right alongside the carrier, a slide tackle (aimed for you) from further out. <b>Hold</b> it and your man closes the carrier down by himself, goal-side, from any distance, and jockeys him until you let go. <b>Tap it twice</b> quickly for a slide tackle, wherever you are (X does it too)</div>
 				<div class="key"><kbd>S</kbd> or <kbd>Space</kbd><b>Pass</b>, or switch player without the ball (press again to cycle to the next best)</div>
 				<div class="key"><kbd>W</kbd><b>Through ball</b> into the space ahead of a teammate</div>
 				<div class="key"><kbd>Q</kbd><b>Long ball</b> to the striker marked Q, into space toward goal. Along the ground when the lane is open, over the top when it isn't.</div>
@@ -10946,10 +10946,28 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 	// tap costs no ground on the way in.
 	const TAP_FRAMES = 15;   // a quarter of a second: an ordinary key press is a tap (at 8 frames many presses counted as a hold, and no slide came)
 	let tackleDownAt = -1;
-	function tackleDown () { if (odr) { endOdr(); return; } tackleDownAt = frame; }
-	function tackleUp () { const tap = tackleDownAt >= 0 && frame - tackleDownAt < TAP_FRAMES; tackleDownAt = -1; if (tap) { humanTackle(); } }
+	// A twice, quickly (the second press within a third of a second of the first tap): a slide tackle, always, even
+	// straight after a shoulder challenge (whose cooldown would otherwise stop it). X does the same, for old hands.
+	const DTAP_FRAMES = 20;
+	let lastTapAt = -1e9, slidOnTap = false;
+	function tackleDown () {
+		if (odr) { endOdr(); return; }
+		if (frame - lastTapAt <= DTAP_FRAMES) {
+			const p = human();
+			if (p && p.lunge <= 0) { p.lungeCd = 0; }
+			lastTapAt = -1e9; slidOnTap = true; tackleDownAt = -1;
+			humanSlide();
+			return;
+		}
+		tackleDownAt = frame;
+	}
+	function tackleUp () {
+		if (slidOnTap) { slidOnTap = false; return; }
+		const tap = tackleDownAt >= 0 && frame - tackleDownAt < TAP_FRAMES; tackleDownAt = -1;
+		if (tap) { lastTapAt = frame; humanTackle(); }
+	}
 	const pressOn = () => pressHeld || touchPress || padPressBtn;
-	// X: a slide tackle, always. Within reach of the carrier (a little further than a tap of A allows) he goes
+	// A twice (or X): a slide tackle, always. Within reach of the carrier (a little further than a tap of A allows) he goes
 	// in at where the carrier is heading; otherwise at the loose ball if it is near, or straight ahead.
 	function humanSlide () {
 		if (odr) { endOdr(); return; }
@@ -24862,7 +24880,7 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 	   One screen with every control, for the keyboard, touch or a controller, and what the
 	   markers on the pitch mean. H opens it any time (and pauses the match). */
 	const HOWTO = {
-		keys: { move: "← ↑ → ↓", sprint: "E", pass: "S", through: "W", long: "Q", shoot: "D", tackle: "A", slide: "X", switch: "S / Tab", tactic: "1 – 4", pause: "P", cam: "C", big: "F", help: "H" },
+		keys: { move: "← ↑ → ↓", sprint: "E", pass: "S", through: "W", long: "Q", shoot: "D", tackle: "A", slide: "A A", switch: "S / Tab", tactic: "1 – 4", pause: "P", cam: "C", big: "F", help: "H" },
 		touch: { move: "Joystick", sprint: "Sprint", pass: "Pass", through: "Through", long: "Long", shoot: "Shoot", tackle: "Tackle", switch: "Pass", tactic: "Tactic", pause: "Pause", cam: "Camera", big: "Big pitch", help: "How to play" },
 		pad: { move: "Left stick", sprint: "RT / LT", pass: "A / ✕", through: "Y / △", long: "RB / R1", shoot: "B / ○", tackle: "X / □", switch: "A / ✕", tactic: "D-pad ↑ ↓", pause: "Start", cam: "Camera", big: "F", help: "H" }
 	};
@@ -24883,7 +24901,7 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 			]),
 			sec("Without the ball", [
 				row(K.tackle, "Tackle", `Tap it: alongside the carrier a shoulder challenge, from further out a slide. ${cap(hold)} it and your man closes him down and jockeys him for you, from any distance, until you let go.`),
-				K.slide ? row(K.slide, "Slide tackle", "Always a slide: at where the carrier is heading if he is in reach, otherwise straight ahead. Mistime it from behind and it's a foul.") : "",
+				K.slide ? row(K.slide, "Slide tackle", "Tap A twice quickly (X does it too). Always a slide: at where the carrier is heading if he is in reach, otherwise straight ahead. Mistime it from behind and it's a foul.") : "",
 				row(K.switch, "Switch player", `To the teammate under the S marker (the defender best placed to win it). Press again for the next best.${howScheme === "keys" ? " Tab does the same at any moment; with the ball in the air it picks whoever is nearest where it will land." : ""}`),
 				row(K.sprint, "Sprint", "Close the carrier down faster; the same bar drains."),
 				row(`${K.shoot} / ${K.pass} / ${K.long}`, "A ball in the air", "Coming down to your man: head it at goal, nod it on to a teammate, or head it clear.")
@@ -24957,7 +24975,7 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 			? [ [ "Stick", "Move" ], [ "A", "Pass" ], [ "Y", "Through" ], [ "B", "Shoot, hold" ], [ "RB", "Long" ], [ "X", "Tackle" ], [ "RT", "Sprint" ] ]
 			: coarse
 				? [ [ "Joystick", "Move" ], [ "Pass", "to the ringed teammate" ], [ "Shoot", "hold for power" ], [ "Tackle", "tap or hold" ], [ "Through", "runner" ], [ "Long", "striker" ], [ "Sprint", "hold" ] ]
-				: [ [ "← ↑ → ↓", "Move" ], [ "S", "Pass" ], [ "W", "Through" ], [ "D", "Shoot, hold" ], [ "Q", "Long" ], [ "A", "Tackle" ], [ "X", "Slide" ], [ "Tab", "Switch" ], [ "E", "Sprint" ], [ "H", "How to play" ] ];
+				: [ [ "← ↑ → ↓", "Move" ], [ "S", "Pass" ], [ "W", "Through" ], [ "D", "Shoot, hold" ], [ "Q", "Long" ], [ "A", "Tackle" ], [ "A A", "Slide" ], [ "Tab", "Switch" ], [ "E", "Sprint" ], [ "H", "How to play" ] ];
 		el.replaceChildren(...items.map(([ key, label ]) => {
 			const s = document.createElement("span"), kb = document.createElement("kbd");
 			kb.textContent = key; s.append(kb, document.createTextNode(label));
