@@ -12,6 +12,26 @@
 		resize3D();
 	}
 	// Keep the view the canvas's shape, 648 tall where it can be, never bigger than the ground.
+	// Where the corner tags start: under the Show menu and Match info buttons, whichever are showing. On a
+	// phone those are bigger and stacked, and a fixed 44 put the tags behind them. Measured at most twice a
+	// second (a layout read every frame would cost), in canvas screen units.
+	let tagTopAt = -1e9, tagTopV = 44;
+	function tagTop () {
+		const now = performance.now();
+		if (now - tagTopAt < 500) { return tagTopV; }
+		tagTopAt = now;
+		const cr = canvas.getBoundingClientRect();
+		if (!cr.width) { return tagTopV; }
+		let low = 0;
+		for (const id of [ "menuToggle", "mcToggle" ]) {
+			const el = $(id);
+			if (!el || el.hidden) { continue; }
+			const r = el.getBoundingClientRect();
+			if (r.height && r.left < cr.right && r.right > cr.left && r.top < cr.top + cr.height / 3) { low = Math.max(low, r.bottom - cr.top); }
+		}
+		tagTopV = Math.max(44, (low + 6) * (canvas.width / cr.width) / scale);
+		return tagTopV;
+	}
 	function fitView () {
 		rotTop = camMode === "top" && canvas.height > canvas.width;
 		const cw = rotTop ? canvas.height : canvas.width, ch = rotTop ? canvas.width : canvas.height;
@@ -1269,7 +1289,7 @@
 		ctx.textBaseline = "middle";
 		const text = `${cond.label} · ${cond.ko === "day" ? "Afternoon" : "Night"}`.toUpperCase(), w = ctx.measureText(text).width;
 		// Top right, under the menu button, right-aligned and quiet: the score bug has the top left.
-		const top = 44, R = SW - 10, hasWind = cond.wind.s >= 6;
+		const top = tagTop(), R = SW - 10, hasWind = cond.wind.s >= 6;
 		const wtx = `${cond.wind.s} KM/H`, ww = hasWind ? ctx.measureText(wtx).width + 30 : 0, x1 = R - ww - (hasWind ? 4 : 0) - (w + 16);
 		ctx.fillStyle = "rgba(10, 14, 20, 0.55)";
 		ctx.fillRect(x1, top, w + 16, 20);

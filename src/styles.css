@@ -154,7 +154,7 @@
 	@media (prefers-reduced-motion: reduce) { .comm.in { animation: none; } }
 	@media (pointer: coarse), (max-width: 640px) { .comm { top: auto; bottom: 8px; max-width: 76%; font-size: 12px; padding: 5px 11px 5px 8px; } }
 	@media (pointer: coarse), (max-width: 640px) {
-		.lower { top: 50px; bottom: auto; left: 10px; }
+		.lower, .lower:has(~ .bc-ticker:not([hidden])) { top: 50px; bottom: auto; left: 10px; }   /* the ticker rule above would pin the bottom too and stretch the caption down the pitch */
 		.lower .lt-tag { font-size: 12px; padding: 0 9px; }
 		.lower .lt-main b { font-size: 16px; }
 		.lower .lt-main small { font-size: 11px; }
