@@ -394,7 +394,7 @@
 	// broadcast (all levels: a few instructions); and, Medium and High, a fine blade grain that fades out by
 	// distance, so the camera at pitch level sees grass, not a blurred picture of it.
 	function grassShader3D (mat, gs, detail) {
-		const mow = gs && cond.surfaceKey !== "turf" ? gs.mow : "stripes";
+		const mow = gs && cond.surfaceKey !== "turf" && gs.mow !== "rings" ? gs.mow : "stripes";
 		const kind = mow === "checks" ? 2 : mow === "diag" ? 3 : mow === "rings" ? 0 : 1;
 		const bands = Math.round(FW / (mow === "wide" ? 200 : 100)), prev = mat.onBeforeCompile, prevKey = prev ? mat.customProgramCacheKey() : "";
 		mat.onBeforeCompile = (sh, r) => {

@@ -51,7 +51,7 @@
 	// its own picture (grassCanvas) and laid down every frame; painted plain if that fails.
 	function paintGrass (g, ox, oy, rich) {
 		const [ c1, c2 ] = cond.surfaceKey === "turf" ? [ "#23804a", "#26894f" ] : [ "#1f6a3b", "#24774a" ];
-		const mow = gstyle && cond.surfaceKey !== "turf" ? gstyle.mow : "stripes";
+		const mow = gstyle && cond.surfaceKey !== "turf" && gstyle.mow !== "rings" ? gstyle.mow : "stripes";
 		g.save();
 		g.beginPath(); g.rect(ox, oy, FW, FH); g.clip();
 		g.fillStyle = c1; g.fillRect(ox, oy, FW, FH);
@@ -297,7 +297,7 @@
 	// The stadium: stands on all four sides full of fans (the home club's colours, an end of
 	// away supporters), advertising boards along the front and the ground's name on the main
 	// stand. It's painted once per match into four strips and then just drawn each frame.
-	let stands = null;
+	let stands = null, crowdKey = "";
 	// Every ground its own: stand concrete, seats, a roof or open terraces, floodlight pylons or
 	// lights along the roof, how full it gets (bigger clubs draw bigger crowds) and how the grass is cut.
 	let gstyle = null;
@@ -307,7 +307,7 @@
 		const pick = a => a[Math.floor(r() * a.length)];
 		const concrete = pick([ [ "#141c18", "#1b2520" ], [ "#2a1c18", "#35241f" ], [ "#172031", "#1f2a3d" ], [ "#222226", "#2c2c31" ], [ "#1d2419", "#262f21" ] ]);
 		return {
-			mow: pick([ "stripes", "wide", "checks", "diag", "rings" ]),
+			mow: pick([ "stripes", "wide", "checks", "diag", "stripes" ]),   // (no bullseye rings round the centre circle: they looked like a target painted on the pitch)
 			concrete: concrete[0], steps: concrete[1],
 			seat: club.color2 && club.color2 !== "#ffffff" ? club.color2 : "#3b4a58",
 			fill: clamp(0.42 + (club.str || 3) * 0.11 + (r() - 0.5) * 0.1, 0.45, 1),
@@ -441,6 +441,11 @@
 		const rnd = () => { h = (h * 16807) % 2147483647; return h / 2147483647; };
 		// The visitors fill the end behind the right-hand goal, as in the 3D stands: a big club brings a full end.
 		const vis = (leagueMatch ? (leagueMatch.home ? TEAMS[leagueMatch.opp] : YOU) : null) || {}, awayFill = clamp(0.45 + (vis.str || 3) * 0.1, 0.5, 0.95);
+		// The crowd is drawn from a fixed seed, so the same inputs draw the same stands: keep them. (Kick-off calls
+		// newMatch again; new stands there made the 3D ground rebuild itself and compile its shaders on that frame.)
+		const ckey = JSON.stringify([ homeC, awayC, st, awayFill, WW, MY, MX, FH, GOAL_T, GOAL_B, NET, matchGround() ]);
+		if (stands && crowdKey === ckey) { return; }
+		crowdKey = ckey;
 		const fan = (g, x, y, away) => {
 			if (rnd() > (away ? awayFill : st.fill)) {   // an empty seat (none on a bare terrace)
 				const sc = seatColOf(st, (y % MY) / MY, x * 7.1 + y * 3.3);

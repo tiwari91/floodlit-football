@@ -866,6 +866,16 @@
 			r.sh[i].rotation.z = clamp(r.sh[i].rotation.z + lean + carry, -0.95 + lean, 0.62 + lean + carry);
 			r.el[i].rotation.z = Math.min(r.el[i].rotation.z, 1.8, 2.0 - Math.max(0, r.sh[i].rotation.z - lean));
 		}
+		// Shuffling (side-stepping or backing off, as at a free kick): the arms hang loose with a small swing and a
+		// relaxed elbow. The run's arm drive here lifted both forearms out in front at chest height, like a tray.
+		if (shuf > 0.02 && !rm && !acting) {
+			const k = 0.85 * shuf;
+			for (let i = 0; i < 2; i++) {
+				r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 0.1 + lean + 0.14 * a * Math.sin(ph + (i ? Math.PI : 0)), k);
+				r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, OUT3(i) * 0.16, k);
+				r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.5 + 0.2 * a, k);
+			}
+		}
 		// Eyes on the ball: the head turns toward it when it is near, and drops to the feet on the ball.
 		if (!rm && ball && fall < 0 && dive < 0 && thr < 0 && cel <= 0 && !down) {
 			if (ball.owner === p) {
@@ -886,6 +896,12 @@
 			// A flare-up (29a): chest out, leaning in, both hands up to shove the other man.
 			const fl = p.flare > 0 && p.flareWith ? clamp(p.flare / 15, 0, 1) * clamp((170 - p.flare) / 10, 0, 1) : 0;
 			if (fl > 0) { const push = 0.25 * Math.max(0, Math.sin(p.flare * 0.12)); for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 1.35 + push, fl); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, OUT3(i) * 0.15, fl); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.5 - push, fl); } r.chest.rotation.z -= 0.18 * fl; r.neck.rotation.z -= 0.1 * fl; }
+			// In the wall at a free kick, set: hands crossed low in front, shoulders squared, chin tucked.
+			const wl = setPiece && setPiece.kind === "free" && setPiece.wall && setPiece.wall.includes(p) ? clamp((0.2 - a) / 0.15, 0, 1) : 0;
+			if (wl > 0) {
+				for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 0.38, wl); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, -OUT3(i) * 0.42, wl); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.95, wl); }
+				r.neck.rotation.z -= 0.12 * wl;
+			}
 			// "Come on!": both arms flung out to the sides, palms up, chest lifted and the head back a touch (mateMoan, 37a).
 			const mo = p.moan > 0 ? clamp(p.moan / 14, 0, 1) * clamp((72 - p.moan) / 6, 0, 1) : 0;
 			if (mo > 0) {
