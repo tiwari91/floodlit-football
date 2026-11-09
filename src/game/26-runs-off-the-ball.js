@@ -137,6 +137,23 @@
 			if (offsideOn()) { rr = Math.min(rr, offsideLine(p.team) - 6); }
 			return [ p.team === 0 ? rr : FW - rr, FH / 2 + fy * FH, "box" ];
 		}
+		// A midfielder arrives late: with the ball in the final third, the most advanced central midfielder
+		// gets into the box (the forwards stay on the line). The ball wide: around the penalty spot, a little to
+		// the far side, for the cross or the cut-back. The ball central: beyond the man on it, on the far side
+		// from the ball, for a ball round the corner.
+		if (inPoss && p.role === "mid" && !p.cam && ball.owner !== p && rel(p.team, ball.owner.x) > FW * 0.66 && lateMid(p.team) === p) {
+			const c = ball.owner, side = Math.sign(c.y - FH / 2) || 1;
+			let rr = isWide(c.y) ? FW - FMT.spot * 1.05 : Math.max(rel(p.team, c.x) + 60 * S, FW - FMT.box * 0.8);
+			const y = isWide(c.y) ? FH / 2 - side * FMT.goal * 0.25 : FH / 2 - side * FMT.goal * 0.55;
+			if (offsideOn()) { rr = Math.min(rr, offsideLine(p.team) - 8); }
+			return [ p.team === 0 ? rr : FW - rr, y, "late" ];
+		}
+		// Between the lines: with the ball in the middle third, that same midfielder finds the gap in front of
+		// their back line, well short of it (the forwards hold the last line), so there is a pass forward into feet.
+		if (inPoss && p.role === "mid" && !p.cam && ball.owner !== p && rel(p.team, ball.owner.x) > FW * 0.3 && lateMid(p.team) === p) {
+			const sp = pocketSpot(p, ball.owner);
+			if (sp) { return [ sp[0], sp[1], "between" ]; }
+		}
 		// The attacking midfielder: with the ball on, the pocket between the carrier and the
 		// striker, on the other side from the ball, as a short option.
 		if (inPoss && p.cam && ball.owner !== p) {
@@ -151,6 +168,41 @@
 		return [ x, y, "slot" ];
 	}
 
+	// Who makes the late run (above): the furthest-forward central midfielder who is not the short support,
+	// not off on a run of his own and not the man you control. One a side, settled once a frame.
+	const lateCache = [ { frame: -1, p: null }, { frame: -1, p: null } ];
+	function lateMid (t) {
+		const lc = lateCache[t];
+		if (lc.frame !== frame) {
+			lc.frame = frame;
+			lc.p = outfield(t).filter(q => q.role === "mid" && !q.cam && !isWide(q.by, 0.2) && !q.run && q !== ball.owner && q !== supporter[t] && !(t === 0 && players.indexOf(q) === ctrl))
+				.reduce((a, b) => (!a || rel(t, b.x) > rel(t, a.x) ? b : a), null);
+		}
+		return lc.p;
+	}
+	// The gap between their lines (above): a few spots across the pitch ahead of the ball and well short of
+	// the last line, each scored by how far it is from the nearest opponent and whether the lane from the ball
+	// is clear. Looked at again every half second, or when the ball changes feet, so he settles in it.
+	function pocketSpot (p, c) {
+		const t = p.team, k = Math.sqrt(S);
+		// (In front of their back line, not just short of the offside line: that is set by their deepest man, often off
+		// marking the striker, and a midfielder level with the rest of their back four only gets a defender dropping onto him.
+		// Their line stepping up to his spot sends him looking again at once, rather than standing on among them.)
+		const front = team(1 - t).filter(q => q.role === "def").reduce((m, q) => Math.min(m, rel(t, q.x)), FW);
+		if (p.pocket && p.pocketFor === c && frame - p.pocketAt < 30 && rel(t, p.pocket[0]) < front - 35 * k) { return p.pocket; }
+		const cr = rel(t, c.x), line = offsideOn() ? offsideLine(t) : FW - 60 * S;
+		const rr = Math.min(cr + 150 * k, line - 115 * k, front - 55 * k);
+		let best = null, bs = -Infinity;
+		if (rr > cr + 80 * k) {
+			for (const off of [ -0.3, -0.15, 0, 0.15, 0.3 ]) {
+				const q = { x: t === 0 ? rr : FW - rr, y: FH / 2 + off * FH + (c.y - FH / 2) * 0.3 };
+				const s = Math.min(150 * k, openness({ ...q, team: t })) - laneBlockers(c, q, 1 - t) * 60 * k - Math.hypot(q.x - p.x, q.y - p.y) * 0.1;
+				if (s > bs) { bs = s; best = [ q.x, q.y ]; }
+			}
+		}
+		p.pocket = best; p.pocketFor = c; p.pocketAt = frame;
+		return best;
+	}
 	// A change of idea eases in over about three quarters of a second, from where he was heading,
 	// rather than snapping the target across the pitch and turning him on the spot.
 	const BLEND = 45;
@@ -442,9 +494,13 @@
 					const d = dist(p, m);
 					if (d < 70 || d > (tr(p, "playmaker") ? 620 : 460) * Math.sqrt(S)) { continue; }
 					const adv = (rel(p.team, m.x) - rel(p.team, p.x)) / 300 * (style[p.team] === "possession" ? 0.5 : style[p.team] === "balanced" ? 1 : 1.6);
-					const s = adv + openness(m) / 120 - d / (style[p.team] === "possession" ? 400 : 800);
+					// Free is free: past a few yards of room, more room counts for nothing, so a man ten yards free behind
+					// him no longer beats one with room ahead. A man with a defender in the lane is a worse ball.
+					const s = adv + Math.min(openness(m), 160 * Math.sqrt(S)) / 120 - laneBlockers(p, m, 1 - p.team) * (adv > 0 ? 1.2 : 0.7) - d / (style[p.team] === "possession" ? 400 : 800);
 					if (offsideOn() && isOffside(m, offsideLine(p.team) + lineEye(p))) { continue; }   // (judged by his eye for the line)
-					if (openness(m) > 40 && s > bs) { bs = s; best = m; }
+					// (A man ahead needs a little more room than one behind: a ball forward to a man with a defender
+					// on his back is the one that gets cut out.)
+					if (openness(m) > (adv > 0 ? 80 * Math.sqrt(S) : 40) && s > bs) { bs = s; best = m; }
 				}
 				// Under pressure, look for the open player on the far side: switch the play.
 				if (pressure) {
