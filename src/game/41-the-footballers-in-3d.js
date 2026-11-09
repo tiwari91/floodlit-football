@@ -1383,7 +1383,7 @@
 	// How much of the recording each joint takes: the hips none (they carry the planted foot), the spine a third, the
 	// head and neck none (he looks where the game says), the arms most of it, and only the leg swinging through
 	// (the planted one stays where the coded gait set it, so the boot does not slide).
-	const ANIM_W3 = [ 0, 0.3, 0.3, 0, 0, 0.75, 0.75, 0.75, 0.75, 0.75, 0.75, ANIM_LEG3, ANIM_LEG3, ANIM_LEG3, ANIM_LEG3, ANIM_LEG3, ANIM_LEG3 ];
+	const ANIM_W3 = [ 0, 0, 0, 0, 0, 0.75, 0.75, 0.75, 0.75, 0.75, 0.75, ANIM_LEG3, ANIM_LEG3, ANIM_LEG3, ANIM_LEG3, ANIM_LEG3, ANIM_LEG3 ];
 	const animLand3 = [ null, null ];   // the stride phase at which the coded gait puts his first foot down, per side of the mirror (measured once)
 	function animPose3D (r, a, ph, w, idlePh, G) {
 		if (!ANIM3 || w <= 0) { return; }

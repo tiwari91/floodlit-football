@@ -286,7 +286,7 @@
 		const base = { possession: 0.13, balanced: 0.2, direct: 0.27, counter: 0.32 }[style[t]] + 0.08 * edge(t);
 		// A runner who has just gone is the cue: he looks for him at once (and is a beat late, or early, by his eye).
 		const fresh = outfield(t).some(m => m.run && m.run.burst && frame - m.run.burst < 16);
-		if (openness(p) < 40 * Math.sqrt(S) || Math.random() > clamp((fresh ? 0.2 : base * 0.25) + eye * 0.5, 0.03, 0.6)) { return false; }
+		if (openness(p) < 40 * Math.sqrt(S) || Math.random() > clamp((fresh ? 0.3 : base * 0.5) + eye * 0.5, 0.05, 0.7)) { return false; }
 		let best = null, bs = 0;
 		// How far beyond the line he will still play it: his eye for the line, and the beat he takes to
 		// release it while the runner keeps going (a weaker passer is later, and misjudges by more).
@@ -400,11 +400,11 @@
 			const range = Math.sqrt(S);
 			// Close in: shoot. Further out and crowded: sometimes try one from distance.
 			const crowded = openness(p) < 70;
-			const longShot = dg < 400 * range && (crowded || edge(p.team) > 0.5) && Math.random() < 0.18 + 0.1 * edge(p.team);   // on top, they fancy one from range
+			const longShot = (dg < 400 * range && (crowded || edge(p.team) > 0.5) && Math.random() < 0.18 + 0.1 * edge(p.team)) || (dg < 330 * range && !crowded && Math.random() < 0.08);   // on top, they fancy one from range; given room on the edge of the area, anyone might
 			// One on one with the keeper off his line: sometimes dink it over him.
 			const keeper = players.find(q => q.team !== p.team && q.role === "gk");
 			if (keeper && dg < 330 * range && dg > 110 * range && rel(keeper.team, keeper.x) > 55 * GH && dist(keeper, p) < dg * 0.75 && Math.random() < 0.3) { chipShot(p); return null; }
-			if (dg < 170 * range || (dg < 270 * range && Math.random() < 0.2) || longShot) {
+			if (dg < 170 * range || (dg < 270 * range && Math.random() < (crowded ? 0.2 : 0.4)) || longShot) {
 				// Better finishers (against the keeper in front of them) are more accurate and hit it harder.
 				const fin = (finQ(p) + Math.max(0, 0.75 - staOf(p)) * 0.8) * (tr(p, "poacher") && inAttackBox(p) ? 0.7 : 1);
 				// He picks the corner away from the keeper; how close he gets to it is his finishing.
