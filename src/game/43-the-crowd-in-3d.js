@@ -173,7 +173,8 @@
 		const gs = gstyle || { fill: 0.8 };
 		const hk = KITS[homeSide] || KITS[0], ak = KITS[1 - homeSide] || KITS[1];
 		const homeC = hk.outfield, homeC2 = hk.second || "#1f2a36", awayC = ak.outfield;
-		const neutrals = [ "#2c3135", "#4a5057", "#8a8f94", "#d9dcdf", "#1e2a38", "#5c4a3a", "#7a2f2f", "#2f4a6a" ];
+		// What the rest wear: mostly dark jackets and coats (a night out at the football), some grey and denim, a few light tops.
+		const neutrals = [ "#1c2024", "#23292f", "#2c3135", "#30363d", "#1e2a38", "#252a33", "#3a3f45", "#4a5057", "#2f4a6a", "#3d4f66", "#5c4a3a", "#4b3d33", "#7a2f2f", "#8a8f94", "#c9ccd0" ];
 		const skins = [ "#f1c9a5", "#e0ac86", "#c68a5e", "#9c6a44", "#6e4a30", "#4a3222" ];
 		let h = 7919;
 		const rnd = () => (h = (h * 48271) % 2147483647) / 2147483647;
@@ -188,7 +189,7 @@
 				for (let s = (i % 2 ? SEAT : SEAT / 2); s < L - SEAT * 0.3; s += SEAT) {
 					const u = s / L;
 					if (ai.some(v => Math.abs(v - u) * L < 5.5)) { continue; }   // the aisle
-					const x = a.x + (b.x - a.x) * u, z = a.z + (b.z - a.z) * u;
+					const uj = u + (rnd() - 0.5) * SEAT * 0.22 / L, x = a.x + (b.x - a.x) * uj, z = a.z + (b.z - a.z) * uj;   // not all sat dead centre on the seat: the rows read less like a grid
 					if (nearSide && row.h < 20 && Math.abs(x - FW / 2) < 190 * Math.sqrt(S) * 1.24 + 26 && Math.abs(x - FW / 2) > 14) { continue; }   // the dugouts
 					const away = !nearSide && x > FW + 10 && z > FH * 0.06 && z < FH * 0.94;   // the visitors: the end behind the right-hand goal, in their colours
 					const nx = a.nx + (b.nx - a.nx) * u, nz = a.nz + (b.nz - a.nz) * u;
@@ -196,9 +197,9 @@
 					const q = rnd();
 					// Behind the goals: the home ends, a standing, flag-waving block striped in the club's two colours.
 					const end = !away && !nearSide && (x < -10 || x > FW + 10) && z > FH * 0.12 && z < FH * 0.88;
-					const color = away ? (q < 0.75 ? awayC : neutrals[Math.floor(rnd() * neutrals.length)])
+					const color = away ? (q < 0.68 ? awayC : neutrals[Math.floor(rnd() * neutrals.length)])
 						: end ? (q < 0.88 ? (i % 2 ? homeC2 : homeC) : neutrals[Math.floor(rnd() * neutrals.length)])
-						: q < 0.55 ? homeC : q < 0.65 ? homeC2 : neutrals[Math.floor(rnd() * neutrals.length)];
+						: q < 0.42 ? homeC : q < 0.5 ? homeC2 : neutrals[Math.floor(rnd() * neutrals.length)];   // half in the club's shirt: a real main stand, not a wall of one colour
 					const side = away ? 0 : color === homeC || color === homeC2 ? 1 : 0.5;
 					if (end) {   // the home ends' extents, for their banners and big flags
 						const e = endRows[x < FW / 2 ? 0 : 1], r = e[i] || (e[i] = { x: 0, y, zMin: 1e9, zMax: -1e9, n: 0 });
@@ -220,7 +221,7 @@
 				M.compose(P.set(f.x, f.y, f.z), Q.setFromEuler(E.set(0, f.ry, 0)), Sc.set(f.scale * f.wide, f.scale * f.tall, f.scale));
 				// The same colours, not the same shirt: a shade lighter or darker, a little more or less vivid.
 				const j1 = (f.phase * 53.17) % 1, j2 = (f.phase * 29.71) % 1;
-				mesh.setMatrixAt(i, M); mesh.setColorAt(i, C.set(f.color).offsetHSL(0, (j1 - 0.5) * 0.16, (j2 - 0.5) * 0.14));
+				mesh.setMatrixAt(i, M); mesh.setColorAt(i, C.set(f.color).offsetHSL(0, (j1 - 0.65) * 0.22, (j2 - 0.5) * 0.2));   // (a touch less vivid on average: replica shirts fade, and neon blocks read as noise)
 				fa.set([ f.phase, f.side, f.stand, f.flag ], i * 4);
 				C.set(f.skin); sk.set([ C.r, C.g, C.b ], i * 3);
 			});
