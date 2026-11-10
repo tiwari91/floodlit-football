@@ -328,7 +328,7 @@
 	// surfaces facing down (under the brow, nose and chin), a warm band where the key light turns to shadow,
 	// a rim of floodlight on the edge turned to the light, and a faint sheen. All of it fades out by
 	// distance, so the broadcast camera sees the figures as before. k: [ fill, warmth, rim, sheen ].
-	const SKIN_LIGHT3 = [ 0.55, 1, 1, 1 ],   /* the face: less of the fill taken off underneath, or the cheeks and under the nose go black */ HAIR_LIGHT3 = [ 0.6, 0, 0.7, 0.5 ], BODY_LIGHT3 = [ 1, 0, 0.8, 0 ], SHIRT_LIGHT3 = [ 1, 0, 0.9, 0.7 ];   // the shirt: a soft fabric sheen
+	const SKIN_LIGHT3 = [ 0.55, 1, 1, 1 ],   /* the face: less of the fill taken off underneath, or the cheeks and under the nose go black */ HAIR_LIGHT3 = [ 0.6, 0, 0.45, 0.35 ], BODY_LIGHT3 = [ 1, 0, 0.8, 0 ], SHIRT_LIGHT3 = [ 1, 0, 0.9, 0.7 ];   // the shirt: a soft fabric sheen
 	function skinLight3D (fs, k) {
 		return fs.replace("#include <aomap_fragment>", `#include <aomap_fragment>
 			{
@@ -514,7 +514,7 @@
 			sh.fragmentShader = sh.fragmentShader
 				.replace("#include <common>", "#include <common>\nvarying vec3 vHd; varying float vCov; float ffHash (vec3 p) { return fract(sin(dot(floor(p), vec3(12.9898, 78.233, 37.719))) * 43758.5453); }")
 				.replace("#include <color_fragment>", `#include <color_fragment>
-					if (vCov < 0.035 * (ffHash(vHd * 140.0) - 0.35)) { discard; }   // a soft, slightly ragged hairline cut per pixel, never a triangle's edge
+					if (vCov < 0.014 * (ffHash(vHd * 140.0) - 0.35)) { discard; }   // a soft hairline cut per pixel, never a triangle's edge (barely ragged: more and it read as torn felt)
 					diffuseColor.rgb *= 0.84 + 0.16 * ffHash(vHd * vec3(70.0, 90.0, 70.0));
 					diffuseColor.rgb *= 0.86 + 0.14 * smoothstep(0.0, 0.12, vCov);   // thinner, darker at the line
 					// Combed strands running from the crown down to the hairline (round the head, so the lines meet
@@ -522,10 +522,10 @@
 					// Whole-number frequencies keep the lines unbroken across the back; they fade out with distance
 					// (fwidth) so the far players never shimmer.
 					float hAng = atan(vHd.z, vHd.x);
-					float fine = sin(hAng * 90.0 + 5.0 * sin(vHd.y * 9.0)), clump = sin(hAng * 14.0 + 3.0 * vHd.y);
+					float fine = 0.6 * sin(hAng * 90.0 + 5.0 * sin(vHd.y * 9.0)) + 0.4 * sin(hAng * 53.0 + 7.0 * sin(vHd.y * 13.0 + hAng * 3.0)), clump = sin(hAng * 14.0 + 3.0 * vHd.y);   // two strand sets that drift in and out of step: even single lines read as a knitted hat
 					float near = clamp(1.0 - fwidth(hAng * 90.0) * 0.5, 0.0, 1.0);
-					diffuseColor.rgb += (diffuseColor.rgb + 0.05) * (0.14 * fine * near + 0.07 * clump) * smoothstep(0.0, 0.25, vCov);   // added light, so black hair shows its strands too
-					diffuseColor.rgb += (diffuseColor.rgb * 0.12 + 0.035) * smoothstep(0.55, 0.95, vHd.y);`);
+					diffuseColor.rgb += (diffuseColor.rgb * 0.6 + 0.05) * (0.09 * fine * near + 0.06 * clump) * smoothstep(0.0, 0.25, vCov);   // added light, so black hair shows its strands too (less on fair hair, which it bleached toward white)
+					diffuseColor.rgb += (diffuseColor.rgb * 0.06 + 0.03) * smoothstep(0.55, 0.95, vHd.y);`);
 			sh.fragmentShader = skinLight3D(sh.fragmentShader, HAIR_LIGHT3);
 		};
 		hairMat.customProgramCacheKey = () => "ff-hair";
@@ -798,7 +798,7 @@
 			// by the hip, level with the shoulder line, while the upper arm stays within 25 degrees of
 			// vertical behind. The forearm hangs nearer straight down behind (about 0.45 rad) and comes up
 			// toward the horizontal in front (about 1.6), so neither hand is held out in front the whole way round.
-			r.sh[i].rotation.z = armA * (sw > 0 ? 0.58 * sw : 0.37 * sw);   // a fuller drive forward; the backswing kept within about 25 degrees
+			r.sh[i].rotation.z = armA * (sw > 0 ? 0.66 * sw : 0.7 * sw);   // a real swing both ways: the elbow driven back about 40 degrees (at about 20 both hands sat out in front, like a tray)
 			// Sideways (OUT3): the arms hang a little away from the sides, coming in as they swing forward.
 			r.sh[i].rotation.x = OUT3(i) * (0.12 + 0.05 * a - 0.2 * a * clamp(sw, 0, 1));
 			const fore = 0.42 + 1.18 * (sw + 1) / 2 + gv.elbow * 0.5;
@@ -1426,7 +1426,7 @@
 	// How much of the recording each joint takes: the hips none (they carry the planted foot), the spine a third, the
 	// head and neck none (he looks where the game says), the arms most of it, and only the leg swinging through
 	// (the planted one stays where the coded gait set it, so the boot does not slide).
-	const ANIM_W3 = [ 0, 0, 0, 0, 0, 0.75, 0.75, 0.75, 0.75, 0.75, 0.75, ANIM_LEG3, ANIM_LEG3, ANIM_LEG3, ANIM_LEG3, ANIM_LEG3, ANIM_LEG3 ];
+	const ANIM_W3 = [ 0, 0, 0, 0, 0, 0.3, 0.3, 0.75, 0.3, 0.3, 0.75, ANIM_LEG3, ANIM_LEG3, ANIM_LEG3, ANIM_LEG3, ANIM_LEG3, ANIM_LEG3 ];
 	const animLand3 = [ null, null ];   // the stride phase at which the coded gait puts his first foot down, per side of the mirror (measured once)
 	function animPose3D (r, a, ph, w, idlePh, G) {
 		if (!ANIM3 || w <= 0) { return; }

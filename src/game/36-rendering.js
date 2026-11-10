@@ -877,7 +877,12 @@
 		// curly or a full afro, long or tied back), so nobody's look changes beyond recognition.
 		const base = [ "short", "short", "short", "curly", "long", "buzz", "shaved" ][(h >>> 5) % 7], alt = (h >>> 13) % 2;
 		const style = base === "short" && alt ? "crop" : base === "curly" && alt ? "afro" : base === "long" && alt ? "tied" : base;
-		return { skin: SKIN[h % SKIN.length], hair: HAIR[(h >>> 2) % HAIR.length], shaved: style === "shaved", style, face: (h >>> 9) % 16 };
+		// Hair to go with the skin: the darker tones nearly always black or near it (a bleached blond now and then),
+		// the lighter ones every shade, browns most of all and blond about one in eight.
+		const si = h % SKIN.length, r = ((h >>> 2) ^ (h >>> 19)) % 32;
+		const hair = si >= 3 ? (r < 18 ? HAIR[0] : r < 26 ? HAIR[5] : r < 30 ? HAIR[1] : HAIR[4])
+			: (r < 7 ? HAIR[0] : r < 15 ? HAIR[1] : r < 22 ? HAIR[2] : r < 26 ? HAIR[3] : r < 30 ? HAIR[4] : HAIR[5]);
+		return { skin: SKIN[si], hair, shaved: style === "shaved", style, face: (h >>> 9) % 16 };
 	}
 	function look (p) {
 		if (!p.look) {
