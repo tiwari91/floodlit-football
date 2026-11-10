@@ -812,6 +812,7 @@
 			offside.set.delete(p);
 		}
 		if (offside.team === p.team && offside.set.has(p)) { callOffside(p); return; }
+		p.gotFrom = ball.lastBy && ball.lastBy !== p ? ball.lastBy : null;   // the man he got it from (the assist, if he scores)
 		lastTouch = p.team;
 		offside = { team: -1, set: new Set() };
 		// How it reached him, for his receiving pose: a pass along the ground (1) or in the air (2).

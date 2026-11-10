@@ -79,13 +79,17 @@ async function lineDepth (ln, at) {
 		const F = window.__ff, c = F.players[F.ctrl];
 		F.autoPilot = false; F.setLine(1, ln); F.pressI[1] = ln === "high" ? "high" : ln === "deep" ? "low" : "mid";
 		const x = F.FW * at, pin = () => { c.x = x; c.y = F.FH / 2; c.vx = c.vy = 0; c.kickCd = 5; F.ball.owner = c; F.ball.x = x + 8; F.ball.y = F.FH / 2; F.ball.vx = F.ball.vy = 0; F.possTeam = 0; };
-		let d = 0, n = 0;
-		for (let s = 0; s < 420; s++) {
+		// A man standing still with the ball gets slide-tackled, and a foul puts everyone at a free kick walking back into
+		// place: so no slides, and the line is read only after 60 clean frames (no stoppage, no freeze) have passed.
+		let d = 0, n = 0, clean = 0;
+		for (let s = 0; s < 1500 && n < 120; s++) {
 			F.setLine(1, ln); F.pressI[1] = ln === "high" ? "high" : ln === "deep" ? "low" : "mid";
+			for (const q of F.players) { if (q.team === 1) { q.slideCd = 60; } }
 			pin(); F.step(1);
-			if (s >= 300) { const defs = F.players.filter(p => p.team === 1 && p.role === "def").map(p => (F.FW - p.x) / F.FW).sort((a, b) => a - b); d += defs[Math.floor(defs.length / 2)]; n++; }   // (the median man: the one pressing the ball is not the line)
+			clean = F.setPiece || F.freeze > 0 || F.state !== "play" ? 0 : clean + 1;
+			if (s >= 300 && clean > 60) { const defs = F.players.filter(p => p.team === 1 && p.role === "def").map(p => (F.FW - p.x) / F.FW).sort((a, b) => a - b); d += defs[Math.floor(defs.length / 2)]; n++; }   // (the median man: the one pressing the ball is not the line)
 		}
-		return d / n;
+		return n ? d / n : 9;
 	}, [ ln, at ]);
 	await ctx.close();
 	return r;

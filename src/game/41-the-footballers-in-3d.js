@@ -311,7 +311,9 @@
 	function noseGeo3 () {
 		const surf = y => { const dy = (y - HEAD_C3[1]) / HEAD_R3[1]; return headPoint3(Math.sqrt(Math.max(0, 1 - dy * dy)), dy, 0)[0]; };
 		const ring = (dy, w, df) => { const y = HEAD_C3[1] + dy * HEAD_R3[1], sx = surf(y); return [ y, w, df, 0.25, sx - 0.25 ]; };
-		const g = loft3D([ ring(0.24, 0.16, 0.22), ring(0.14, 0.2, 0.28), ring(0.0, 0.24, 0.4), ring(-0.14, 0.29, 0.54), ring(-0.24, 0.4, 0.62), ring(-0.3, 0.43, 0.54), ring(-0.35, 0.34, 0.34) ], 10, 2.0);
+		// (Sixteen sides and a rounded tip with the underside tucked back in: at ten sides, ending on a flat ring, the
+		// close-up camera saw a block with a hard edge under it.)
+		const g = loft3D([ ring(0.24, 0.16, 0.22), ring(0.14, 0.2, 0.28), ring(0.0, 0.24, 0.4), ring(-0.14, 0.29, 0.54), ring(-0.24, 0.4, 0.62), ring(-0.3, 0.42, 0.58), ring(-0.345, 0.34, 0.42), ring(-0.37, 0.22, 0.2), ring(-0.38, 0.1, 0.06) ], 16, 2.2);
 		return g;
 	}
 	// Hair styles drawn by the hair shader on a copy of the skull surface: [ thickness over the top, at the
@@ -464,6 +466,8 @@
 		// Faces: an atlas of sixteen, each also open-mouthed, painted once (eyes, brows, a nose, a mouth,
 		// facial hair on some), wrapped round the head sphere with the face at the front. Each figure picks its cell
 		// with an instanced attribute; the painted parts are laid over the skin colour, the rest is skin.
+		// (Not painted any larger: a 2048 by 4096 atlas made every Lambert program fail to validate in Chrome, and the
+		// 3D view fell back to 2D.)
 		const fc = document.createElement("canvas"); fc.width = 1024; fc.height = 2048;
 		const fg = fc.getContext && fc.getContext("2d");
 		if (fg) {
@@ -1225,6 +1229,12 @@
 			const w = cel;
 			for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 0.2, w); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, OUT3(i) * 2.4, w); r.sh[i].rotation.y = lerp3(r.sh[i].rotation.y, OUT3(i) * 1.3, w); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 2.0, w); }
 			r.neck.rotation.z = lerp3(r.neck.rotation.z, -0.2, w);
+		} else if (cel > 0 && fall < 0 && ck === 8) {
+			// Arms wide to the fans, soaking it in: both arms out level with the shoulders, palms up, chest out, chin up,
+			// a slow sway from side to side.
+			const w = cel, sway = rm ? 0 : Math.sin(idle * 1.2) * 0.1;
+			for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 0.25 + (i ? -1 : 1) * sway, w); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, OUT3(i) * 1.55, w); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.12, w); r.ha[i].rotation.y = lerp3(r.ha[i].rotation.y, -OUT3(i) * 1.2, w); }
+			r.spine.rotation.z = lerp3(r.spine.rotation.z, 0.16, w); r.neck.rotation.z = lerp3(r.neck.rotation.z, 0.3, w); r.chest.rotation.y += sway * 0.5 * w;
 		} else if (cel > 0 && fall < 0 && ck === 5) {
 			// A brace or a hat-trick: both arms straight up, pointing to the sky, head back.
 			const w = cel, pt = rm ? 0 : Math.sin(idle * 1.5) * 0.06;

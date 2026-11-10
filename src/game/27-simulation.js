@@ -68,6 +68,16 @@
 		return [ dx / d * s, dy / d * s ];
 	}
 
+	// With the ball in his own box, a marker holds the line with his man rather than following him back out: he
+	// stands no further from goal than his back line plus a stride or two (the runner can step offside if he wants
+	// to be deeper). Following runners out had the line hovering round the penalty spot with the ball on the six-yard line.
+	function holdLine (p, target) {
+		if (rel(p.team, ball.x) > FMT.box + 20) { return target; }
+		const cap = teamShapeInfo(p.team).defX + 25 * Math.sqrt(S);
+		if (rel(p.team, target[0]) > cap) { target[0] = p.team === 0 ? cap : FW - cap; }
+		return target;
+	}
+
 	// Nobody reacts on the frame: when the ball is struck, or changes sides, each player carries on as he was for a
 	// moment (a fifth of a second or so, his own) before he turns to the new picture. The kicker's teammates saw it
 	// coming and are first away; the side that has just lost it is a beat slower; a man far from it has less to read.
@@ -577,12 +587,12 @@
 			} else if (marks1.has(p)) {
 				const q = marks1.get(p), qx = q.x + q.vx * 8, qy = q.y + q.vy * 8, gx = FW - qx, gy = FH / 2 - qy, gd = Math.hypot(gx, gy) || 1;
 				const gap = clamp(40 - (A(p, "def") - 65) * 0.6, 22, 55);   // tight, tighter for good markers
-				target = [ qx + gx / gd * gap, qy + gy / gd * gap ];
+				target = holdLine(p, [ qx + gx / gd * gap, qy + gy / gd * gap ]);
 			} else if (marks0.has(p)) {
 				// Stand goal-side of your man, between him and your goal.
 				const q = marks0.get(p), qx = q.x + q.vx * 8, qy = q.y + q.vy * 8, gx = 0 - qx, gy = FH / 2 - qy, gd = Math.hypot(gx, gy) || 1;
 				const gap = clamp(40 - (A(p, "def") - 65) * 0.6, 22, 55);   // tight, tighter for good markers
-				target = [ qx + gx / gd * gap, qy + gy / gd * gap ];
+				target = holdLine(p, [ qx + gx / gd * gap, qy + gy / gd * gap ]);
 			} else {
 				target = spreadTarget(p, formationTarget(p));
 			}
@@ -806,15 +816,16 @@
 					// The other celebrations: a run (arms out like wings for the aeroplane), then he stops
 					// and turns to the camera to pump his fist or kiss the badge in front of the fans.
 					if (C.posedAt < 0) {
+						if (C.style === 9 && C.mate && players.includes(C.mate)) { C.target = [ C.mate.x, C.mate.y ]; }   // to the man who set it up, wherever he has got to
 						[ tx, ty ] = C.target; spd = BASE_SPD * (C.style === 7 ? 1.5 : 1); acc = 0.14;
 						if (C.style === 7 && T === 40 && typeof benchJoin === "function") { benchJoin(sc, p.x); }   // the bench sees him coming and runs to meet him
 						if (C.style === 7 && T > 40 && typeof benchFront === "function") { const f = benchFront(sc); if (f !== null && Math.abs(f - p.x) < 140) { tx = f; ty = FH - 34; } }   // he meets them at the touchline
-						if (Math.hypot(tx - p.x, ty - p.y) < 40 || T > (C.style === 7 ? 300 : 140)) {
+						if (Math.hypot(tx - p.x, ty - p.y) < (C.style === 9 ? 34 : 40) || T > (C.style === 7 ? 300 : C.style === 9 ? 240 : 140)) {
 							C.posedAt = T;
 							if (sc === homeSide || C.style === 7) { roar(0.6); }
 						}
 					}
-					p.celebK = C.posedAt < 0 && C.style !== 2 && C.style !== 6 ? 0 : C.style === 7 ? 5 : C.style;   // at the bench: both arms to the sky   // the aeroplane and the shirt over the head are run, the rest are struck on arrival
+					p.celebK = C.posedAt < 0 && C.style !== 2 && C.style !== 6 ? 0 : C.style === 7 ? 5 : C.style === 9 ? 0 : C.style;   // (9: arms round his mate, below)   // at the bench: both arms to the sky   // the aeroplane and the shirt over the head are run, the rest are struck on arrival
 				} else if (kneeling) {
 					// Sliding on his knees: he carries his pace into the slide and it bleeds away.
 					p.vx *= 0.955; p.vy *= 0.955;
@@ -867,7 +878,8 @@
 				p.dir = turnToward(p.dir, Math.atan2(ey - p.y, ex - p.x), 0.12);
 			}
 			// Team-mates who reach him wrap their arms round him; the rest jump and punch the air.
-			p.hug = clamp((p.hug || 0) + (scored && p !== hero && (p.role !== "gk" || wild) && !home && !muted && dist(p, hero) < (wild ? 48 : 40) ? 0.08 : -0.08), 0, 1);
+			const mateHug = C.style === 9 && C.posedAt >= 0 && !home && (p === hero || p === C.mate) && C.mate && dist(hero, C.mate) < 48;   // the scorer and the man who set it up, in each other's arms
+			p.hug = clamp((p.hug || 0) + (mateHug || (scored && p !== hero && (p.role !== "gk" || wild) && !home && !muted && dist(p, hero) < (wild ? 48 : 40)) ? 0.08 : -0.08), 0, 1);
 			if (home && p === hero) { p.celebK = 0; }
 			const armsUp = muted ? 0 : p === hero ? (home ? 0 : 1) : scored && (p.role !== "gk" || wild) && !home && dist(p, hero) < 60 ? 0.7 : 0;
 			p.celebA = (p.celebA || 0) + (armsUp - (p.celebA || 0)) * 0.08;
@@ -918,16 +930,22 @@
 			const goals = nm ? matchLog.filter(e => e.kind === "goal" && e.team === scorer && (e.text === nm || e.text === `${nm} (header)`)).length : 1;
 			const plan = celebPlan({ minute: shoot || tut ? 0 : minuteNow(), diff: diffB, goals, own: own0, first: firstGoal });
 			let style = plan.style;
+			// The man who set it up: the team-mate he got the ball from, within the last ten seconds.
+			const assister = !own0 && hero.gotFrom && players.includes(hero.gotFrom) && hero.gotFrom !== hero && hero.gotFrom.team === scorer && hero.gotFrom.role !== "gk" && frame - (hero.gotAt || -1e9) < 600 ? hero.gotFrom : null;
 			if (plan.mood === "standard" || plan.mood === "opener") {
-				style = 1 + Math.floor(Math.random() * 4);
-				if (style === lastCelebStyle) { style = style % 4 + 1; }
+				// 1 knee slide, 2 aeroplane, 3 fist pump, 4 badge, 8 arms wide to the fans, 9 straight to the man who set it up.
+				const pool = [ 1, 2, 3, 4, 8 ].concat(assister ? [ 9, 9 ] : []);
+				style = pool[Math.floor(Math.random() * pool.length)];
+				if (style === lastCelebStyle) { style = pool[(pool.indexOf(style) + 1) % pool.length]; }
 				lastCelebStyle = style;
 			}
+			if (window.__ffCelebStyle) { style = window.__ffCelebStyle; }   // tests: a chosen celebration
+			if (style === 9 && !assister) { style = 3; }   // nobody to run to
 			const cx = scorer === 0 ? FW - 70 : 70, cy = hero.y < FH / 2 ? 44 : FH - 44, dx = cx - hero.x, dy = cy - hero.y, L = Math.hypot(dx, dy) || 1, run = Math.min(L, plan.run || (style >= 3 ? 110 : 260));
 			// Now and then (7) he runs to his own bench instead: the subs and the manager come to meet him.
 			let toBench = null;
 			if (plan.mood !== "muted" && !own0 && !shoot && !tut && (window.__ffBenchCeleb || (!window.__ffPlainGoal && Math.random() < (plan.mood === "wild" ? 0.45 : 0.3))) && typeof benchSimX === "function") { style = 7; toBench = [ benchSimX(scorer), FH - 12 ]; }
-			celeb = { t: 0, hero, style, mood: plan.mood, comm: plan.comm, commDone: false, sulk: plan.sulk, mgr: plan.mgr, target: toBench || [ hero.x + dx / L * run, hero.y + dy / L * run ], kneelAt: -1, posedAt: -1, fetched: plan.mood === "muted", rp: goalTimer - GOAL_CELEB };
+			celeb = { t: 0, hero, style, mood: plan.mood, comm: plan.comm, commDone: false, sulk: plan.sulk, mgr: plan.mgr, target: toBench || [ hero.x + dx / L * run, hero.y + dy / L * run ], mate: style === 9 ? assister : null, kneelAt: -1, posedAt: -1, fetched: plan.mood === "muted", rp: goalTimer - GOAL_CELEB };
 			if (toBench) { goalTimer += 150; }   // two seconds more: the run to the bench is a long one
 			varOnGoal(scorer);   // perhaps a VAR check (21a)
 			tlc = null;   // no touchline cutaway over a goal

@@ -44,8 +44,17 @@
 		// tighter still as the ball comes towards our goal.
 		let stretch = inPoss ? { possession: 0.95, balanced: 1.1, direct: 1.25, counter: 1.3 }[st] : { high: 0.9, mid: 0.8, low: 0.7 }[pr];
 		if (!inPoss) { stretch *= clamp(0.6 + bx / FW * 0.6, 0.6, 1); }
-		const midX = clamp(defX + (base.mid - base.def) * stretch, FW * 0.18, FW * 0.85);
+		let midX = clamp(defX + (base.mid - base.def) * stretch, FW * 0.18, FW * 0.85);
 		let fwdX = midX + (base.fwd - base.mid) * stretch;
+		// With the ball in the final third, the side goes up with it: the midfield to the edge of the box and the
+		// forwards into it (the back line a little past halfway). Before this the whole shape stood a third of the
+		// pitch behind the carrier, so a man in the box had nobody to pick out and their defence never had to drop.
+		if (inPoss) {
+			const deep = clamp((bx - FW * 0.62) / (FW * 0.25), 0, 1), edge = Math.min(bx - 30 * S, FW - FMT.box - 12 * S);
+			midX += (Math.max(midX, edge) - midX) * deep;
+			fwdX += (Math.max(fwdX, midX + 70 * S) - fwdX) * deep;
+			defX += (Math.max(defX, FW * 0.58) - defX) * deep * 0.6;
+		}
 		if (inPoss && offsideOn()) { fwdX = Math.min(fwdX, offsideLine(t) - 25 * S); }   // the front line plays on the shoulder
 		fwdX = clamp(fwdX, FW * 0.3, FW - 80 * S);
 		// Across the pitch the side slides towards the ball as one, and narrows without it.

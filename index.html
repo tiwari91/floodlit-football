@@ -11239,8 +11239,17 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 		// tighter still as the ball comes towards our goal.
 		let stretch = inPoss ? { possession: 0.95, balanced: 1.1, direct: 1.25, counter: 1.3 }[st] : { high: 0.9, mid: 0.8, low: 0.7 }[pr];
 		if (!inPoss) { stretch *= clamp(0.6 + bx / FW * 0.6, 0.6, 1); }
-		const midX = clamp(defX + (base.mid - base.def) * stretch, FW * 0.18, FW * 0.85);
+		let midX = clamp(defX + (base.mid - base.def) * stretch, FW * 0.18, FW * 0.85);
 		let fwdX = midX + (base.fwd - base.mid) * stretch;
+		// With the ball in the final third, the side goes up with it: the midfield to the edge of the box and the
+		// forwards into it (the back line a little past halfway). Before this the whole shape stood a third of the
+		// pitch behind the carrier, so a man in the box had nobody to pick out and their defence never had to drop.
+		if (inPoss) {
+			const deep = clamp((bx - FW * 0.62) / (FW * 0.25), 0, 1), edge = Math.min(bx - 30 * S, FW - FMT.box - 12 * S);
+			midX += (Math.max(midX, edge) - midX) * deep;
+			fwdX += (Math.max(fwdX, midX + 70 * S) - fwdX) * deep;
+			defX += (Math.max(defX, FW * 0.58) - defX) * deep * 0.6;
+		}
 		if (inPoss && offsideOn()) { fwdX = Math.min(fwdX, offsideLine(t) - 25 * S); }   // the front line plays on the shoulder
 		fwdX = clamp(fwdX, FW * 0.3, FW - 80 * S);
 		// Across the pitch the side slides towards the ball as one, and narrows without it.
@@ -11925,6 +11934,16 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 		return [ dx / d * s, dy / d * s ];
 	}
 
+	// With the ball in his own box, a marker holds the line with his man rather than following him back out: he
+	// stands no further from goal than his back line plus a stride or two (the runner can step offside if he wants
+	// to be deeper). Following runners out had the line hovering round the penalty spot with the ball on the six-yard line.
+	function holdLine (p, target) {
+		if (rel(p.team, ball.x) > FMT.box + 20) { return target; }
+		const cap = teamShapeInfo(p.team).defX + 25 * Math.sqrt(S);
+		if (rel(p.team, target[0]) > cap) { target[0] = p.team === 0 ? cap : FW - cap; }
+		return target;
+	}
+
 	// Nobody reacts on the frame: when the ball is struck, or changes sides, each player carries on as he was for a
 	// moment (a fifth of a second or so, his own) before he turns to the new picture. The kicker's teammates saw it
 	// coming and are first away; the side that has just lost it is a beat slower; a man far from it has less to read.
@@ -12434,12 +12453,12 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 			} else if (marks1.has(p)) {
 				const q = marks1.get(p), qx = q.x + q.vx * 8, qy = q.y + q.vy * 8, gx = FW - qx, gy = FH / 2 - qy, gd = Math.hypot(gx, gy) || 1;
 				const gap = clamp(40 - (A(p, "def") - 65) * 0.6, 22, 55);   // tight, tighter for good markers
-				target = [ qx + gx / gd * gap, qy + gy / gd * gap ];
+				target = holdLine(p, [ qx + gx / gd * gap, qy + gy / gd * gap ]);
 			} else if (marks0.has(p)) {
 				// Stand goal-side of your man, between him and your goal.
 				const q = marks0.get(p), qx = q.x + q.vx * 8, qy = q.y + q.vy * 8, gx = 0 - qx, gy = FH / 2 - qy, gd = Math.hypot(gx, gy) || 1;
 				const gap = clamp(40 - (A(p, "def") - 65) * 0.6, 22, 55);   // tight, tighter for good markers
-				target = [ qx + gx / gd * gap, qy + gy / gd * gap ];
+				target = holdLine(p, [ qx + gx / gd * gap, qy + gy / gd * gap ]);
 			} else {
 				target = spreadTarget(p, formationTarget(p));
 			}
@@ -12663,15 +12682,16 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 					// The other celebrations: a run (arms out like wings for the aeroplane), then he stops
 					// and turns to the camera to pump his fist or kiss the badge in front of the fans.
 					if (C.posedAt < 0) {
+						if (C.style === 9 && C.mate && players.includes(C.mate)) { C.target = [ C.mate.x, C.mate.y ]; }   // to the man who set it up, wherever he has got to
 						[ tx, ty ] = C.target; spd = BASE_SPD * (C.style === 7 ? 1.5 : 1); acc = 0.14;
 						if (C.style === 7 && T === 40 && typeof benchJoin === "function") { benchJoin(sc, p.x); }   // the bench sees him coming and runs to meet him
 						if (C.style === 7 && T > 40 && typeof benchFront === "function") { const f = benchFront(sc); if (f !== null && Math.abs(f - p.x) < 140) { tx = f; ty = FH - 34; } }   // he meets them at the touchline
-						if (Math.hypot(tx - p.x, ty - p.y) < 40 || T > (C.style === 7 ? 300 : 140)) {
+						if (Math.hypot(tx - p.x, ty - p.y) < (C.style === 9 ? 34 : 40) || T > (C.style === 7 ? 300 : C.style === 9 ? 240 : 140)) {
 							C.posedAt = T;
 							if (sc === homeSide || C.style === 7) { roar(0.6); }
 						}
 					}
-					p.celebK = C.posedAt < 0 && C.style !== 2 && C.style !== 6 ? 0 : C.style === 7 ? 5 : C.style;   // at the bench: both arms to the sky   // the aeroplane and the shirt over the head are run, the rest are struck on arrival
+					p.celebK = C.posedAt < 0 && C.style !== 2 && C.style !== 6 ? 0 : C.style === 7 ? 5 : C.style === 9 ? 0 : C.style;   // (9: arms round his mate, below)   // at the bench: both arms to the sky   // the aeroplane and the shirt over the head are run, the rest are struck on arrival
 				} else if (kneeling) {
 					// Sliding on his knees: he carries his pace into the slide and it bleeds away.
 					p.vx *= 0.955; p.vy *= 0.955;
@@ -12724,7 +12744,8 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 				p.dir = turnToward(p.dir, Math.atan2(ey - p.y, ex - p.x), 0.12);
 			}
 			// Team-mates who reach him wrap their arms round him; the rest jump and punch the air.
-			p.hug = clamp((p.hug || 0) + (scored && p !== hero && (p.role !== "gk" || wild) && !home && !muted && dist(p, hero) < (wild ? 48 : 40) ? 0.08 : -0.08), 0, 1);
+			const mateHug = C.style === 9 && C.posedAt >= 0 && !home && (p === hero || p === C.mate) && C.mate && dist(hero, C.mate) < 48;   // the scorer and the man who set it up, in each other's arms
+			p.hug = clamp((p.hug || 0) + (mateHug || (scored && p !== hero && (p.role !== "gk" || wild) && !home && !muted && dist(p, hero) < (wild ? 48 : 40)) ? 0.08 : -0.08), 0, 1);
 			if (home && p === hero) { p.celebK = 0; }
 			const armsUp = muted ? 0 : p === hero ? (home ? 0 : 1) : scored && (p.role !== "gk" || wild) && !home && dist(p, hero) < 60 ? 0.7 : 0;
 			p.celebA = (p.celebA || 0) + (armsUp - (p.celebA || 0)) * 0.08;
@@ -12775,16 +12796,22 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 			const goals = nm ? matchLog.filter(e => e.kind === "goal" && e.team === scorer && (e.text === nm || e.text === `${nm} (header)`)).length : 1;
 			const plan = celebPlan({ minute: shoot || tut ? 0 : minuteNow(), diff: diffB, goals, own: own0, first: firstGoal });
 			let style = plan.style;
+			// The man who set it up: the team-mate he got the ball from, within the last ten seconds.
+			const assister = !own0 && hero.gotFrom && players.includes(hero.gotFrom) && hero.gotFrom !== hero && hero.gotFrom.team === scorer && hero.gotFrom.role !== "gk" && frame - (hero.gotAt || -1e9) < 600 ? hero.gotFrom : null;
 			if (plan.mood === "standard" || plan.mood === "opener") {
-				style = 1 + Math.floor(Math.random() * 4);
-				if (style === lastCelebStyle) { style = style % 4 + 1; }
+				// 1 knee slide, 2 aeroplane, 3 fist pump, 4 badge, 8 arms wide to the fans, 9 straight to the man who set it up.
+				const pool = [ 1, 2, 3, 4, 8 ].concat(assister ? [ 9, 9 ] : []);
+				style = pool[Math.floor(Math.random() * pool.length)];
+				if (style === lastCelebStyle) { style = pool[(pool.indexOf(style) + 1) % pool.length]; }
 				lastCelebStyle = style;
 			}
+			if (window.__ffCelebStyle) { style = window.__ffCelebStyle; }   // tests: a chosen celebration
+			if (style === 9 && !assister) { style = 3; }   // nobody to run to
 			const cx = scorer === 0 ? FW - 70 : 70, cy = hero.y < FH / 2 ? 44 : FH - 44, dx = cx - hero.x, dy = cy - hero.y, L = Math.hypot(dx, dy) || 1, run = Math.min(L, plan.run || (style >= 3 ? 110 : 260));
 			// Now and then (7) he runs to his own bench instead: the subs and the manager come to meet him.
 			let toBench = null;
 			if (plan.mood !== "muted" && !own0 && !shoot && !tut && (window.__ffBenchCeleb || (!window.__ffPlainGoal && Math.random() < (plan.mood === "wild" ? 0.45 : 0.3))) && typeof benchSimX === "function") { style = 7; toBench = [ benchSimX(scorer), FH - 12 ]; }
-			celeb = { t: 0, hero, style, mood: plan.mood, comm: plan.comm, commDone: false, sulk: plan.sulk, mgr: plan.mgr, target: toBench || [ hero.x + dx / L * run, hero.y + dy / L * run ], kneelAt: -1, posedAt: -1, fetched: plan.mood === "muted", rp: goalTimer - GOAL_CELEB };
+			celeb = { t: 0, hero, style, mood: plan.mood, comm: plan.comm, commDone: false, sulk: plan.sulk, mgr: plan.mgr, target: toBench || [ hero.x + dx / L * run, hero.y + dy / L * run ], mate: style === 9 ? assister : null, kneelAt: -1, posedAt: -1, fetched: plan.mood === "muted", rp: goalTimer - GOAL_CELEB };
 			if (toBench) { goalTimer += 150; }   // two seconds more: the run to the bench is a long one
 			varOnGoal(scorer);   // perhaps a VAR check (21a)
 			tlc = null;   // no touchline cutaway over a goal
@@ -14065,6 +14092,7 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 			offside.set.delete(p);
 		}
 		if (offside.team === p.team && offside.set.has(p)) { callOffside(p); return; }
+		p.gotFrom = ball.lastBy && ball.lastBy !== p ? ball.lastBy : null;   // the man he got it from (the assist, if he scores)
 		lastTouch = p.team;
 		offside = { team: -1, set: new Set() };
 		// How it reached him, for his receiving pose: a pass along the ground (1) or in the air (2).
@@ -20035,7 +20063,9 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 	function noseGeo3 () {
 		const surf = y => { const dy = (y - HEAD_C3[1]) / HEAD_R3[1]; return headPoint3(Math.sqrt(Math.max(0, 1 - dy * dy)), dy, 0)[0]; };
 		const ring = (dy, w, df) => { const y = HEAD_C3[1] + dy * HEAD_R3[1], sx = surf(y); return [ y, w, df, 0.25, sx - 0.25 ]; };
-		const g = loft3D([ ring(0.24, 0.16, 0.22), ring(0.14, 0.2, 0.28), ring(0.0, 0.24, 0.4), ring(-0.14, 0.29, 0.54), ring(-0.24, 0.4, 0.62), ring(-0.3, 0.43, 0.54), ring(-0.35, 0.34, 0.34) ], 10, 2.0);
+		// (Sixteen sides and a rounded tip with the underside tucked back in: at ten sides, ending on a flat ring, the
+		// close-up camera saw a block with a hard edge under it.)
+		const g = loft3D([ ring(0.24, 0.16, 0.22), ring(0.14, 0.2, 0.28), ring(0.0, 0.24, 0.4), ring(-0.14, 0.29, 0.54), ring(-0.24, 0.4, 0.62), ring(-0.3, 0.42, 0.58), ring(-0.345, 0.34, 0.42), ring(-0.37, 0.22, 0.2), ring(-0.38, 0.1, 0.06) ], 16, 2.2);
 		return g;
 	}
 	// Hair styles drawn by the hair shader on a copy of the skull surface: [ thickness over the top, at the
@@ -20188,6 +20218,8 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 		// Faces: an atlas of sixteen, each also open-mouthed, painted once (eyes, brows, a nose, a mouth,
 		// facial hair on some), wrapped round the head sphere with the face at the front. Each figure picks its cell
 		// with an instanced attribute; the painted parts are laid over the skin colour, the rest is skin.
+		// (Not painted any larger: a 2048 by 4096 atlas made every Lambert program fail to validate in Chrome, and the
+		// 3D view fell back to 2D.)
 		const fc = document.createElement("canvas"); fc.width = 1024; fc.height = 2048;
 		const fg = fc.getContext && fc.getContext("2d");
 		if (fg) {
@@ -20949,6 +20981,12 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 			const w = cel;
 			for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 0.2, w); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, OUT3(i) * 2.4, w); r.sh[i].rotation.y = lerp3(r.sh[i].rotation.y, OUT3(i) * 1.3, w); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 2.0, w); }
 			r.neck.rotation.z = lerp3(r.neck.rotation.z, -0.2, w);
+		} else if (cel > 0 && fall < 0 && ck === 8) {
+			// Arms wide to the fans, soaking it in: both arms out level with the shoulders, palms up, chest out, chin up,
+			// a slow sway from side to side.
+			const w = cel, sway = rm ? 0 : Math.sin(idle * 1.2) * 0.1;
+			for (let i = 0; i < 2; i++) { r.sh[i].rotation.z = lerp3(r.sh[i].rotation.z, 0.25 + (i ? -1 : 1) * sway, w); r.sh[i].rotation.x = lerp3(r.sh[i].rotation.x, OUT3(i) * 1.55, w); r.el[i].rotation.z = lerp3(r.el[i].rotation.z, 0.12, w); r.ha[i].rotation.y = lerp3(r.ha[i].rotation.y, -OUT3(i) * 1.2, w); }
+			r.spine.rotation.z = lerp3(r.spine.rotation.z, 0.16, w); r.neck.rotation.z = lerp3(r.neck.rotation.z, 0.3, w); r.chest.rotation.y += sway * 0.5 * w;
 		} else if (cel > 0 && fall < 0 && ck === 5) {
 			// A brace or a hat-trick: both arms straight up, pointing to the sky, head back.
 			const w = cel, pt = rm ? 0 : Math.sin(idle * 1.5) * 0.06;
