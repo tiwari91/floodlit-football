@@ -12391,7 +12391,10 @@ button.fp-club:not(:disabled):hover { border-color: var(--amber); background-col
 			}
 
 			// Still taking it in (see readThePlay): he carries on as he was, easing off a touch, his eyes going to the ball.
-			if (frame < (p.reactAt || 0) && !setPiece && p.role !== "gk" && ball.owner !== p && p !== receiver && p !== ball.intended && !airMen.has(p) && !(cornerPlan && cornerPlan.role.has(p))) {
+			// (Except, on the side with the ball, a forward or anyone near their line: he never stops watching it, and
+			// carrying on past it had him caught offside half as often again.)
+			if (frame < (p.reactAt || 0) && !setPiece && p.role !== "gk" && ball.owner !== p && p !== receiver && p !== ball.intended && !airMen.has(p) && !(cornerPlan && cornerPlan.role.has(p))
+				&& !(offsideOn() && (ball.owner ? ball.owner.team : lastTouch) === p.team && (p.role === "fwd" || rel(p.team, p.x) > offsideLine(p.team) - 80))) {
 				movePlayer(p, p.vx * 0.97, p.vy * 0.97);
 				p.dir = turnToward(p.dir, Math.atan2(ball.y - p.y, ball.x - p.x), 0.06);
 				continue;
