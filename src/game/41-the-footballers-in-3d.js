@@ -1371,11 +1371,17 @@
 				const m = new T.SkinnedMesh(g, mat);
 				m.bindMode = T.DetachedBindMode; m.bind(new T.Skeleton(bones), new T.Matrix4());
 				m.frustumCulled = false; m.castShadow = true; m.visible = false; m.matrixAutoUpdate = false;
+				// Given here, not worked out: the renderer sorts by each mesh's bounding sphere, and working one out for a
+				// skinned mesh runs every vertex through its bones (53 figures: about 20 ms on the first frame of the match).
+				m.boundingSphere = new T.Sphere(new T.Vector3(0, 14, 0), 40);
 				resetRig3D(r);
 				r.body = m; r.bodyReg = reg; r.bodyKey = "";
 				G3.scene.add(m);
 			}
 			G3.fig.body = true;
+			// The shaders for the body (and anything else not yet drawn) are built now, in the background, rather than
+			// on the first frame of the match.
+			if (G3.renderer && G3.renderer.compileAsync && G3.cam) { G3.renderer.compileAsync(G3.scene, G3.cam).catch(() => { /* drawn as before */ }); }
 			// The number, the name and the chest print were curved onto the old shirt: lay them on the new one,
 			// just proud of the shirt's surface (its back, or its front) at each point, in the spine's frame.
 			const shirt = [];
